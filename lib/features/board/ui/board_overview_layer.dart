@@ -96,6 +96,10 @@ class BoardOverviewLayerState extends State<BoardOverviewLayer>
   }
 
   Future<void> _selectBoard(String boardId) async {
+    widget.debugLog(
+      'select.attempt board=$boardId closing=$_closing '
+      'active=${widget.activeBoardId}',
+    );
     if (_closing) return;
     final boards = _orderedBoards;
     final watch = Stopwatch()..start();

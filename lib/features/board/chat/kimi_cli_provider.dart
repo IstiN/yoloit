@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
 import 'package:yoloit/features/board/chat/cli_guidance_service.dart';
 import 'package:yoloit/features/board/chat/cli_provider_base.dart';
@@ -8,11 +10,26 @@ import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/settings/data/agent_config_service.dart';
 import 'package:yoloit/features/settings/data/provider_model_catalog_service.dart';
 
+/// Per-session mutable state so that rapid successive messages do not
+/// overwrite each other's data.
+class _KimiSessionState {
+  final Map<String, String> toolCallNames = {};
+  bool wireJsonlAvailable = false;
+  String? currentTurnId;
+  String lastWirePartType = '';
+}
+
 /// [ChatProvider] implementation that wraps the Kimi CLI.
+///
+/// Uses `stream-json` for structured fallback events (tool calls, session IDs)
+/// and watches the internal `wire.jsonl` log file for real-time thinking
+/// and streaming text content.
 class KimiCliProvider extends CliProviderBase {
   KimiCliProvider({super.agentId = 'kimi', super.processStarter});
 
-  final Map<String, String> _toolCallNames = {};
+  final Map<String, _KimiSessionState> _sessionStates = {};
+  final Map<String, Process> _currentProcesses = {};
+  final Map<String, Future<void>> _wireWatcherFutures = {};
 
   @override
   String get debugPrefix => '[KimiCli]';
@@ -31,8 +48,14 @@ class KimiCliProvider extends CliProviderBase {
 
   @override
   void dispose() {
-    _toolCallNames.clear();
+    _sessionStates.clear();
+    _currentProcesses.clear();
+    _wireWatcherFutures.clear();
     super.dispose();
+  }
+
+  _KimiSessionState _state(String sessionName) {
+    return _sessionStates.putIfAbsent(sessionName, _KimiSessionState.new);
   }
 
   @override
@@ -84,24 +107,420 @@ class KimiCliProvider extends CliProviderBase {
   }
 
   @override
+  void onProcessStarted(
+    Process process,
+    String sessionName,
+    StreamController<ChatEvent> controller,
+  ) {
+    final state = _state(sessionName);
+    state.currentTurnId = null;
+    state.wireJsonlAvailable = false;
+    state.lastWirePartType = '';
+    state.toolCallNames.clear();
+
+    _currentProcesses[sessionName] = process;
+
+    // Start watching wire.jsonl for real-time thinking and streaming.
+    _wireWatcherFutures[sessionName] = _startWireJsonlWatcher(
+      process,
+      sessionName,
+      controller,
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // wire.jsonl watcher
+  // ---------------------------------------------------------------------------
+
+  Future<void> _startWireJsonlWatcher(
+    Process process,
+    String sessionName,
+    StreamController<ChatEvent> controller,
+  ) async {
+    // Wait for wire.jsonl to be created.
+    await Future<void>.delayed(const Duration(milliseconds: 1000));
+
+    final startTime = DateTime.now().subtract(const Duration(seconds: 2));
+    final wirePath = await _findWireJsonl(startTime);
+
+    if (wirePath == null) {
+      debugPrint(
+        '$debugPrefix [$sessionName] wire.jsonl not found, '
+        'using stream-json fallback',
+      );
+      return;
+    }
+
+    debugPrint('$debugPrefix [$sessionName] Found wire.jsonl: $wirePath');
+    _state(sessionName).wireJsonlAvailable = true;
+
+    final file = File(wirePath);
+    var lastSize = 0;
+
+    while (!controller.isClosed &&
+        _currentProcesses[sessionName] == process) {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+
+      if (!await file.exists()) continue;
+
+      final stat = await file.stat();
+      if (stat.size <= lastSize) continue;
+
+      try {
+        final raf = await file.open(mode: FileMode.read);
+        await raf.setPosition(lastSize);
+        final bytes = await raf.read(stat.size - lastSize);
+        await raf.close();
+        lastSize = stat.size;
+
+        final text = utf8.decode(bytes);
+        for (final line in const LineSplitter().convert(text)) {
+          if (line.trim().isEmpty) continue;
+          try {
+            final events = _parseWireJsonlLine(
+              line,
+              startTime,
+              sessionName,
+            );
+            for (final event in events) {
+              if (!controller.isClosed) {
+                controller.add(event);
+              }
+            }
+          } catch (e) {
+            debugPrint(
+              '$debugPrefix [$sessionName] wire.jsonl parse error: $e',
+            );
+          }
+        }
+      } catch (e) {
+        debugPrint(
+          '$debugPrefix [$sessionName] wire.jsonl read error: $e',
+        );
+      }
+    }
+
+    // Flush any remaining bytes after the loop exits.
+    await _flushRemainingWireJsonl(
+      wirePath,
+      lastSize,
+      startTime,
+      sessionName,
+      controller,
+    );
+  }
+
+  Future<void> _flushRemainingWireJsonl(
+    String wirePath,
+    int lastSize,
+    DateTime startTime,
+    String sessionName,
+    StreamController<ChatEvent> controller,
+  ) async {
+    final file = File(wirePath);
+    if (!await file.exists()) return;
+
+    // Give the file a moment to finish writing.
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+
+    final stat = await file.stat();
+    if (stat.size <= lastSize) return;
+
+    try {
+      final raf = await file.open(mode: FileMode.read);
+      await raf.setPosition(lastSize);
+      final bytes = await raf.read(stat.size - lastSize);
+      await raf.close();
+
+      final text = utf8.decode(bytes);
+      for (final line in const LineSplitter().convert(text)) {
+        if (line.trim().isEmpty) continue;
+        try {
+          final events = _parseWireJsonlLine(
+            line,
+            startTime,
+            sessionName,
+          );
+          for (final event in events) {
+            if (!controller.isClosed) {
+              controller.add(event);
+            }
+          }
+        } catch (e) {
+          debugPrint(
+            '$debugPrefix [$sessionName] wire.jsonl flush parse error: $e',
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint(
+        '$debugPrefix [$sessionName] wire.jsonl flush error: $e',
+      );
+    }
+  }
+
+  Future<String?> _findWireJsonl(DateTime after) async {
+    final home = Platform.environment['HOME'] ?? '';
+    if (home.isEmpty) return null;
+
+    // Retry up to 15 times (3s total) – wire.jsonl may not exist immediately.
+    for (var attempt = 0; attempt < 15; attempt++) {
+      final result = await Process.run(
+        'find',
+        ['$home/.kimi-code/sessions', '-name', 'wire.jsonl'],
+      );
+
+      final paths =
+          (result.stdout as String)
+              .trim()
+              .split('\n')
+              .where((p) => p.isNotEmpty)
+              .toList();
+
+      File? newestFile;
+      DateTime? newestTime;
+      for (final path in paths) {
+        final file = File(path);
+        if (!await file.exists()) continue;
+        final stat = await file.stat();
+        if (stat.modified.isBefore(after)) continue;
+        if (newestTime == null || stat.modified.isAfter(newestTime)) {
+          newestTime = stat.modified;
+          newestFile = file;
+        }
+      }
+
+      if (newestFile != null) {
+        debugPrint(
+          '$debugPrefix wire.jsonl found after ${attempt + 1} '
+          'attempt(s): ${newestFile.path}',
+        );
+        return newestFile.path;
+      }
+
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    }
+
+    debugPrint('$debugPrefix wire.jsonl not found after 15 attempts');
+    return null;
+  }
+
+  List<ChatEvent> _parseWireJsonlLine(
+    String line,
+    DateTime startTime,
+    String sessionName,
+  ) {
+    final json = jsonDecode(line) as Map<String, dynamic>;
+    final type = json['type'] as String?;
+
+    if (type != 'context.append_loop_event') return const [];
+
+    final event = json['event'] as Map<String, dynamic>?;
+    if (event == null) return const [];
+
+    final time = json['time'] as int?;
+    if (time != null) {
+      final eventTime = DateTime.fromMillisecondsSinceEpoch(time);
+      if (eventTime.isBefore(startTime)) return const [];
+    }
+
+    final eventType = event['type'] as String?;
+    final turnId = event['turnId'] as String?;
+    final state = _state(sessionName);
+
+    // Track current turn from the first step.begin we see.
+    if (eventType == 'step.begin' && turnId != null) {
+      if (state.currentTurnId == null) {
+        state.currentTurnId = turnId;
+        debugPrint(
+          '$debugPrefix [$sessionName] Wire turnId: $turnId',
+        );
+      }
+    }
+
+    // Only process events from current turn.
+    if (turnId != null && turnId != state.currentTurnId) return const [];
+
+    switch (eventType) {
+      case 'step.begin':
+        return [
+          ChatEvent(
+            type: ChatEventType.assistantMessageStart,
+            rawType: 'kimi.wire.step_begin',
+            id: 'kimi-step-${event['uuid']}',
+            data: {'messageId': 'kimi-step-${event['uuid']}'},
+          ),
+        ];
+
+      case 'content.part':
+        final part = event['part'] as Map<String, dynamic>?;
+        if (part == null) return const [];
+        final partType = part['type'] as String?;
+
+        if (partType == 'think') {
+          final think = part['think'] as String? ?? '';
+          if (think.isEmpty) return const [];
+
+          final delta = state.lastWirePartType != 'think'
+              ? '> $think\n'
+              : '$think\n';
+          state.lastWirePartType = 'think';
+          debugPrint(
+            '$debugPrefix [$sessionName] Wire think '
+            '[${state.currentTurnId ?? "?"}]: '
+            '${think.substring(0, think.length.clamp(0, 60))}...',
+          );
+
+          return [
+            ChatEvent(
+              type: ChatEventType.assistantDelta,
+              rawType: 'kimi.wire.think',
+              id: 'kimi-think-${event['uuid']}',
+              data: {'deltaContent': delta},
+            ),
+          ];
+        } else if (partType == 'text') {
+          final text = part['text'] as String? ?? '';
+          if (text.isEmpty) return const [];
+
+          final delta = state.lastWirePartType == 'think'
+              ? '\n$text'
+              : text;
+          state.lastWirePartType = 'text';
+          debugPrint(
+            '$debugPrefix [$sessionName] Wire text '
+            '[${state.currentTurnId ?? "?"}]: '
+            '${text.substring(0, text.length.clamp(0, 60))}...',
+          );
+
+          return [
+            ChatEvent(
+              type: ChatEventType.assistantDelta,
+              rawType: 'kimi.wire.text',
+              id: 'kimi-text-${event['uuid']}',
+              data: {'deltaContent': delta},
+            ),
+          ];
+        }
+        return const [];
+
+      case 'tool.call':
+        final toolCallId = event['toolCallId'] as String? ?? '';
+        final name = event['name'] as String? ?? '';
+        final args = event['args'] as Map<String, dynamic>? ?? {};
+        if (toolCallId.isNotEmpty && name.isNotEmpty) {
+          state.toolCallNames[toolCallId] = name;
+        }
+        return [
+          ChatEvent(
+            type: ChatEventType.toolStart,
+            rawType: 'kimi.wire.tool_call',
+            id: toolCallId,
+            data: {
+              'toolCallId': toolCallId,
+              'toolName': name,
+              'arguments': args,
+            },
+          ),
+        ];
+
+      case 'tool.result':
+        final toolCallId = event['toolCallId'] as String? ?? '';
+        final result = event['result'] as Map<String, dynamic>?;
+        final output = result?['output'] as String? ?? '';
+        final resolvedToolName = state.toolCallNames[toolCallId] ?? '';
+        return [
+          ChatEvent(
+            type: ChatEventType.toolComplete,
+            rawType: 'kimi.wire.tool_result',
+            id: toolCallId,
+            data: {
+              'toolCallId': toolCallId,
+              'toolName': resolvedToolName,
+              'success': true,
+              'result': {'content': output},
+            },
+          ),
+        ];
+
+      case 'step.end':
+        state.lastWirePartType = '';
+        return [
+          ChatEvent(
+            type: ChatEventType.assistantMessage,
+            rawType: 'kimi.wire.step_end',
+            id: 'kimi-end-${event['uuid']}',
+            data: {
+              'messageId': 'kimi-end-${event['uuid']}',
+              // Intentionally omit 'content' so that consumers fall back to
+              // their accumulated _streamingContent via ??
+            },
+          ),
+        ];
+
+      default:
+        return const [];
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // stream-json fallback
+  // ---------------------------------------------------------------------------
+
+  @override
   List<ChatEvent> parseLine(String line, String sessionName) {
+    debugPrint('$debugPrefix [$sessionName] stream-json: $line');
+
     final json = jsonDecode(line) as Map<String, dynamic>;
     final role = json['role'] as String?;
+    final state = _state(sessionName);
 
-    // Assistant message (may contain tool_calls).
+    // When wire.jsonl is available, skip assistant/tool events from
+    // stream-json to avoid duplication. Only process meta/session events.
+    if (state.wireJsonlAvailable) {
+      if (role == 'assistant') {
+        // Still extract tool_calls as a safety net.
+        final toolCalls = _extractToolCalls(json['tool_calls']);
+        final events = <ChatEvent>[];
+        for (final tc in toolCalls) {
+          final tcId = tc['toolCallId'] as String? ?? '';
+          final tcName = tc['name'] as String? ?? '';
+          if (tcId.isNotEmpty && tcName.isNotEmpty) {
+            state.toolCallNames[tcId] = tcName;
+          }
+          events.add(
+            ChatEvent(
+              type: ChatEventType.toolStart,
+              rawType: 'kimi.tool_call.start',
+              id: tcId,
+              data: {
+                'toolCallId': tcId,
+                'toolName': tcName,
+                'arguments': tc['arguments'],
+              },
+            ),
+          );
+        }
+        return events;
+      }
+
+      if (role == 'tool') {
+        return const [];
+      }
+    }
+
+    // Fallback: full stream-json parsing when wire.jsonl is not available.
     if (role == 'assistant') {
       final content = _extractText(json['content']);
       final toolCalls = _extractToolCalls(json['tool_calls']);
       final id = 'kimi-${DateTime.now().microsecondsSinceEpoch}';
       final events = <ChatEvent>[];
 
-      // Emit toolStart for each requested tool call so the UI shows a
-      // running card before the tool result arrives.
       for (final tc in toolCalls) {
         final tcId = tc['toolCallId'] as String? ?? '';
         final tcName = tc['name'] as String? ?? '';
         if (tcId.isNotEmpty && tcName.isNotEmpty) {
-          _toolCallNames[tcId] = tcName;
+          state.toolCallNames[tcId] = tcName;
         }
         events.add(
           ChatEvent(
@@ -132,12 +551,11 @@ class KimiCliProvider extends CliProviderBase {
       return events;
     }
 
-    // Tool result message.
     if (role == 'tool') {
       final content = _extractText(json['content']);
       final toolCallId = json['tool_call_id'] as String? ?? '';
       final isError = content.contains('<system>ERROR:');
-      final resolvedToolName = _toolCallNames[toolCallId] ?? '';
+      final resolvedToolName = state.toolCallNames[toolCallId] ?? '';
       return [
         ChatEvent(
           type: ChatEventType.toolComplete,
@@ -194,6 +612,45 @@ class KimiCliProvider extends CliProviderBase {
 
     return const [];
   }
+
+  // ---------------------------------------------------------------------------
+  // Hooks
+  // ---------------------------------------------------------------------------
+
+  @override
+  void onProcessExited(
+    int exitCode,
+    String stderr,
+    String sessionName,
+    StreamController<ChatEvent> controller,
+  ) {
+    _currentProcesses.remove(sessionName);
+  }
+
+  @override
+  Future<void> onBeforeControllerClose(String sessionName) async {
+    final future = _wireWatcherFutures.remove(sessionName);
+    if (future != null) {
+      debugPrint(
+        '$debugPrefix [$sessionName] Waiting for wire.jsonl watcher...',
+      );
+      await future.timeout(
+        const Duration(seconds: 3),
+        onTimeout: () {
+          debugPrint(
+            '$debugPrefix [$sessionName] wire.jsonl watcher timed out',
+          );
+        },
+      );
+      debugPrint(
+        '$debugPrefix [$sessionName] wire.jsonl watcher done',
+      );
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Helpers
+  // ---------------------------------------------------------------------------
 
   /// Extracts plain text from Kimi message content.
   /// Content may be a single string or a list of content parts.

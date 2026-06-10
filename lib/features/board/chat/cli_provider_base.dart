@@ -138,6 +138,13 @@ abstract class CliProviderBase extends ChatProvider {
     StreamController<ChatEvent> controller,
   ) {}
 
+  /// Called right before the stream controller is closed.
+  ///
+  /// Subclasses can override this to wait for any pending background
+  /// work (e.g. log-file watchers) to finish before the event stream
+  /// is sealed.
+  Future<void> onBeforeControllerClose(String sessionName) async {}
+
   /// Subclass hook for environment-variable overrides.
   ///
   /// The returned map is merged on top of the base environment (which already
@@ -249,6 +256,20 @@ abstract class CliProviderBase extends ChatProvider {
     }());
     assert(() { debugPrint('$debugPrefix cwd: $workingDir'); return true; }());
 
+    // Debug log file for CLI output (always available for user to copy).
+    final logFileName =
+        'yoloit_cli_${agentId}_${DateTime.now().millisecondsSinceEpoch}.log';
+    final logFile = File('/tmp/$logFileName');
+    IOSink? logSink;
+    try {
+      logSink = logFile.openWrite();
+      logSink.writeln('Command: $executable ${args.join(' ')}');
+      logSink.writeln('Cwd: $workingDir');
+      logSink.writeln('---');
+    } catch (_) {
+      logSink = null;
+    }
+
     // 4. Start process.
     try {
       final extraEnv = await GlobalEnvGroupsService.instance
@@ -289,6 +310,7 @@ abstract class CliProviderBase extends ChatProvider {
           .transform(utf8.decoder)
           .listen(
             (chunk) {
+              logSink?.write(chunk);
               buffer.write(chunk);
               final lines = buffer.toString().split('\n');
               buffer.clear();
@@ -313,6 +335,7 @@ abstract class CliProviderBase extends ChatProvider {
           .transform(utf8.decoder)
           .listen(
             (chunk) {
+              logSink?.write('[STDERR] $chunk');
               stderrBuffer.write(chunk);
               onStderrChunk(chunk, config.sessionName, controller);
             },
@@ -334,6 +357,11 @@ abstract class CliProviderBase extends ChatProvider {
         _dispatchLine(remaining, config.sessionName, controller);
       }
 
+      logSink?.writeln('---');
+      logSink?.writeln('Exit code: $exitCode');
+      await logSink?.close();
+      debugPrint('$debugPrefix CLI log: ${logFile.path}');
+
       onProcessExited(
         exitCode,
         stderrBuffer.toString().trim(),
@@ -354,11 +382,16 @@ abstract class CliProviderBase extends ChatProvider {
         _processes.remove(config.sessionName);
       }
       unregisterChatProcessResource(process);
+      await onBeforeControllerClose(config.sessionName);
       await controller.close();
     } catch (error, stack) {
       assert(() { debugPrint('$debugPrefix Failed to start process: $error'); return true; }());
       assert(() { debugPrint('$debugPrefix Stack: $stack'); return true; }());
+      logSink?.writeln('---');
+      logSink?.writeln('Failed to start: $error');
+      await logSink?.close();
       if (!controller.isClosed) controller.addError(error);
+      await onBeforeControllerClose(config.sessionName);
       await controller.close();
     }
   }

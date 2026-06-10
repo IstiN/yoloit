@@ -298,6 +298,12 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     // Subscribe to session ChangeNotifier so CLI-driven changes
     // (sendMessage called headlessly) update the UI automatically.
     _session?.addListener(_onSessionChanged);
+
+    // Restore scroll position now that _session and _messages are finalised.
+    if (_messages.isNotEmpty) {
+      _restoreScrollOffset();
+    }
+
     _consumeCliPendingMessage();
   }
 
@@ -389,9 +395,6 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
             }
           } catch (_) {}
         }
-      }
-      if (_messages.isNotEmpty) {
-        _restoreScrollOffset();
       }
     }
     // Restore last usage
