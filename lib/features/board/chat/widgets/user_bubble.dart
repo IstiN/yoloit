@@ -82,19 +82,15 @@ class UserBubbleState extends State<UserBubble> {
                         vertical: 10,
                       ),
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            context.appColors.accentBlue,
-                            context.appColors.primary,
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
+                        color: context.appColors.surfaceElevated,
                         borderRadius: const BorderRadius.only(
                           topLeft: Radius.circular(16),
                           topRight: Radius.circular(16),
                           bottomLeft: Radius.circular(16),
                           bottomRight: Radius.circular(4),
+                        ),
+                        border: Border.all(
+                          color: context.appColors.border.withAlpha(100),
                         ),
                       ),
                       child: RepaintBoundary(

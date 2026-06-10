@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/features/settings/ui/debug_ui/sections/chat_message_showcase.dart';
 import 'package:yoloit/features/settings/ui/debug_ui/sections/color_showcase.dart';
 import 'package:yoloit/features/settings/ui/debug_ui/sections/component_showcase.dart';
 import 'package:yoloit/features/settings/ui/debug_ui/sections/plectrum_debug.dart';
@@ -25,6 +26,7 @@ class _DebugUIShellState extends State<DebugUIShell> {
     ('Typography', TypographyShowcase()),
     ('Colors', ColorShowcase()),
     ('Components', ComponentShowcase()),
+    ('Chat Messages', ChatMessageShowcase()),
   ];
 
   @override

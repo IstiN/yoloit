@@ -2,6 +2,7 @@ export 'buttons/icon_text_button.dart';
 export 'buttons/small_action_button.dart';
 export 'cards/mindmap_card_shell.dart';
 export 'cards/settings_card.dart';
+export 'chat/chat_message_molecule.dart';
 export 'dialog/editor_dialog_actions.dart';
 export 'feedback/neon_badge.dart';
 export 'feedback/status_badge.dart';

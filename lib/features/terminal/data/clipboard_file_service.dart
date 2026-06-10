@@ -126,4 +126,29 @@ class ClipboardFileService {
   String _guessExtension(String text) {
     return 'txt';
   }
+
+  /// If [text] is a single-line path to an existing file, returns that path.
+  /// Otherwise returns null so the caller can fall back to saving a temp file.
+  Future<String?> tryResolveTextAsFilePath(String text) async {
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) return null;
+    if (trimmed.contains('\n') || trimmed.contains('\r')) return null;
+
+    try {
+      final file = File(trimmed);
+      if (await file.exists()) {
+        return trimmed;
+      }
+    } catch (_) {
+      // ignore path parsing or permission errors
+    }
+    return null;
+  }
+
+  /// Saves the provided [text] to a temp file and returns the absolute path.
+  Future<String> saveTextToFile(String text) async {
+    final file = await _tempFile('txt');
+    await file.writeAsString(text);
+    return file.path;
+  }
 }

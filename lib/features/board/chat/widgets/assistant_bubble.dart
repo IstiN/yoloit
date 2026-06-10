@@ -71,10 +71,10 @@ class AssistantBubbleState extends State<AssistantBubble> {
                                 vertical: 3,
                               ),
                               decoration: BoxDecoration(
-                                color: colors.accentOrange.withAlpha(21),
+                                color: colors.surface,
                                 borderRadius: BorderRadius.circular(10),
                                 border: Border.all(
-                                  color: colors.accentOrange.withAlpha(48),
+                                  color: colors.border.withAlpha(120),
                                 ),
                               ),
                               child: Row(
@@ -90,7 +90,7 @@ class AssistantBubbleState extends State<AssistantBubble> {
                                     tc.toolName,
                                     style: TextStyle(
                                       fontSize: 10,
-                                      color: colors.accentOrange,
+                                      color: colors.textSecondary,
                                     ),
                                   ),
                                 ],

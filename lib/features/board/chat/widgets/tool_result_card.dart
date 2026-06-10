@@ -114,11 +114,10 @@ class ToolResultCardState extends State<ToolResultCard> {
         child: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: Color.lerp(colors.surfaceHighlight, status.tint, 0.14),
+            color: colors.surfaceElevated,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color:
-                  Color.lerp(colors.border, status.tint, 0.35) ?? colors.border,
+              color: colors.border.withAlpha(100),
             ),
           ),
           child: Column(
@@ -130,7 +129,7 @@ class ToolResultCardState extends State<ToolResultCard> {
                     width: 22,
                     height: 22,
                     decoration: BoxDecoration(
-                      color: status.tint.withAlpha(28),
+                      color: status.tint.withAlpha(18),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(status.icon, size: 14, color: status.tint),

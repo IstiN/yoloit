@@ -18,9 +18,9 @@ class NeonBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withAlpha(30),
+        color: color.withAlpha(12),
         borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: color.withAlpha(80), width: 0.5),
+        border: Border.all(color: color.withAlpha(45), width: 0.5),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -33,7 +33,7 @@ class NeonBadge extends StatelessWidget {
                 color: color,
                 shape: BoxShape.circle,
                 boxShadow: [
-                  BoxShadow(color: color.withAlpha(120), blurRadius: 4),
+                  BoxShadow(color: color.withAlpha(60), blurRadius: 4),
                 ],
               ),
             ),

@@ -44,9 +44,14 @@ class SmartClipboardPasteService {
 
     if (text == null || text.isEmpty) return null;
 
-    // Always save text to a temp file so terminals and chats get a uniform
+    // If the clipboard contains a single existing file path, return it as-is
+    // instead of wrapping it in a .txt file.
+    final filePath = await ClipboardFileService.instance.tryResolveTextAsFilePath(text);
+    if (filePath != null) return filePath;
+
+    // Otherwise save text to a temp file so terminals and chats get a uniform
     // file-based paste experience (no inline text that may be interpreted as
     // escape sequences by terminals or split into unknown tokens by models).
-    return ClipboardFileService.instance.saveClipboardToFile();
+    return ClipboardFileService.instance.saveTextToFile(text);
   }
 }
