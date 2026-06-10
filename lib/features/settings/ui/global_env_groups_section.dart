@@ -85,7 +85,8 @@ class _GlobalEnvGroupsSectionState extends State<GlobalEnvGroupsSection> {
 
   void _addGroup() {
     setState(() {
-      _groups.add(
+      _groups.insert(
+        0,
         GlobalEnvGroup(
           id: 'group_${DateTime.now().millisecondsSinceEpoch}',
           name: 'New Group',
@@ -106,7 +107,7 @@ class _GlobalEnvGroupsSectionState extends State<GlobalEnvGroupsSection> {
     if (filePath == null) return;
     final imported = await _service.importEnvFileAsGroup(filePath);
     if (!mounted) return;
-    setState(() => _groups.add(imported));
+    setState(() => _groups.insert(0, imported));
   }
 
   Future<void> _importIntoGroup(int groupIndex) async {

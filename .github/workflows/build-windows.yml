@@ -19,7 +19,7 @@ on:
 jobs:
   build-windows:
     name: Build Windows App
-    runs-on: windows-latest
+    runs-on: windows-2019
     permissions:
       contents: write   # needed to upload release assets
 
@@ -79,6 +79,11 @@ jobs:
           VERSION_CLEAN="${TAG#v}"
           echo "version=$VERSION_CLEAN" >> $GITHUB_OUTPUT
           echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      # ── Windows-specific patches ─────────────────────────────────────────────
+      - name: Apply Cargokit patch
+        shell: pwsh
+        run: .\windows\flutter\tools\patch_cargokit.ps1
 
       # ── Build ────────────────────────────────────────────────────────────────
       - name: Build Windows release

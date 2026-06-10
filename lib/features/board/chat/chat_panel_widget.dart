@@ -150,6 +150,11 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     );
     _provider = _session!.provider;
 
+    // Restore draft text from persisted panel state (survives board switches
+    // and app restarts). Each panel has its own state, so this is safe in
+    // tests and avoids leaking draft text through the shared session manager.
+    _inputController.text = widget.panel.state['draftText'] as String? ?? '';
+
     // If opencode provider, refresh models and rebuild setup view once loaded.
     if (_provider is OpencodeProvider) {
       (_provider as OpencodeProvider).refreshModelsFromModelsDev().then((_) {
@@ -301,7 +306,11 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
 
     // Restore scroll position now that _session and _messages are finalised.
     if (_messages.isNotEmpty) {
-      _restoreScrollOffset();
+      if (_session!.isProcessing) {
+        _scrollToBottom(animate: false);
+      } else {
+        _restoreScrollOffset();
+      }
     }
 
     _consumeCliPendingMessage();
@@ -454,6 +463,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       'config': configJson,
       'messages': messagesJson,
       'lastUsage': _lastUsage?.toJson(),
+      'draftText': _inputController.text,
       if (_opencodeSessionId != null) 'opencodeSessionId': _opencodeSessionId,
       if (_copilotSessionId != null) 'copilotSessionId': _copilotSessionId,
       if (_cursorSessionId != null) 'cursorSessionId': _cursorSessionId,
@@ -508,10 +518,12 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     // Persist current messages to board state
     _persistMessages();
     // Save scroll offset so the user returns to the same position after
-    // switching boards.
+    // switching boards. If still processing, reset to null so we jump to
+    // the bottom on re-mount instead of restoring a stale middle position.
     final session = _session;
     if (session != null && _scrollController.hasClients) {
-      session.savedScrollOffset = _scrollController.offset;
+      session.savedScrollOffset =
+          session.isProcessing ? null : _scrollController.offset;
     }
     // Detach from session — session keeps its stream subscription alive.
     // The session already has accurate messages via _handleCoreEvent.
@@ -529,20 +541,29 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     super.dispose();
   }
 
-  void _scrollToBottom() {
+  void _scrollToBottom({bool onlyIfNearBottom = false, bool animate = true}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
+      if (!_scrollController.hasClients) return;
+      final position = _scrollController.position;
+      if (onlyIfNearBottom) {
+        const threshold = 80.0;
+        if (position.pixels < position.maxScrollExtent - threshold) return;
+      }
+      final target = position.maxScrollExtent;
+      if (animate) {
         _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
+          target,
           duration: const Duration(milliseconds: 150),
           curve: Curves.easeOut,
         );
+      } else {
+        _scrollController.jumpTo(target);
       }
     });
   }
 
   /// Restores the previously saved scroll offset after the widget re-mounts.
-  /// Falls back to scrolling to the bottom when no offset was saved.
+  /// Falls back to jumping to the bottom when no offset was saved.
   void _restoreScrollOffset() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_scrollController.hasClients) return;
@@ -552,11 +573,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
           saved <= _scrollController.position.maxScrollExtent) {
         _scrollController.jumpTo(saved);
       } else {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 150),
-          curve: Curves.easeOut,
-        );
+        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
       }
     });
   }
@@ -576,7 +593,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       _streamingMessageId = session.streamingMessageId;
     });
     if (session.messages.isNotEmpty) {
-      _scrollToBottom();
+      _scrollToBottom(onlyIfNearBottom: true);
     }
     // Re-attach UI callbacks if session started processing externally
     if (session.isProcessing && !_isSending) {

@@ -127,16 +127,28 @@ class ClipboardFileService {
     return 'txt';
   }
 
-  /// If [text] is a single-line path to an existing file, returns that path.
-  /// Otherwise returns null so the caller can fall back to saving a temp file.
+  /// If [text] is a single-line URL, path to an existing file, or path to an
+  /// existing directory, returns it as-is. Otherwise returns null so the caller
+  /// can fall back to saving a temp file.
   Future<String?> tryResolveTextAsFilePath(String text) async {
     final trimmed = text.trim();
     if (trimmed.isEmpty) return null;
     if (trimmed.contains('\n') || trimmed.contains('\r')) return null;
 
+    // URLs should be pasted inline, not wrapped into a .txt file.
+    final lower = trimmed.toLowerCase();
+    const urlSchemes = ['http://', 'https://', 'ftp://', 'file://'];
+    for (final scheme in urlSchemes) {
+      if (lower.startsWith(scheme)) return trimmed;
+    }
+
     try {
       final file = File(trimmed);
       if (await file.exists()) {
+        return trimmed;
+      }
+      final dir = Directory(trimmed);
+      if (await dir.exists()) {
         return trimmed;
       }
     } catch (_) {

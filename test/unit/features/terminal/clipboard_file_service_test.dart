@@ -61,6 +61,34 @@ void main() {
       final result = await ClipboardFileService.instance.tryResolveTextAsFilePath('   ');
       expect(result, isNull);
     });
+
+    test('returns the URL as-is for http and https links', () async {
+      expect(
+        await ClipboardFileService.instance.tryResolveTextAsFilePath('https://example.com'),
+        'https://example.com',
+      );
+      expect(
+        await ClipboardFileService.instance.tryResolveTextAsFilePath('http://localhost:8080'),
+        'http://localhost:8080',
+      );
+    });
+
+    test('returns the path when text points to an existing directory', () async {
+      final tempDir = Directory('${Directory.systemTemp.path}/yoloit_test_dir_${DateTime.now().millisecondsSinceEpoch}');
+      await tempDir.create();
+      addTearDown(() async {
+        if (await tempDir.exists()) await tempDir.delete();
+      });
+
+      final result = await ClipboardFileService.instance.tryResolveTextAsFilePath(tempDir.path);
+      expect(result, tempDir.path);
+    });
+
+    test('returns null when text points to a non-existing directory', () async {
+      final fakePath = '${Directory.systemTemp.path}/yoloit_test_nonexistent_dir_${DateTime.now().millisecondsSinceEpoch}';
+      final result = await ClipboardFileService.instance.tryResolveTextAsFilePath(fakePath);
+      expect(result, isNull);
+    });
   });
 
   group('ClipboardFileService.saveTextToFile', () {
