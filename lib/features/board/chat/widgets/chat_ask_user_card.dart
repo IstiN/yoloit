@@ -23,7 +23,6 @@ class ChatAskUserCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: colors.primaryLight.withAlpha(21),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: colors.primaryLight.withAlpha(64)),
         ),

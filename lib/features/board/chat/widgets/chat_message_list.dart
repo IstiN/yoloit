@@ -92,21 +92,9 @@ class ChatMessageList extends StatelessWidget {
         }
 
         if (showThinking) {
-          return Padding(
-            padding: const EdgeInsets.only(top: 6, bottom: 2, right: 48),
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: context.appColors.surfaceElevated,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(4),
-                  topRight: Radius.circular(16),
-                  bottomLeft: Radius.circular(16),
-                  bottomRight: Radius.circular(16),
-                ),
-              ),
-              child: const ChatTypingIndicator(),
-            ),
+          return const Padding(
+            padding: EdgeInsets.only(top: 6, bottom: 2, right: 48, left: 12),
+            child: ChatTypingIndicator(),
           );
         }
 

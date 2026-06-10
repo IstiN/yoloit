@@ -46,7 +46,6 @@ class ChatRunningToolsCard extends StatelessWidget {
                   vertical: 7,
                 ),
                 decoration: BoxDecoration(
-                  color: color.withAlpha(22),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: color.withAlpha(60)),
                 ),

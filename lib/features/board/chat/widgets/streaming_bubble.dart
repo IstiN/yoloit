@@ -22,9 +22,8 @@ class StreamingBubble extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.only(top: 6, bottom: 2, right: 48),
-      child: Container(
+      child: Padding(
         padding: const EdgeInsets.all(12),
-        decoration: chatBubbleDecoration(colors),
         child:
             processedContent.isEmpty
                 ? const ChatTypingIndicator()

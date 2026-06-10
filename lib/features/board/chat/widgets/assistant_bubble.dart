@@ -118,9 +118,8 @@ class AssistantBubbleState extends State<AssistantBubble> {
                     children: [
                       ConstrainedBox(
                         constraints: BoxConstraints(maxWidth: bubbleMaxWidth),
-                        child: Container(
+                        child: Padding(
                           padding: const EdgeInsets.all(12),
-                          decoration: chatBubbleDecoration(colors),
                           child: RepaintBoundary(
                             child: SelectionArea(
                               child: MarkdownBody(
