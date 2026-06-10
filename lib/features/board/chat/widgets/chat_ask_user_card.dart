@@ -66,8 +66,8 @@ class ChatAskUserCard extends StatelessWidget {
                               foregroundColor: colors.primaryLight,
                               side: BorderSide(color: colors.primaryLight),
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 6,
+                                horizontal: 14,
+                                vertical: 10,
                               ),
                               minimumSize: Size.zero,
                               tapTargetSize: MaterialTapTargetSize.shrinkWrap,

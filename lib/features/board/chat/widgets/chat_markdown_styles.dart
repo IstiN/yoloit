@@ -80,7 +80,7 @@ MarkdownStyleSheet chatMarkdownStyle({
     ),
     blockquote: TextStyle(
       fontSize: 12,
-      color: mutedColor,
+      color: colors.textSecondary,
       fontStyle: FontStyle.italic,
       height: 1.4,
     ),
