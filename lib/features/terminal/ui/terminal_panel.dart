@@ -17,7 +17,7 @@ import 'package:yoloit/features/mindmap/widgets/canvas_interaction_lock.dart';
 import 'package:yoloit/features/settings/data/agent_config_service.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_cubit.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_state.dart';
-import 'package:yoloit/features/terminal/data/clipboard_file_service.dart';
+import 'package:yoloit/features/terminal/data/smart_clipboard_paste_service.dart';
 import 'package:yoloit/features/terminal/data/terminal_backend_service.dart';
 import 'package:yoloit/features/terminal/models/agent_phase.dart';
 import 'package:yoloit/features/terminal/models/agent_session.dart';
@@ -1332,9 +1332,11 @@ class TerminalWidgetState extends State<TerminalWidget> {
   }
 
   Future<void> _pasteAsFileRef() async {
-    // Always save to a temp file so the terminal never receives raw text
-    // that could be interpreted as escape sequences or control characters.
-    final pasted = await ClipboardFileService.instance.saveClipboardToFile();
+    // Use the same smart-paste logic as chat: URLs and existing file paths
+    // are pasted inline; everything else (images, plain text) becomes a
+    // temp-file reference so the terminal never receives raw escape sequences.
+    final pasted =
+        await SmartClipboardPasteService.instance.readInlineTextOrSavedFilePath();
     if (pasted == null || !mounted) return;
     TerminalBackendService.instance.write(widget.session.id, pasted);
   }
