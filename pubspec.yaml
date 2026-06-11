@@ -75,7 +75,6 @@ dependencies:
     path: third_party/flutter_local_models/packages/local_models_sdk
   local_models_flutter:
     path: third_party/flutter_local_models/packages/local_models_flutter
-  kterm: ^1.1.7
 
   xml: any
   path_provider: any

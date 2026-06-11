@@ -4,18 +4,15 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:yoloit/core/utils/clipboard_utils.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:yoloit/features/terminal/ui/widgets/workspace_status_bar.dart';
-import 'package:kterm/kterm.dart' as kterm;
-import 'package:kterm/src/core/buffer/line.dart' as kterm_buffer;
-import 'package:kterm/src/core/cell.dart' as kterm_core;
-import 'package:xterm/xterm.dart' hide TerminalState;
 import 'package:xterm/src/core/buffer/line.dart' as xterm_buffer;
 import 'package:xterm/src/core/cell.dart' as xterm_core;
+import 'package:xterm/xterm.dart' hide TerminalState;
+import 'package:yoloit/core/hotkeys/hotkeys.dart';
 import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/core/session/session_prefs.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/core/utils/clipboard_utils.dart';
 import 'package:yoloit/features/mindmap/widgets/canvas_interaction_lock.dart';
 import 'package:yoloit/features/settings/data/agent_config_service.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_cubit.dart';
@@ -26,6 +23,7 @@ import 'package:yoloit/features/terminal/models/agent_phase.dart';
 import 'package:yoloit/features/terminal/models/agent_session.dart';
 import 'package:yoloit/features/terminal/models/agent_type.dart';
 import 'package:yoloit/features/terminal/models/terminal_render_engine.dart';
+import 'package:yoloit/features/terminal/ui/widgets/workspace_status_bar.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_cubit.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_state.dart';
 import 'package:yoloit/features/workspaces/data/worktree_service.dart';
@@ -700,12 +698,8 @@ class TerminalWidgetState extends State<TerminalWidget> {
   final _controller = TerminalController(
     pointerInputs: const PointerInputs.none(),
   );
-  final _kController = kterm.TerminalController(
-    pointerInputs: const kterm.PointerInputs.none(),
-  );
   final _focusNode = FocusNode();
   final _terminalViewKey = GlobalKey<TerminalViewState>();
-  final _kTerminalViewKey = GlobalKey<kterm.TerminalViewState>();
   Timer? _focusRetryTimer;
   double _fontSize = 13.0;
 
@@ -750,7 +744,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
   int _currentHitIndex = -1;
 
   Size? get _terminalRenderSize {
-    final context = _terminalViewKey.currentContext ?? _kTerminalViewKey.currentContext;
+    final context = _terminalViewKey.currentContext;
     if (context == null) return null;
     final renderBox = context.findRenderObject() as RenderBox?;
     return renderBox?.size;
@@ -786,9 +780,6 @@ class TerminalWidgetState extends State<TerminalWidget> {
     _scrollController.addListener(_persistScrollOffset);
     _bindTerminal();
     _attachTerminalDiagnostics(widget.session);
-    AgentConfigService.instance.terminalRenderEngineNotifier.addListener(
-      _rebindTerminalForActiveEngine,
-    );
     if (widget.autoRequestFocus) _requestFocusAfterFrame();
     HardwareKeyboard.instance.addHandler(_handleHardwareKey);
     // Load persisted font size
@@ -831,11 +822,6 @@ class TerminalWidgetState extends State<TerminalWidget> {
     }
   }
 
-  void _rebindTerminalForActiveEngine() {
-    _bindTerminal();
-    if (mounted) setState(() {});
-  }
-
   void _requestFocusAfterFrame() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -854,12 +840,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
   }
 
   void _requestKeyboardOnActiveEngine() {
-    switch (AgentConfigService.instance.terminalRenderEngine) {
-      case TerminalRenderEngine.kterm:
-        _kTerminalViewKey.currentState?.requestKeyboard();
-      case TerminalRenderEngine.xterm:
-        _terminalViewKey.currentState?.requestKeyboard();
-    }
+    _terminalViewKey.currentState?.requestKeyboard();
   }
 
   void _bindTerminal() {
@@ -881,14 +862,8 @@ class TerminalWidgetState extends State<TerminalWidget> {
       _scheduleTerminalDiagnostics('resize cols=$cols rows=$rows');
       _restoreResizeScrollAnchor();
     };
-    switch (AgentConfigService.instance.terminalRenderEngine) {
-      case TerminalRenderEngine.kterm:
-        widget.session.kTerminal.onOutput = _boundOnOutput;
-        widget.session.kTerminal.onResize = _boundOnResize;
-      case TerminalRenderEngine.xterm:
-        widget.session.terminal.onOutput = _boundOnOutput;
-        widget.session.terminal.onResize = _boundOnResize;
-    }
+    widget.session.terminal.onOutput = _boundOnOutput;
+    widget.session.terminal.onResize = _boundOnResize;
   }
 
   void _unbindTerminalIfOurs(AgentSession session) {
@@ -901,24 +876,16 @@ class TerminalWidgetState extends State<TerminalWidget> {
     if (identical(session.terminal.onResize, _boundOnResize)) {
       session.terminal.onResize = null;
     }
-    if (identical(session.kTerminal.onOutput, _boundOnOutput)) {
-      session.kTerminal.onOutput = null;
-    }
-    if (identical(session.kTerminal.onResize, _boundOnResize)) {
-      session.kTerminal.onResize = null;
-    }
   }
 
   void _attachTerminalDiagnostics(AgentSession session) {
     if (!_terminalDiagnosticsEnabled) return;
     session.terminal.addListener(_onTerminalDiagnosticsChange);
-    session.kTerminal.addListener(_onTerminalDiagnosticsChange);
   }
 
   void _detachTerminalDiagnostics(AgentSession session) {
     if (!_terminalDiagnosticsEnabled) return;
     session.terminal.removeListener(_onTerminalDiagnosticsChange);
-    session.kTerminal.removeListener(_onTerminalDiagnosticsChange);
   }
 
   void _onTerminalDiagnosticsChange() {
@@ -954,10 +921,8 @@ class TerminalWidgetState extends State<TerminalWidget> {
   }
 
   void _dumpTerminalDiagnostics(String reason) {
-    final engine = AgentConfigService.instance.terminalRenderEngine;
     _debugTerminalLog('$reason ${debugStateSummary}');
-    _dumpXtermDiagnostics(active: engine == TerminalRenderEngine.xterm);
-    _dumpKtermDiagnostics(active: engine == TerminalRenderEngine.kterm);
+    _dumpXtermDiagnostics(active: true);
   }
 
   void _dumpXtermDiagnostics({required bool active}) {
@@ -1002,50 +967,6 @@ class TerminalWidgetState extends State<TerminalWidget> {
           'xterm row=$row wrapped=${line.isWrapped} '
           'text="${_sanitizeTerminalText(line.getText())}" '
           'cells=${_dumpXtermCells(line, maxCols: terminal.viewWidth.clamp(0, 80).toInt())}',
-        );
-      }
-    }
-  }
-
-  void _dumpKtermDiagnostics({required bool active}) {
-    final terminal = widget.session.kTerminal;
-    final buffer = terminal.buffer;
-    final lines = buffer.lines;
-    if (lines.length == 0) {
-      _debugTerminalLog('kterm active=$active lines=0');
-      return;
-    }
-    final visibleStart = buffer.scrollBack.clamp(0, lines.length - 1);
-    final visibleEnd = (visibleStart + terminal.viewHeight - 1).clamp(
-      visibleStart,
-      lines.length - 1,
-    );
-    final renderState = _kTerminalViewKey.currentState;
-    final renderTerminal = renderState?.renderTerminal;
-    final renderSummary =
-        renderTerminal == null
-            ? 'render=none'
-            : 'cell=${renderTerminal.cellSize.width.toStringAsFixed(2)}x'
-                '${renderTerminal.cellSize.height.toStringAsFixed(2)} '
-                'lineHeight=${renderTerminal.lineHeight.toStringAsFixed(2)}';
-    _debugTerminalLog(
-      'kterm active=$active visible=$visibleStart-$visibleEnd '
-      'cursor=${buffer.cursorX},${buffer.cursorY} abs=${buffer.absoluteCursorY} '
-      'scrollBack=${buffer.scrollBack} $renderSummary',
-    );
-    if (TerminalWidgetState.enableTerminalDiagnostics) {
-      for (final row in _collectDiagnosticRows(
-        visibleStart: visibleStart,
-        visibleEnd: visibleEnd,
-        cursorRow: buffer.absoluteCursorY,
-        lineCount: lines.length,
-        textAt: (row) => lines[row].getText(),
-      )) {
-        final line = lines[row];
-        _debugTerminalLog(
-          'kterm row=$row wrapped=${line.isWrapped} '
-          'text="${_sanitizeTerminalText(line.getText())}" '
-          'cells=${_dumpKtermCells(line, maxCols: terminal.viewWidth.clamp(0, 24).toInt())}',
         );
       }
     }
@@ -1134,26 +1055,6 @@ class TerminalWidgetState extends State<TerminalWidget> {
       final code = cell.content & xterm_core.CellContent.codepointMask;
       final width = cell.content >> xterm_core.CellContent.widthShift;
       if (parts.length >= 40) break;
-      if (code == 0 && width <= 0) continue;
-      if (code == 0 && cell.flags == 0 && cell.background == 0 && col >= 6) {
-        continue;
-      }
-      parts.add(
-        '$col:${_debugCellChar(code)}'
-        '/w$width/f${cell.flags}/fg${cell.foreground}/bg${cell.background}',
-      );
-    }
-    return parts.isEmpty ? '-' : parts.join(' | ');
-  }
-
-  String _dumpKtermCells(kterm_buffer.BufferLine line, {required int maxCols}) {
-    final cell = kterm_core.CellData.empty();
-    final parts = <String>[];
-    for (var col = 0; col < maxCols && col < line.length; col++) {
-      line.getCellData(col, cell);
-      final code = cell.content & kterm_core.CellContent.codepointMask;
-      final width = cell.content >> kterm_core.CellContent.widthShift;
-      if (parts.length >= 12) break;
       if (code == 0 && width <= 0) continue;
       if (code == 0 && cell.flags == 0 && cell.background == 0 && col >= 6) {
         continue;
@@ -1311,6 +1212,12 @@ class TerminalWidgetState extends State<TerminalWidget> {
     // Cmd+F → open search
     if (isCmd && key == LogicalKeyboardKey.keyF) {
       _openSearch();
+      return true;
+    }
+
+    // Cmd+O → global quick file search (prevent terminal from swallowing it)
+    if (isCmd && !isCtrl && !isAlt && key == LogicalKeyboardKey.keyO) {
+      Actions.invoke(context, const OpenFileSearchIntent());
       return true;
     }
 
@@ -1566,15 +1473,11 @@ class TerminalWidgetState extends State<TerminalWidget> {
     _userScrollPreserveTimer?.cancel();
     _resizeDebounce?.cancel();
     HardwareKeyboard.instance.removeHandler(_handleHardwareKey);
-    AgentConfigService.instance.terminalRenderEngineNotifier.removeListener(
-      _rebindTerminalForActiveEngine,
-    );
     _unbindTerminalIfOurs(widget.session);
     _detachTerminalDiagnostics(widget.session);
     _terminalDiagnosticsDebounce?.cancel();
     _scrollController.removeListener(_persistScrollOffset);
     _controller.dispose();
-    _kController.dispose();
     _scrollController.dispose();
     _focusNode.dispose();
     _searchController.dispose();
@@ -1920,27 +1823,6 @@ class TerminalWidgetState extends State<TerminalWidget> {
     return true;
   }
 
-  bool _openKtermUrlAt(Offset globalPosition) {
-    final state = _kTerminalViewKey.currentState;
-    if (state == null) return false;
-    final renderTerminal = state.renderTerminal;
-    final cell = renderTerminal.getCellOffset(
-      renderTerminal.globalToLocal(globalPosition),
-    );
-    if (cell.y < 0 || cell.y >= widget.session.kTerminal.buffer.lines.length) {
-      return false;
-    }
-    final bufferLines = widget.session.kTerminal.buffer.lines;
-    final lines = List<TerminalUrlLine>.generate(bufferLines.length, (index) {
-      final line = bufferLines[index];
-      return TerminalUrlLine(line.toString(), isWrapped: line.isWrapped);
-    }, growable: false);
-    final url = terminalUrlAtWrappedCell(lines, cell.y, cell.x);
-    if (url == null) return false;
-    unawaited(_openTerminalUrl(url));
-    return true;
-  }
-
   Future<void> _openTerminalUrl(String url) async {
     final opener = widget.linkOpener;
     if (opener != null) {
@@ -1953,87 +1835,13 @@ class TerminalWidgetState extends State<TerminalWidget> {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    return ValueListenableBuilder<TerminalRenderEngine>(
-      valueListenable: AgentConfigService.instance.terminalRenderEngineNotifier,
-      builder: (context, engine, _) {
-        if (engine == TerminalRenderEngine.kterm) {
-          return _buildKtermTerminal(colors);
-        }
-        return Stack(
-          children: [
-            _buildXtermTerminal(colors),
-            // Search overlay
-            if (_isSearching)
-              Positioned(top: 8, right: 8, child: _buildSearchBar(colors)),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildKtermTerminal(AppColorScheme colors) {
-    return Listener(
-      behavior: HitTestBehavior.opaque,
-      onPointerDown: (event) {
-        if (!_focusNode.hasFocus) _focusNode.requestFocus();
-        if (event.buttons != kPrimaryButton) return;
-        _clickDownPosition = event.localPosition;
-      },
-      onPointerUp: (event) {
-        final down = _clickDownPosition;
-        _clickDownPosition = null;
-        if (down == null) return;
-        if ((event.localPosition - down).distance > 6.0) return;
-        _openKtermUrlAt(event.position);
-      },
-      onPointerCancel: (_) {
-        _clickDownPosition = null;
-      },
-      child: _wrapTerminal(
-        colors,
-        kterm.TerminalView(
-          widget.session.kTerminal,
-          key: _kTerminalViewKey,
-          controller: _kController,
-          focusNode: _focusNode,
-          autofocus: widget.isActive,
-          hardwareKeyboardOnly: _hardwareKeyboardOnly,
-          scrollController: _scrollController,
-          simulateScroll: true,
-          showSearchBar: true,
-          onKeyEvent: _onTerminalKeyEvent,
-          textStyle: kterm.TerminalStyle(
-            fontSize: _fontSize,
-            height: 1.2,
-          ),
-          theme: kterm.TerminalTheme(
-            cursor: colors.primary,
-            selection: colors.primary.withAlpha(120),
-            foreground: colors.terminalText,
-            background: colors.terminalBackground,
-            black: colors.surface,
-            red: colors.accentRed,
-            green: colors.accentGreen,
-            yellow: colors.accentOrange,
-            blue: colors.accentBlue,
-            magenta: colors.primary,
-            cyan: colors.terminalPrompt,
-            white: colors.terminalText,
-            brightBlack: colors.textMuted,
-            brightRed: colors.accentRedDim,
-            brightGreen: colors.accentGreenDim,
-            brightYellow: colors.statusWarning,
-            brightBlue: colors.accentBlue,
-            brightMagenta: colors.primaryLight,
-            brightCyan: colors.accentBlue,
-            brightWhite: colors.textPrimary,
-            searchHitBackground: colors.accentOrange,
-            searchHitBackgroundCurrent: colors.statusWarning,
-            searchHitForeground: colors.background,
-          ),
-          padding: const EdgeInsets.all(8),
-        ),
-      ),
+    return Stack(
+      children: [
+        _buildXtermTerminal(colors),
+        // Search overlay
+        if (_isSearching)
+          Positioned(top: 8, right: 8, child: _buildSearchBar(colors)),
+      ],
     );
   }
 

@@ -405,7 +405,15 @@ class _FilePreviewContentState extends State<_FilePreviewContent> {
     if (_isDotEnvPath(path)) return true;
     if (_isMarkdownExt(ext) || _isTextExt(ext)) return true;
     if (_isSvgExt(ext)) return true;
-    return _looksLikeTextFile(path);
+    if (_looksLikeTextFile(path)) return true;
+    // Allow editing any reasonably-sized file as text, even with unknown extension.
+    try {
+      final file = File(path);
+      if (!file.existsSync()) return false;
+      return file.lengthSync() <= 5 * 1024 * 1024; // 5 MB
+    } catch (_) {
+      return false;
+    }
   }
 
   /// Heuristic: files without extension or with unknown extension — try reading

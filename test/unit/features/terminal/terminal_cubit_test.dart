@@ -138,7 +138,6 @@ void main() {
         id: 'id5', type: AgentType.terminal, workspacePath: '/p',
       );
       expect(s.terminal.maxLines, 2000);
-      expect(s.kTerminal.maxLines, 2000);
     });
   });
 }
