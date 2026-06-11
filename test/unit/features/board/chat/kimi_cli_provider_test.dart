@@ -307,5 +307,54 @@ void main() {
 
       expect(capturedArgs, containsAll(['--session', 'sess-123']));
     });
+
+    test('reads events from wire.jsonl fixture', () async {
+      final p = KimiCliProvider(
+        wireJsonlPath: 'test/fixtures/wire.jsonl',
+        processStarter: _starterFor(stdout: const []),
+      );
+
+      final events = await p
+          .sendMessage(
+            message: 'hi',
+            config: const ChatSessionConfig(
+              sessionName: 's1',
+              workingDir: '/tmp',
+            ),
+            isFirstMessage: true,
+          )
+          .toList();
+
+      expect(events, hasLength(6));
+
+      // step.begin
+      expect(events[0].type, ChatEventType.assistantMessageStart);
+      expect(events[0].rawType, 'kimi.wire.step_begin');
+
+      // think part
+      expect(events[1].type, ChatEventType.assistantDelta);
+      expect(events[1].rawType, 'kimi.wire.think');
+      expect(events[1].data['deltaContent'], '> Thinking...\n');
+
+      // text part
+      expect(events[2].type, ChatEventType.assistantDelta);
+      expect(events[2].rawType, 'kimi.wire.text');
+      expect(events[2].data['deltaContent'], '\nHello from wire');
+
+      // tool.call
+      expect(events[3].type, ChatEventType.toolStart);
+      expect(events[3].rawType, 'kimi.wire.tool_call');
+      expect(events[3].data['toolName'], 'read_file');
+
+      // tool.result
+      expect(events[4].type, ChatEventType.toolComplete);
+      expect(events[4].rawType, 'kimi.wire.tool_result');
+      expect(events[4].data['toolName'], 'read_file');
+      expect(events[4].data['success'], isTrue);
+
+      // step.end
+      expect(events[5].type, ChatEventType.assistantMessage);
+      expect(events[5].rawType, 'kimi.wire.step_end');
+    }, timeout: const Timeout(Duration(seconds: 10)));
   });
 }
