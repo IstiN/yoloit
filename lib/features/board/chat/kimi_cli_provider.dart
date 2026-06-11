@@ -25,7 +25,15 @@ class _KimiSessionState {
 /// and watches the internal `wire.jsonl` log file for real-time thinking
 /// and streaming text content.
 class KimiCliProvider extends CliProviderBase {
-  KimiCliProvider({super.agentId = 'kimi', super.processStarter});
+  KimiCliProvider({
+    super.agentId = 'kimi',
+    super.processStarter,
+    this.wireJsonlPath,
+  });
+
+  /// When non-null, overrides the auto-discovered wire.jsonl path.
+  /// An empty string disables the watcher entirely (stream-json fallback).
+  final String? wireJsonlPath;
 
   final Map<String, _KimiSessionState> _sessionStates = {};
   final Map<String, Process> _currentProcesses = {};
@@ -141,7 +149,17 @@ class KimiCliProvider extends CliProviderBase {
     await Future<void>.delayed(const Duration(milliseconds: 1000));
 
     final startTime = DateTime.now().subtract(const Duration(seconds: 2));
-    final wirePath = await _findWireJsonl(startTime);
+
+    String? wirePath;
+    if (wireJsonlPath != null) {
+      if (wireJsonlPath!.isEmpty) {
+        // Explicitly disabled (e.g. in unit tests).
+        return;
+      }
+      wirePath = wireJsonlPath;
+    } else {
+      wirePath = await _findWireJsonl(startTime);
+    }
 
     if (wirePath == null) {
       debugPrint(

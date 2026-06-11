@@ -1,4 +1,3 @@
-@Tags(['flaky'])
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -90,7 +89,7 @@ ProcessStarter _starterFor({
 void main() {
   group('KimiCliProvider', () {
     test('provider metadata', () {
-      final p = KimiCliProvider();
+      final p = KimiCliProvider(wireJsonlPath: '');
       expect(p.providerId, 'kimi');
       expect(p.displayName, 'Kimi');
       expect(p.supportsImages, isTrue);
@@ -99,6 +98,7 @@ void main() {
 
     test('emits assistant message from JSON stdout', () async {
       final p = KimiCliProvider(
+        wireJsonlPath: '',
         processStarter: _starterFor(stdout: [
           '{"role":"assistant","content":"hello world"}',
         ]),
@@ -122,6 +122,7 @@ void main() {
 
     test('handles list-style content', () async {
       final p = KimiCliProvider(
+        wireJsonlPath: '',
         processStarter: _starterFor(stdout: [
           '{"role":"assistant","content":[{"text":"part1"},{"text":"part2"}]}',
         ]),
@@ -143,6 +144,7 @@ void main() {
 
     test('includes thinking parts as quoted block', () async {
       final p = KimiCliProvider(
+        wireJsonlPath: '',
         processStarter: _starterFor(stdout: [
           '{"role":"assistant","content":[{"type":"think","think":"I need to check..."},{"type":"text","text":"Here is the answer."}]}',
         ]),
@@ -166,6 +168,7 @@ void main() {
 
     test('stores session id from meta event', () async {
       final p = KimiCliProvider(
+        wireJsonlPath: '',
         processStarter: _starterFor(stdout: [
           '{"role":"meta","type":"session.resume_hint","session_id":"sess-99"}',
           '{"role":"assistant","content":"ok"}',
@@ -188,6 +191,7 @@ void main() {
 
     test('ignores unknown roles', () async {
       final p = KimiCliProvider(
+        wireJsonlPath: '',
         processStarter: _starterFor(stdout: [
           '{"role":"system","content":"setup"}',
           '{"role":"assistant","content":"hi"}',
@@ -211,6 +215,7 @@ void main() {
 
     test('propagates stderr on error exit', () async {
       final p = KimiCliProvider(
+        wireJsonlPath: '',
         processStarter: _starterFor(
           stderr: ['kimi: command not found'],
           exitCode: 127,
@@ -241,6 +246,7 @@ void main() {
     test('builds args with model and plan mode', () async {
       late List<String> capturedArgs;
       final p = KimiCliProvider(
+        wireJsonlPath: '',
         processStarter: (String exe, List<String> args,
                 {String? workingDirectory,
                 Map<String, String>? environment}) {
@@ -274,6 +280,7 @@ void main() {
     test('resumes with stored session id', () async {
       late List<String> capturedArgs;
       final p = KimiCliProvider(
+        wireJsonlPath: '',
         processStarter: (String exe, List<String> args,
                 {String? workingDirectory,
                 Map<String, String>? environment}) {

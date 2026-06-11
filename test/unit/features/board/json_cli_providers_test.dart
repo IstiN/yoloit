@@ -1,4 +1,3 @@
-@Tags(['flaky'])
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -117,7 +116,10 @@ void main() {
     final starter = _FakeStarter();
     final process = _FakeProcess(pid: 101, stdin: stdinSink);
     starter.processes.add(process);
-    final provider = KimiCliProvider(processStarter: starter.start);
+    final provider = KimiCliProvider(
+      wireJsonlPath: '',
+      processStarter: starter.start,
+    );
 
     final eventsFuture =
         provider
@@ -148,7 +150,10 @@ void main() {
     final starter = _FakeStarter();
     final process = _FakeProcess(pid: 102, stdin: stdinSink);
     starter.processes.add(process);
-    final provider = KimiCliProvider(processStarter: starter.start);
+    final provider = KimiCliProvider(
+      wireJsonlPath: '',
+      processStarter: starter.start,
+    );
 
     final eventsFuture =
         provider
@@ -179,7 +184,10 @@ void main() {
     final starter = _FakeStarter();
     final process = _FakeProcess(pid: 102, stdin: stdinSink);
     starter.processes.add(process);
-    final provider = KimiCliProvider(processStarter: starter.start);
+    final provider = KimiCliProvider(
+      wireJsonlPath: '',
+      processStarter: starter.start,
+    );
 
     final eventsFuture =
         provider
@@ -209,7 +217,10 @@ void main() {
     final starter = _FakeStarter();
     final process = _FakeProcess(pid: 103, stdin: stdinSink);
     starter.processes.add(process);
-    final provider = KimiCliProvider(processStarter: starter.start);
+    final provider = KimiCliProvider(
+      wireJsonlPath: '',
+      processStarter: starter.start,
+    );
 
     final eventsFuture =
         provider
@@ -244,7 +255,10 @@ void main() {
     final starter = _FakeStarter();
     final process = _FakeProcess(pid: 104, stdin: stdinSink);
     starter.processes.add(process);
-    final provider = KimiCliProvider(processStarter: starter.start);
+    final provider = KimiCliProvider(
+      wireJsonlPath: '',
+      processStarter: starter.start,
+    );
 
     final eventsFuture =
         provider
@@ -274,7 +288,10 @@ void main() {
     final starter = _FakeStarter();
     final process = _FakeProcess(pid: 105, stdin: stdinSink);
     starter.processes.add(process);
-    final provider = KimiCliProvider(processStarter: starter.start);
+    final provider = KimiCliProvider(
+      wireJsonlPath: '',
+      processStarter: starter.start,
+    );
 
     final eventsFuture =
         provider
