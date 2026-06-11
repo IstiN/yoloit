@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,6 +11,7 @@ import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/builtin/file_preview_plugin.dart';
 import 'package:yoloit/features/board/ui/board_overview_preview.dart';
+import 'package:yoloit/features/board/utils/panel_placement.dart';
 import 'package:yoloit/features/editor/bloc/file_editor_cubit.dart';
 import 'package:yoloit/features/review/bloc/review_cubit.dart';
 import 'package:yoloit/features/search/data/file_search_service.dart';
@@ -160,7 +162,8 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
 
   Future<void> _runSearch() async {
     final generation = ++_searchGeneration;
-    final query = _controller.text.trim().toLowerCase();
+    final rawQuery = _controller.text.trim();
+    final query = rawQuery.toLowerCase();
     final queries = FuzzyMatcher.candidates(query);
     final appColors = context.appColors;
     final wsState = context.read<WorkspaceCubit>().state;
@@ -176,6 +179,9 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
     setState(() => _loading = true);
 
     final results = <_QuickResult>[];
+
+    // 0. If the query looks like an existing file path, surface it first.
+    await _tryAddPathResult(rawQuery, results, appColors);
 
     // 1. Search panels across all boards by title and shallow state content.
     for (final entry in _panels) {
@@ -318,6 +324,42 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
     }
   }
 
+  String _resolveFilePath(String input) {
+    if (input.startsWith('~/')) {
+      final home = Platform.environment['HOME'];
+      if (home != null && home.isNotEmpty) {
+        return p.join(home, input.substring(2));
+      }
+    }
+    return input;
+  }
+
+  Future<void> _tryAddPathResult(
+    String rawQuery,
+    List<_QuickResult> results,
+    AppColorScheme appColors,
+  ) async {
+    if (rawQuery.isEmpty) return;
+    final resolved = _resolveFilePath(rawQuery);
+    final file = File(resolved);
+    if (!await file.exists()) return;
+    if (results.any((r) => r.filePath == resolved)) return;
+    final name = p.basename(resolved);
+    final ext = name.contains('.') ? name.split('.').last.toLowerCase() : '';
+    final (icon, color) = _iconForExtension(ext, appColors);
+    results.insert(
+      0,
+      _QuickResult(
+        kind: _QuickResultKind.file,
+        title: name,
+        subtitle: resolved,
+        icon: icon,
+        iconColor: color,
+        filePath: resolved,
+      ),
+    );
+  }
+
   List<String> _collectSearchStrings(dynamic value, {int depth = 0}) {
     if (value == null || depth > 4) return const [];
     if (value is String) {
@@ -356,61 +398,94 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
     return '${start > 0 ? '…' : ''}${compact.substring(start, end)}${end < compact.length ? '…' : ''}';
   }
 
-  void _openSelected() {
-    if (_results.isEmpty) return;
+  Future<void> _openSelected() async {
+    final rawQuery = _controller.text.trim();
+    if (_results.isEmpty) {
+      // Fallback: if the typed text is an existing file path, open it directly.
+      final resolved = _resolveFilePath(rawQuery);
+      final file = File(resolved);
+      if (file.existsSync()) {
+        Navigator.of(context).pop();
+        await _openFilePath(resolved);
+      }
+      return;
+    }
     final result = _results[_selectedIndex];
     Navigator.of(context).pop();
 
     if (result.kind == _QuickResultKind.panel && result.panelId != null) {
       final boardCubit = context.read<BoardCubit>();
-      unawaited(() async {
-        if (result.boardId != null) {
-          await boardCubit.setActiveBoard(result.boardId!);
-        }
-        await boardCubit.focusPanel(
-          result.panelId!,
-          boardId: result.boardId,
-          zoomOnFocus: true,
-        );
-      }());
+      if (result.boardId != null) {
+        await boardCubit.setActiveBoard(result.boardId!);
+      }
+      await boardCubit.focusPanel(
+        result.panelId!,
+        boardId: result.boardId,
+        zoomOnFocus: true,
+      );
     } else if (result.kind == _QuickResultKind.file &&
         result.filePath != null) {
-      if (widget.onFileSelected != null) {
-        widget.onFileSelected!(result.filePath!);
-      } else {
-        // Try to open as board file preview panel
-        final boardCubit = context.read<BoardCubit>();
-        final board = boardCubit.state.activeBoard;
-        if (board != null) {
-          final fileName = p.basename(result.filePath!);
-          const bounds = BoardPanelBounds(
-            x: 200,
-            y: 200,
-            width: 500,
-            height: 400,
-          );
-          final panel = BoardPanelInstance(
-            id: 'panel-${DateTime.now().microsecondsSinceEpoch}',
-            type: FilePreviewPlugin.kTypeId,
-            title: fileName,
-            bounds: bounds,
-            state: {'path': result.filePath!, 'title': fileName},
-            zIndex:
-                board.panels.fold<int>(
-                  0,
-                  (v, p) => p.zIndex > v ? p.zIndex : v,
-                ) +
-                1,
-          );
-          boardCubit.addPanel(panel);
-          boardCubit.focusPanel(panel.id);
-        } else {
-          context.read<ReviewCubit>().selectFile(result.filePath!);
-          context.read<FileEditorCubit>().openFile(result.filePath!);
-        }
-      }
-      widget.onFileOpened();
+      await _openFilePath(result.filePath!);
     }
+  }
+
+  Future<void> _openFilePath(String filePath) async {
+    if (widget.onFileSelected != null) {
+      widget.onFileSelected!(filePath);
+      widget.onFileOpened();
+      return;
+    }
+
+    final boardCubit = context.read<BoardCubit>();
+    final board = boardCubit.state.activeBoard;
+    if (board == null) {
+      context.read<ReviewCubit>().selectFile(filePath);
+      await context.read<FileEditorCubit>().openFile(filePath);
+      widget.onFileOpened();
+      return;
+    }
+
+    // 1. Deduplicate: focus existing panel for this file.
+    final existing = PanelPlacementHelper.findExistingFilePreview(board, filePath);
+    if (existing != null) {
+      await boardCubit.focusPanel(existing.id, zoomOnFocus: true);
+      widget.onFileOpened();
+      return;
+    }
+
+    // 2. Smart sizing based on file type.
+    final desiredSize = PanelPlacementHelper.desiredSizeForFile(filePath);
+
+    // 3. Find a non-overlapping slot near the focused panel or viewport centre
+    //    (so the user doesn't get teleported far away).
+    final viewport = board.viewport;
+    final screenSize = MediaQuery.sizeOf(context);
+    final viewportCenter = Offset(
+      (-viewport.translation.dx + screenSize.width / 2) /
+          math.max(viewport.scale, 0.001),
+      (-viewport.translation.dy + screenSize.height / 2) /
+          math.max(viewport.scale, 0.001),
+    );
+    final placement = PanelPlacementHelper.findPlacement(
+      board,
+      desiredSize: desiredSize,
+      anchorPanelId: board.viewport.focusedPanelId,
+      viewportCenter: viewportCenter,
+    );
+
+    final fileName = p.basename(filePath);
+    final panel = BoardPanelInstance(
+      id: 'panel-${DateTime.now().microsecondsSinceEpoch}',
+      type: FilePreviewPlugin.kTypeId,
+      title: fileName,
+      bounds: placement.bounds,
+      state: {'path': filePath, 'title': fileName},
+      zIndex: placement.zIndex,
+    );
+
+    await boardCubit.addPanel(panel);
+    await boardCubit.focusPanel(panel.id, zoomOnFocus: true);
+    widget.onFileOpened();
   }
 
   void _navigate(int delta) {
@@ -454,7 +529,7 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
                 _navigate(-1);
                 return KeyEventResult.handled;
               } else if (event.logicalKey == LogicalKeyboardKey.enter) {
-                _openSelected();
+                unawaited(_openSelected());
                 return KeyEventResult.handled;
               } else if (event.logicalKey == LogicalKeyboardKey.escape) {
                 Navigator.of(context).pop();
@@ -582,7 +657,7 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
           query: _controller.text.trim(),
           onTap: () {
             setState(() => _selectedIndex = index);
-            _openSelected();
+            unawaited(_openSelected());
           },
         );
       },

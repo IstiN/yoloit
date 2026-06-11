@@ -83,7 +83,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   static final RegExp _brTagRe = RegExp(r'<br\s*/?>');
 
   final _inputController = TextEditingController();
-  final _scrollController = ScrollController();
+  late ScrollController _scrollController;
   final _inputFocusNode = FocusNode();
   late AnimationController _glowCtrl;
 
@@ -202,6 +202,16 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         _session!.restoreLastUsage(Map<String, dynamic>.from(savedUsage));
       }
     }
+
+    // Create scroll controller with an initial offset so the list starts at
+    // the correct position without a visible jump after the first frame.
+    // double.maxFinite is clamped to maxScrollExtent on the first layout,
+    // effectively starting at the bottom for non-empty chats.
+    final savedOffset = _session?.savedScrollOffset;
+    _scrollController = ScrollController(
+      initialScrollOffset:
+          savedOffset ?? (_messages.isNotEmpty ? double.maxFinite : 0.0),
+    );
 
     // Restore sessionID for opencode
     if (_config.provider == 'opencode') {
@@ -467,7 +477,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       if (_opencodeSessionId != null) 'opencodeSessionId': _opencodeSessionId,
       if (_copilotSessionId != null) 'copilotSessionId': _copilotSessionId,
       if (_cursorSessionId != null) 'cursorSessionId': _cursorSessionId,
-    });
+    }..remove('_cliPendingMessage')..remove('_cliPendingAttachments'));
     // Update session history registry (metadata + messages on disk)
     ChatSessionHistory.instance.upsert(
       ChatSessionEntry(
@@ -585,9 +595,13 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     final session = _session;
     if (session == null) return;
     setState(() {
-      _messages
-        ..clear()
-        ..addAll(session.messages);
+      // Only sync messages when not actively sending to avoid duplicates
+      // with _handleEvent which drives UI updates during streaming.
+      if (!_isSending) {
+        _messages
+          ..clear()
+          ..addAll(session.messages);
+      }
       _isProcessing = session.isProcessing;
       _streamingContent = session.streamingContent;
       _streamingMessageId = session.streamingMessageId;
@@ -1141,73 +1155,14 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         }
 
       case ChatEventType.assistantMessage:
-        final content = event.messageContent ?? _streamingContent;
-        final toolReqs = event.toolRequests;
         setState(() {
-          // Remove any existing streaming placeholder
-          _messages.removeWhere(
-            (m) => m.id == _streamingMessageId && m.isStreaming,
-          );
-
-          final toolCalls =
-              toolReqs.map((tr) {
-                final args = tr['arguments'];
-                return ChatToolCall(
-                  toolCallId: tr['toolCallId'] as String? ?? '',
-                  toolName: tr['name'] as String? ?? '',
-                  arguments:
-                      args is Map
-                          ? Map<String, dynamic>.from(args)
-                          : <String, dynamic>{},
-                );
-              }).toList();
-
-          // Extract token usage from this message if available
-          final outputTokens = (event.data['outputTokens'] as num?)?.toInt();
-          ChatTokenUsage? usage;
-          if (outputTokens != null) {
-            usage = ChatTokenUsage(outputTokens: outputTokens);
-            _totalOutputTokens += outputTokens;
-          }
-
-          // Insert at the position saved when streaming started so the
-          // assistant text appears before any tool-result messages that were
-          // added while the assistant was still streaming (cursor-agent sends
-          // tool events before the final assistantMessage event).
-          final insertAt = _assistantInsertIndex?.clamp(0, _messages.length);
-          if (insertAt != null && insertAt < _messages.length) {
-            _messages.insert(
-              insertAt,
-              ChatMessage(
-                id:
-                    event.messageId ??
-                    'assistant-${DateTime.now().millisecondsSinceEpoch}',
-                role: ChatRole.assistant,
-                content: content,
-                timestamp: event.timestamp ?? DateTime.now(),
-                toolCalls: toolCalls,
-                isStreaming: false,
-                tokenUsage: usage,
-              ),
-            );
-          } else {
-            _messages.add(
-              ChatMessage(
-                id:
-                    event.messageId ??
-                    'assistant-${DateTime.now().millisecondsSinceEpoch}',
-                role: ChatRole.assistant,
-                content: content,
-                timestamp: event.timestamp ?? DateTime.now(),
-                toolCalls: toolCalls,
-                isStreaming: false,
-                tokenUsage: usage,
-              ),
-            );
-          }
+          // Sync from session to avoid duplicates with _onSessionChanged.
+          _messages..clear()..addAll(_session!.messages);
           _streamingMessageId = null;
           _streamingContent = '';
           _assistantInsertIndex = null;
+          _markAllActiveToolCallsCompleted();
+          _totalOutputTokens = _session!.totalOutputTokens;
         });
         _scrollToBottom();
 
@@ -1265,34 +1220,26 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
           BoardEventBus.instance.fileModified(path);
         }
         setState(() {
-          _assistantInsertIndex ??= _messages.length;
-          _activeToolCalls[toolCallId] = (_activeToolCalls[toolCallId] ??
-                  ChatToolCall(
-                    toolCallId: toolCallId,
-                    toolName: 'unknown',
-                    arguments: {},
-                  ))
-              .copyWith(
-                isRunning: false,
-                success: success,
-                result: resultContent,
-              );
-
-          // Add tool result as a message for the chat log
-          _messages.add(
-            ChatMessage(
-              id: 'tool-$toolCallId',
-              role: ChatRole.tool,
-              content: resultContent,
-              toolName: toolName,
-              toolCallId: toolCallId,
-              timestamp: event.timestamp ?? DateTime.now(),
+          // Sync from session to avoid duplicates with _onSessionChanged,
+          // then patch changedFiles metadata that _handleCoreEvent doesn't capture.
+          _messages..clear()..addAll(_session!.messages);
+          final idx = _messages.indexWhere(
+            (m) => m.role == ChatRole.tool && m.toolCallId == toolCallId,
+          );
+          if (idx != -1) {
+            final existing = _messages[idx];
+            _messages[idx] = existing.copyWith(
               metadata: {
+                ...?existing.metadata,
                 'success': success,
                 if (changedFiles.isNotEmpty) 'changedFiles': changedFiles,
               },
-            ),
-          );
+            );
+          }
+          _activeToolCalls.remove(toolCallId);
+          if (_activeToolCalls.isEmpty) {
+            _markAllActiveToolCallsCompleted();
+          }
         });
         _scrollToBottom();
 
@@ -1317,6 +1264,9 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
               linesRemoved:
                   (codeChanges?['linesRemoved'] as num?)?.toInt() ?? 0,
             );
+            // Sync from session to keep _messages consistent.
+            _messages..clear()..addAll(_session!.messages);
+            _totalOutputTokens = _session!.totalOutputTokens;
           });
         }
 
