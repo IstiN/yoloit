@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -16,6 +17,7 @@ import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
 import 'package:yoloit/features/board/plugins/builtin/playlist_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/webview_manager.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_panel_plugin.dart';
+import 'package:yoloit/features/board/utils/board_grid_layout.dart';
 import 'package:yoloit/features/settings/data/agent_config_service.dart';
 import 'package:yoloit/features/settings/data/provider_model_catalog_service.dart';
 
@@ -89,7 +91,10 @@ class BoardCubit extends Cubit<BoardState> {
             return board;
           }).toList();
       if (needsResave) {
-        assert(() { debugPrint('[BoardCubit] removed duplicate-ID panels, re-saving'); return true; }());
+        assert(() {
+          debugPrint('[BoardCubit] removed duplicate-ID panels, re-saving');
+          return true;
+        }());
         await _persist(boards: boards, activeBoardId: rawActiveId);
       }
       if (boards.isEmpty) {
@@ -402,6 +407,7 @@ class BoardCubit extends Cubit<BoardState> {
   Future<void> setActiveBoard(String id) async {
     if (!state.boards.any((board) => board.id == id)) return;
     await _setBoards(state.boards, activeBoardId: id);
+    emit(state.copyWith(clearSelection: true));
   }
 
   Future<void> renameBoard(String id, String name) async {
@@ -580,6 +586,965 @@ class BoardCubit extends Cubit<BoardState> {
     });
   }
 
+  // ── Grid view ─────────────────────────────────────────────────────────────
+
+  static const _gridSnapshotKey = 'gridViewSnapshot';
+
+  Map<String, dynamic> _snapshotPanelBounds(List<BoardPanelInstance> panels) {
+    return {for (final panel in panels) panel.id: panel.bounds.toJson()};
+  }
+
+  Future<void> setGridMode(String boardId, {required bool enabled}) async {
+    await _updateBoard(
+      boardId,
+      (board) {
+        final current = board.gridMode;
+        if (current.enabled == enabled) return board;
+        var next = board.copyWithGridMode(current.copyWith(enabled: enabled));
+        final metadata = Map<String, dynamic>.from(next.metadata);
+        if (enabled) {
+          metadata[_gridSnapshotKey] = _snapshotPanelBounds(board.panels);
+          next = next.copyWith(
+            metadata: metadata,
+            panels: arrangePanelsInCloud(next.gridMode, next.panels),
+          );
+        } else {
+          final snapshot = metadata[_gridSnapshotKey] as Map<String, dynamic>?;
+          if (snapshot != null) {
+            final restoredPanels =
+                next.panels.map((panel) {
+                  final raw = snapshot[panel.id];
+                  if (raw is Map<String, dynamic>) {
+                    return panel.copyWith(
+                      bounds: BoardPanelBounds.fromJson(raw),
+                    );
+                  }
+                  return panel;
+                }).toList();
+            next = next.copyWith(panels: restoredPanels);
+          }
+          metadata.remove(_gridSnapshotKey);
+          next = next.copyWith(metadata: metadata);
+        }
+        return next;
+      },
+      historyEvent:
+          (before, after, revision) => _historyEvent(
+            boardId: boardId,
+            type: 'board.gridModeChanged',
+            entityType: 'board',
+            entityId: boardId,
+            revision: revision,
+            before: before.gridMode.toJson(),
+            after: after.gridMode.toJson(),
+          ),
+    );
+  }
+
+  Future<void> setGridCellSize(String boardId, double cellSize) async {
+    if (cellSize < 40) return;
+    await _updateBoard(
+      boardId,
+      (board) {
+        final nextMode = board.gridMode.copyWith(cellSize: cellSize);
+        final snapped =
+            board.panels
+                .map((panel) => snapPanelToGrid(nextMode, panel))
+                .toList();
+        return board.copyWithGridMode(nextMode).copyWith(panels: snapped);
+      },
+      historyEvent:
+          (before, after, revision) => _historyEvent(
+            boardId: boardId,
+            type: 'board.gridCellSizeChanged',
+            entityType: 'board',
+            entityId: boardId,
+            revision: revision,
+            before: before.gridMode.toJson(),
+            after: after.gridMode.toJson(),
+          ),
+    );
+  }
+
+  Future<void> setGridSpacing(String boardId, double spacing) async {
+    if (spacing < 0) return;
+    await _updateBoard(
+      boardId,
+      (board) {
+        final nextMode = board.gridMode.copyWith(spacing: spacing);
+        final snapped =
+            board.panels
+                .map((panel) => snapPanelToGrid(nextMode, panel))
+                .toList();
+        return board.copyWithGridMode(nextMode).copyWith(panels: snapped);
+      },
+      historyEvent:
+          (before, after, revision) => _historyEvent(
+            boardId: boardId,
+            type: 'board.gridSpacingChanged',
+            entityType: 'board',
+            entityId: boardId,
+            revision: revision,
+            before: before.gridMode.toJson(),
+            after: after.gridMode.toJson(),
+          ),
+    );
+  }
+
+  Future<void> arrangePanelsInGrid(String boardId) async {
+    await _updateBoard(
+      boardId,
+      (board) => board.copyWith(
+        panels: arrangePanelsInCloud(board.gridMode, board.panels),
+      ),
+      historyEvent:
+          (before, after, revision) => _historyEvent(
+            boardId: boardId,
+            type: 'board.gridArranged',
+            entityType: 'board',
+            entityId: boardId,
+            revision: revision,
+            before: {'panelCount': before.panels.length},
+            after: {'panelCount': after.panels.length},
+          ),
+    );
+  }
+
+  Future<void> arrangePanelsByTypeInGrid(String boardId) async {
+    await _updateBoard(
+      boardId,
+      (board) => board.copyWith(
+        panels: arrangePanelsByType(board.gridMode, board.panels),
+      ),
+      historyEvent:
+          (before, after, revision) => _historyEvent(
+            boardId: boardId,
+            type: 'board.gridArrangedByType',
+            entityType: 'board',
+            entityId: boardId,
+            revision: revision,
+            before: {'panelCount': before.panels.length},
+            after: {'panelCount': after.panels.length},
+          ),
+    );
+  }
+
+  /// Re-snaps the current grid layout to the default cloud arrangement.
+  ///
+  /// If grid mode is off, it is enabled first and a freeform snapshot is saved.
+  /// If a snapshot already exists, the cloud is recomputed from those original
+  /// freeform positions so repeated resets are deterministic.
+  Future<void> resetGridView(String boardId) async {
+    await _updateBoard(
+      boardId,
+      (board) {
+        final metadata = Map<String, dynamic>.from(board.metadata);
+        var next = board;
+        if (!next.gridMode.enabled) {
+          metadata[_gridSnapshotKey] = _snapshotPanelBounds(next.panels);
+          next = next.copyWithGridMode(next.gridMode.copyWith(enabled: true));
+        }
+
+        final snapshot = metadata[_gridSnapshotKey] as Map<String, dynamic>?;
+        final basePanels =
+            snapshot == null
+                ? next.panels
+                : next.panels.map((panel) {
+                  final raw = snapshot[panel.id];
+                  if (raw is Map<String, dynamic>) {
+                    return panel.copyWith(
+                      bounds: BoardPanelBounds.fromJson(raw),
+                    );
+                  }
+                  return panel;
+                }).toList();
+
+        next = next.copyWith(
+          metadata: metadata,
+          panels: arrangePanelsInCloud(next.gridMode, basePanels),
+        );
+        return next;
+      },
+      historyEvent:
+          (before, after, revision) => _historyEvent(
+            boardId: boardId,
+            type: 'board.gridReset',
+            entityType: 'board',
+            entityId: boardId,
+            revision: revision,
+            before: before.gridMode.toJson(),
+            after: after.gridMode.toJson(),
+          ),
+    );
+  }
+
+  Future<void> movePanelInGrid(
+    String boardId,
+    String panelId, {
+    required int deltaCol,
+    required int deltaRow,
+  }) async {
+    await _updateBoard(
+      boardId,
+      (board) => board.copyWith(
+        panels: pushPanelInGrid(
+          board.gridMode,
+          board.panels,
+          panelId,
+          deltaCol,
+          deltaRow,
+        ),
+      ),
+      historyEvent:
+          (before, after, revision) => _historyEvent(
+            boardId: boardId,
+            type: 'panel.movedInGrid',
+            entityType: 'panel',
+            entityId: panelId,
+            revision: revision,
+            before: _panelSnapshot(
+              before.panels.firstWhere((p) => p.id == panelId),
+            ),
+            after: _panelSnapshot(
+              after.panels.firstWhere((p) => p.id == panelId),
+            ),
+          ),
+    );
+  }
+
+  Future<void> resizePanelInGrid(
+    String panelId, {
+    required int deltaCols,
+    required int deltaRows,
+    String? boardId,
+  }) async {
+    final targetId = boardId ?? state.activeBoard?.id;
+    if (targetId == null) return;
+    final board = state.boards.firstWhere((b) => b.id == targetId);
+    final mode = board.gridMode;
+    await updatePanel(
+      panelId,
+      (panel) => panel.copyWith(
+        bounds: resizeBoundsInGrid(
+          mode,
+          panel.bounds,
+          deltaCols: deltaCols,
+          deltaRows: deltaRows,
+        ),
+      ),
+      boardId: targetId,
+    );
+  }
+
+  /// Snaps a panel to the given grid cell and pushes overlapping neighbours.
+  ///
+  /// When [targetRect] is omitted the panel is snapped to the nearest cell of
+  /// its current bounds. This is the commit step used after a smooth freeform
+  /// drag or resize inside grid mode.
+  Future<void> placePanelInGrid(
+    String boardId,
+    String panelId, {
+    GridRect? targetRect,
+  }) async {
+    await _updateBoard(
+      boardId,
+      (board) {
+        final panel = board.panels.firstWhereOrNull((p) => p.id == panelId);
+        if (panel == null) return board;
+        final resolvedTarget =
+            targetRect ?? boundsToGridRect(board.gridMode, panel.bounds);
+        return board.copyWith(
+          panels: pushPanelToRect(
+            board.gridMode,
+            board.panels,
+            panelId,
+            resolvedTarget,
+          ),
+        );
+      },
+      historyEvent:
+          (before, after, revision) => _historyEvent(
+            boardId: boardId,
+            type: 'panel.placedInGrid',
+            entityType: 'panel',
+            entityId: panelId,
+            revision: revision,
+            before: _panelSnapshot(
+              before.panels.firstWhere((p) => p.id == panelId),
+            ),
+            after: _panelSnapshot(
+              after.panels.firstWhere((p) => p.id == panelId),
+            ),
+          ),
+    );
+  }
+
+  // ── Panel groups ──────────────────────────────────────────────────────────
+
+  static const double _collapsedCardWidth = 152;
+  static const double _collapsedCardHeight = 112;
+  static const double _collapsedCardOffset = 16;
+  static const double _collapsedMinCardWidth = 80;
+  static const double _collapsedMinCardHeight = 60;
+  static const int _collapsedMaxCards = 5;
+
+  BoardPanelBounds? _originalBounds(BoardPanelInstance panel) {
+    final raw = panel.state['_originalBounds'];
+    if (raw is Map<String, dynamic>) {
+      return BoardPanelBounds.fromJson(raw);
+    }
+    return null;
+  }
+
+  Rect _groupExpandedBounds(BoardDocument board, BoardPanelGroup group) {
+    Rect? union;
+    for (final panelId in group.panelIds) {
+      final panel = board.panels.firstWhereOrNull((p) => p.id == panelId);
+      if (panel == null) continue;
+      final bounds = _originalBounds(panel) ?? panel.bounds;
+      final rect = Rect.fromLTWH(
+        bounds.x,
+        bounds.y,
+        bounds.width,
+        bounds.height,
+      );
+      union = union?.expandToInclude(rect) ?? rect;
+    }
+    return union ?? Rect.zero;
+  }
+
+  List<String> _orderedVisiblePanelIds(BoardPanelGroup group) {
+    final focusId = group.collapsedFocusPanelId;
+    final ids = List<String>.from(group.panelIds);
+    if (focusId != null && ids.contains(focusId)) {
+      ids.remove(focusId);
+      ids.add(focusId);
+    }
+    if (ids.length <= _collapsedMaxCards) return ids;
+    return ids.sublist(ids.length - _collapsedMaxCards);
+  }
+
+  /// Returns the container rect for a collapsed group in board coordinates.
+  /// If the group already has explicit [collapsedBounds], those are used;
+  /// otherwise a default size is anchored at the group's expanded bounds.
+  Rect _collapsedStackBounds(
+    BoardDocument board,
+    BoardPanelGroup group,
+    int visibleCount,
+  ) {
+    final saved = group.collapsedBounds;
+    if (saved != null) {
+      return Rect.fromLTWH(saved.x, saved.y, saved.width, saved.height);
+    }
+    final expanded = _groupExpandedBounds(board, group);
+    final count = math.max(visibleCount, 1);
+    return Rect.fromLTWH(
+      expanded.left,
+      expanded.top,
+      _collapsedCardWidth + (count - 1) * _collapsedCardOffset,
+      _collapsedCardHeight + (count - 1) * _collapsedCardOffset,
+    );
+  }
+
+  BoardPanelBounds _stackedCardBounds(
+    Rect stackBounds,
+    int visibleIndex,
+    int visibleCount,
+  ) {
+    final count = math.max(visibleCount, 1);
+    final totalOffset = (count - 1) * _collapsedCardOffset;
+    final width = math.max(
+      stackBounds.width - totalOffset,
+      _collapsedMinCardWidth,
+    );
+    final height = math.max(
+      stackBounds.height - totalOffset,
+      _collapsedMinCardHeight,
+    );
+    return BoardPanelBounds(
+      x: stackBounds.left + visibleIndex * _collapsedCardOffset,
+      y: stackBounds.top + visibleIndex * _collapsedCardOffset,
+      width: width,
+      height: height,
+    );
+  }
+
+  List<BoardPanelGroup> _removePanelFromAllGroups(
+    List<BoardPanelGroup> groups,
+    String panelId,
+  ) {
+    return groups
+        .map(
+          (group) => group.copyWith(
+            panelIds: group.panelIds.where((id) => id != panelId).toList(),
+          ),
+        )
+        .toList();
+  }
+
+  Future<void> createGroup(
+    String boardId, {
+    required String name,
+    List<String> panelIds = const [],
+    int? color,
+  }) async {
+    await _updateBoard(
+      boardId,
+      (board) {
+        var nextGroups = board.groups;
+        for (final panelId in panelIds) {
+          nextGroups = _removePanelFromAllGroups(nextGroups, panelId);
+        }
+        final group = BoardPanelGroup(
+          id: _nextId('group'),
+          name: name.trim().isEmpty ? 'Group' : name.trim(),
+          color: color,
+          panelIds: panelIds,
+          collapsed: false,
+        );
+        return board.copyWith(groups: [...nextGroups, group]);
+      },
+      historyEvent:
+          (before, after, revision) => _historyEvent(
+            boardId: boardId,
+            type: 'group.created',
+            entityType: 'group',
+            entityId: after.groups.last.id,
+            revision: revision,
+            before: null,
+            after: after.groups.last.toJson(),
+          ),
+    );
+  }
+
+  Future<void> deleteGroup(String boardId, String groupId) async {
+    await _updateBoard(
+      boardId,
+      (board) {
+        final removed = board.groups.firstWhereOrNull((g) => g.id == groupId);
+        if (removed == null) return board;
+        final remaining = board.groups.where((g) => g.id != groupId).toList();
+        // Restore visibility and original bounds of collapsed group panels.
+        var panels = board.panels;
+        if (removed.collapsed) {
+          panels = panels.map((panel) {
+            if (removed.panelIds.contains(panel.id)) {
+              final original = _originalBounds(panel);
+              final nextState = Map<String, dynamic>.from(panel.state)
+                ..remove('_originalBounds');
+              return panel.copyWith(
+                hidden: false,
+                bounds: original ?? panel.bounds,
+                state: nextState,
+              );
+            }
+            return panel;
+          }).toList();
+        }
+        return board.copyWith(groups: remaining, panels: panels);
+      },
+      historyEvent:
+          (before, after, revision) => _historyEvent(
+            boardId: boardId,
+            type: 'group.deleted',
+            entityType: 'group',
+            entityId: groupId,
+            revision: revision,
+            before:
+                before.groups.firstWhereOrNull((g) => g.id == groupId)?.toJson(),
+            after: null,
+          ),
+    );
+  }
+
+  Future<void> renameGroup(
+    String boardId,
+    String groupId,
+    String name,
+  ) async {
+    await _updateBoard(
+      boardId,
+      (board) => board.copyWith(
+        groups:
+            board.groups.map((group) {
+              if (group.id != groupId) return group;
+              return group.copyWith(
+                name: name.trim().isEmpty ? group.name : name.trim(),
+              );
+            }).toList(),
+      ),
+      historyEvent:
+          (before, after, revision) => _historyEvent(
+            boardId: boardId,
+            type: 'group.renamed',
+            entityType: 'group',
+            entityId: groupId,
+            revision: revision,
+            before: before.groups
+                .firstWhereOrNull((g) => g.id == groupId)
+                ?.toJson(),
+            after: after.groups
+                .firstWhereOrNull((g) => g.id == groupId)
+                ?.toJson(),
+          ),
+    );
+  }
+
+  Future<void> setGroupColor(
+    String boardId,
+    String groupId,
+    int? color,
+  ) async {
+    await _updateBoard(
+      boardId,
+      (board) => board.copyWith(
+        groups:
+            board.groups.map((group) {
+              if (group.id != groupId) return group;
+              return group.copyWith(
+                color: color,
+                clearColor: color == null,
+              );
+            }).toList(),
+      ),
+      historyEvent:
+          (before, after, revision) => _historyEvent(
+            boardId: boardId,
+            type: 'group.colorChanged',
+            entityType: 'group',
+            entityId: groupId,
+            revision: revision,
+            before: before.groups
+                .firstWhereOrNull((g) => g.id == groupId)
+                ?.toJson(),
+            after: after.groups
+                .firstWhereOrNull((g) => g.id == groupId)
+                ?.toJson(),
+          ),
+    );
+  }
+
+  Future<void> addPanelsToGroup(
+    String boardId,
+    String groupId,
+    List<String> panelIds,
+  ) async {
+    await _updateBoard(
+      boardId,
+      (board) {
+        var nextGroups = board.groups;
+        for (final panelId in panelIds) {
+          nextGroups = _removePanelFromAllGroups(nextGroups, panelId);
+        }
+        nextGroups = nextGroups.map((group) {
+          if (group.id != groupId) return group;
+          final mergedIds = <String>[
+            ...group.panelIds,
+            ...panelIds.where((id) => !group.panelIds.contains(id)),
+          ];
+          return group.copyWith(panelIds: mergedIds);
+        }).toList();
+        return board.copyWith(groups: nextGroups);
+      },
+      historyEvent:
+          (before, after, revision) => _historyEvent(
+            boardId: boardId,
+            type: 'group.panelsAdded',
+            entityType: 'group',
+            entityId: groupId,
+            revision: revision,
+            before: before.groups
+                .firstWhereOrNull((g) => g.id == groupId)
+                ?.toJson(),
+            after: after.groups
+                .firstWhereOrNull((g) => g.id == groupId)
+                ?.toJson(),
+          ),
+    );
+  }
+
+  Future<void> removePanelsFromGroup(
+    String boardId,
+    String groupId,
+    List<String> panelIds,
+  ) async {
+    await _updateBoard(
+      boardId,
+      (board) {
+        final targetGroup = board.groups.firstWhereOrNull(
+          (g) => g.id == groupId,
+        );
+        if (targetGroup == null) return board;
+        final nextGroups = board.groups.map((group) {
+          if (group.id != groupId) return group;
+          final remaining = group.panelIds
+              .where((id) => !panelIds.contains(id))
+              .toList();
+          return group.copyWith(panelIds: remaining);
+        }).toList();
+        // Restore visibility and original bounds if the group is collapsed.
+        var panels = board.panels;
+        if (targetGroup.collapsed) {
+          panels = panels.map((panel) {
+            if (panelIds.contains(panel.id)) {
+              final original = _originalBounds(panel);
+              final nextState = Map<String, dynamic>.from(panel.state)
+                ..remove('_originalBounds');
+              return panel.copyWith(
+                hidden: false,
+                bounds: original ?? panel.bounds,
+                state: nextState,
+              );
+            }
+            return panel;
+          }).toList();
+        }
+        return board.copyWith(groups: nextGroups, panels: panels);
+      },
+      historyEvent:
+          (before, after, revision) => _historyEvent(
+            boardId: boardId,
+            type: 'group.panelsRemoved',
+            entityType: 'group',
+            entityId: groupId,
+            revision: revision,
+            before: before.groups
+                .firstWhereOrNull((g) => g.id == groupId)
+                ?.toJson(),
+            after: after.groups
+                .firstWhereOrNull((g) => g.id == groupId)
+                ?.toJson(),
+          ),
+    );
+  }
+
+  Future<void> toggleGroupCollapse(
+    String boardId,
+    String groupId,
+  ) async {
+    await _updateBoard(
+      boardId,
+      (board) {
+        final group = board.groups.firstWhereOrNull((g) => g.id == groupId);
+        if (group == null) return board;
+        final collapsed = !group.collapsed;
+        final focusId =
+            group.collapsedFocusPanelId ??
+            (group.panelIds.isEmpty ? null : group.panelIds[0]);
+        final nextGroups = board.groups.map((g) {
+          if (g.id != groupId) return g;
+          return g.copyWith(
+            collapsed: collapsed,
+            collapsedFocusPanelId: collapsed ? focusId : null,
+            clearCollapsedFocus: !collapsed,
+          );
+        }).toList();
+
+        if (!collapsed) {
+          // Expand: restore original bounds and visibility.
+          final nextPanels = board.panels.map((panel) {
+            if (!group.panelIds.contains(panel.id)) return panel;
+            final original = _originalBounds(panel);
+            final nextState = Map<String, dynamic>.from(panel.state)
+              ..remove('_originalBounds');
+            return panel.copyWith(
+              hidden: false,
+              bounds: original ?? panel.bounds,
+              state: nextState,
+            );
+          }).toList();
+          return board.copyWith(groups: nextGroups, panels: nextPanels);
+        }
+
+        // Collapse: save original bounds, then stack panels inside the group's
+        // collapsed bounds (explicit or default).
+        final visibleIds = _orderedVisiblePanelIds(
+          group.copyWith(collapsedFocusPanelId: focusId),
+        );
+        final stackBounds = _collapsedStackBounds(
+          board,
+          group,
+          visibleIds.length,
+        );
+        final nextGroupsWithBounds = nextGroups.map((g) {
+          if (g.id != groupId) return g;
+          return g.collapsedBounds == null
+              ? g.copyWith(
+                collapsedBounds: BoardPanelBounds(
+                  x: stackBounds.left,
+                  y: stackBounds.top,
+                  width: stackBounds.width,
+                  height: stackBounds.height,
+                ),
+              )
+              : g;
+        }).toList();
+        final maxZ = board.panels.fold<int>(
+          0,
+          (value, panel) => panel.zIndex > value ? panel.zIndex : value,
+        );
+        final nextPanels = board.panels.map((panel) {
+          if (!group.panelIds.contains(panel.id)) return panel;
+          final visibleIndex = visibleIds.indexOf(panel.id);
+          final isVisible = visibleIndex != -1;
+          final original = _originalBounds(panel) ?? panel.bounds;
+          final state = Map<String, dynamic>.from(panel.state)
+            ..['_originalBounds'] = original.toJson();
+          if (!isVisible) {
+            return panel.copyWith(hidden: true, state: state);
+          }
+          final stackedBounds = _stackedCardBounds(
+            stackBounds,
+            visibleIndex,
+            visibleIds.length,
+          );
+          return panel.copyWith(
+            hidden: false,
+            bounds: stackedBounds,
+            zIndex: maxZ + 1 + visibleIndex,
+            state: state,
+          );
+        }).toList();
+        final focusedId = board.viewport.focusedPanelId;
+        final clearFocus =
+            focusedId != null && group.panelIds.contains(focusedId);
+        return board.copyWith(
+          groups: nextGroupsWithBounds,
+          panels: nextPanels,
+          viewport:
+              clearFocus
+                  ? board.viewport.copyWith(clearFocusedPanelId: true)
+                  : null,
+        );
+      },
+      historyEvent:
+          (before, after, revision) => _historyEvent(
+            boardId: boardId,
+            type: 'group.toggledCollapse',
+            entityType: 'group',
+            entityId: groupId,
+            revision: revision,
+            before: before.groups
+                .firstWhereOrNull((g) => g.id == groupId)
+                ?.toJson(),
+            after: after.groups
+                .firstWhereOrNull((g) => g.id == groupId)
+                ?.toJson(),
+          ),
+    );
+  }
+
+  /// Moves every panel in [groupId] by [delta].
+  Future<void> moveGroup(
+    String boardId,
+    String groupId,
+    Offset delta,
+  ) async {
+    await _updateBoard(
+      boardId,
+      (board) {
+        final group = board.groups.firstWhereOrNull((g) => g.id == groupId);
+        if (group == null || delta == Offset.zero) return board;
+        final nextPanels = board.panels.map((panel) {
+          if (!group.panelIds.contains(panel.id)) return panel;
+          final original = _originalBounds(panel);
+          final movedBounds = panel.bounds.copyWith(
+            x: panel.bounds.x + delta.dx,
+            y: panel.bounds.y + delta.dy,
+          );
+          final nextState = Map<String, dynamic>.from(panel.state);
+          if (original != null) {
+            nextState['_originalBounds'] = original
+                .copyWith(
+                  x: original.x + delta.dx,
+                  y: original.y + delta.dy,
+                )
+                .toJson();
+          }
+          return panel.copyWith(bounds: movedBounds, state: nextState);
+        }).toList();
+        final nextGroups = board.groups.map((g) {
+          if (g.id != groupId) return g;
+          final bounds = g.collapsedBounds;
+          if (bounds == null) return g;
+          return g.copyWith(
+            collapsedBounds: bounds.copyWith(
+              x: bounds.x + delta.dx,
+              y: bounds.y + delta.dy,
+            ),
+          );
+        }).toList();
+        return board.copyWith(panels: nextPanels, groups: nextGroups);
+      },
+      historyEvent: null,
+    );
+  }
+
+  /// Resizes a collapsed group's container to [newBounds] and reflows the
+  /// stacked panel cards so they fill the new size.
+  Future<void> resizeGroupCollapsedBounds(
+    String boardId,
+    String groupId,
+    BoardPanelBounds newBounds,
+  ) async {
+    await _updateBoard(
+      boardId,
+      (board) {
+        final group = board.groups.firstWhereOrNull((g) => g.id == groupId);
+        if (group == null || !group.collapsed) return board;
+        final stackBounds = Rect.fromLTWH(
+          newBounds.x,
+          newBounds.y,
+          newBounds.width,
+          newBounds.height,
+        );
+        final visibleIds = _orderedVisiblePanelIds(group);
+        final maxZ = board.panels.fold<int>(
+          0,
+          (value, panel) => panel.zIndex > value ? panel.zIndex : value,
+        );
+        final nextPanels = board.panels.map((panel) {
+          if (!group.panelIds.contains(panel.id)) return panel;
+          final visibleIndex = visibleIds.indexOf(panel.id);
+          final isVisible = visibleIndex != -1;
+          if (!isVisible) return panel.copyWith(hidden: true);
+          final stackedBounds = _stackedCardBounds(
+            stackBounds,
+            visibleIndex,
+            visibleIds.length,
+          );
+          return panel.copyWith(
+            hidden: false,
+            bounds: stackedBounds,
+            zIndex: maxZ + 1 + visibleIndex,
+          );
+        }).toList();
+        final nextGroups = board.groups.map((g) {
+          if (g.id != groupId) return g;
+          return g.copyWith(collapsedBounds: newBounds);
+        }).toList();
+        return board.copyWith(groups: nextGroups, panels: nextPanels);
+      },
+      historyEvent: null,
+    );
+  }
+
+  /// Cycles the focused panel inside a collapsed group.
+  ///
+  /// [direction] 1 for next, -1 for previous.
+  Future<void> cycleGroupFocus(
+    String boardId,
+    String groupId,
+    int direction,
+  ) async {
+    await _updateBoard(
+      boardId,
+      (board) {
+        final group = board.groups.firstWhereOrNull((g) => g.id == groupId);
+        if (group == null || group.panelIds.isEmpty || !group.collapsed) {
+          return board;
+        }
+        final panelIds = group.panelIds;
+        final currentId = group.collapsedFocusPanelId;
+        var index = 0;
+        if (currentId != null) {
+          final found = panelIds.indexOf(currentId);
+          if (found != -1) index = found;
+        }
+        final nextIndex = (index + direction) % panelIds.length;
+        final focusedId = panelIds[nextIndex];
+        final nextGroup = group.copyWith(collapsedFocusPanelId: focusedId);
+        final visibleIds = _orderedVisiblePanelIds(nextGroup);
+        final stackBounds = _collapsedStackBounds(
+          board,
+          nextGroup,
+          visibleIds.length,
+        );
+        final maxZ = board.panels.fold<int>(
+          0,
+          (value, panel) => panel.zIndex > value ? panel.zIndex : value,
+        );
+        final nextPanels = board.panels.map((panel) {
+          if (!group.panelIds.contains(panel.id)) return panel;
+          final visibleIndex = visibleIds.indexOf(panel.id);
+          final isVisible = visibleIndex != -1;
+          if (!isVisible) return panel.copyWith(hidden: true);
+          final stackedBounds = _stackedCardBounds(
+            stackBounds,
+            visibleIndex,
+            visibleIds.length,
+          );
+          return panel.copyWith(
+            hidden: false,
+            bounds: stackedBounds,
+            zIndex: maxZ + 1 + visibleIndex,
+          );
+        }).toList();
+        final nextGroups = board.groups.map((g) {
+          if (g.id != groupId) return g;
+          return nextGroup;
+        }).toList();
+        return board.copyWith(groups: nextGroups, panels: nextPanels);
+      },
+      historyEvent: null,
+    );
+  }
+
+  // ── Multi-selection ───────────────────────────────────────────────────────
+
+  void selectPanels(Set<String> panelIds) {
+    emit(state.copyWith(selectedPanelIds: panelIds));
+  }
+
+  void togglePanelSelection(String panelId) {
+    final current = state.selectedPanelIds;
+    if (current.contains(panelId)) {
+      emit(state.copyWith(selectedPanelIds: current.difference({panelId})));
+    } else {
+      emit(state.copyWith(selectedPanelIds: current.union({panelId})));
+    }
+  }
+
+  void clearSelection() {
+    emit(state.copyWith(clearSelection: true));
+  }
+
+  void selectPanelsInRect(Rect rect) {
+    final board = state.activeBoard;
+    if (board == null) return;
+    final ids = <String>{};
+    for (final panel in board.panels) {
+      if (panel.hidden) continue;
+      final panelRect = Rect.fromLTWH(
+        panel.bounds.x,
+        panel.bounds.y,
+        panel.bounds.width,
+        panel.bounds.height,
+      );
+      if (rect.overlaps(panelRect)) {
+        ids.add(panel.id);
+      }
+    }
+    emit(state.copyWith(selectedPanelIds: ids));
+  }
+
+  Future<void> createGroupFromSelection({
+    required String name,
+    int? color,
+  }) async {
+    final board = state.activeBoard;
+    if (board == null) return;
+    final panelIds = state.selectedPanelIds.toList();
+    if (panelIds.isEmpty) return;
+    await createGroup(
+      board.id,
+      name: name,
+      panelIds: panelIds,
+      color: color,
+    );
+    emit(state.copyWith(clearSelection: true));
+  }
+
   Future<void> createMarkdownNote({
     required String title,
     required String markdown,
@@ -627,9 +1592,7 @@ class BoardCubit extends Cubit<BoardState> {
     );
 
     final effectiveProvider =
-        provider ??
-        AgentConfigService.instance.defaultAgentId ??
-        'copilot';
+        provider ?? AgentConfigService.instance.defaultAgentId ?? 'copilot';
 
     // Resolve effective model: user's explicit arg → agent default model → catalog default → hardcoded default
     final effectiveModel = _resolveDefaultModel(effectiveProvider, model);
@@ -1158,7 +2121,10 @@ class BoardCubit extends Cubit<BoardState> {
     try {
       await _historyStore.append(event);
     } catch (error, stackTrace) {
-      assert(() { debugPrint('[BoardCubit] failed to append board history: $error'); return true; }());
+      assert(() {
+        debugPrint('[BoardCubit] failed to append board history: $error');
+        return true;
+      }());
       debugPrintStack(stackTrace: stackTrace);
     }
   }
@@ -1335,16 +2301,16 @@ class BoardCubit extends Cubit<BoardState> {
           ).fetchBoard(remote.boardId, viewportOverride: board.viewport);
           assert(() {
             debugPrint(
-            '[BoardCubit] refreshed stale remote board ${board.id} after revision conflict',
-          );
+              '[BoardCubit] refreshed stale remote board ${board.id} after revision conflict',
+            );
             return true;
           }());
           continue;
         }
         assert(() {
           debugPrint(
-          '[BoardCubit] failed to sync remote board ${board.id}: $error',
-        );
+            '[BoardCubit] failed to sync remote board ${board.id}: $error',
+          );
           return true;
         }());
       }
@@ -1469,6 +2435,14 @@ class BoardCubit extends Cubit<BoardState> {
     required double preferredWidth,
     required double preferredHeight,
   }) {
+    if (board.gridMode.enabled) {
+      return _nextAvailableGridBounds(
+        board,
+        preferredWidth: preferredWidth,
+        preferredHeight: preferredHeight,
+      );
+    }
+
     const startX = 120.0;
     const startY = 120.0;
     const gap = 24.0;
@@ -1507,6 +2481,57 @@ class BoardCubit extends Cubit<BoardState> {
       y: startY + (occupiedRects.length * (preferredHeight + stepY) * 0.35),
       width: preferredWidth,
       height: preferredHeight,
+    );
+  }
+
+  BoardPanelBounds _nextAvailableGridBounds(
+    BoardDocument board, {
+    required double preferredWidth,
+    required double preferredHeight,
+  }) {
+    final mode = board.gridMode;
+    final rects = buildGridRects(
+      mode,
+      board.panels.where((p) => !p.hidden).toList(),
+    );
+    final probe = BoardPanelBounds(
+      x: 0,
+      y: 0,
+      width: preferredWidth,
+      height: preferredHeight,
+    );
+    final probeRect = boundsToGridRect(mode, probe);
+
+    // Search a generous region around the origin for the first free slot.
+    const searchRadius = 12;
+    for (var row = 0; row < searchRadius; row++) {
+      for (var col = 0; col < searchRadius; col++) {
+        final candidate = GridRect(
+          col,
+          row,
+          colSpan: probeRect.colSpan,
+          rowSpan: probeRect.rowSpan,
+        );
+        final overlaps = rects.values.any(candidate.overlaps);
+        if (!overlaps) {
+          return gridRectToBounds(mode, candidate);
+        }
+      }
+    }
+
+    // Fallback: place below the occupied region.
+    final maxRow =
+        rects.values.isEmpty
+            ? 0
+            : rects.values.map((r) => r.bottom).reduce(math.max);
+    return gridRectToBounds(
+      mode,
+      GridRect(
+        0,
+        maxRow + 1,
+        colSpan: probeRect.colSpan,
+        rowSpan: probeRect.rowSpan,
+      ),
     );
   }
 }

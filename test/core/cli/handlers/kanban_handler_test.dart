@@ -86,4 +86,31 @@ void main() {
     final cards = r.stateUpdate!['cards'] as List;
     expect(cards.length, 1);
   });
+
+  test('send-card-to-chat queues pending message on target panel', () async {
+    final r = await handler.handleAction(
+      'send-card-to-chat',
+      {'cardId': 'card-1', 'targetPanelId': 'chat-1'},
+      _panel(state: _withColumns()),
+    );
+    expect(r.ok, isTrue);
+    expect(r.additionalStateUpdates, contains('chat-1'));
+    final targetState = r.additionalStateUpdates!['chat-1']!;
+    expect(targetState['_cliPendingMessage'], 'Task A');
+    expect(targetState['_cliPendingAttachments'], isEmpty);
+  });
+
+  test('paste creates a card from text', () async {
+    final r = await handler.handleAction(
+      'paste',
+      {'text': 'New task\nDescription line', 'columnIndex': 1},
+      _panel(state: _withColumns()),
+    );
+    expect(r.ok, isTrue);
+    final cards = r.stateUpdate!['cards'] as List;
+    final pasted = cards.last as Map<String, dynamic>;
+    expect(pasted['title'], 'New task');
+    expect(pasted['description'], 'Description line');
+    expect(pasted['columnIndex'], 1);
+  });
 }

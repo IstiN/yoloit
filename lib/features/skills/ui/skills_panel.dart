@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/utils/input_decoration_utils.dart';
 import 'package:yoloit/features/skills/bloc/skills_cubit.dart';
@@ -429,16 +430,22 @@ class _SkillCard extends StatelessWidget {
                 )
               else ...[
                 _SmallButton(
-                  label: 'Remove',
-                  icon: Icons.delete_outline,
-                  color: colors.accentOrange,
-                  onTap: () => _confirmUninstall(context, cubit),
+                  label: 'View',
+                  icon: Icons.visibility_outlined,
+                  onTap: () => _viewSkill(context, cubit),
                 ),
                 const SizedBox(height: 4),
                 _SmallButton(
                   label: 'To Repo',
                   icon: Icons.folder_open_outlined,
                   onTap: () => _showInstallToRepoDialog(context, cubit),
+                ),
+                const SizedBox(height: 4),
+                _SmallButton(
+                  label: 'Remove',
+                  icon: Icons.delete_outline,
+                  color: colors.accentOrange,
+                  onTap: () => _confirmUninstall(context, cubit),
                 ),
               ],
             ],
@@ -493,6 +500,13 @@ class _SkillCard extends StatelessWidget {
         workspaces: state.workspaces,
         cubit: cubit,
       ),
+    );
+  }
+
+  void _viewSkill(BuildContext context, SkillsCubit cubit) {
+    showDialog<void>(
+      context: context,
+      builder: (_) => _SkillPreviewDialog(skill: skill, cubit: cubit),
     );
   }
 }
@@ -830,6 +844,100 @@ class _InstallToRepoDialogState extends State<_InstallToRepoDialog> {
                   Navigator.pop(context);
                 },
           child: const Text('Install'),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Skill preview dialog ──────────────────────────────────────────────────────
+
+class _SkillPreviewDialog extends StatefulWidget {
+  const _SkillPreviewDialog({required this.skill, required this.cubit});
+  final SkillEntry skill;
+  final SkillsCubit cubit;
+
+  @override
+  State<_SkillPreviewDialog> createState() => _SkillPreviewDialogState();
+}
+
+class _SkillPreviewDialogState extends State<_SkillPreviewDialog> {
+  late final Future<String?> _contentFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _contentFuture = widget.cubit.readSkillContent(widget.skill.id);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return AlertDialog(
+      backgroundColor: colors.surfaceElevated,
+      title: Text(
+        widget.skill.name,
+        style: TextStyle(color: colors.textPrimary, fontSize: 15),
+      ),
+      content: SizedBox(
+        width: 640,
+        height: 520,
+        child: FutureBuilder<String?>(
+          future: _contentFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return Center(
+                child: CircularProgressIndicator(strokeWidth: 2, color: colors.primary),
+              );
+            }
+            final content = snapshot.data;
+            if (content == null || content.isEmpty) {
+              return const Center(
+                child: Caption(
+                  'Skill content not found.',
+                  fontSize: 13,
+                ),
+              );
+            }
+            return Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: colors.background,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: colors.border),
+              ),
+              child: SingleChildScrollView(
+                child: MarkdownBody(
+                  data: content,
+                  selectable: true,
+                  styleSheet: MarkdownStyleSheet(
+                    p: TextStyle(color: colors.textPrimary, fontSize: 12),
+                    h1: TextStyle(color: colors.textPrimary, fontSize: 18, fontWeight: FontWeight.w600),
+                    h2: TextStyle(color: colors.textPrimary, fontSize: 15, fontWeight: FontWeight.w600),
+                    h3: TextStyle(color: colors.textPrimary, fontSize: 13, fontWeight: FontWeight.w600),
+                    code: TextStyle(
+                      color: colors.terminalText,
+                      fontFamily: 'JetBrainsMono',
+                      fontSize: 11,
+                      backgroundColor: colors.surfaceHighlight,
+                    ),
+                    codeblockDecoration: BoxDecoration(
+                      color: colors.surfaceHighlight,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    blockquote: TextStyle(color: colors.textMuted, fontSize: 12),
+                    listBullet: TextStyle(color: colors.textPrimary, fontSize: 12),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Close'),
         ),
       ],
     );

@@ -107,4 +107,61 @@ void main() {
       expect(await file.readAsString(), 'sample content');
     });
   });
+
+  group('ClipboardFileService.isSafeInlineText', () {
+    test('returns true for short single-line plain text', () {
+      expect(
+        ClipboardFileService.instance.isSafeInlineText(
+          'chore/bump-agents-submodule-token-usage had recent pushes about 1 hour ago',
+        ),
+        isTrue,
+      );
+    });
+
+    test('returns false for empty text', () {
+      expect(ClipboardFileService.instance.isSafeInlineText(''), isFalse);
+    });
+
+    test('returns false for multi-line text', () {
+      expect(
+        ClipboardFileService.instance.isSafeInlineText('line one\nline two'),
+        isFalse,
+      );
+    });
+
+    test('returns false for text containing control characters', () {
+      expect(
+        ClipboardFileService.instance.isSafeInlineText('hello\x1b[31mworld'),
+        isFalse,
+      );
+    });
+
+    test('returns false when text exceeds maxLength', () {
+      final longText = 'a' * 1001;
+      expect(ClipboardFileService.instance.isSafeInlineText(longText), isFalse);
+    });
+
+    test('returns true for text exactly at maxLength', () {
+      final text = 'a' * 1000;
+      expect(ClipboardFileService.instance.isSafeInlineText(text), isTrue);
+    });
+
+    test('allows tab characters', () {
+      expect(
+        ClipboardFileService.instance.isSafeInlineText('col1\tcol2'),
+        isTrue,
+      );
+    });
+
+    test('respects custom maxLength', () {
+      expect(
+        ClipboardFileService.instance.isSafeInlineText('abcd', maxLength: 3),
+        isFalse,
+      );
+      expect(
+        ClipboardFileService.instance.isSafeInlineText('abc', maxLength: 3),
+        isTrue,
+      );
+    });
+  });
 }

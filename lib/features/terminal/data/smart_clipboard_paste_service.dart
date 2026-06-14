@@ -2,14 +2,14 @@ import 'package:flutter/services.dart';
 import 'package:super_clipboard/super_clipboard.dart';
 import 'package:yoloit/features/terminal/data/clipboard_file_service.dart';
 
-/// Returns either inline text (for short text clipboard content) or an absolute
-/// temp-file path containing clipboard data (for images / long text).
+/// Returns either inline text (for short, safe clipboard content) or an
+/// absolute temp-file path containing clipboard data (for images / long text).
 class SmartClipboardPasteService {
   SmartClipboardPasteService._();
 
   static final instance = SmartClipboardPasteService._();
 
-  Future<String?> readInlineTextOrSavedFilePath() async {
+  Future<String?> readInlineTextOrSavedFilePath({bool allowInlineText = false}) async {
     String? text;
 
     // Try super_clipboard first.
@@ -49,9 +49,14 @@ class SmartClipboardPasteService {
     final filePath = await ClipboardFileService.instance.tryResolveTextAsFilePath(text);
     if (filePath != null) return filePath;
 
-    // Otherwise save text to a temp file so terminals and chats get a uniform
-    // file-based paste experience (no inline text that may be interpreted as
-    // escape sequences by terminals or split into unknown tokens by models).
+    // For short, single-line, control-character-free text, paste it inline
+    // when the caller opts in (e.g. chat input fields). Otherwise fall back to
+    // a temp-file reference to keep terminals safe from escape sequences and
+    // to give models a uniform file-based attachment.
+    if (allowInlineText && ClipboardFileService.instance.isSafeInlineText(text)) {
+      return text;
+    }
+
     return ClipboardFileService.instance.saveTextToFile(text);
   }
 }

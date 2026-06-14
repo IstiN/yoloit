@@ -9,7 +9,7 @@ final _boardToolDefaultColors = AppColorScheme.fromAccent(Colors.deepPurple);
 // Tool identifiers
 // ─────────────────────────────────────────────────────────────────────────────
 
-enum BoardToolId { select, draw, connect }
+enum BoardToolId { select, multiSelect, draw, connect }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Abstract base
@@ -58,6 +58,25 @@ class SelectTool extends BoardTool {
   String? get shortcutHint => 'V';
 }
 
+class MultiSelectTool extends BoardTool {
+  const MultiSelectTool();
+
+  @override
+  BoardToolId get id => BoardToolId.multiSelect;
+
+  @override
+  String get label => 'Select Many';
+
+  @override
+  IconData get icon => Icons.select_all;
+
+  @override
+  Color get accentColor => _boardToolDefaultColors.accentBlue;
+
+  @override
+  String? get shortcutHint => 'M';
+}
+
 class DrawTool extends BoardTool {
   const DrawTool();
 
@@ -97,7 +116,12 @@ class ConnectTool extends BoardTool {
 }
 
 /// The canonical ordered list of all available tools.
-const List<BoardTool> kBoardTools = [SelectTool(), DrawTool(), ConnectTool()];
+const List<BoardTool> kBoardTools = [
+  SelectTool(),
+  MultiSelectTool(),
+  DrawTool(),
+  ConnectTool(),
+];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Draw tool settings (value object, immutable)

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:yoloit/core/platform/platform_dirs.dart';
 
@@ -50,6 +51,7 @@ class YoloitGlobalSkillsService {
   static final instance = YoloitGlobalSkillsService._();
 
   static const builtInSkillId = 'yoloit-app-development';
+  static const yoloitSkillId = 'yoloit';
 
   String get _home {
     final configDir = PlatformDirs.instance.configDir;
@@ -96,6 +98,11 @@ class YoloitGlobalSkillsService {
       name: 'Windsurf',
       path: p.join(_home, '.windsurf', 'rules'),
     ),
+    GlobalSkillTarget(
+      id: 'kimi-user',
+      name: 'Kimi Agent',
+      path: p.join(_home, '.agents', 'skills'),
+    ),
   ];
 
   Future<GlobalSkillsStatus> check() async {
@@ -141,10 +148,25 @@ class YoloitGlobalSkillsService {
   }
 
   Future<void> ensureBuiltInSkill() async {
+    await _ensureAppDevelopmentSkill();
+    await _ensureYoloitSkill();
+  }
+
+  Future<void> _ensureAppDevelopmentSkill() async {
     final skillDir = Directory(p.join(_skillsDir, builtInSkillId));
     await skillDir.create(recursive: true);
     final skillFile = File(p.join(skillDir.path, 'SKILL.md'));
     await skillFile.writeAsString(await _builtInSkillContent());
+  }
+
+  Future<void> _ensureYoloitSkill() async {
+    final skillDir = Directory(p.join(_skillsDir, yoloitSkillId));
+    await skillDir.create(recursive: true);
+    final skillFile = File(p.join(skillDir.path, 'SKILL.md'));
+    final content = await rootBundle.loadString(
+      'assets/skills/yoloit/SKILL.md',
+    );
+    await skillFile.writeAsString(content);
   }
 
   Future<List<String>> _installedSkillIds() async {

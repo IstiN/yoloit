@@ -23,6 +23,7 @@ class ChatCliHandler extends PanelCliHandler {
     'status',
     'stop',
     'sessions',
+    'set-follow-up',
   ];
 
   @override
@@ -85,6 +86,8 @@ class ChatCliHandler extends PanelCliHandler {
         return _handleStop(panel);
       case 'sessions':
         return _handleSessions();
+      case 'set-follow-up':
+        return _handleSetFollowUp(args, panel);
       default:
         return CliActionResult(ok: false, message: 'Unknown action: $action');
     }
@@ -282,6 +285,32 @@ class ChatCliHandler extends PanelCliHandler {
     return CliActionResult(data: {'sessions': sessions});
   }
 
+  CliActionResult _handleSetFollowUp(
+    Map<String, dynamic> args,
+    BoardPanelInstance panel,
+  ) {
+    final clear = args['clear'] == true;
+    if (clear) {
+      final nextState = {...panel.state}..remove('_followUpDraft');
+      return CliActionResult(
+        message: 'Follow-up cleared',
+        stateUpdate: nextState,
+      );
+    }
+
+    final text = args['text'] as String?;
+    if (text == null || text.trim().isEmpty) {
+      return const CliActionResult(
+        ok: false,
+        message: 'Missing "text" or set "clear": true',
+      );
+    }
+    return CliActionResult(
+      message: 'Follow-up draft set',
+      stateUpdate: {...panel.state, '_followUpDraft': text.trim()},
+    );
+  }
+
   String _truncate(String s, int max) => truncateText(s, max);
 
   Map<String, dynamic> _mergeConfig(
@@ -382,6 +411,14 @@ class ChatCliHandler extends PanelCliHandler {
     'stop': const CliActionHelp(description: 'Stop any active streaming'),
     'sessions': const CliActionHelp(
       description: 'List all active chat sessions across panels',
+    ),
+    'set-follow-up': const CliActionHelp(
+      description:
+          'Queue a follow-up message to be auto-sent when the current turn ends',
+      params: {
+        'text': 'The follow-up text (required unless clear is true)',
+        'clear': 'Set true to remove the queued follow-up',
+      },
     ),
   };
 }

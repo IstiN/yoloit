@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
-import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/chat/widgets/chat_markdown_styles.dart';
 import 'package:yoloit/features/board/chat/widgets/chat_typing_indicator.dart';
 

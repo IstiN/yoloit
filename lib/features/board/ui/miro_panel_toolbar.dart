@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/ui/adaptive_dialog.dart';
 import 'package:yoloit/core/utils/color_utils.dart';
+import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/ui/components/menus/miro_toolbar_primitives.dart';
@@ -348,6 +350,25 @@ class PanelSettingsDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final board = context.read<BoardCubit>().state.activeBoard;
+    BoardPanelGroup? currentGroup;
+    if (board != null) {
+      for (final group in board.groups) {
+        if (group.panelIds.contains(panel.id)) {
+          currentGroup = group;
+          break;
+        }
+      }
+    }
+    final otherGroups = <BoardPanelGroup>[];
+    if (board != null) {
+      for (final group in board.groups) {
+        if (group.id != currentGroup?.id) {
+          otherGroups.add(group);
+        }
+      }
+    }
+
     return AdaptiveDialogScaffold(
       title: 'Panel settings',
       icon: Icon(plugin?.icon ?? Icons.dashboard_customize_outlined),
@@ -420,6 +441,88 @@ class PanelSettingsDialog extends StatelessWidget {
                 ),
               ],
             ),
+            const SizedBox(height: 18),
+            PanelSettingsSection(
+              title: 'Group',
+              children: [
+                if (currentGroup != null)
+                  Builder(
+                    builder: (context) {
+                      final group = currentGroup!;
+                      return Row(
+                        children: [
+                          Expanded(
+                            child: PanelSettingsInfoRow(
+                              label: 'In group',
+                              value: group.name,
+                            ),
+                          ),
+                          OutlinedButton.icon(
+                            onPressed: () {
+                              final cubit = context.read<BoardCubit>();
+                              final boardId = board?.id;
+                              if (boardId == null) return;
+                              cubit.removePanelsFromGroup(
+                                boardId,
+                                group.id,
+                                [panel.id],
+                              );
+                              Navigator.of(context).maybePop();
+                            },
+                            icon: const Icon(Icons.link_off_outlined, size: 18),
+                            label: const Text('Remove'),
+                          ),
+                        ],
+                      );
+                    },
+                  )
+                else
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: [
+                          FilledButton.tonalIcon(
+                            onPressed: () async {
+                              final navigator = Navigator.of(context);
+                              final cubit = context.read<BoardCubit>();
+                              final boardId = board?.id;
+                              final name = await _showGroupNameDialog(context);
+                              if (name == null || name.isEmpty) return;
+                              if (boardId == null) return;
+                              await cubit.createGroup(
+                                boardId,
+                                name: name,
+                                panelIds: [panel.id],
+                              );
+                              navigator.maybePop();
+                            },
+                            icon: const Icon(Icons.create_new_folder_outlined, size: 18),
+                            label: const Text('New group'),
+                          ),
+                          if (otherGroups.isNotEmpty)
+                            _ExistingGroupDropdown(
+                              groups: otherGroups,
+                              onSelected: (groupId) {
+                                final cubit = context.read<BoardCubit>();
+                                final boardId = board?.id;
+                                if (boardId == null) return;
+                                cubit.addPanelsToGroup(
+                                  boardId,
+                                  groupId,
+                                  [panel.id],
+                                );
+                                Navigator.of(context).maybePop();
+                              },
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+              ],
+            ),
           ],
         ),
       ),
@@ -429,6 +532,63 @@ class PanelSettingsDialog extends StatelessWidget {
           child: const Text('Close'),
         ),
       ],
+    );
+  }
+
+  Future<String?> _showGroupNameDialog(BuildContext context) async {
+    final controller = TextEditingController();
+    return showAdaptiveYoloDialog<String?>(
+      context: context,
+      builder:
+          (dialogContext) => AdaptiveDialogScaffold(
+            title: 'New group',
+            icon: const Icon(Icons.create_new_folder_outlined),
+            maxWidth: 360,
+            body: TextField(
+              controller: controller,
+              autofocus: true,
+              decoration: const InputDecoration(labelText: 'Group name'),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed:
+                    () => Navigator.of(dialogContext).pop(
+                      controller.text.trim(),
+                    ),
+                child: const Text('Create'),
+              ),
+            ],
+          ),
+    );
+  }
+}
+
+class _ExistingGroupDropdown extends StatelessWidget {
+  const _ExistingGroupDropdown({required this.groups, required this.onSelected});
+
+  final List<BoardPanelGroup> groups;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonHideUnderline(
+      child: DropdownButton<String>(
+        hint: const Text('Add to group'),
+        items:
+            groups.map((group) {
+              return DropdownMenuItem<String>(
+                value: group.id,
+                child: Text(group.name),
+              );
+            }).toList(),
+        onChanged: (value) {
+          if (value != null) onSelected(value);
+        },
+      ),
     );
   }
 }

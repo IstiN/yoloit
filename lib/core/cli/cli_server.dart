@@ -59,13 +59,20 @@ class CliServer {
   TerminalCubit? _terminalCubit;
   final Set<String> _warnedActionHelpTypes = <String>{};
 
+  /// Config directory used for CLI files. Debug builds use a separate
+  /// directory so they do not overwrite the release CLI installation.
+  static String get _configDir {
+    if (kDebugMode) {
+      return '${Platform.environment['HOME'] ?? '/tmp'}/.config/yoloit-dev';
+    }
+    return '${Platform.environment['HOME'] ?? '/tmp'}/.config/yoloit';
+  }
+
   /// Port file written so the CLI client knows which port to connect to.
-  static String get _portFilePath =>
-      '${Platform.environment['HOME'] ?? '/tmp'}/.config/yoloit/cli.port';
+  static String get _portFilePath => '$_configDir/cli.port';
 
   /// VM service URI file so the CLI can trigger hot reload/restart.
-  static String get _vmServiceFilePath =>
-      '${Platform.environment['HOME'] ?? '/tmp'}/.config/yoloit/cli.vmservice';
+  static String get _vmServiceFilePath => '$_configDir/cli.vmservice';
 
   /// Whether the server is currently running.
   bool get isRunning => _server != null;
@@ -110,9 +117,15 @@ class CliServer {
     try {
       _server = await shelf_io.serve(handler, InternetAddress.loopbackIPv4, 0);
       _writePortFile(_server!.port);
-      assert(() { debugPrint('[CliServer] listening on localhost:${_server!.port}'); return true; }());
+      assert(() {
+        debugPrint('[CliServer] listening on localhost:${_server!.port}');
+        return true;
+      }());
     } catch (e) {
-      assert(() { debugPrint('[CliServer] failed to start: $e'); return true; }());
+      assert(() {
+        debugPrint('[CliServer] failed to start: $e');
+        return true;
+      }());
     }
   }
 
@@ -135,7 +148,11 @@ class CliServer {
     // Also write VM service URI for hot reload support
     _writeVmServiceFile();
     // Install the CLI script to a known location so terminals can use it.
-    unawaited(_installCliScript());
+    if (kDebugMode) {
+      unawaited(_installDebugCliScript());
+    } else {
+      unawaited(_installCliScript());
+    }
   }
 
   /// Extracts the bundled `tools/yoloit` asset to `~/.config/yoloit/yoloit`
@@ -153,9 +170,45 @@ class CliServer {
         flush: true,
       );
       await Process.run('chmod', ['+x', binFile.path]);
-      assert(() { debugPrint('[CliServer] CLI script installed at ${binFile.path}'); return true; }());
+      assert(() {
+        debugPrint('[CliServer] CLI script installed at ${binFile.path}');
+        return true;
+      }());
     } catch (e) {
-      assert(() { debugPrint('[CliServer] Failed to install CLI script: $e'); return true; }());
+      assert(() {
+        debugPrint('[CliServer] Failed to install CLI script: $e');
+        return true;
+      }());
+    }
+  }
+
+  /// Installs a debug-only `yoloit-debug` CLI script that talks to the debug
+  /// app's HTTP server and uses `~/.config/yoloit-dev` for state.
+  Future<void> _installDebugCliScript() async {
+    try {
+      final home = Platform.environment['HOME'] ?? '';
+      if (home.isEmpty) return;
+      final binFile = File('$home/.config/yoloit/yoloit-debug');
+      final data = await rootBundle.loadString('tools/yoloit');
+      final transformed = data
+          .replaceFirst(
+            '#!/usr/bin/env bash',
+            '#!/usr/bin/env bash\nexport YOLOIT_DEV_RUNTIME=1',
+          )
+          .replaceAll('\${HOME}/.config/yoloit', '\${HOME}/.config/yoloit-dev')
+          .replaceAll('~/.config/yoloit', '~/.config/yoloit-dev');
+      binFile.parent.createSync(recursive: true);
+      await binFile.writeAsString(transformed, flush: true);
+      await Process.run('chmod', ['+x', binFile.path]);
+      assert(() {
+        debugPrint('[CliServer] Debug CLI script installed at ${binFile.path}');
+        return true;
+      }());
+    } catch (e) {
+      assert(() {
+        debugPrint('[CliServer] Failed to install debug CLI script: $e');
+        return true;
+      }());
     }
   }
 
@@ -439,12 +492,7 @@ class CliServer {
   }
 
   Future<shelf.Response> _handleLmGenerate(shelf.Request request) async {
-    return handleLmGenerate(
-      request,
-      body: _body,
-      json: _json,
-      error: _error,
-    );
+    return handleLmGenerate(request, body: _body, json: _json, error: _error);
   }
 
   Future<shelf.Response> _handleYoloChat(
@@ -502,6 +550,7 @@ class CliServer {
       updateViewport: _updateViewport,
       fitViewport: _fitViewport,
       arrangeBoard: _arrangeBoard,
+      gridBoard: _gridBoard,
     );
   }
 
@@ -550,6 +599,7 @@ class CliServer {
       'panelCount': board.panels.length,
       'linkCount': board.links.length,
       'defaultFolder': board.defaultFolder,
+      'gridMode': board.gridMode.toJson(),
       if (activeId != null) 'active': board.id == activeId,
     };
   }
@@ -581,6 +631,7 @@ class CliServer {
       'panelCount': board.panels.length,
       'linkCount': board.links.length,
       'defaultFolder': board.defaultFolder,
+      'gridMode': board.gridMode.toJson(),
       'panels': board.panels.map(_panelSummary).toList(),
     });
   }
@@ -673,7 +724,10 @@ class CliServer {
 
     Uint8List? png;
     if (forceOffscreen) {
-      assert(() { debugPrint('[CliServer] screenshot: offscreen board=${board.id}'); return true; }());
+      assert(() {
+        debugPrint('[CliServer] screenshot: offscreen board=${board.id}');
+        return true;
+      }());
       png = await BoardOffscreenRenderer.instance.renderBoard(board);
     } else {
       final activeBoard = activeCubit.state.activeBoard;
@@ -682,7 +736,10 @@ class CliServer {
         _scheduleRebuild();
         png = await BoardScreenshotService.instance.capturePng(pixelRatio: 1.5);
       } else {
-        assert(() { debugPrint('[CliServer] screenshot: offscreen board=${board.id}'); return true; }());
+        assert(() {
+          debugPrint('[CliServer] screenshot: offscreen board=${board.id}');
+          return true;
+        }());
         png = await BoardOffscreenRenderer.instance.renderBoard(board);
       }
     }
@@ -1131,6 +1188,26 @@ class CliServer {
       _scheduleRebuild();
     }
 
+    // Apply optional state updates to other panels on the same board.
+    if (result.additionalStateUpdates != null && result.ok) {
+      for (final entry in result.additionalStateUpdates!.entries) {
+        BoardPanelInstance? targetPanel;
+        for (final p in board.panels) {
+          if (p.id == entry.key) {
+            targetPanel = p;
+            break;
+          }
+        }
+        if (targetPanel == null) continue;
+        await cubit.updatePanel(
+          targetPanel.id,
+          (p) => p.copyWith(state: {...targetPanel!.state, ...entry.value}),
+          boardId: board.id,
+        );
+      }
+      _scheduleRebuild();
+    }
+
     return _json(result.toJson());
   }
 
@@ -1349,6 +1426,63 @@ class CliServer {
       'arranged': moves.length,
       'layout': 'tree',
       'direction': direction,
+    });
+  }
+
+  // ── Grid view implementation ─────────────────────────────────────────────
+
+  /// Toggle, adjust or reset the board grid view.
+  ///
+  /// Body params:
+  /// - enabled (bool, optional unless reset is false): turn grid view on or off
+  /// - cellSize (num, optional): grid cell size in logical pixels
+  /// - spacing (num, optional): gap between cells in logical pixels
+  /// - arrange (bool, optional): if true, re-arrange panels into the default cloud
+  /// - groupByType (bool, optional): if true, arrange panels into type blocks
+  /// - reset (bool, optional): if true, reset the grid layout to the default cloud
+  Future<shelf.Response> _gridBoard(
+    BoardCubit cubit,
+    BoardDocument board,
+    Map<String, dynamic> body,
+  ) async {
+    final reset = body['reset'] == true;
+    if (reset) {
+      await cubit.resetGridView(board.id);
+    }
+
+    final enabled = body['enabled'];
+    if (!reset && enabled is! bool) {
+      return _error('Missing or invalid "enabled" field');
+    }
+
+    if (enabled is bool) {
+      await cubit.setGridMode(board.id, enabled: enabled);
+    }
+
+    final cellSize = (body['cellSize'] as num?)?.toDouble();
+    if (cellSize != null) {
+      await cubit.setGridCellSize(board.id, cellSize);
+    }
+
+    final spacing = (body['spacing'] as num?)?.toDouble();
+    if (spacing != null) {
+      await cubit.setGridSpacing(board.id, spacing);
+    }
+
+    if (body['arrange'] == true) {
+      await cubit.arrangePanelsInGrid(board.id);
+    }
+
+    if (body['groupByType'] == true) {
+      await cubit.arrangePanelsByTypeInGrid(board.id);
+    }
+
+    _scheduleRebuild();
+    final updated =
+        cubit.state.boards.where((b) => b.id == board.id).firstOrNull;
+    return _json({
+      'ok': true,
+      'gridMode': (updated ?? board).gridMode.toJson(),
     });
   }
 
@@ -2506,13 +2640,7 @@ class CliServer {
     List<String> path,
     shelf.Request request,
   ) async {
-    return handleTheme(
-      method,
-      path,
-      request,
-      json: _json,
-      notFound: _notFound,
-    );
+    return handleTheme(method, path, request, json: _json, notFound: _notFound);
   }
 }
 

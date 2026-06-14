@@ -25,9 +25,11 @@ import 'package:yoloit/features/board/chat/widgets/chat_action_button.dart';
 import 'package:yoloit/features/board/chat/widgets/chat_changed_files_strip.dart';
 import 'package:yoloit/features/board/chat/widgets/chat_context_toggles.dart';
 import 'package:yoloit/features/board/chat/widgets/chat_empty_state.dart';
+import 'package:yoloit/features/board/chat/widgets/chat_follow_up_banner.dart';
 import 'package:yoloit/features/board/chat/widgets/chat_info_bar.dart';
 import 'package:yoloit/features/board/chat/widgets/chat_message_list.dart';
 import 'package:yoloit/features/board/chat/widgets/chat_model_suggestions.dart';
+import 'package:yoloit/features/board/chat/widgets/chat_panel_suggestions.dart';
 import 'package:yoloit/features/board/chat/widgets/chat_setup_view.dart';
 import 'package:yoloit/features/board/chat/widgets/chat_slash_chips.dart';
 import 'package:yoloit/features/board/chat/widgets/local_tools_dialog.dart';
@@ -128,6 +130,15 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   bool _isRecordingMic = false;
   bool _isTranscribingMic = false;
 
+  /// Debounced timer for persisting the input draft on every keystroke.
+  Timer? _draftSaveTimer;
+
+  /// Queued follow-up message that will be sent when the current turn ends.
+  String? _pendingFollowUp;
+
+  /// Subscription for kanban card → chat input events.
+  StreamSubscription<KanbanCardToChatEvent>? _kanbanToChatSub;
+
   @override
   void initState() {
     super.initState();
@@ -154,6 +165,19 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     // and app restarts). Each panel has its own state, so this is safe in
     // tests and avoids leaking draft text through the shared session manager.
     _inputController.text = widget.panel.state['draftText'] as String? ?? '';
+
+    // Restore a queued follow-up draft if one was set while the agent was busy.
+    _pendingFollowUp = widget.panel.state['_followUpDraft'] as String?;
+
+    // Listen for kanban cards being sent to this chat panel.
+    _kanbanToChatSub = BoardEventBus.instance
+        .on<KanbanCardToChatEvent>()
+        .where((e) => e.targetPanelId == widget.panel.id)
+        .listen((event) {
+          _insertTextAtCursor(event.text);
+          _inputFocusNode.requestFocus();
+          _persistDraftText();
+        });
 
     // If opencode provider, refresh models and rebuild setup view once loaded.
     if (_provider is OpencodeProvider) {
@@ -329,6 +353,14 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   @override
   void didUpdateWidget(covariant ChatPanelWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
+
+    // Pick up a follow-up draft that was set from the CLI while mounted.
+    final oldFollowUp = oldWidget.panel.state['_followUpDraft'] as String?;
+    final newFollowUp = widget.panel.state['_followUpDraft'] as String?;
+    if (newFollowUp != oldFollowUp && newFollowUp != _pendingFollowUp) {
+      setState(() => _pendingFollowUp = newFollowUp);
+    }
+
     final oldRaw = oldWidget.panel.state['config'];
     final newRaw = widget.panel.state['config'];
     if (oldRaw is Map && newRaw is Map) {
@@ -452,6 +484,29 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
 
   static const _maxSavedMessages = 100;
 
+  /// Saves only the draft text to panel state.
+  ///
+  /// Called on every input change with a debounce so the draft survives board
+  /// switches and app restarts even if [dispose] never runs.
+  void _persistDraftText() {
+    widget.onUpdateState({
+      ...widget.panel.state,
+      'draftText': _inputController.text,
+    });
+  }
+
+  /// Saves or clears the queued follow-up draft in panel state.
+  void _persistFollowUpState() {
+    final nextState = {...widget.panel.state};
+    final followUp = _pendingFollowUp;
+    if (followUp == null || followUp.isEmpty) {
+      nextState.remove('_followUpDraft');
+    } else {
+      nextState['_followUpDraft'] = followUp;
+    }
+    widget.onUpdateState(nextState);
+  }
+
   void _persistMessages() {
     final trimmed =
         _messages.length > _maxSavedMessages
@@ -540,6 +595,8 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     // When the widget re-mounts, it reads from session.messages.
     ChatSessionManager.instance.detach(widget.panel.id);
     _session = null;
+    _kanbanToChatSub?.cancel();
+    _draftSaveTimer?.cancel();
     _inputController.dispose();
     _scrollController.dispose();
     _inputFocusNode.dispose();
@@ -953,7 +1010,6 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   }) async {
     final text = overrideText?.trim() ?? _inputController.text.trim();
     if (text.isEmpty) return;
-    if (_isSending) return; // prevent re-entrance
 
     // Handle /model command
     if (text == '/model') {
@@ -968,7 +1024,30 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       return;
     }
 
-    setState(() => _isSending = true);
+    // Handle /yolo command — keep the input so the user can pick panels, then
+    // the actual mentions are resolved when the message is sent.
+    if (text == '/yolo' || text == '.yolo') {
+      _hideYoloSlash();
+      return;
+    }
+
+    // If the agent is busy, queue this text as the next follow-up instead of
+    // trying to send it now. The user can edit or cancel it from the banner.
+    if (_isProcessing) {
+      setState(() => _pendingFollowUp = text);
+      _persistFollowUpState();
+      if (overrideText == null) {
+        _inputController.clear();
+      }
+      return;
+    }
+
+    if (_isSending) return; // prevent re-entrance
+
+    setState(() {
+      _isSending = true;
+      _isYoloSlash = false;
+    });
     if (overrideText == null) {
       _inputController.clear();
     }
@@ -993,6 +1072,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     _assistantInsertIndex = _messages.length;
 
     final board = _currentBoardForPanel();
+    final enrichedText = _injectYoloPanelContext(text);
 
     // Capture board snapshot if enabled
     String? snapshotPath;
@@ -1014,7 +1094,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     // Route through the session — it owns the stream subscription.
     // When this widget is disposed, the session keeps processing events.
     final ok = await _session!.sendMessage(
-      text: text,
+      text: enrichedText,
       attachments: overrideAttachments,
       runtimeContext: ChatRuntimeContext(
         boardId: board?.id,
@@ -1082,6 +1162,14 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         _scrollToBottom();
         // Play macOS system sound on completion
         _playCompletionSound();
+
+        // Auto-send any queued follow-up message now that the turn is done.
+        final followUp = _pendingFollowUp;
+        if (followUp != null && followUp.trim().isNotEmpty) {
+          setState(() => _pendingFollowUp = null);
+          _persistFollowUpState();
+          unawaited(_sendMessage(overrideText: followUp.trim()));
+        }
       },
     );
 
@@ -1645,6 +1733,25 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (_pendingFollowUp != null && _pendingFollowUp!.isNotEmpty) ...[
+            ChatFollowUpBanner(
+              text: _pendingFollowUp!,
+              onEdit: () {
+                _inputController.text = _pendingFollowUp!;
+                _inputController.selection = TextSelection.collapsed(
+                  offset: _inputController.text.length,
+                );
+                setState(() => _pendingFollowUp = null);
+                _persistFollowUpState();
+                _inputFocusNode.requestFocus();
+              },
+              onCancel: () {
+                setState(() => _pendingFollowUp = null);
+                _persistFollowUpState();
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
           if (changedFiles.isNotEmpty) ...[
             ChatChangedFilesStrip(
               files: changedFiles,
@@ -1666,6 +1773,8 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                     _modelQuery = '';
                     _modelSelectedIndex = 0;
                   });
+                } else if (cmd.id == 'yolo') {
+                  setState(() => _isYoloSlash = true);
                 }
               },
             ),
@@ -1704,6 +1813,14 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
               onSystemPromptChanged: (v) {
                 setState(() => _ctxSystemPrompt = v);
               },
+            ),
+            const SizedBox(height: 8),
+          ],
+          if (_isYoloSlash) ...[
+            ChatPanelSuggestions(
+              panels: _currentBoardForPanel()?.panels ?? [],
+              selectedIds: _selectedYoloPanelIds,
+              onSelect: _toggleYoloPanel,
             ),
             const SizedBox(height: 8),
           ],
@@ -1807,6 +1924,12 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                       }
                     }
 
+                    if (_isYoloSlash &&
+                        event.logicalKey == LogicalKeyboardKey.escape) {
+                      _hideYoloSlash();
+                      return KeyEventResult.handled;
+                    }
+
                     // Enter (without Shift) → send
                     final isEnter =
                         event.logicalKey == LogicalKeyboardKey.enter ||
@@ -1899,12 +2022,12 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     );
   }
 
-  /// Smart paste: images → file ref, text → temp file ref.
+  /// Smart paste: images → file ref, safe short text → inline, otherwise temp file ref.
   Future<void> _handleSmartPaste() async {
     try {
       final pasted =
           await SmartClipboardPasteService.instance
-              .readInlineTextOrSavedFilePath();
+              .readInlineTextOrSavedFilePath(allowInlineText: true);
       if (pasted != null && mounted) {
         _insertTextAtCursor(pasted);
       }
@@ -2305,6 +2428,12 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       description: 'Toggle context injections',
       triggers: ['/context', '.context'],
     ),
+    ChatSlashCommand(
+      id: 'yolo',
+      displayName: 'yolo',
+      description: 'Reference a board panel',
+      triggers: ['/yolo', '.yolo'],
+    ),
   ];
 
   ChatSlashCommand? _findMatchingCommand(String text) {
@@ -2327,17 +2456,27 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         _modelSelectedIndex = 0;
         _isModelSlash = cmd.id == 'model';
         _isContextSlash = cmd.id == 'context';
+        _isYoloSlash = cmd.id == 'yolo';
       } else {
         _modelQuery = '';
         _isModelSlash = false;
         _isContextSlash = false;
+        _isYoloSlash = false;
       }
     });
     if (needsScroll) _ensureSuggestionsVisible();
+
+    // Debounce draft persistence so board switches never lose typed text.
+    _draftSaveTimer?.cancel();
+    _draftSaveTimer = Timer(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
+      _persistDraftText();
+    });
   }
 
   bool _isModelSlash = false;
   bool _isContextSlash = false;
+  bool _isYoloSlash = false;
 
   // ── Context toggles state ─────────────────────────────────────────────────
   bool _ctxCliHelp = true;
@@ -2349,7 +2488,8 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     final t = _inputController.text;
     return (t.startsWith('/') || t.startsWith('.')) &&
         !_isModelSlash &&
-        !_isContextSlash;
+        !_isContextSlash &&
+        !_isYoloSlash;
   }
 
   void _ensureSuggestionsVisible() {
@@ -2403,6 +2543,8 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         _isModelSlash = true;
         _modelQuery = '';
         _modelSelectedIndex = 0;
+      } else if (cmd.id == 'yolo') {
+        _isYoloSlash = true;
       }
     });
   }
@@ -2424,6 +2566,124 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     _hideModelSlash();
     _inputController.clear();
     _inputFocusNode.requestFocus();
+  }
+
+  // ── /yolo panel mention helpers ───────────────────────────────────────────
+
+  static final _yoloMentionRe = RegExp(
+    r'\[panel:([^|\]]+)\|([^|\]]+)\]',
+  );
+
+  Set<String> get _selectedYoloPanelIds {
+    final text = _inputController.text;
+    return _yoloMentionRe
+        .allMatches(text)
+        .map((m) => m.group(2)!)
+        .toSet();
+  }
+
+  void _toggleYoloPanel(BoardPanelInstance panel) {
+    final currentText = _inputController.text;
+    final selected = _selectedYoloPanelIds;
+    String nextText;
+    if (selected.contains(panel.id)) {
+      final mention = '[panel:${panel.title}|${panel.id}]';
+      nextText = currentText.replaceAll(mention, '').trim();
+    } else {
+      final prefix = currentText.trim();
+      final separator = prefix.isEmpty ? '' : ' ';
+      nextText = '$prefix$separator[panel:${panel.title}|${panel.id}]';
+    }
+    _inputController.text = nextText;
+    _inputController.selection = TextSelection.collapsed(
+      offset: _inputController.text.length,
+    );
+    _inputFocusNode.requestFocus();
+  }
+
+  void _hideYoloSlash() {
+    setState(() => _isYoloSlash = false);
+  }
+
+  /// Builds a concise textual summary of a panel to inject into the user
+  /// message when /yolo mentions are used.
+  String _summarizePanelForYolo(BoardPanelInstance panel) {
+    final state = panel.state;
+    final buffer = StringBuffer();
+    buffer.writeln('- ${panel.title} [${panel.type}] (id: ${panel.id})');
+    switch (panel.type) {
+      case 'board.note.markdown':
+        final markdown = (state['markdown'] as String? ?? '').trim();
+        if (markdown.isNotEmpty) {
+          final preview = markdown.length > 500
+              ? '${markdown.substring(0, 500)}…'
+              : markdown;
+          buffer.writeln('  Markdown preview:\n$preview');
+        }
+      case 'board.kanban':
+        final columns = (state['columns'] as List?)?.cast<String>() ?? [];
+        final cards = (state['cards'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+        for (var i = 0; i < columns.length; i++) {
+          final colCards = cards
+              .where((c) => (c['columnIndex'] as int? ?? 0) == i)
+              .toList();
+          if (colCards.isEmpty) continue;
+          buffer.writeln('  ${columns[i]}:');
+          for (final card in colCards) {
+            final title = card['title'] as String? ?? '';
+            if (title.isNotEmpty) buffer.writeln('    - $title');
+          }
+        }
+      case 'board.file.preview':
+        final path = state['path'] as String? ?? '';
+        if (path.isNotEmpty) buffer.writeln('  File: $path');
+      case 'board.chat':
+        buffer.writeln('  AI chat panel');
+      default:
+        final keys = state.keys
+            .where((k) => k != 'config' && k != 'messages' && k != 'lastUsage')
+            .toList();
+        if (keys.isNotEmpty) {
+          buffer.writeln('  State keys: ${keys.join(', ')}');
+        }
+    }
+    return buffer.toString().trimRight();
+  }
+
+  /// Parses /yolo panel mentions, appends their summaries to [text], and
+  /// returns the enriched prompt. Also strips the bare `/yolo` trigger.
+  String _injectYoloPanelContext(String text) {
+    final matches = _yoloMentionRe.allMatches(text).toList();
+    if (matches.isEmpty) return text;
+
+    final board = _currentBoardForPanel();
+    if (board == null) return text;
+
+    final summaryBuffer = StringBuffer('\n\nReferenced board panels:\n');
+    for (final match in matches) {
+      final panelId = match.group(2)!;
+      BoardPanelInstance? panel;
+      for (final p in board.panels) {
+        if (p.id == panelId) {
+          panel = p;
+          break;
+        }
+      }
+      if (panel != null) {
+        summaryBuffer.writeln(_summarizePanelForYolo(panel));
+      }
+    }
+
+    var userText = text.replaceAll(_yoloMentionRe, '').trim();
+    if (userText.startsWith('/yolo')) {
+      userText = userText.substring(5).trim();
+    } else if (userText.startsWith('.yolo')) {
+      userText = userText.substring(5).trim();
+    }
+    if (userText.isEmpty) {
+      return 'See the referenced board panels:${summaryBuffer.toString()}';
+    }
+    return '$userText${summaryBuffer.toString()}';
   }
 
   void _showSessionHistoryDialog(BuildContext context) {

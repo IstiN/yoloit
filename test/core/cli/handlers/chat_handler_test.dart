@@ -415,4 +415,22 @@ void main() {
     final messages = content['messages'] as List;
     expect(messages.first['content'], 'live message');
   });
+
+  test('set-follow-up stores draft in panel state', () async {
+    final panel = _panel();
+    final r = await handler.handleAction(
+      'set-follow-up',
+      {'text': 'Follow up text'},
+      panel,
+    );
+    expect(r.ok, isTrue);
+    expect(r.stateUpdate, containsPair('_followUpDraft', 'Follow up text'));
+  });
+
+  test('set-follow-up clear removes draft from panel state', () async {
+    final panel = _panel(state: {'_followUpDraft': 'old'});
+    final r = await handler.handleAction('set-follow-up', {'clear': true}, panel);
+    expect(r.ok, isTrue);
+    expect(r.stateUpdate, isNot(contains('_followUpDraft')));
+  });
 }

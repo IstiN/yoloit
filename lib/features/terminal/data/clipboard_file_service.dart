@@ -163,4 +163,16 @@ class ClipboardFileService {
     await file.writeAsString(text);
     return file.path;
   }
+
+  /// Returns true when [text] is short, single-line and contains no control
+  /// characters other than tab, making it safe to paste inline into text
+  /// fields instead of wrapping it in a temp file.
+  bool isSafeInlineText(String text, {int maxLength = 1000}) {
+    if (text.isEmpty || text.length > maxLength) return false;
+    if (text.contains('\n') || text.contains('\r')) return false;
+    for (final codeUnit in text.codeUnits) {
+      if (codeUnit < 32 && codeUnit != 9) return false;
+    }
+    return true;
+  }
 }

@@ -6,11 +6,13 @@ class BoardState extends Equatable {
     this.boards = const [],
     this.activeBoardId,
     this.isLoaded = false,
+    this.selectedPanelIds = const {},
   });
 
   final List<BoardDocument> boards;
   final String? activeBoardId;
   final bool isLoaded;
+  final Set<String> selectedPanelIds;
 
   BoardDocument? get activeBoard {
     if (boards.isEmpty) return null;
@@ -27,15 +29,19 @@ class BoardState extends Equatable {
     String? activeBoardId,
     bool clearActiveBoardId = false,
     bool? isLoaded,
+    Set<String>? selectedPanelIds,
+    bool clearSelection = false,
   }) {
     return BoardState(
       boards: boards ?? this.boards,
       activeBoardId:
           clearActiveBoardId ? null : (activeBoardId ?? this.activeBoardId),
       isLoaded: isLoaded ?? this.isLoaded,
+      selectedPanelIds:
+          clearSelection ? const {} : (selectedPanelIds ?? this.selectedPanelIds),
     );
   }
 
   @override
-  List<Object?> get props => [boards, activeBoardId, isLoaded];
+  List<Object?> get props => [boards, activeBoardId, isLoaded, selectedPanelIds];
 }

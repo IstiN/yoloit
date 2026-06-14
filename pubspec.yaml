@@ -130,6 +130,7 @@ flutter:
     - tools/widgets/animation-showcase/manifest.json
     - tools/widgets/animation-showcase/widget.js
     - docs/app-development-skill.md
+    - assets/skills/yoloit/SKILL.md
     - third_party/flutter_local_models/registry/models/
 
   fonts:

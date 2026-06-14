@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -975,39 +976,63 @@ class _TitleBar extends StatelessWidget {
     final isLinux = Platform.isLinux;
     return GestureDetector(
       onPanStart: (_) => windowManager.startDragging(),
-      child: Container(
-        height: 44,
-        color: colors.surface,
-        child: Row(
-          children: [
-            // macOS: reserve space for native traffic lights (close/min/max)
-            // Windows/Linux: small left margin only
-            SizedBox(width: isWindows || isLinux ? 12 : 82),
-            const Spacer(),
-            const _ResourceChip(),
-            const SizedBox(width: 8),
-            _PanelToggleButton(
-              icon: Icons.settings_outlined,
-              tooltip: 'Settings (⌘,)',
-              semanticsLabel: 'Open settings',
-              active: false,
-              onTap: onSettings,
+      child: ClipRRect(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+          child: Container(
+            height: 44,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  colors.surface.withOpacity(0.12),
+                  colors.surface.withOpacity(0.32),
+                ],
+              ),
+              border: Border(
+                bottom: BorderSide(color: colors.border.withOpacity(0.65)),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.18),
+                  blurRadius: 12,
+                  offset: const Offset(0, 3),
+                ),
+              ],
             ),
-            // Windows / Linux: show custom minimize/maximize/close buttons
-            // because TitleBarStyle.hidden removes native window controls.
-            if (isWindows || isLinux) ...[
-              const SizedBox(width: 8),
-              const _WindowControls(),
-            ] else
-              const SizedBox(width: 12),
-          ],
+            child: Row(
+              children: [
+                // macOS: reserve space for native traffic lights (close/min/max)
+                // Windows/Linux: small left margin only
+                SizedBox(width: isWindows || isLinux ? 12 : 82),
+                const Spacer(),
+                const _ResourceChip(),
+                const SizedBox(width: 8),
+                _PanelToggleButton(
+                  icon: Icons.settings_outlined,
+                  tooltip: 'Settings (⌘,)',
+                  semanticsLabel: 'Open settings',
+                  active: false,
+                  onTap: onSettings,
+                ),
+                // Windows / Linux: show custom minimize/maximize/close buttons
+                // because TitleBarStyle.hidden removes native window controls.
+                if (isWindows || isLinux) ...[
+                  const SizedBox(width: 8),
+                  const _WindowControls(),
+                ] else
+                  const SizedBox(width: 12),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 }
 
-class _PanelToggleButton extends StatelessWidget {
+class _PanelToggleButton extends StatefulWidget {
   const _PanelToggleButton({
     required this.icon,
     required this.tooltip,
@@ -1023,31 +1048,50 @@ class _PanelToggleButton extends StatelessWidget {
   final String? semanticsLabel;
 
   @override
+  State<_PanelToggleButton> createState() => _PanelToggleButtonState();
+}
+
+class _PanelToggleButtonState extends State<_PanelToggleButton> {
+  bool _hovered = false;
+
+  @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
     return Tooltip(
-      message: tooltip,
+      message: widget.tooltip,
       child: Semantics(
-        label: semanticsLabel ?? tooltip,
+        label: widget.semanticsLabel ?? widget.tooltip,
         button: true,
-        toggled: active,
-        child: GestureDetector(
-          onTap: onTap,
-          child: Container(
-            width: 32,
-            height: 28,
-            decoration: BoxDecoration(
-              color: active ? colors.primary.withAlpha(40) : Colors.transparent,
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Icon(
-              icon,
-              size: 16,
-              color:
-                  active
-                      ? colors.primary
-                      : (context.appColors.textMuted),
-              semanticLabel: tooltip,
+        toggled: widget.active,
+        child: MouseRegion(
+          onEnter: (_) => setState(() => _hovered = true),
+          onExit: (_) => setState(() => _hovered = false),
+          child: GestureDetector(
+            onTap: widget.onTap,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 120),
+              curve: Curves.easeOut,
+              width: 32,
+              height: 28,
+              decoration: BoxDecoration(
+                color: widget.active
+                    ? colors.primary.withOpacity(0.18)
+                    : _hovered
+                        ? colors.surfaceHighlight.withOpacity(0.6)
+                        : Colors.transparent,
+                borderRadius: BorderRadius.circular(8),
+                border: widget.active
+                    ? Border.all(color: colors.primary.withOpacity(0.25))
+                    : null,
+              ),
+              child: Icon(
+                widget.icon,
+                size: 16,
+                color: widget.active
+                    ? colors.primary
+                    : context.appColors.textMuted,
+                semanticLabel: widget.tooltip,
+              ),
             ),
           ),
         ),
@@ -1244,24 +1288,25 @@ class _ResourceChipState extends State<_ResourceChip> {
     return GestureDetector(
       onTap: () => _toggle(context),
       child: Container(
-        height: 22,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
+        height: 24,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
         decoration: BoxDecoration(
-          color: colors.surface,
-          borderRadius: BorderRadius.circular(5),
-          border: Border.all(color: colors.border),
+          color: colors.surface.withOpacity(0.5),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: colors.border.withOpacity(0.6)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.memory, size: 11, color: colors.primary),
-            const SizedBox(width: 4),
+            Icon(Icons.memory, size: 12, color: colors.primary),
+            const SizedBox(width: 5),
             Text(
               cpu > 0 ? '${cpu.toStringAsFixed(1)}%  $mem' : mem,
               style: TextStyle(
                 color: textColor,
-                fontSize: 10,
+                fontSize: 11,
                 fontFamily: 'monospace',
+                fontWeight: FontWeight.w500,
               ),
             ),
           ],

@@ -197,6 +197,17 @@ class SkillsStoreService {
     _availableSkills = await _buildSkillList();
   }
 
+  /// Reads the raw SKILL.md content for an installed skill, if present.
+  Future<String?> readSkillContent(String skillId) async {
+    final file = File(p.join(_skillsDir, skillId, 'SKILL.md'));
+    if (!await file.exists()) return null;
+    try {
+      return await file.readAsString();
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Hard-coded fallback list for when the remote has no catalog field.
   List<SkillEntry> _builtInFlutterSkills() {
     const flutterSkills = [

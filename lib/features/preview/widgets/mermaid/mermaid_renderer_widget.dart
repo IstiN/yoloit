@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:yoloit/core/utils/clipboard_utils.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
-import 'package:yoloit/core/utils/svg_utils.dart';
 import 'package:yoloit/features/board/services/board_offscreen_renderer.dart';
 import 'package:yoloit/features/preview/widgets/mermaid/mermaid_cache.dart';
 import 'package:yoloit/features/preview/widgets/mermaid/mermaid_expanded_dialog.dart';

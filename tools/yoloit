@@ -14,7 +14,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 _runtime_home() {
   if [[ "${YOLOIT_DEV_RUNTIME:-0}" == "1" ]]; then
-    echo "${HOME}/.config/yoloit-dev/runtime"
+    echo "${HOME}/.config/yoloit/runtime"
   else
     echo "${YOLOIT_RUNTIME_HOME:-${HOME}/.config/yoloit/runtime}"
   fi
@@ -103,6 +103,36 @@ _resolve_base() {
   port=$(cat "$PORT_FILE")
   BASE="http://127.0.0.1:${port}/api"
   return 0
+}
+
+_resolve_vm_service_ws_uri() {
+  # Flutter runs a small `development-service` proxy next to the app. Its
+  # command line contains the app VM service URI:
+  #   --vm-service-uri=http://127.0.0.1:<port>/<token>=/
+  # That endpoint redirects to a DevTools page whose `uri` query parameter is
+  # the real WebSocket URI for the running app isolate.
+  local http_uri
+  http_uri=$(ps aux 2>/dev/null \
+    | grep -E 'development-service.*--vm-service-uri=http://127\.0\.0\.1:' \
+    | grep -v grep \
+    | sed -E 's#.*--vm-service-uri=(http://127\.0\.0\.1:[0-9]+/[^[:space:]]+=/).*#\1#' \
+    | head -1)
+  if [[ -z "$http_uri" ]]; then
+    return 1
+  fi
+  local ws_uri
+  ws_uri=$(curl -Ls -o /dev/null -w '%{url_effective}' "$http_uri" 2>/dev/null \
+    | python3 -c '
+import sys, urllib.parse
+url = sys.stdin.read().strip()
+q = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)
+print(q.get("uri", [""])[0])
+' 2>/dev/null)
+  if [[ -n "$ws_uri" ]]; then
+    printf '%s' "$ws_uri"
+    return 0
+  fi
+  return 1
 }
 
 _curl() {
@@ -313,6 +343,104 @@ commands = [
       ["json", "JSON body (optional)", False],
     ],
     "example": "yoloit do \"My Board\" \"Run\" list",
+  },
+  {
+    "group": "group",
+    "name": "groups",
+    "description": "List groups on a board",
+    "params": [["board", "Board id or name", True]],
+    "example": "yoloit groups \"My Board\"",
+  },
+  {
+    "group": "group",
+    "name": "group:create",
+    "description": "Create a named group of panels",
+    "params": [
+      ["board", "Board id or name", True],
+      ["name", "Group name", True],
+      ["panels", "Comma-separated panel ids or titles", False],
+      ["color", "Hex or named color, or 'clear'", False],
+    ],
+    "example": "yoloit group:create \"My Board\" \"Research\" \"Notes,Web\"",
+  },
+  {
+    "group": "group",
+    "name": "group:delete",
+    "description": "Delete a group",
+    "params": [["board", "Board id or name", True], ["group", "Group id or name", True]],
+    "example": "yoloit group:delete \"My Board\" \"Research\"",
+  },
+  {
+    "group": "group",
+    "name": "group:rename",
+    "description": "Rename a group",
+    "params": [
+      ["board", "Board id or name", True],
+      ["group", "Group id or name", True],
+      ["new_name", "New group name", True],
+    ],
+    "example": "yoloit group:rename \"My Board\" \"Research\" \"Reference\"",
+  },
+  {
+    "group": "group",
+    "name": "group:color",
+    "description": "Set or clear a group color",
+    "params": [
+      ["board", "Board id or name", True],
+      ["group", "Group id or name", True],
+      ["color", "Hex or named color, or 'clear'", True],
+    ],
+    "example": "yoloit group:color \"My Board\" \"Research\" \"#3B82F6\"",
+  },
+  {
+    "group": "group",
+    "name": "group:add",
+    "description": "Add panels to a group",
+    "params": [
+      ["board", "Board id or name", True],
+      ["group", "Group id or name", True],
+      ["panels", "Comma-separated panel ids or titles", True],
+    ],
+    "example": "yoloit group:add \"My Board\" \"Research\" \"Notes,Web\"",
+  },
+  {
+    "group": "group",
+    "name": "group:remove",
+    "description": "Remove panels from a group",
+    "params": [
+      ["board", "Board id or name", True],
+      ["group", "Group id or name", True],
+      ["panels", "Comma-separated panel ids or titles", True],
+    ],
+    "example": "yoloit group:remove \"My Board\" \"Research\" \"Web\"",
+  },
+  {
+    "group": "group",
+    "name": "group:collapse",
+    "description": "Collapse a group and hide its panels",
+    "params": [["board", "Board id or name", True], ["group", "Group id or name", True]],
+    "example": "yoloit group:collapse \"My Board\" \"Research\"",
+  },
+  {
+    "group": "group",
+    "name": "group:expand",
+    "description": "Expand a collapsed group and show its panels",
+    "params": [["board", "Board id or name", True], ["group", "Group id or name", True]],
+    "example": "yoloit group:expand \"My Board\" \"Research\"",
+  },
+  {
+    "group": "group",
+    "name": "group:move",
+    "description": "Move every panel in a group by the given board delta",
+    "params": [["board", "Board id or name", True], ["group", "Group id or name", True], ["dx", "Horizontal delta", True], ["dy", "Vertical delta", True]],
+    "example": "yoloit group:move \"My Board\" \"Research\" 100 -50",
+  },
+  {
+    "group": "group",
+    "name": "group:cycle-focus",
+    "description": "Cycle the visible panel inside a collapsed group",
+    "params": [["board", "Board id or name", True], ["group", "Group id or name", True], ["direction", "1 for next, -1 for previous", False]],
+    "example": "yoloit group:cycle-focus \"My Board\" \"Research\"",
   },
   {
     "group": "run",
@@ -865,6 +993,24 @@ commands = [
   },
   {
     "group": "board",
+    "name": "board:grid",
+    "description": "Toggle or reset grid view for a board",
+    "params": [["id|name", "Board identifier or board name", True], ["on|off|reset", "Enable, disable or reset grid view", True], ["--cell N", "Grid cell size in pixels", False], ["--spacing N", "Gap between cells in pixels", False], ["--arrange", "Re-arrange panels into the default cloud", False], ["--group", "Arrange panels into type blocks", False]],
+    "example": "yoloit board:grid \"My Board\" on --cell 220 --spacing 24 --arrange",
+  },
+  {
+    "group": "board",
+    "name": "select",
+    "description": "Select panels by ids or rectangle, or show current selection",
+    "params": [
+      ["board", "Board id or name", True],
+      ["--panels p1,p2", "Comma-separated panel ids or titles", False],
+      ["--rect x,y,w,h", "Rectangle in board coordinates", False],
+    ],
+    "example": "yoloit select \"My Board\" --rect 0,0,1200,800",
+  },
+  {
+    "group": "board",
     "name": "board:use",
     "description": "Set current board context for subsequent commands (does not switch UI focus)",
     "params": [["board", "Board id or name", True]],
@@ -1200,6 +1346,14 @@ commands = [
     "params": [["[panel]", "Panel title", False], ["[board]", "Board name", False]],
     "example": "yoloit kanban:cards",
     "aliases": ["k:ls"],
+  },
+  {
+    "group": "kanban",
+    "name": "kanban:paste",
+    "description": "Create a kanban card from text — board and panel optional (alias: k:p)",
+    "params": [["text", "Card text (first line becomes title)", True], ["[column]", "Column index or title (default first)", False], ["[panel]", "Panel title", False], ["[board]", "Board name", False]],
+    "example": "yoloit kanban:paste \"Fix bug\\nDescription here\"",
+    "aliases": ["k:p"],
   },
   {
     "group": "playlist",
@@ -1910,12 +2064,15 @@ PY
   reload)
     # Hot reload: recompile changed files, preserve app state
     VM_FILE="${HOME}/.config/yoloit/cli.vmservice"
-    if [[ ! -f "$VM_FILE" ]]; then
-      # Try fetching from server
-      _resolve_base
-      ws_uri=$(curl -s "${BASE}/vmservice" | python3 -c "import json,sys; print(json.load(sys.stdin).get('vmServiceWsUri',''))" 2>/dev/null)
-    else
-      ws_uri=$(cat "$VM_FILE")
+    ws_uri=$(_resolve_vm_service_ws_uri)
+    if [[ -z "$ws_uri" ]]; then
+      if [[ -f "$VM_FILE" ]]; then
+        ws_uri=$(cat "$VM_FILE")
+      else
+        # Try fetching from server
+        _resolve_base
+        ws_uri=$(curl -s "${BASE}/vmservice" | python3 -c "import json,sys; print(json.load(sys.stdin).get('vmServiceWsUri',''))" 2>/dev/null)
+      fi
     fi
     if [[ -z "$ws_uri" ]]; then
       echo "Error: VM service URI not found. Is the app running in debug mode?" >&2; exit 1
@@ -1952,11 +2109,14 @@ PYEOF
     else
       # Fallback: raw VM service reloadSources (no recompile — use when not running via flutter run)
       VM_FILE="${HOME}/.config/yoloit/cli.vmservice"
-      if [[ ! -f "$VM_FILE" ]]; then
-        _resolve_base
-        ws_uri=$(curl -s "${BASE}/vmservice" | python3 -c "import json,sys; print(json.load(sys.stdin).get('vmServiceWsUri',''))" 2>/dev/null)
-      else
-        ws_uri=$(cat "$VM_FILE")
+      ws_uri=$(_resolve_vm_service_ws_uri)
+      if [[ -z "$ws_uri" ]]; then
+        if [[ -f "$VM_FILE" ]]; then
+          ws_uri=$(cat "$VM_FILE")
+        else
+          _resolve_base
+          ws_uri=$(curl -s "${BASE}/vmservice" | python3 -c "import json,sys; print(json.load(sys.stdin).get('vmServiceWsUri',''))" 2>/dev/null)
+        fi
       fi
       if [[ -z "$ws_uri" ]]; then
         echo "Error: VM service URI not found." >&2; exit 1
@@ -2357,11 +2517,148 @@ PYEOF
     hs="${3:-80}"; vs="${4:-60}"
     _post "/boards/${bid}/arrange" "{\"direction\":\"${dir}\",\"hSpacing\":${hs},\"vSpacing\":${vs}}" | python3 -m json.tool 2>/dev/null
     ;;
+  board:grid)
+    [[ $# -lt 2 ]] && { echo "Usage: yoloit board:grid <id|name> on|off|reset [--cell N] [--spacing N] [--arrange]" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"
+    enabled_raw="${2,,}"
+    reset="false"
+    case "$enabled_raw" in
+      on|1|true) enabled="true" ;;
+      off|0|false) enabled="false" ;;
+      reset) reset="true"; enabled="" ;;
+      *) echo "Usage: yoloit board:grid <id|name> on|off|reset [--cell N] [--spacing N] [--arrange]" >&2; exit 1 ;;
+    esac
+    shift 2
+    cell_size=""
+    spacing=""
+    arrange="false"
+    group="false"
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --cell) cell_size=",\"cellSize\":$2"; shift 2 ;;
+        --spacing) spacing=",\"spacing\":$2"; shift 2 ;;
+        --arrange) arrange="true"; shift ;;
+        --group) group="true"; shift ;;
+        *) shift ;;
+      esac
+    done
+    payload=""
+    if [[ "$reset" == "true" ]]; then
+      payload="{\"reset\":true${cell_size}${spacing},\"arrange\":${arrange},\"groupByType\":${group}}"
+    else
+      payload="{\"enabled\":${enabled}${cell_size}${spacing},\"arrange\":${arrange},\"groupByType\":${group}}"
+    fi
+    _post "/boards/${bid}/grid" "$payload" | python3 -m json.tool 2>/dev/null
+    ;;
   board:undo|bundo)
     bid_raw=$(_board "${1:-}")
     [[ -z "$bid_raw" ]] && { echo "Usage: yoloit board:undo [board]" >&2; exit 1; }
     bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
     _post "/boards/${bid}/undo" '{}' | python3 -m json.tool 2>/dev/null
+    ;;
+
+  # ── selection ──
+  select)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit select <board> [--panels p1,p2 | --rect x,y,w,h]" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"; shift
+    panels=""
+    rect=""
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --panels) panels="$2"; shift 2 ;;
+        --rect) rect="$2"; shift 2 ;;
+        *) shift ;;
+      esac
+    done
+    if [[ -n "$panels" ]]; then
+      _post "/boards/${bid}/select" "{\"panels\":\"${panels}\"}" | python3 -m json.tool 2>/dev/null
+    elif [[ -n "$rect" ]]; then
+      IFS=',' read -r x y w h <<< "$rect"
+      _post "/boards/${bid}/select" "{\"rect\":{\"x\":${x},\"y\":${y},\"width\":${w},\"height\":${h}}}" | python3 -m json.tool 2>/dev/null
+    else
+      _get "/boards/${bid}/select" | python3 -m json.tool 2>/dev/null
+    fi
+    ;;
+
+  # ── groups ──
+  groups|gls)
+    bid_raw=$(_board "${1:-}")
+    [[ -z "$bid_raw" ]] && { echo "Usage: yoloit groups [board]" >&2; exit 1; }
+    bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
+    _get "/boards/${bid}/groups" | python3 -m json.tool 2>/dev/null
+    ;;
+  group:create|gmk)
+    [[ $# -lt 2 ]] && { echo "Usage: yoloit group:create <board> <name> [panels] [color]" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"; shift
+    name="$1"; shift
+    panels=""
+    color=""
+    while [[ $# -gt 0 ]]; do
+      if [[ "$1" == --* ]]; then
+        case "$1" in
+          --panels) panels="$2"; shift 2 ;;
+          --color) color="$2"; shift 2 ;;
+          *) shift ;;
+        esac
+      elif [[ -z "$panels" && "$1" != \#* && "$1" != [[:digit:]]* ]]; then
+        panels="$1"; shift
+      elif [[ -z "$color" ]]; then
+        color="$1"; shift
+      else
+        shift
+      fi
+    done
+    payload="{\"name\":\"${name}\""
+    [[ -n "$panels" ]] && payload="${payload},\"panels\":\"${panels}\""
+    [[ -n "$color" ]] && payload="${payload},\"color\":\"${color}\""
+    payload="${payload}}"
+    _post "/boards/${bid}/groups" "$payload" | python3 -m json.tool 2>/dev/null
+    ;;
+  group:delete|gdl)
+    [[ $# -lt 2 ]] && { echo "Usage: yoloit group:delete <board> <group>" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"; gid=$(_encode "$2")
+    _delete "/boards/${bid}/groups/${gid}" | python3 -m json.tool 2>/dev/null
+    ;;
+  group:rename|grn)
+    [[ $# -lt 3 ]] && { echo "Usage: yoloit group:rename <board> <group> <new_name>" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"; gid=$(_encode "$2")
+    _put "/boards/${bid}/groups/${gid}" "{\"name\":\"$3\"}" | python3 -m json.tool 2>/dev/null
+    ;;
+  group:color|gco)
+    [[ $# -lt 3 ]] && { echo "Usage: yoloit group:color <board> <group> <color>" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"; gid=$(_encode "$2")
+    _put "/boards/${bid}/groups/${gid}" "{\"color\":\"$3\"}" | python3 -m json.tool 2>/dev/null
+    ;;
+  group:add|gadd)
+    [[ $# -lt 3 ]] && { echo "Usage: yoloit group:add <board> <group> <panels>" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"; gid=$(_encode "$2")
+    _post "/boards/${bid}/groups/${gid}/panels" "{\"panels\":\"$3\"}" | python3 -m json.tool 2>/dev/null
+    ;;
+  group:remove|grm)
+    [[ $# -lt 3 ]] && { echo "Usage: yoloit group:remove <board> <group> <panels>" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"; gid=$(_encode "$2")
+    _curl DELETE "/boards/${bid}/groups/${gid}/panels" -d "{\"panels\":\"$3\"}" | python3 -m json.tool 2>/dev/null
+    ;;
+  group:collapse|gcol)
+    [[ $# -lt 2 ]] && { echo "Usage: yoloit group:collapse <board> <group>" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"; gid=$(_encode "$2")
+    _put "/boards/${bid}/groups/${gid}" "{\"collapsed\":true}" | python3 -m json.tool 2>/dev/null
+    ;;
+  group:expand|gexp)
+    [[ $# -lt 2 ]] && { echo "Usage: yoloit group:expand <board> <group>" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"; gid=$(_encode "$2")
+    _put "/boards/${bid}/groups/${gid}" "{\"collapsed\":false}" | python3 -m json.tool 2>/dev/null
+    ;;
+  group:move|gmv)
+    [[ $# -lt 4 ]] && { echo "Usage: yoloit group:move <board> <group> <dx> <dy>" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"; gid=$(_encode "$2")
+    _curl POST "/boards/${bid}/groups/${gid}/move" -d "{\"dx\":$3,\"dy\":$4}" | python3 -m json.tool 2>/dev/null
+    ;;
+  group:cycle-focus|gcf)
+    [[ $# -lt 2 ]] && { echo "Usage: yoloit group:cycle-focus <board> <group> [direction]" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"; gid=$(_encode "$2")
+    dir=${3:-1}
+    _curl POST "/boards/${bid}/groups/${gid}/cycle-focus" -d "{\"direction\":$dir}" | python3 -m json.tool 2>/dev/null
     ;;
 
   # ── panels ──
@@ -3694,6 +3991,26 @@ PYEOF
     pid=$(_smart_panel "$bid" "board.kanban" "$panel_hint"); pid=$(_encode "$pid")
     _post "/boards/${bid}/panels/${pid}/action" '{"action":"cards"}' | python3 -m json.tool 2>/dev/null
     ;;
+  kanban:paste|k:p)
+    local bid_raw="" panel_hint="" text="" col="0"
+    case $# in
+      0) echo "Usage: yoloit kanban:paste <text> [column] [panel] [board]" >&2; exit 1 ;;
+      1) text="$1" ;;
+      2) text="$1"; col="$2" ;;
+      3) text="$1"; col="$2"; panel_hint="$3" ;;
+      *) text="$1"; col="$2"; panel_hint="$3"; bid_raw="$4" ;;
+    esac
+    bid_raw=$(_require_board "$bid_raw")
+    bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
+    pid=$(_smart_panel "$bid" "board.kanban" "$panel_hint"); pid=$(_encode "$pid")
+    # Resolve column title to index if non-numeric.
+    if [[ "$col" =~ ^[0-9]+$ ]]; then
+      colIdx="$col"
+    else
+      colIdx=$(python3 -c "import json,sys; data=json.load(sys.stdin); cols=data['data']['columns']; print(next((i for i,c in enumerate(cols) if c==sys.argv[1]), 0))" "$col" <<< "$(curl -s "http://127.0.0.1:${_port}/api/boards/${bid}/panels/${pid}/action" -H 'Content-Type: application/json' -d '{"action":"cards"}')")
+    fi
+    _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"paste\",\"text\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$text"),\"columnIndex\":$colIdx}" | python3 -m json.tool 2>/dev/null
+    ;;
   play)
     # Usage variants:
     #   yoloit play
@@ -4161,6 +4478,10 @@ ALIAS = {
     'panel:stop':'panel:hide','run:script':'run:attach',
     'sticky:new':'sticky:create','shape:new':'shape:create','frame:new':'frame:create',
     'panel:bring-front':'panel:front','panel:send-back':'panel:back',
+    'gls':'groups','gmk':'group:create','gdl':'group:delete',
+    'grn':'group:rename','gco':'group:color','gadd':'group:add',
+    'grm':'group:remove','gcol':'group:collapse','gexp':'group:expand',
+    'gmv':'group:move','gcf':'group:cycle-focus',
 }
 if cmd in ALIAS:
     cmd = ALIAS[cmd]

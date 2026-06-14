@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -9,6 +10,8 @@ import 'package:yoloit/features/board/bloc/board_state.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 
 class _MockBoardCubit extends Mock implements BoardCubit {}
+
+class _FakeRect extends Fake implements Rect {}
 
 shelf.Request _getRequest(String path, {Map<String, String>? query}) {
   final uri = Uri.parse('http://localhost:8080$path').replace(queryParameters: query);
@@ -65,11 +68,15 @@ void main() {
   late BoardDocument testBoard;
   var rebuildScheduled = false;
 
+  setUpAll(() {
+    registerFallbackValue(_FakeRect());
+  });
+
   setUp(() {
     mockBoardCubit = _MockBoardCubit();
     rebuildScheduled = false;
 
-    testBoard = BoardDocument(
+    testBoard = const BoardDocument(
       id: 'b1',
       name: 'Test Board',
       panels: [
@@ -77,7 +84,7 @@ void main() {
           id: 'p1',
           type: 'board.chat',
           title: 'Chat',
-          bounds: const BoardPanelBounds(x: 0, y: 0, width: 400, height: 300),
+          bounds: BoardPanelBounds(x: 0, y: 0, width: 400, height: 300),
         ),
       ],
     );
@@ -87,11 +94,14 @@ void main() {
         boards: [testBoard],
         activeBoardId: 'b1',
         isLoaded: true,
+        selectedPanelIds: const {'p1'},
       ),
     );
     when(() => mockBoardCubit.deleteBoard(any())).thenAnswer((_) async {});
     when(() => mockBoardCubit.removeLink(any(), boardId: any(named: 'boardId')))
         .thenAnswer((_) async {});
+    when(() => mockBoardCubit.selectPanels(any())).thenReturn(null);
+    when(() => mockBoardCubit.selectPanelsInRect(any())).thenReturn(null);
   });
 
   group('handleBoard', () {
@@ -797,6 +807,115 @@ void main() {
 
       expect(response.statusCode, 200);
       expect(called, true);
+    });
+
+    test('GET /boards/:id/select returns selected panel ids', () async {
+      final response = await handleBoard(
+        'GET',
+        ['select'],
+        testBoard,
+        mockBoardCubit,
+        _getRequest('/api/boards/b1/select'),
+        body: _body,
+        json: _json,
+        error: _error,
+        notFound: _notFound,
+        scheduleRebuild: () {},
+        boardDetails: (_) => _json({}),
+        updateBoard: (_, __, ___) async => _json({}),
+        boardSnapshot: (_, {format = 'md'}) => _json({}),
+        applyYaml: (_, __, ___) async => _json({}),
+        undoBoard: (_, __) async => _json({}),
+        boardScreenshot: (_, {cubit, forceOffscreen = false}) async => _json({}),
+        boardSvg: (_) => _json({}),
+        listPanels: (_) => _json({}),
+        createPanel: (_, __, ___) async => _json({}),
+        handlePanel: (_, __, ___, ____, _____, ______) async => _json({}),
+        listLinks: (_) => _json({}),
+        createLink: (_, __, ___) async => _json({}),
+        updateLink: (_, __, ___, ____) async => _json({}),
+        listPanelTypes: () => _json({}),
+        updateViewport: (_, __, ___) async => _json({}),
+        fitViewport: (_, __, ___) async => _json({}),
+        arrangeBoard: (_, __, ___) async => _json({}),
+      );
+
+      expect(response.statusCode, 200);
+      final payload = jsonDecode(await response.readAsString())
+          as Map<String, dynamic>;
+      expect(payload['ok'], true);
+      expect(payload['selected'], const ['p1']);
+    });
+
+    test('POST /boards/:id/select selects panels by ids', () async {
+      final response = await handleBoard(
+        'POST',
+        ['select'],
+        testBoard,
+        mockBoardCubit,
+        _postRequest('/api/boards/b1/select', body: {'panels': 'p1,p2'}),
+        body: _body,
+        json: _json,
+        error: _error,
+        notFound: _notFound,
+        scheduleRebuild: () {},
+        boardDetails: (_) => _json({}),
+        updateBoard: (_, __, ___) async => _json({}),
+        boardSnapshot: (_, {format = 'md'}) => _json({}),
+        applyYaml: (_, __, ___) async => _json({}),
+        undoBoard: (_, __) async => _json({}),
+        boardScreenshot: (_, {cubit, forceOffscreen = false}) async => _json({}),
+        boardSvg: (_) => _json({}),
+        listPanels: (_) => _json({}),
+        createPanel: (_, __, ___) async => _json({}),
+        handlePanel: (_, __, ___, ____, _____, ______) async => _json({}),
+        listLinks: (_) => _json({}),
+        createLink: (_, __, ___) async => _json({}),
+        updateLink: (_, __, ___, ____) async => _json({}),
+        listPanelTypes: () => _json({}),
+        updateViewport: (_, __, ___) async => _json({}),
+        fitViewport: (_, __, ___) async => _json({}),
+        arrangeBoard: (_, __, ___) async => _json({}),
+      );
+
+      expect(response.statusCode, 200);
+      verify(() => mockBoardCubit.selectPanels(const {'p1', 'p2'})).called(1);
+    });
+
+    test('POST /boards/:id/select rejects missing panels and rect', () async {
+      final response = await handleBoard(
+        'POST',
+        ['select'],
+        testBoard,
+        mockBoardCubit,
+        _postRequest('/api/boards/b1/select'),
+        body: _body,
+        json: _json,
+        error: _error,
+        notFound: _notFound,
+        scheduleRebuild: () {},
+        boardDetails: (_) => _json({}),
+        updateBoard: (_, __, ___) async => _json({}),
+        boardSnapshot: (_, {format = 'md'}) => _json({}),
+        applyYaml: (_, __, ___) async => _json({}),
+        undoBoard: (_, __) async => _json({}),
+        boardScreenshot: (_, {cubit, forceOffscreen = false}) async => _json({}),
+        boardSvg: (_) => _json({}),
+        listPanels: (_) => _json({}),
+        createPanel: (_, __, ___) async => _json({}),
+        handlePanel: (_, __, ___, ____, _____, ______) async => _json({}),
+        listLinks: (_) => _json({}),
+        createLink: (_, __, ___) async => _json({}),
+        updateLink: (_, __, ___, ____) async => _json({}),
+        listPanelTypes: () => _json({}),
+        updateViewport: (_, __, ___) async => _json({}),
+        fitViewport: (_, __, ___) async => _json({}),
+        arrangeBoard: (_, __, ___) async => _json({}),
+      );
+
+      expect(response.statusCode, 400);
+      verifyNever(() => mockBoardCubit.selectPanels(any()));
+      verifyNever(() => mockBoardCubit.selectPanelsInRect(any()));
     });
 
     test('unknown route returns notFound', () async {

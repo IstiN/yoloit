@@ -14,7 +14,6 @@ import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_panel_plugin.dart';
 import 'package:yoloit/features/board/ui/chat_glow_wrapper.dart';
 import 'package:yoloit/features/board/ui/chat_header_menu.dart';
-import 'package:yoloit/features/board/ui/dialogs/board_settings_dialog.dart';
 import 'package:yoloit/features/board/ui/miro_panel_toolbar.dart';
 import 'package:yoloit/ui/components/buttons/panel_header_icon_button.dart';
 
@@ -87,6 +86,7 @@ class BoardPanelCard extends StatefulWidget {
     this.connectSourceId,
     this.onConnectTap,
     this.capturingScreenshot = false,
+    this.selected = false,
   });
 
   final BoardPanelInstance panel;
@@ -112,6 +112,7 @@ class BoardPanelCard extends StatefulWidget {
   final String? connectSourceId;
   final VoidCallback? onConnectTap;
   final bool capturingScreenshot;
+  final bool selected;
 
   @override
   State<BoardPanelCard> createState() => BoardPanelCardState();
@@ -143,6 +144,7 @@ class BoardPanelCardState extends State<BoardPanelCard>
   bool get connectMode => widget.connectMode;
   String? get connectSourceId => widget.connectSourceId;
   VoidCallback? get onConnectTap => widget.onConnectTap;
+  bool get selected => widget.selected;
 
   @override
   void initState() {
@@ -261,6 +263,8 @@ class BoardPanelCardState extends State<BoardPanelCard>
             ? Colors.transparent
             : isCapturing
             ? colors.background
+            : selected
+            ? colors.statusActive
             : accent == null
             ? colors.divider
             : Color.lerp(colors.divider, accent, 0.65) ?? colors.divider;
@@ -349,10 +353,12 @@ class BoardPanelCardState extends State<BoardPanelCard>
                           color:
                               isCapturing
                                   ? colors.background
+                                  : selected
+                                  ? colors.statusActive
                                   : isFocused
                                   ? colors.primary
                                   : borderColor,
-                          width: isFocused && !isCapturing ? 1.5 : 1,
+                          width: (selected || isFocused) && !isCapturing ? 2 : 1,
                         ),
                         boxShadow:
                             isCapturing || !usePanelChrome

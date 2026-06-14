@@ -12,6 +12,7 @@ import 'package:yoloit/features/board/chat/chat_provider.dart';
 import 'package:yoloit/features/board/chat/cli_tools/app_tools.dart';
 import 'package:yoloit/features/board/chat/cli_tools/board_tools.dart';
 import 'package:yoloit/features/board/chat/cli_tools/file_tools.dart';
+import 'package:yoloit/features/board/chat/cli_tools/group_tools.dart';
 import 'package:yoloit/features/board/chat/cli_tools/link_tools.dart';
 import 'package:yoloit/features/board/chat/cli_tools/note_tools.dart';
 import 'package:yoloit/features/board/chat/cli_tools/panel_tools.dart';
@@ -1288,6 +1289,7 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
   ...appTools,
   ...boardTools,
   ...panelTools,
+  ...groupTools,
   ...runTools,
   ...noteTools,
   ...fileTools,

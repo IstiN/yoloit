@@ -14,6 +14,14 @@ class BoardFileModifiedEvent extends BoardEvent {
   final String path;
 }
 
+/// Emitted when a kanban card should be inserted into a chat panel's input.
+class KanbanCardToChatEvent extends BoardEvent {
+  const KanbanCardToChatEvent(this.targetPanelId, this.text);
+
+  final String targetPanelId;
+  final String text;
+}
+
 /// Central event bus for board-wide notifications.
 ///
 /// **Emitting events** (from chat/agent code):

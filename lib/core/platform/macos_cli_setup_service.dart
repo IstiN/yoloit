@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
+
 /// macOS-specific service that ensures the `yoloit` CLI is accessible from
 /// terminals and GUI apps after installation.
 ///
@@ -15,6 +17,17 @@ class MacosCliSetupService {
   Future<void> ensureInstalled() async {
     if (!Platform.isMacOS) return;
 
+    final home = Platform.environment['HOME'] ?? '';
+    if (home.isEmpty) return;
+
+    // Debug builds use a separate yoloit-dev setup managed by CliServer.
+    // Make sure the release symlink does not accidentally point to the debug
+    // bundle, but do not overwrite a working release installation.
+    if (kDebugMode) {
+      await _repairReleaseSymlinkForDebug(home);
+      return;
+    }
+
     final appBundle = _resolveAppBundle();
     if (appBundle == null) return;
 
@@ -22,9 +35,6 @@ class MacosCliSetupService {
       '$appBundle/Contents/Frameworks/App.framework/Versions/A/Resources/flutter_assets/tools/yoloit',
     );
     if (!cliSource.existsSync()) return;
-
-    final home = Platform.environment['HOME'] ?? '';
-    if (home.isEmpty) return;
 
     // 1. User-local symlink (always works without sudo)
     await _installUserLocalSymlink(cliSource.path, home);
@@ -106,6 +116,52 @@ class MacosCliSetupService {
     } catch (_) {
       // User cancelled or failed — ignore
     }
+  }
+
+  /// In debug mode the release `~/.config/yoloit/yoloit` symlink may have been
+  /// overwritten by a previous debug run. Fix it to point to the installed
+  /// release app (if found) so that `yoloit` continues to mean "production".
+  Future<void> _repairReleaseSymlinkForDebug(String home) async {
+    final userDir = '$home/.config/yoloit';
+    await Directory(userDir).create(recursive: true);
+    final userLink = File('$userDir/yoloit');
+
+    // If the symlink points to a debug/dev bundle, remove it.
+    if (userLink.existsSync()) {
+      try {
+        final target = userLink.resolveSymbolicLinksSync();
+        if (target.contains('(dev).app') || target.contains('/Debug/')) {
+          userLink.deleteSync();
+        }
+      } catch (_) {
+        // Not a symlink or cannot read — leave it alone.
+      }
+    }
+
+    // Try to find the installed release app and point the symlink there.
+    final releaseBundle = _resolveReleaseAppBundle();
+    if (releaseBundle == null) return;
+    final releaseSource = File(
+      '$releaseBundle/Contents/Frameworks/App.framework/Versions/A/Resources/flutter_assets/tools/yoloit',
+    );
+    if (!releaseSource.existsSync()) return;
+    if (userLink.existsSync()) userLink.deleteSync();
+    try {
+      await Process.run('ln', ['-s', releaseSource.path, userLink.path]);
+    } catch (_) {
+      // Best-effort
+    }
+  }
+
+  String? _resolveReleaseAppBundle() {
+    final candidates = [
+      '/Applications/YoLoIT.app',
+      '${Platform.environment['HOME']}/Applications/YoLoIT.app',
+    ];
+    for (final path in candidates) {
+      if (Directory(path).existsSync()) return path;
+    }
+    return null;
   }
 
   String? _resolveAppBundle() {

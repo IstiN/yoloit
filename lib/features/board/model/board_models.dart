@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
 import 'package:json_annotation/json_annotation.dart';
+import 'package:yoloit/features/board/model/board_grid_mode.dart';
 import 'package:yoloit/features/board/model/board_json_converters.dart';
 
 part 'board_models.g.dart';
@@ -423,6 +424,109 @@ class BoardPanelLink extends Equatable {
   ];
 }
 
+/// A named group of panels on a board.
+///
+/// The group itself does not store geometry; its bounds are computed from the
+/// current positions of its panels.
+class BoardPanelGroup extends Equatable {
+  const BoardPanelGroup({
+    required this.id,
+    required this.name,
+    this.color,
+    this.panelIds = const [],
+    this.collapsed = false,
+    this.collapsedFocusPanelId,
+    this.collapsedBounds,
+  });
+
+  final String id;
+  final String name;
+
+  /// ARGB color value. When null, a default board accent color is used.
+  final int? color;
+
+  /// Ordered list of panel ids belonging to the group.
+  final List<String> panelIds;
+
+  /// When true the group's panels are hidden and only the group header is shown.
+  final bool collapsed;
+
+  /// Panel id that is currently visible inside a collapsed group.
+  final String? collapsedFocusPanelId;
+
+  /// Optional fixed bounds for a collapsed group. When null, the bounds are
+  /// derived from the stacked panel cards.
+  final BoardPanelBounds? collapsedBounds;
+
+  BoardPanelGroup copyWith({
+    String? id,
+    String? name,
+    int? color,
+    List<String>? panelIds,
+    bool? collapsed,
+    String? collapsedFocusPanelId,
+    BoardPanelBounds? collapsedBounds,
+    bool clearColor = false,
+    bool clearCollapsedFocus = false,
+    bool clearCollapsedBounds = false,
+  }) {
+    return BoardPanelGroup(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      color: clearColor ? null : (color ?? this.color),
+      panelIds: panelIds ?? this.panelIds,
+      collapsed: collapsed ?? this.collapsed,
+      collapsedFocusPanelId:
+          clearCollapsedFocus
+              ? null
+              : (collapsedFocusPanelId ?? this.collapsedFocusPanelId),
+      collapsedBounds:
+          clearCollapsedBounds
+              ? null
+              : (collapsedBounds ?? this.collapsedBounds),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'color': color,
+    'panelIds': panelIds,
+    'collapsed': collapsed,
+    'collapsedFocusPanelId': collapsedFocusPanelId,
+    'collapsedBounds': collapsedBounds?.toJson(),
+  };
+
+  factory BoardPanelGroup.fromJson(Map<String, dynamic> json) {
+    final rawPanelIds = json['panelIds'] as List? ?? const [];
+    BoardPanelBounds? collapsedBounds;
+    final rawCollapsedBounds = json['collapsedBounds'];
+    if (rawCollapsedBounds is Map<String, dynamic>) {
+      collapsedBounds = BoardPanelBounds.fromJson(rawCollapsedBounds);
+    }
+    return BoardPanelGroup(
+      id: json['id'] as String,
+      name: json['name'] as String? ?? 'Group',
+      color: json['color'] as int?,
+      panelIds: rawPanelIds.cast<String>().toList(),
+      collapsed: json['collapsed'] as bool? ?? false,
+      collapsedFocusPanelId: json['collapsedFocusPanelId'] as String?,
+      collapsedBounds: collapsedBounds,
+    );
+  }
+
+  @override
+  List<Object?> get props => [
+    id,
+    name,
+    color,
+    panelIds,
+    collapsed,
+    collapsedFocusPanelId,
+    collapsedBounds,
+  ];
+}
+
 class BoardDocument extends Equatable {
   const BoardDocument({
     required this.id,
@@ -431,6 +535,7 @@ class BoardDocument extends Equatable {
     this.panels = const [],
     this.links = const [],
     this.drawings = const [],
+    this.groups = const [],
     this.metadata = const {},
   });
 
@@ -440,10 +545,25 @@ class BoardDocument extends Equatable {
   final List<BoardPanelInstance> panels;
   final List<BoardPanelLink> links;
   final List<BoardDrawingElement> drawings;
+  final List<BoardPanelGroup> groups;
   final Map<String, dynamic> metadata;
 
   String get defaultFolder =>
       (metadata['defaultFolder'] as String? ?? '').trim();
+
+  BoardGridMode get gridMode {
+    final raw = metadata['gridView'];
+    if (raw is Map<String, dynamic>) {
+      return BoardGridMode.fromJson(raw);
+    }
+    return const BoardGridMode();
+  }
+
+  BoardDocument copyWithGridMode(BoardGridMode mode) {
+    final next = Map<String, dynamic>.from(metadata);
+    next['gridView'] = mode.toJson();
+    return copyWith(metadata: next);
+  }
 
   BoardDocument copyWith({
     String? id,
@@ -452,6 +572,7 @@ class BoardDocument extends Equatable {
     List<BoardPanelInstance>? panels,
     List<BoardPanelLink>? links,
     List<BoardDrawingElement>? drawings,
+    List<BoardPanelGroup>? groups,
     Map<String, dynamic>? metadata,
   }) {
     return BoardDocument(
@@ -461,6 +582,7 @@ class BoardDocument extends Equatable {
       panels: panels ?? this.panels,
       links: links ?? this.links,
       drawings: drawings ?? this.drawings,
+      groups: groups ?? this.groups,
       metadata: metadata ?? this.metadata,
     );
   }
@@ -472,6 +594,7 @@ class BoardDocument extends Equatable {
     'panels': panels.map((panel) => panel.toJson()).toList(),
     'links': links.map((link) => link.toJson()).toList(),
     'drawings': drawings.map((d) => d.toJson()).toList(),
+    'groups': groups.map((g) => g.toJson()).toList(),
     'metadata': metadata,
   };
 
@@ -479,6 +602,7 @@ class BoardDocument extends Equatable {
     final rawPanels = json['panels'] as List? ?? const [];
     final rawLinks = json['links'] as List? ?? const [];
     final rawDrawings = json['drawings'] as List? ?? const [];
+    final rawGroups = json['groups'] as List? ?? const [];
     return BoardDocument(
       id: json['id'] as String,
       name: json['name'] as String? ?? 'Board',
@@ -509,6 +633,14 @@ class BoardDocument extends Equatable {
                 ),
               )
               .toList(),
+      groups:
+          rawGroups
+              .map(
+                (entry) => BoardPanelGroup.fromJson(
+                  Map<String, dynamic>.from(entry as Map),
+                ),
+              )
+              .toList(),
       metadata: Map<String, dynamic>.from(json['metadata'] as Map? ?? const {}),
     );
   }
@@ -521,6 +653,7 @@ class BoardDocument extends Equatable {
     panels,
     links,
     drawings,
+    groups,
     metadata,
   ];
 }

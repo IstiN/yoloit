@@ -169,4 +169,9 @@ class SkillsCubit extends Cubit<SkillsState> {
     final s = state;
     if (s is SkillsLoaded) emit(s.copyWith(clearError: true));
   }
+
+  /// Reads the raw SKILL.md content for an installed skill.
+  Future<String?> readSkillContent(String skillId) async {
+    return _storeService.readSkillContent(skillId);
+  }
 }

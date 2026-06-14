@@ -1,9 +1,23 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:ui';
 
 import 'package:shelf/shelf.dart' as shelf;
+import 'package:yoloit/core/cli/handlers/group_handler.dart';
 import 'package:yoloit/core/cli/handlers/server_helpers.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
+
+Future<shelf.Response> _defaultGridBoard(
+  BoardCubit cubit,
+  BoardDocument board,
+  Map<String, dynamic> body,
+) async {
+  return shelf.Response.notFound(
+    jsonEncode({'ok': false, 'error': 'Grid route not implemented'}),
+    headers: {'content-type': 'application/json'},
+  );
+}
 
 Future<shelf.Response> handleBoard(
   String method,
@@ -23,7 +37,8 @@ Future<shelf.Response> handleBoard(
     Map<String, dynamic>,
   )
   updateBoard,
-  required shelf.Response Function(BoardDocument, {String format}) boardSnapshot,
+  required shelf.Response Function(BoardDocument, {String format})
+  boardSnapshot,
   required Future<shelf.Response> Function(
     BoardCubit,
     BoardDocument,
@@ -87,6 +102,12 @@ Future<shelf.Response> handleBoard(
     Map<String, dynamic>,
   )
   arrangeBoard,
+  Future<shelf.Response> Function(
+    BoardCubit,
+    BoardDocument,
+    Map<String, dynamic>,
+  )
+  gridBoard = _defaultGridBoard,
 }) async {
   // GET /api/boards/:id → board details
   if (sub.isEmpty && method == 'GET') {
@@ -119,11 +140,7 @@ Future<shelf.Response> handleBoard(
   // GET /api/boards/:id/screenshot
   if (sub.length == 1 && sub[0] == 'screenshot' && method == 'GET') {
     final forceOffscreen = request.url.queryParameters['mode'] == 'offscreen';
-    return boardScreenshot(
-      board,
-      cubit: cubit,
-      forceOffscreen: forceOffscreen,
-    );
+    return boardScreenshot(board, cubit: cubit, forceOffscreen: forceOffscreen);
   }
   // GET /api/boards/:id/svg
   if (sub.length == 1 && sub[0] == 'svg' && method == 'GET') {
@@ -184,6 +201,72 @@ Future<shelf.Response> handleBoard(
     final requestBody = await body(request);
     return arrangeBoard(cubit, board, requestBody);
   }
+  // POST /api/boards/:id/grid → toggle/adjust grid view
+  if (sub.length == 1 && sub[0] == 'grid' && method == 'POST') {
+    final requestBody = await body(request);
+    return gridBoard(cubit, board, requestBody);
+  }
+
+  // GET /api/boards/:id/select → current selection
+  if (sub.length == 1 && sub[0] == 'select' && method == 'GET') {
+    return json({
+      'ok': true,
+      'selected': cubit.state.selectedPanelIds.toList(),
+    });
+  }
+  // POST /api/boards/:id/select → select panels by id list or rect
+  if (sub.length == 1 && sub[0] == 'select' && method == 'POST') {
+    final requestBody = await body(request);
+    final panelIds = _parsePanelIds(requestBody['panels']);
+    if (panelIds.isNotEmpty) {
+      cubit.selectPanels(panelIds.toSet());
+      return json({'ok': true, 'selected': panelIds});
+    }
+    final rectRaw = requestBody['rect'];
+    if (rectRaw is Map<String, dynamic>) {
+      final x = (rectRaw['x'] as num?)?.toDouble() ?? 0;
+      final y = (rectRaw['y'] as num?)?.toDouble() ?? 0;
+      final width = (rectRaw['width'] as num?)?.toDouble() ?? 0;
+      final height = (rectRaw['height'] as num?)?.toDouble() ?? 0;
+      cubit.selectPanelsInRect(Rect.fromLTWH(x, y, width, height));
+      return json({
+        'ok': true,
+        'selected': cubit.state.selectedPanelIds.toList(),
+      });
+    }
+    return error(missingField('panels or rect'));
+  }
+
+  // /api/boards/:id/groups/...
+  if (sub.isNotEmpty && sub[0] == 'groups') {
+    return handleGroup(
+      method,
+      sub.sublist(1),
+      board,
+      cubit,
+      request,
+      body: body,
+      json: json,
+      error: error,
+      notFound: notFound,
+      scheduleRebuild: scheduleRebuild,
+    );
+  }
 
   return notFound('Unknown board route');
+}
+
+List<String> _parsePanelIds(dynamic value) {
+  if (value == null) return const [];
+  if (value is String) {
+    return value
+        .split(',')
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+  }
+  if (value is List) {
+    return value.whereType<String>().toList();
+  }
+  return const [];
 }

@@ -19,6 +19,8 @@ class KanbanCliHandler extends PanelCliHandler {
     'move-card',
     'remove-card',
     'update-card',
+    'send-card-to-chat',
+    'paste',
   ];
 
   @override
@@ -211,6 +213,61 @@ class KanbanCliHandler extends PanelCliHandler {
           message: 'Card updated',
           stateUpdate: {'cards': cards},
         );
+      case 'send-card-to-chat':
+        final cardId = args['cardId'] as String?;
+        final targetPanelId = args['targetPanelId'] as String?;
+        if (cardId == null || targetPanelId == null) {
+          return const CliActionResult(
+            ok: false,
+            message: 'Missing "cardId" and "targetPanelId"',
+          );
+        }
+        final cards = _cards(panel);
+        final idx = _cardIndex(cards, cardId);
+        if (idx == null) {
+          return CliActionResult(ok: false, message: 'Card not found: $cardId');
+        }
+        final card = cards[idx];
+        final title = card['title']?.toString().trim() ?? '';
+        final description = card['description']?.toString().trim() ?? '';
+        final cardText = <String>[
+          if (title.isNotEmpty) title,
+          if (description.isNotEmpty) description,
+        ].join('\n\n');
+        return CliActionResult(
+          message: 'Card queued for chat panel $targetPanelId',
+          data: {'targetPanelId': targetPanelId, 'cardText': cardText},
+          additionalStateUpdates: {
+            targetPanelId: {
+              '_cliPendingMessage': cardText,
+              '_cliPendingAttachments': <String>[],
+            },
+          },
+        );
+      case 'paste':
+        final text = args['text'] as String?;
+        final columnIndex = (args['columnIndex'] as num?)?.toInt() ?? 0;
+        if (text == null || text.trim().isEmpty) {
+          return const CliActionResult(
+            ok: false,
+            message: 'Missing "text" to paste',
+          );
+        }
+        final lines = text.trim().split('\n');
+        final title = lines.first.trim();
+        final description = lines.skip(1).join('\n').trim();
+        final cards = List<Map<String, dynamic>>.from(_cards(panel));
+        final columns = _columns(panel);
+        cards.add({
+          'id': 'card-${DateTime.now().millisecondsSinceEpoch}',
+          'title': title.length > 120 ? '${title.substring(0, 120)}…' : title,
+          'description': description,
+          'columnIndex': columnIndex.clamp(0, columns.length - 1),
+        });
+        return CliActionResult(
+          message: 'Card pasted to ${columns[columnIndex.clamp(0, columns.length - 1)]}',
+          stateUpdate: {'cards': cards},
+        );
       default:
         return CliActionResult(ok: false, message: 'Unknown action: $action');
     }
@@ -313,6 +370,21 @@ class KanbanCliHandler extends PanelCliHandler {
         'title': 'New title',
         'description': 'New description',
         'color': 'Color',
+      },
+    ),
+    'send-card-to-chat': const CliActionHelp(
+      description:
+          'Copy a kanban card into a chat panel as a pending message',
+      params: {
+        'cardId': 'Card id',
+        'targetPanelId': 'Target chat panel id',
+      },
+    ),
+    'paste': const CliActionHelp(
+      description: 'Create a card from clipboard text',
+      params: {
+        'text': 'Text to paste (first line becomes title)',
+        'columnIndex': 'Target column index (default 0)',
       },
     ),
   };

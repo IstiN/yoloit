@@ -72,6 +72,7 @@ class CliActionResult {
     this.message,
     this.data,
     this.stateUpdate,
+    this.additionalStateUpdates,
   });
 
   /// Whether the action succeeded.
@@ -83,8 +84,14 @@ class CliActionResult {
   /// Structured response data.
   final Map<String, dynamic>? data;
 
-  /// If non-null, these key/values should be merged into the panel's state.
+  /// If non-null, these key/values should be merged into the action target
+  /// panel's state.
   final Map<String, dynamic>? stateUpdate;
+
+  /// Optional state updates for other panels on the same board.
+  ///
+  /// Map keys are panel IDs; values are state patches to merge.
+  final Map<String, Map<String, dynamic>>? additionalStateUpdates;
 
   Map<String, dynamic> toJson() => {
     'ok': ok,

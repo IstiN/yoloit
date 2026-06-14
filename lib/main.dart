@@ -10,6 +10,7 @@ import 'package:yoloit/core/hotkeys/hotkey_registry.dart';
 import 'package:yoloit/core/platform/macos_cli_setup_service.dart';
 import 'package:yoloit/core/services/app_logger.dart';
 import 'package:yoloit/core/services/resource_monitor_service.dart';
+import 'package:yoloit/core/skills/yoloit_global_skills_service.dart';
 import 'package:yoloit/core/theme/theme_manager.dart';
 import 'package:yoloit/features/settings/data/provider_model_catalog_service.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_cubit.dart';
@@ -81,6 +82,10 @@ void main(List<String> args) async {
   await AppConfig.instance.load();
   // Ensure CLI symlinks and PATH entries are set up (macOS only, best-effort).
   unawaited(MacosCliSetupService.instance.ensureInstalled());
+  // Auto-install the built-in YoLoIT skill into global agent harnesses.
+  unawaited(
+    YoloitGlobalSkillsService.instance.installOrUpdate().drain<void>(),
+  );
   // Init TmuxService early so board terminal panels can reattach to existing
   // tmux sessions during the first frame — before TerminalCubit.initialize()
   // runs in its postFrameCallback.
@@ -88,14 +93,14 @@ void main(List<String> args) async {
   unawaited(ProviderModelCatalogService.instance.load());
 
   await windowManager.ensureInitialized();
+
   const options = WindowOptions(
     size: Size(1400, 900),
     minimumSize: Size(900, 600),
     center: true,
     title: 'YoLoIT',
-    titleBarStyle: TitleBarStyle.hidden,
-    // On macOS, window buttons (traffic lights) are shown natively in hidden mode.
-    // On Windows/Linux, we render our own controls in _WindowControls widget.
+    // macOS titlebar styling is handled in MainFlutterWindow.swift.
+    // Windows/Linux keep using the custom _WindowControls widget.
     windowButtonVisibility: true,
   );
   await windowManager.waitUntilReadyToShow(options, () async {

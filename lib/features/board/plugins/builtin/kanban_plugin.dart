@@ -1,8 +1,17 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/features/board/bloc/board_cubit.dart';
+import 'package:yoloit/features/board/chat/chat_panel_plugin.dart';
+import 'package:yoloit/features/board/events/board_event_bus.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
+import 'package:yoloit/features/terminal/data/smart_clipboard_paste_service.dart';
 import 'package:yoloit/ui/components/dialog/editor_dialog_actions.dart';
+
 
 final _kanbanDefaultColors = AppColorScheme.fromAccent(Colors.indigo);
 
@@ -103,6 +112,12 @@ class _KanbanContentState extends State<_KanbanContent> {
 
   bool _editMode = false;
 
+  // search/filter state
+  bool _searchActive = false;
+  final _searchCtrl = TextEditingController();
+  String _searchQuery = '';
+  Timer? _searchDebounce;
+
   // per-column add-card controllers
   final Map<int, TextEditingController> _addCtrl = {};
   final Map<int, bool> _adding = {};
@@ -114,12 +129,18 @@ class _KanbanContentState extends State<_KanbanContent> {
   // drag highlight
   int? _dragOverCol;
 
+  // keyboard focus for clipboard paste
+  final _focusNode = FocusNode();
+
   @override
   void dispose() {
     for (final c in _addCtrl.values) {
       c.dispose();
     }
     _renameCtrl.dispose();
+    _focusNode.dispose();
+    _searchCtrl.dispose();
+    _searchDebounce?.cancel();
     super.dispose();
   }
 
@@ -141,6 +162,56 @@ class _KanbanContentState extends State<_KanbanContent> {
       'columns': cols,
       'cards': cards,
     });
+  }
+
+  void _onSearchChanged(String value) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 150), () {
+      setState(() => _searchQuery = value.trim().toLowerCase());
+    });
+  }
+
+  void _clearSearch() {
+    _searchDebounce?.cancel();
+    _searchCtrl.clear();
+    setState(() => _searchQuery = '');
+  }
+
+  void _closeSearch() {
+    _searchDebounce?.cancel();
+    _searchCtrl.clear();
+    setState(() {
+      _searchActive = false;
+      _searchQuery = '';
+    });
+  }
+
+  Future<void> _pasteFromClipboard({int columnIndex = 0}) async {
+    final data = await Clipboard.getData('text/plain');
+    final text = data?.text;
+    if (text == null || text.trim().isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Clipboard is empty')),
+        );
+      }
+      return;
+    }
+    _addCardFromText(text.trim(), columnIndex: columnIndex);
+  }
+
+  void _addCardFromText(String text, {int columnIndex = 0}) {
+    final lines = text.split('\n');
+    final title = lines.first.trim();
+    final description = lines.skip(1).join('\n').trim();
+    final cards = List<Map<String, dynamic>>.from(_cards);
+    cards.add({
+      'id': 'card-${DateTime.now().millisecondsSinceEpoch}',
+      'title': title.length > 120 ? '${title.substring(0, 120)}…' : title,
+      'description': description,
+      'columnIndex': columnIndex.clamp(0, _columns.length - 1),
+    });
+    _saveCards(cards);
   }
 
   // ── Column actions ─────────────────────────────────────────────────────────
@@ -289,48 +360,165 @@ class _KanbanContentState extends State<_KanbanContent> {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final columns = _columns;
-    final cards = _cards;
+    final query = _searchQuery;
+    final cards = query.isEmpty
+        ? _cards
+        : _cards.where((c) {
+            final title = (c['title'] as String? ?? '').toLowerCase();
+            final description = (c['description'] as String? ?? '').toLowerCase();
+            return title.contains(query) || description.contains(query);
+          }).toList();
 
-    return Container(
-      color: colors.background,
-      child: Column(
-        children: [
-          // ── Top bar with edit toggle ──
-          if (_editMode)
-            Container(
-              height: 28,
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              decoration: BoxDecoration(
-                border: Border(bottom: BorderSide(color: colors.border)),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.tune, size: 12, color: colors.primary),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Edit columns',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: colors.primary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const Spacer(),
-                  GestureDetector(
-                    onTap: () => setState(() => _editMode = false),
-                    child: Text(
-                      'Done',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: colors.primary,
-                        fontWeight: FontWeight.w600,
+    return Focus(
+      focusNode: _focusNode,
+      onKeyEvent: (node, event) {
+        final isCtrl = HardwareKeyboard.instance.isControlPressed ||
+            HardwareKeyboard.instance.isMetaPressed;
+        if (isCtrl &&
+            event is KeyDownEvent &&
+            event.logicalKey == LogicalKeyboardKey.keyV) {
+          _pasteFromClipboard();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: GestureDetector(
+        onTap: () => _focusNode.requestFocus(),
+        behavior: HitTestBehavior.translucent,
+        child: Container(
+          color: colors.background,
+          child: Column(
+            children: [
+              // ── Top bar with edit toggle and paste ──
+              Container(
+                height: 28,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                decoration: BoxDecoration(
+                  border: Border(bottom: BorderSide(color: colors.border)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    if (_searchActive) ...[
+                      Expanded(
+                        child: TextField(
+                          controller: _searchCtrl,
+                          autofocus: true,
+                          style: const TextStyle(fontSize: 12),
+                          decoration: InputDecoration(
+                            hintText: 'Search cards…',
+                            hintStyle: TextStyle(
+                              fontSize: 11,
+                              color: colors.textMuted,
+                            ),
+                            isDense: true,
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.zero,
+                            suffixIcon: ValueListenableBuilder<TextEditingValue>(
+                              valueListenable: _searchCtrl,
+                              builder: (context, value, child) {
+                                return Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (value.text.isNotEmpty)
+                                      Tooltip(
+                                        message: 'Clear search',
+                                        child: InkWell(
+                                          onTap: _clearSearch,
+                                          borderRadius: BorderRadius.circular(6),
+                                          child: Padding(
+                                            padding: const EdgeInsets.all(4),
+                                            child: Icon(
+                                              Icons.clear,
+                                              size: 14,
+                                              color: colors.primary,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    Tooltip(
+                                      message: 'Close search',
+                                      child: InkWell(
+                                        onTap: _closeSearch,
+                                        borderRadius: BorderRadius.circular(6),
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(4),
+                                          child: Icon(
+                                            Icons.close,
+                                            size: 14,
+                                            color: colors.primary,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
+                          ),
+                          onChanged: _onSearchChanged,
+                        ),
                       ),
-                    ),
-                  ),
-                ],
+                    ] else if (_editMode) ...[
+                      Icon(Icons.tune, size: 12, color: colors.primary),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Edit columns',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: colors.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const Spacer(),
+                      GestureDetector(
+                        onTap: () => setState(() => _editMode = false),
+                        child: Text(
+                          'Done',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: colors.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ] else ...[
+                      Tooltip(
+                        message: 'Search cards',
+                        child: InkWell(
+                          onTap: () => setState(() => _searchActive = true),
+                          borderRadius: BorderRadius.circular(6),
+                          child: Padding(
+                            padding: const EdgeInsets.all(4),
+                            child: Icon(
+                              Icons.search,
+                              size: 14,
+                              color: colors.primary,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Tooltip(
+                        message: 'Edit columns',
+                        child: InkWell(
+                          onTap: () => setState(() => _editMode = true),
+                          borderRadius: BorderRadius.circular(6),
+                          child: Padding(
+                            padding: const EdgeInsets.all(4),
+                            child: Icon(
+                              Icons.tune,
+                              size: 14,
+                              color: colors.primary,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
-            ),
-          Expanded(
+              Expanded(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -378,7 +566,9 @@ class _KanbanContentState extends State<_KanbanContent> {
           ),
         ],
       ),
-    );
+    ),
+  ),
+);
   }
 
   Widget _buildColumn(int ci, List<String> columns, List<_CardData> allCards) {
@@ -419,79 +609,83 @@ class _KanbanContentState extends State<_KanbanContent> {
               _buildColumnHeader(ci, columns, colCards.length),
               Divider(height: 1, color: border),
               // ── Cards ──────────────────────────────────────────────────
-              Padding(
-                padding: const EdgeInsets.all(6),
-                child: Column(
-                  children: [
-                    ...colCards.map(
-                      (card) => _buildCard(card, ci, columns.length),
-                    ),
-                    // Inline add field
-                    if (_adding[ci] == true)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: TextField(
-                          controller: _addCtrl.putIfAbsent(
-                            ci,
-                            () => TextEditingController(),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Padding(
+                    padding: const EdgeInsets.all(6),
+                    child: Column(
+                      children: [
+                        ...colCards.map(
+                          (card) => _buildCard(card, ci, columns.length),
+                        ),
+                        // Inline add field
+                        if (_adding[ci] == true)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: TextField(
+                              controller: _addCtrl.putIfAbsent(
+                                ci,
+                                () => TextEditingController(),
+                              ),
+                              autofocus: true,
+                              style: const TextStyle(fontSize: 12),
+                              decoration: InputDecoration(
+                                hintText: 'Card title…',
+                                hintStyle: const TextStyle(fontSize: 12),
+                                isDense: true,
+                                filled: true,
+                                fillColor: inputBg,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 6,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(6),
+                                  borderSide: BorderSide(color: colors.primary),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(6),
+                                  borderSide: BorderSide(
+                                    color: colors.primary.withAlpha(100),
+                                  ),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(6),
+                                  borderSide: BorderSide(color: colors.primary),
+                                ),
+                                suffixIcon: IconButton(
+                                  icon: const Icon(Icons.check, size: 14),
+                                  color: colors.primary,
+                                  onPressed: () => _addCard(ci),
+                                ),
+                              ),
+                              onSubmitted: (_) => _addCard(ci),
+                            ),
                           ),
-                          autofocus: true,
-                          style: const TextStyle(fontSize: 12),
-                          decoration: InputDecoration(
-                            hintText: 'Card title…',
-                            hintStyle: const TextStyle(fontSize: 12),
-                            isDense: true,
-                            filled: true,
-                            fillColor: inputBg,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 6,
-                            ),
-                            border: OutlineInputBorder(
+                        // Drop indicator when dragging over empty column
+                        if (isDragOver && colCards.isEmpty)
+                          Container(
+                            height: 48,
+                            margin: const EdgeInsets.only(top: 4),
+                            decoration: BoxDecoration(
+                              color: colors.primary.withAlpha(15),
                               borderRadius: BorderRadius.circular(6),
-                              borderSide: BorderSide(color: colors.primary),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(6),
-                              borderSide: BorderSide(
-                                color: colors.primary.withAlpha(100),
+                              border: Border.all(
+                                color: colors.primary.withAlpha(80),
+                                style: BorderStyle.solid,
                               ),
                             ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(6),
-                              borderSide: BorderSide(color: colors.primary),
-                            ),
-                            suffixIcon: IconButton(
-                              icon: const Icon(Icons.check, size: 14),
-                              color: colors.primary,
-                              onPressed: () => _addCard(ci),
+                            child: Center(
+                              child: Icon(
+                                Icons.add,
+                                size: 16,
+                                color: colors.primary.withAlpha(150),
+                              ),
                             ),
                           ),
-                          onSubmitted: (_) => _addCard(ci),
-                        ),
-                      ),
-                    // Drop indicator when dragging over empty column
-                    if (isDragOver && colCards.isEmpty)
-                      Container(
-                        height: 48,
-                        margin: const EdgeInsets.only(top: 4),
-                        decoration: BoxDecoration(
-                          color: colors.primary.withAlpha(15),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                            color: colors.primary.withAlpha(80),
-                            style: BorderStyle.solid,
-                          ),
-                        ),
-                        child: Center(
-                          child: Icon(
-                            Icons.add,
-                            size: 16,
-                            color: colors.primary.withAlpha(150),
-                          ),
-                        ),
-                      ),
-                  ],
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -731,8 +925,65 @@ class _KanbanContentState extends State<_KanbanContent> {
         color: color,
         onEdit: () => _editCard(card, columns),
         onDelete: () => _deleteCard(id),
+        onSendToChat: () => _sendCardToChat(context, card),
       ),
     );
+  }
+
+  void _sendCardToChat(BuildContext context, _CardData card) {
+    final board = context.read<BoardCubit>().state.activeBoard;
+    if (board == null) return;
+    final chatPanels =
+        board.panels.where((p) => p.type == ChatPanelPlugin.kTypeId).toList();
+    if (chatPanels.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No chat panels on this board')),
+      );
+      return;
+    }
+
+    final title = card['title']?.toString().trim() ?? '';
+    final description = card['description']?.toString().trim() ?? '';
+    final cardText = <String>[if (title.isNotEmpty) title, if (description.isNotEmpty) description].join('\n\n');
+
+    if (chatPanels.length == 1) {
+      BoardEventBus.instance.emit(
+        KanbanCardToChatEvent(chatPanels.first.id, cardText),
+      );
+      return;
+    }
+
+    final renderBox = context.findRenderObject() as RenderBox?;
+    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox?;
+    final position = renderBox != null && overlay != null
+        ? RelativeRect.fromRect(
+            Rect.fromPoints(
+              renderBox.localToGlobal(Offset.zero, ancestor: overlay),
+              renderBox.localToGlobal(
+                renderBox.size.bottomRight(Offset.zero),
+                ancestor: overlay,
+              ),
+            ),
+            Offset.zero & overlay.size,
+          )
+        : RelativeRect.fill;
+
+    showMenu<String>(
+      context: context,
+      position: position,
+      items: [
+        for (final panel in chatPanels)
+          PopupMenuItem<String>(
+            value: panel.id,
+            child: Text(panel.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+          ),
+      ],
+    ).then((selectedId) {
+      if (selectedId == null) return;
+      BoardEventBus.instance.emit(
+        KanbanCardToChatEvent(selectedId, cardText),
+      );
+    });
   }
 
   Color? _cardColor(_CardData card) {
@@ -761,6 +1012,7 @@ class _CardTile extends StatelessWidget {
     required this.color,
     required this.onEdit,
     required this.onDelete,
+    this.onSendToChat,
   });
 
   final String title;
@@ -768,6 +1020,7 @@ class _CardTile extends StatelessWidget {
   final Color? color;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final VoidCallback? onSendToChat;
 
   @override
   Widget build(BuildContext context) {
@@ -838,6 +1091,18 @@ class _CardTile extends StatelessWidget {
                 ],
               ),
             ),
+            // Send to chat
+            if (onSendToChat != null)
+              SizedBox(
+                width: 18,
+                height: 18,
+                child: IconButton(
+                  padding: EdgeInsets.zero,
+                  tooltip: 'Send to chat',
+                  icon: Icon(Icons.send_outlined, size: 11, color: muted),
+                  onPressed: onSendToChat,
+                ),
+              ),
             // Delete
             SizedBox(
               width: 18,
@@ -874,6 +1139,7 @@ class _KanbanCardEditorDialog extends StatefulWidget {
 class _KanbanCardEditorDialogState extends State<_KanbanCardEditorDialog> {
   late final TextEditingController _titleCtrl;
   late final TextEditingController _descriptionCtrl;
+  late final FocusNode _descriptionFocusNode;
   late int _columnIndex;
   Color? _color;
 
@@ -886,6 +1152,7 @@ class _KanbanCardEditorDialogState extends State<_KanbanCardEditorDialog> {
     _descriptionCtrl = TextEditingController(
       text: widget.card['description']?.toString() ?? '',
     );
+    _descriptionFocusNode = FocusNode();
     _columnIndex = _readColumnIndex(widget.card);
     _color = _readColor(widget.card['color']);
   }
@@ -894,7 +1161,38 @@ class _KanbanCardEditorDialogState extends State<_KanbanCardEditorDialog> {
   void dispose() {
     _titleCtrl.dispose();
     _descriptionCtrl.dispose();
+    _descriptionFocusNode.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleDescriptionPaste() async {
+    try {
+      final pasted = await SmartClipboardPasteService.instance
+          .readInlineTextOrSavedFilePath(allowInlineText: true);
+      if (pasted == null || !mounted) return;
+      _insertTextAtCursor(_descriptionCtrl, pasted);
+    } catch (e) {
+      assert(() {
+        debugPrint('[KanbanCardEditor] Smart paste error: $e');
+        return true;
+      }());
+    }
+  }
+
+  void _insertTextAtCursor(
+    TextEditingController controller,
+    String insertion,
+  ) {
+    final text = controller.text;
+    final selection = controller.selection;
+    final start = selection.start >= 0 ? selection.start : 0;
+    final end = selection.end >= 0 ? selection.end : start;
+    final newText = text.replaceRange(start, end, insertion);
+    final newOffset = start + insertion.length;
+    controller.value = TextEditingValue(
+      text: newText,
+      selection: TextSelection.collapsed(offset: newOffset),
+    );
   }
 
   int _readColumnIndex(_CardData card) {
@@ -984,20 +1282,37 @@ class _KanbanCardEditorDialogState extends State<_KanbanCardEditorDialog> {
                 onSubmitted: (_) => _save(),
               ),
               const SizedBox(height: 10),
-              TextField(
-                controller: _descriptionCtrl,
-                minLines: 3,
-                maxLines: 5,
-                decoration: const InputDecoration(
-                  labelText: 'Description',
-                  isDense: true,
-                  border: OutlineInputBorder(),
+              Focus(
+                onKeyEvent: (node, event) {
+                  if (event is! KeyDownEvent) {
+                    return KeyEventResult.ignored;
+                  }
+                  final isPaste =
+                      event.logicalKey == LogicalKeyboardKey.keyV &&
+                      (HardwareKeyboard.instance.isMetaPressed ||
+                          HardwareKeyboard.instance.isControlPressed);
+                  if (isPaste) {
+                    _handleDescriptionPaste();
+                    return KeyEventResult.handled;
+                  }
+                  return KeyEventResult.ignored;
+                },
+                child: TextField(
+                  controller: _descriptionCtrl,
+                  focusNode: _descriptionFocusNode,
+                  minLines: 3,
+                  maxLines: 5,
+                  decoration: const InputDecoration(
+                    labelText: 'Description',
+                    isDense: true,
+                    border: OutlineInputBorder(),
+                  ),
                 ),
               ),
               const SizedBox(height: 10),
               if (widget.columns.isNotEmpty)
                 DropdownButtonFormField<int>(
-                  value: _columnIndex,
+                  initialValue: _columnIndex,
                   decoration: const InputDecoration(
                     labelText: 'Column',
                     isDense: true,

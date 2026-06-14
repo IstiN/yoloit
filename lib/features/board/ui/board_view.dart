@@ -16,7 +16,6 @@ import 'package:yoloit/core/remote/yoloit_remote_client.dart';
 import 'package:yoloit/core/services/support_log_service.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/ui/adaptive_dialog.dart';
-import 'package:yoloit/ui/components/buttons/markdown_tool_button.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/bloc/board_state.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
@@ -24,31 +23,37 @@ import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
 import 'package:yoloit/features/board/plugins/builtin/webpage_plugin.dart';
 import 'package:yoloit/features/board/services/board_offscreen_renderer.dart';
 import 'package:yoloit/features/board/tools/board_tool.dart';
-import 'package:yoloit/features/board/ui/board_overview_layer.dart';
-import 'package:yoloit/features/board/ui/board_overview_widgets.dart';
-import 'package:yoloit/features/board/ui/dialogs/board_settings_dialog.dart';
-import 'package:yoloit/features/board/ui/dialogs/connect_remote_yoloit_dialog.dart';
-import 'package:yoloit/features/board/ui/dialogs/share_board_dialog.dart';
+import 'package:yoloit/features/board/ui/board_constants.dart';
 import 'package:yoloit/features/board/ui/board_drawing_widgets.dart';
+import 'package:yoloit/features/board/ui/board_grid_painter.dart';
+import 'package:yoloit/features/board/ui/board_group_overlay.dart';
 import 'package:yoloit/features/board/ui/board_history_panel.dart';
 import 'package:yoloit/features/board/ui/board_link_widgets.dart';
 import 'package:yoloit/features/board/ui/board_links_painter.dart';
-import 'package:yoloit/features/board/ui/board_tools_panel.dart';
-import 'package:yoloit/features/board/ui/yolo_badge_with_chat.dart';
-import 'package:yoloit/features/board/widgets/widget_engine_manager.dart';
-import 'package:yoloit/features/mindmap/widgets/canvas_interaction_lock.dart';
-import 'package:yoloit/features/search/ui/file_search_overlay.dart';
-import 'package:yoloit/features/board/ui/board_constants.dart';
 import 'package:yoloit/features/board/ui/board_math.dart';
+import 'package:yoloit/features/board/ui/board_overview_layer.dart';
+import 'package:yoloit/features/board/ui/board_overview_widgets.dart';
 import 'package:yoloit/features/board/ui/board_panel_card.dart';
 import 'package:yoloit/features/board/ui/board_toolbar.dart';
+import 'package:yoloit/features/board/ui/board_tools_panel.dart';
+import 'package:yoloit/features/board/ui/dialogs/board_settings_dialog.dart';
+import 'package:yoloit/features/board/ui/dialogs/connect_remote_yoloit_dialog.dart';
+import 'package:yoloit/features/board/ui/dialogs/share_board_dialog.dart';
 import 'package:yoloit/features/board/ui/infinite_grid_painter.dart';
 import 'package:yoloit/features/board/ui/webview_overlays.dart';
 import 'package:yoloit/features/board/ui/widgets/board_empty_state.dart';
+import 'package:yoloit/features/board/ui/widgets/board_selection_toolbar.dart';
 import 'package:yoloit/features/board/ui/widgets/board_top_right_controls.dart';
 import 'package:yoloit/features/board/ui/widgets/cancel_connection_bar.dart';
 import 'package:yoloit/features/board/ui/widgets/link_delete_badges.dart';
 import 'package:yoloit/features/board/ui/widgets/text_editing_utils.dart';
+import 'package:yoloit/features/board/ui/yolo_badge_with_chat.dart';
+import 'package:yoloit/features/board/utils/board_grid_layout.dart';
+import 'package:yoloit/features/board/widgets/widget_engine_manager.dart';
+import 'package:yoloit/features/mindmap/widgets/canvas_interaction_lock.dart';
+import 'package:yoloit/features/search/ui/file_search_overlay.dart';
+import 'package:yoloit/ui/components/buttons/markdown_tool_button.dart';
+
 class BoardView extends StatefulWidget {
   const BoardView({super.key, this.skipOverviewPreviewCapture = false});
 
@@ -60,6 +65,7 @@ class BoardView extends StatefulWidget {
   @override
   State<BoardView> createState() => _BoardViewState();
 }
+
 @visibleForTesting
 bool boardShouldRevertInteractionForCanvasLock({
   required bool interactionStartedLocked,
@@ -68,6 +74,7 @@ bool boardShouldRevertInteractionForCanvasLock({
 }) {
   return interactionStartedLocked && currentlyLocked && !isScaleChanging;
 }
+
 class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   static bool _isPointerOverScrollableCard(Offset position, int viewId) {
     final result = HitTestResult();
@@ -76,6 +83,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
       (entry) => entry.target is RenderScrollableCardMarker,
     );
   }
+
   final FocusNode _boardFocus = FocusNode();
 
   final TransformationController _transformController =
@@ -94,6 +102,10 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   bool _interactionStartedLocked = false;
   int? _lastLoggedLockCount;
   Offset? _lastPanelDragBoardPointer;
+  Offset _gridDragAccumulatedDelta = Offset.zero;
+  String? _transformingPanelId;
+  BoardPanelBounds? _transformStartBounds;
+  bool _isCurrentTransformResize = false;
 
   String? _syncedBoardId;
   BoardViewport? _syncedViewport;
@@ -135,6 +147,12 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   BoardToolId _activeTool = BoardToolId.select;
   DrawSettings _drawSettings = const DrawSettings();
   ConnectSettings _connectSettings = const ConnectSettings();
+
+  // ── Multi-select state ────────────────────────────────────────────────────
+  Offset? _multiSelectStart;
+  Offset? _multiSelectCurrent;
+  String? _multiSelectStartPanelId;
+  bool _multiSelectHasDragged = false;
 
   /// Link id currently hovered (for showing delete badge).
 
@@ -246,6 +264,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                         _scheduleFocusedPanelVisibilityIfNeeded(activeBoard);
                         final focusedPanelId =
                             activeBoard.viewport.focusedPanelId;
+                        final selectedPanelIds = state.selectedPanelIds;
 
                         return Stack(
                           clipBehavior: Clip.none,
@@ -259,16 +278,32 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                     child: IgnorePointer(
                                       child: CustomPaint(
                                         isComplex: true,
-                                        painter: InfiniteBoardGridPainter(
-                                          transformCtrl: _transformController,
-                                          origin: _canvasOrigin,
-                                          minorColor: colors.divider.withAlpha(
-                                            60,
-                                          ),
-                                          majorColor: colors.divider.withAlpha(
-                                            110,
-                                          ),
-                                        ),
+                                        painter:
+                                            activeBoard.gridMode.enabled
+                                                ? BoardGridPainter(
+                                                  transformCtrl:
+                                                      _transformController,
+                                                  origin: _canvasOrigin,
+                                                  cellSize:
+                                                      activeBoard
+                                                          .gridMode
+                                                          .cellSize,
+                                                  spacing:
+                                                      activeBoard
+                                                          .gridMode
+                                                          .spacing,
+                                                  color: colors.divider
+                                                      .withAlpha(90),
+                                                )
+                                                : InfiniteBoardGridPainter(
+                                                  transformCtrl:
+                                                      _transformController,
+                                                  origin: _canvasOrigin,
+                                                  minorColor: colors.divider
+                                                      .withAlpha(60),
+                                                  majorColor: colors.divider
+                                                      .withAlpha(110),
+                                                ),
                                       ),
                                     ),
                                   ),
@@ -291,8 +326,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                         _lastLoggedLockCount = lockVersion;
                                         assert(() {
                                           debugPrint(
-                                          '[BoardViewLock] activeCount=$activeCount, isLocked=$isLocked',
-                                        );
+                                            '[BoardViewLock] activeCount=$activeCount, isLocked=$isLocked',
+                                          );
                                           return true;
                                         }());
                                       }
@@ -305,10 +340,9 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                   event.position,
                                                   event.viewId,
                                                 );
-                                            final scale =
-                                                matrixScaleOf(
-                                                  _transformController.value,
-                                                );
+                                            final scale = matrixScaleOf(
+                                              _transformController.value,
+                                            );
                                             _boardSupportLog(
                                               'pointerScroll locked=$isLocked '
                                               'canvasGesture=${CanvasInteractionLock.instance.isCanvasGestureActive} '
@@ -393,18 +427,20 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                           boundaryMargin: const EdgeInsets.all(
                                             canvasExpansionChunk,
                                           ),
-                                          // Disable pan only while actively drawing (drawPointer held) or canvas is locked
+                                          // Disable pan while actively drawing,
+                                          // in multi-select mode, or when canvas is locked.
                                           panEnabled:
                                               (_activeTool !=
                                                       BoardToolId.draw ||
-                                                  _drawPointer == null),
+                                                  _drawPointer == null) &&
+                                              _activeTool !=
+                                                  BoardToolId.multiSelect,
                                           transformationController:
                                               _transformController,
                                           onInteractionStart: (details) {
-                                            final startScale =
-                                                matrixScaleOf(
-                                                  _transformController.value,
-                                                );
+                                            final startScale = matrixScaleOf(
+                                              _transformController.value,
+                                            );
                                             _boardSupportLog(
                                               'interaction.start locked=$isLocked '
                                               'tool=${_activeTool.name} '
@@ -432,10 +468,9 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                             _stopPanAnimation();
                                           },
                                           onInteractionUpdate: (details) {
-                                            final currentScale =
-                                                matrixScaleOf(
-                                                  _transformController.value,
-                                                );
+                                            final currentScale = matrixScaleOf(
+                                              _transformController.value,
+                                            );
                                             if (boardShouldRevertInteractionForCanvasLock(
                                                   interactionStartedLocked:
                                                       _interactionStartedLocked,
@@ -553,6 +588,14 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                         HitTestBehavior
                                                             .translucent,
                                                     onPointerDown: (_) {
+                                                      if (_activeTool ==
+                                                          BoardToolId
+                                                              .multiSelect) {
+                                                        context
+                                                            .read<BoardCubit>()
+                                                            .clearSelection();
+                                                        return;
+                                                      }
                                                       if (focusedPanelId !=
                                                           null) {
                                                         _boardWebFocusLog(
@@ -564,6 +607,61 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                       }
                                                     },
                                                   ),
+                                                ),
+                                                // ── Group backgrounds & headers ────────────
+                                                BoardGroupOverlay(
+                                                  board: activeBoard,
+                                                  origin: _canvasOrigin,
+                                                  onToggleCollapse: (groupId) {
+                                                    context
+                                                        .read<BoardCubit>()
+                                                        .toggleGroupCollapse(
+                                                          activeBoard.id,
+                                                          groupId,
+                                                        );
+                                                  },
+                                                  onMoveGroupStart: (_) {},
+                                                  onMoveGroup: (
+                                                    groupId,
+                                                    details,
+                                                  ) =>
+                                                      _moveGroupWithEdgePan(
+                                                        context,
+                                                        groupId,
+                                                        details,
+                                                      ),
+                                                  onMoveGroupEnd: (_) {},
+                                                  onRenameGroup: (groupId) {
+                                                    _showRenameGroupDialog(
+                                                      context,
+                                                      activeBoard.id,
+                                                      groupId,
+                                                    );
+                                                  },
+                                                  onCycleFocus: (
+                                                    groupId,
+                                                    direction,
+                                                  ) {
+                                                    context
+                                                        .read<BoardCubit>()
+                                                        .cycleGroupFocus(
+                                                          activeBoard.id,
+                                                          groupId,
+                                                          direction,
+                                                        );
+                                                  },
+                                                  onResizeCollapsedGroup: (
+                                                    groupId,
+                                                    bounds,
+                                                  ) {
+                                                    context
+                                                        .read<BoardCubit>()
+                                                        .resizeGroupCollapsedBounds(
+                                                          activeBoard.id,
+                                                          groupId,
+                                                          bounds,
+                                                        );
+                                                  },
                                                 ),
                                                 // ── Link delete badges ─────────────────────
                                                 if (_activeTool ==
@@ -593,13 +691,33 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                     final boardCubit =
                                                         context
                                                             .read<BoardCubit>();
-                                                    return BoardPanelCard(
-                                                        key: ValueKey(panel.id),
-                                                        panel: panel,
+                                                    final isInCollapsedGroup =
+                                                        activeBoard
+                                                            .groups
+                                                            .any(
+                                                              (group) =>
+                                                                  group
+                                                                      .collapsed &&
+                                                                  group
+                                                                      .panelIds
+                                                                      .contains(
+                                                                        panel
+                                                                            .id,
+                                                                      ),
+                                                            );
+                                                    final card = BoardPanelCard(
+                                                      key: ValueKey(panel.id),
+                                                      panel: panel,
                                                       positionOffset:
                                                           _canvasOrigin,
                                                       capturingScreenshot:
                                                           _isCapturingScreenshot,
+                                                      selected:
+                                                          !isInCollapsedGroup &&
+                                                          selectedPanelIds
+                                                              .contains(
+                                                                panel.id,
+                                                              ),
                                                       onTap:
                                                           () => boardCubit
                                                               .focusPanel(
@@ -867,7 +985,13 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                                     panel.id,
                                                                   )
                                                               : null,
+                                                    );
+                                                    if (isInCollapsedGroup) {
+                                                      return IgnorePointer(
+                                                        child: card,
                                                       );
+                                                    }
+                                                    return card;
                                                   }).toList();
                                                 })(),
                                                 // ── Drawing layer (above panels visually;
@@ -973,6 +1097,16 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                       ),
                                                     ),
                                                   ),
+                                                // ── Multi-select marquee overlay ──────────
+                                                if (_activeTool ==
+                                                    BoardToolId.multiSelect)
+                                                  _buildMultiSelectOverlay(
+                                                    context,
+                                                    activeBoard,
+                                                  ),
+                                                if (_multiSelectStart != null &&
+                                                    _multiSelectCurrent != null)
+                                                  _buildMultiSelectRect(),
                                               ],
                                             ),
                                           ),
@@ -1057,7 +1191,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                   if (activeBoard.panels.isEmpty)
                                     BoardEmptyState(
                                       onAddNote:
-                                          () => _showMarkdownNoteDialog(context),
+                                          () =>
+                                              _showMarkdownNoteDialog(context),
                                     ),
                                   if (!_isBoardOverviewOpen &&
                                       !_isCapturingScreenshot)
@@ -1065,19 +1200,38 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                       showMinimap: _showMinimap,
                                       onToggleMinimap:
                                           () => setState(
-                                            () =>
-                                                _showMinimap = !_showMinimap,
+                                            () => _showMinimap = !_showMinimap,
                                           ),
                                       onFitBoard:
                                           () => _fitBoardPanels(
                                             activeBoard,
                                             persist: true,
                                           ),
+                                      isGridMode: activeBoard.gridMode.enabled,
+                                      onToggleGrid:
+                                          () => context
+                                              .read<BoardCubit>()
+                                              .setGridMode(
+                                                activeBoard.id,
+                                                enabled:
+                                                    !activeBoard
+                                                        .gridMode
+                                                        .enabled,
+                                              ),
+                                      onResetGrid:
+                                          () => context
+                                              .read<BoardCubit>()
+                                              .resetGridView(activeBoard.id),
+                                      onGroupByType:
+                                          () => context
+                                              .read<BoardCubit>()
+                                              .arrangePanelsByTypeInGrid(
+                                                activeBoard.id,
+                                              ),
                                       panels: activeBoard.panels,
                                       transformController: _transformController,
                                       viewportSize:
-                                          _viewportSize ??
-                                          const Size(1, 1),
+                                          _viewportSize ?? const Size(1, 1),
                                       origin: _canvasOrigin,
                                       onPanTo:
                                           (center) => _centerViewportOn(
@@ -1104,6 +1258,13 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                               _activeStroke.clear();
                                               _connectSourceId = null;
                                               _connectPreviewPointer = null;
+                                              _clearMultiSelectGesture();
+                                              if (tool !=
+                                                  BoardToolId.multiSelect) {
+                                                context
+                                                    .read<BoardCubit>()
+                                                    .clearSelection();
+                                              }
                                             }),
                                         onDrawSettingsChanged:
                                             (s) => setState(
@@ -1137,11 +1298,16 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                               context,
                                             ),
                                         onAddChat:
-                                            () => context.read<BoardCubit>().createChatPanel(
-                                              configured: false,
-                                            ),
+                                            () => context
+                                                .read<BoardCubit>()
+                                                .createChatPanel(
+                                                  configured: false,
+                                                ),
                                         onAddTerminal:
-                                            () => context.read<BoardCubit>().createTerminalPanel(),
+                                            () =>
+                                                context
+                                                    .read<BoardCubit>()
+                                                    .createTerminalPanel(),
                                         onAddGeneric:
                                             (typeId) =>
                                                 _handleGenericToolSelection(
@@ -1175,6 +1341,30 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                             _connectSourceId = null;
                                             _connectPreviewPointer = null;
                                           }),
+                                    ),
+                                  // ── Multi-selection toolbar ────────────────────────
+                                  if (!_isBoardOverviewOpen &&
+                                      !_isCapturingScreenshot &&
+                                      selectedPanelIds.isNotEmpty)
+                                    Positioned(
+                                      top: 12,
+                                      left: 0,
+                                      right: 0,
+                                      child: Center(
+                                        child: BoardSelectionToolbar(
+                                          selectedCount:
+                                              selectedPanelIds.length,
+                                          onClear:
+                                              () => context
+                                                  .read<BoardCubit>()
+                                                  .clearSelection(),
+                                          onAddToGroup:
+                                              () => _addSelectionToGroup(
+                                                context,
+                                                activeBoard,
+                                              ),
+                                        ),
+                                      ),
                                     ),
                                   // ── YOLO badge removed from canvas stack ──────────────
                                 ],
@@ -1806,7 +1996,27 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   ) {
     _panViewportNearEdge(details.globalPosition);
     final delta = _consumePanelDragDelta(details.globalPosition, details.delta);
+    final board = context.read<BoardCubit>().state.activeBoard;
+    if (board != null && board.gridMode.enabled) {
+      _gridDragAccumulatedDelta += delta;
+      // In grid mode the panel follows the pointer smoothly during the drag;
+      // the snap and neighbour-push happen on drag end.
+      context.read<BoardCubit>().movePanel(panelId, delta);
+      return;
+    }
     context.read<BoardCubit>().movePanel(panelId, delta);
+  }
+
+  void _moveGroupWithEdgePan(
+    BuildContext context,
+    String groupId,
+    DragUpdateDetails details,
+  ) {
+    _panViewportNearEdge(details.globalPosition);
+    final delta = _consumePanelDragDelta(details.globalPosition, details.delta);
+    final board = context.read<BoardCubit>().state.activeBoard;
+    if (board == null) return;
+    context.read<BoardCubit>().moveGroup(board.id, groupId, delta);
   }
 
   void _resizePanelWithEdgePan(
@@ -1816,6 +2026,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   ) {
     _panViewportNearEdge(update.globalPosition);
     final delta = _consumePanelDragDelta(update.globalPosition, update.delta);
+    _isCurrentTransformResize = true;
     final next = _resizeBoundsForHandle(panel, update.handle, delta);
     context.read<BoardCubit>().updatePanel(
       panel.id,
@@ -1861,6 +2072,12 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   void _handlePanelDragStart(String panelId, DragStartDetails details) {
     _isPanelDragging = true;
     _lastPanelDragBoardPointer = _boardPointFromGlobal(details.globalPosition);
+    _gridDragAccumulatedDelta = Offset.zero;
+    _isCurrentTransformResize = false;
+    _transformingPanelId = panelId;
+    final board = context.read<BoardCubit>().state.activeBoard;
+    final panel = board?.panels.where((p) => p.id == panelId).firstOrNull;
+    _transformStartBounds = panel?.bounds;
     _boardDebugLog('panelDrag.start panel=$panelId');
     _stopPanAnimation();
   }
@@ -1870,10 +2087,47 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     _isPanelDragging = false;
     _lastPanelDragBoardPointer = null;
     final board = context.read<BoardCubit>().state.activeBoard;
+    if (board != null && board.gridMode.enabled) {
+      _commitPanelGridTransform(board);
+    }
     if (board != null) {
       _persistViewport(context, board);
     }
     _scheduleCanvasExpansionIfNeeded();
+  }
+
+  void _commitPanelGridTransform(BoardDocument board) {
+    final panelId = _transformingPanelId;
+    final startBounds = _transformStartBounds;
+    if (panelId == null || startBounds == null) return;
+
+    final mode = board.gridMode;
+    final pitch = mode.cellSize + mode.spacing;
+
+    GridRect targetRect;
+    if (_isCurrentTransformResize) {
+      // For a resize, snap the freeform result to the nearest grid cell.
+      final panel = board.panels.where((p) => p.id == panelId).firstOrNull;
+      if (panel == null) return;
+      targetRect = boundsToGridRect(mode, panel.bounds);
+    } else {
+      // For a drag, snap the drop point to the cell offset from the start cell.
+      final startRect = boundsToGridRect(mode, startBounds);
+      final dCol = (_gridDragAccumulatedDelta.dx / pitch).round();
+      final dRow = (_gridDragAccumulatedDelta.dy / pitch).round();
+      targetRect = startRect.shifted(dCol, dRow);
+    }
+
+    context.read<BoardCubit>().placePanelInGrid(
+      board.id,
+      panelId,
+      targetRect: targetRect,
+    );
+
+    _transformingPanelId = null;
+    _transformStartBounds = null;
+    _isCurrentTransformResize = false;
+    _gridDragAccumulatedDelta = Offset.zero;
   }
 
   void _handleGenericToolSelection(BuildContext context, String value) {
@@ -1955,6 +2209,139 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
       'panelDrag.delta pointer=${fmtOffset(current)} delta=${fmtOffset(delta)} fallback=${fmtOffset(fallbackDelta)}',
     );
     return delta;
+  }
+
+  Widget _buildMultiSelectOverlay(
+    BuildContext context,
+    BoardDocument board,
+  ) {
+    return Positioned.fill(
+      child: MouseRegion(
+        cursor: SystemMouseCursors.precise,
+        child: Listener(
+          behavior: HitTestBehavior.translucent,
+          onPointerDown: (e) {
+            final point = _boardPointFromGlobal(e.position);
+            if (point == null) return;
+            setState(() {
+              _multiSelectStart = point;
+              _multiSelectCurrent = point;
+              _multiSelectHasDragged = false;
+              _multiSelectStartPanelId = _panelIdAtBoardPoint(board, point);
+            });
+          },
+          onPointerMove: (e) {
+            if (_multiSelectStart == null) return;
+            final point = _boardPointFromGlobal(e.position);
+            if (point == null) return;
+            if ((point - _multiSelectStart!).distance > 4) {
+              setState(() => _multiSelectHasDragged = true);
+            }
+            setState(() => _multiSelectCurrent = point);
+          },
+          onPointerUp: (e) {
+            _finishMultiSelectGesture(context, board);
+          },
+          onPointerCancel: (_) {
+            setState(_clearMultiSelectGesture);
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMultiSelectRect() {
+    final start = _multiSelectStart!;
+    final current = _multiSelectCurrent!;
+    final left = math.min(start.dx, current.dx) + _canvasOrigin.dx;
+    final top = math.min(start.dy, current.dy) + _canvasOrigin.dy;
+    final width = (start.dx - current.dx).abs();
+    final height = (start.dy - current.dy).abs();
+    final colors = context.appColors;
+    return Positioned(
+      left: left,
+      top: top,
+      width: width,
+      height: height,
+      child: Container(
+        decoration: BoxDecoration(
+          color: colors.statusActive.withAlpha(30),
+          border: Border.all(color: colors.statusActive, width: 1.5),
+        ),
+      ),
+    );
+  }
+
+  String? _panelIdAtBoardPoint(BoardDocument board, Offset point) {
+    for (var i = board.panels.length - 1; i >= 0; i--) {
+      final panel = board.panels[i];
+      if (panel.hidden) continue;
+      final rect = Rect.fromLTWH(
+        panel.bounds.x,
+        panel.bounds.y,
+        panel.bounds.width,
+        panel.bounds.height,
+      );
+      if (rect.contains(point)) return panel.id;
+    }
+    return null;
+  }
+
+  void _finishMultiSelectGesture(BuildContext context, BoardDocument board) {
+    final start = _multiSelectStart;
+    final hasDragged = _multiSelectHasDragged;
+    final startPanelId = _multiSelectStartPanelId;
+    final cubit = context.read<BoardCubit>();
+    if (start == null) {
+      setState(_clearMultiSelectGesture);
+      return;
+    }
+    if (!hasDragged) {
+      if (startPanelId != null) {
+        cubit.togglePanelSelection(startPanelId);
+      } else {
+        cubit.clearSelection();
+      }
+    } else {
+      final current = _multiSelectCurrent ?? start;
+      final rect = Rect.fromPoints(start, current);
+      cubit.selectPanelsInRect(rect);
+    }
+    setState(_clearMultiSelectGesture);
+  }
+
+  void _clearMultiSelectGesture() {
+    _multiSelectStart = null;
+    _multiSelectCurrent = null;
+    _multiSelectStartPanelId = null;
+    _multiSelectHasDragged = false;
+  }
+
+  Future<void> _addSelectionToGroup(
+    BuildContext context,
+    BoardDocument board,
+  ) async {
+    final cubit = context.read<BoardCubit>();
+    final result = await showDialog<
+      ({String? groupId, String? newName})?
+    >(
+      context: context,
+      builder:
+          (_) => BoardSelectionGroupDialog(groups: board.groups),
+    );
+    if (result == null) return;
+    if (result.newName != null && result.newName!.trim().isNotEmpty) {
+      await cubit.createGroupFromSelection(name: result.newName!.trim());
+      return;
+    }
+    if (result.groupId != null) {
+      await cubit.addPanelsToGroup(
+        board.id,
+        result.groupId!,
+        cubit.state.selectedPanelIds.toList(),
+      );
+      cubit.clearSelection();
+    }
   }
 
   Offset? _boardPointFromGlobal(Offset globalPosition) {
@@ -2178,11 +2565,78 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     return scenePoint - _canvasOrigin;
   }
 
+  Future<void> _showRenameGroupDialog(
+    BuildContext context,
+    String boardId,
+    String groupId,
+  ) async {
+    BoardDocument? board;
+    for (final candidate in context.read<BoardCubit>().state.boards) {
+      if (candidate.id == boardId) {
+        board = candidate;
+        break;
+      }
+    }
+    BoardPanelGroup? group;
+    if (board != null) {
+      for (final candidate in board.groups) {
+        if (candidate.id == groupId) {
+          group = candidate;
+          break;
+        }
+      }
+    }
+    if (group == null) return;
+
+    final controller = TextEditingController(text: group.name);
+    await showDialog<void>(
+      context: context,
+      builder:
+          (dialogContext) => AlertDialog(
+            title: const Text('Rename group'),
+            content: TextField(
+              controller: controller,
+              autofocus: true,
+              decoration: const InputDecoration(hintText: 'Group name'),
+              onSubmitted: (value) {
+                context.read<BoardCubit>().renameGroup(
+                  boardId,
+                  groupId,
+                  value,
+                );
+                Navigator.of(dialogContext).pop();
+              },
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () {
+                  context.read<BoardCubit>().renameGroup(
+                    boardId,
+                    groupId,
+                    controller.text,
+                  );
+                  Navigator.of(dialogContext).pop();
+                },
+                child: const Text('Rename'),
+              ),
+            ],
+          ),
+    );
+    controller.dispose();
+  }
+
   void _boardDebugLog(String message) {
     if (!kDebugMode || !const bool.fromEnvironment('YOLOIT_BOARD_DEBUG')) {
       return;
     }
-    assert(() { debugPrint('[BoardView] $message'); return true; }());
+    assert(() {
+      debugPrint('[BoardView] $message');
+      return true;
+    }());
   }
 
   void _boardSupportLog(String message) {
@@ -2191,12 +2645,18 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
 
   void _boardOverviewLog(String message) {
     if (!kDebugMode) return;
-    assert(() { debugPrint('[BoardOverview] $message'); return true; }());
+    assert(() {
+      debugPrint('[BoardOverview] $message');
+      return true;
+    }());
   }
 
   void _boardWebFocusLog(String message) {
     if (!kDebugMode) return;
-    assert(() { debugPrint('[BoardWebFocus] $message'); return true; }());
+    assert(() {
+      debugPrint('[BoardWebFocus] $message');
+      return true;
+    }());
   }
 
   // ── Tool actions ──────────────────────────────────────────────────────────
@@ -2263,9 +2723,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     });
   }
 
-  Future<LinkStyleChoice?> _showConnectStyleDialog(
-    BuildContext context,
-  ) async {
+  Future<LinkStyleChoice?> _showConnectStyleDialog(BuildContext context) async {
     return showAdaptiveYoloDialog<LinkStyleChoice>(
       context: context,
       builder: (ctx) => LinkStyleDialog(initialSettings: _connectSettings),
@@ -2547,10 +3005,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                             icon: Icons.check_box_outlined,
                             tooltip: 'Checklist',
                             onTap: () {
-                              prefixSelectedLines(
-                                markdownController,
-                                '- [ ] ',
-                              );
+                              prefixSelectedLines(markdownController, '- [ ] ');
                               setDialogState(() {});
                             },
                           ),
@@ -2801,4 +3256,3 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     );
   }
 }
-

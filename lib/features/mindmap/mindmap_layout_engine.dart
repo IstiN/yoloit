@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:yoloit/features/mindmap/model/mindmap_node_model.dart';
 
