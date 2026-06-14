@@ -30,63 +30,87 @@ jobs:
       DOTNET_SYSTEM_NET_HTTP_USESOCKETSHTTPHANDLER: "0"
 
     steps:
-      # ── Checkout ────────────────────────────────────────────────────────────
-      - name: Checkout repository (fast local mirror)
+      # ── Prepare persistent local git mirrors ────────────────────────────────
+      # Keeps bare mirrors outside the ephemeral workspace so subsequent runs
+      # only fetch deltas instead of cloning the whole repo + submodules.
+      - name: Update local git mirrors
         run: |
-          # Debug: show HOME and check paths
+          set -euo pipefail
+
+          MIRROR_BASE="$HOME/actions-runner-yoloit/mirror"
+          mkdir -p "$MIRROR_BASE"
+
+          update_mirror() {
+            local url="$1"
+            local mirror="$2"
+            local extra_args="${3:-}"
+            if [ ! -d "$mirror" ]; then
+              echo "Creating mirror: $mirror"
+              git clone --mirror $extra_args "$url" "$mirror"
+            else
+              echo "Updating mirror: $mirror"
+              git -C "$mirror" fetch origin || true
+            fi
+          }
+
+          # Main repository
+          update_mirror https://github.com/IstiN/yoloit.git "$MIRROR_BASE/yoloit.git"
+
+          # Submodules
+          update_mirror https://github.com/IstiN/mermaid_renderer_flutter.git \
+            "$MIRROR_BASE/mermaid_renderer_flutter.git"
+          update_mirror https://github.com/IstiN/flutter_local_models.git \
+            "$MIRROR_BASE/flutter_local_models.git"
+          update_mirror https://github.com/IstiN/xterm.git \
+            "$MIRROR_BASE/xterm.git"
+
+          # flutter_code_editor path dependency (single branch)
+          update_mirror https://github.com/akvelon/flutter-code-editor.git \
+            "$MIRROR_BASE/flutter-code-editor.git" \
+            "--branch v0.3.5 --single-branch"
+
+      # ── Checkout ────────────────────────────────────────────────────────────
+      - name: Checkout repository from local mirrors
+        run: |
+          set -euo pipefail
+
+          MIRROR_BASE="$HOME/actions-runner-yoloit/mirror"
+          MAIN_MIRROR="$MIRROR_BASE/yoloit.git"
+
           echo "HOME=$HOME"
           echo "GITHUB_WORKSPACE=$GITHUB_WORKSPACE"
+          echo "MAIN_MIRROR=$MAIN_MIRROR"
 
-          # Try multiple possible local repo paths
-          LOCAL_REPO=""
-          for candidate in "$HOME/git/yoloit/yoloit" "/Users/Uladzimir_Klyshevich/git/yoloit/yoloit" "/Users/uladzimir_klyshevich/git/yoloit/yoloit" "/Users/shared/git/yoloit/yoloit" "/opt/git/yoloit/yoloit"; do
-            echo "Checking: $candidate"
-            if [ -d "$candidate/.git" ]; then
-              LOCAL_REPO="$candidate"
-              echo "  → Found!"
-              break
-            else
-              echo "  → Not found (or no .git)"
-              ls -la "$candidate" 2>/dev/null | head -3 || echo "  → Path does not exist"
-            fi
-          done
+          # Clean workspace contents (not the dir itself — shell CWD)
+          cd /tmp
+          rm -rf "$GITHUB_WORKSPACE"
+          mkdir -p "$GITHUB_WORKSPACE"
 
-          if [ -n "$LOCAL_REPO" ]; then
-            echo "Using fast local mirror: $LOCAL_REPO"
-            echo "Updating local mirror to latest origin/main..."
-            git -C "$LOCAL_REPO" fetch origin main
-            git -C "$LOCAL_REPO" reset --hard origin/main
-            echo "Local mirror now at:"
-            git -C "$LOCAL_REPO" log -1 --oneline
-            rsync -a --delete \
-              --exclude='build/' \
-              --exclude='.dart_tool/' \
-              "$LOCAL_REPO/" "$GITHUB_WORKSPACE/"
-            echo "Synced from local repo at commit:"
-            git -C "$GITHUB_WORKSPACE" log -1 --oneline
-          else
-            echo "No local mirror found — cloning from GitHub..."
-            # Clean workspace contents (not the dir itself — shell CWD)
-            cd /tmp
-            rm -rf "$GITHUB_WORKSPACE"
-            mkdir -p "$GITHUB_WORKSPACE"
-            git clone --depth=1 https://github.com/IstiN/yoloit.git "$GITHUB_WORKSPACE"
-            echo "Cloned at commit:"
-            git -C "$GITHUB_WORKSPACE" log -1 --oneline
-          fi
+          echo "Cloning main repo with mirror reference..."
+          git clone --reference "$MAIN_MIRROR" --depth=1 \
+            https://github.com/IstiN/yoloit.git "$GITHUB_WORKSPACE"
 
-          # Initialize and update git submodules with shallow clone for speed
-          git -C "$GITHUB_WORKSPACE" submodule update --init --recursive --depth=1 --jobs=8
+          cd "$GITHUB_WORKSPACE"
+
+          # Point submodules to local mirrors for fast shallow update
+          git config submodule.packages/mermaid_renderer_flutter.url \
+            "$MIRROR_BASE/mermaid_renderer_flutter.git"
+          git config submodule.third_party/flutter_local_models.url \
+            "$MIRROR_BASE/flutter_local_models.git"
+          git config submodule.packages/xterm.url \
+            "$MIRROR_BASE/xterm.git"
+
+          git submodule update --init --recursive --depth=1 --jobs=8
           echo "Submodules initialized:"
-          git -C "$GITHUB_WORKSPACE" submodule status
+          git submodule status
 
-          # Clone flutter_code_editor (not a submodule, but a path dependency)
-          rm -rf "$GITHUB_WORKSPACE/third_party/flutter_code_editor"
+          # Clone flutter_code_editor from local mirror
+          rm -rf third_party/flutter_code_editor
           git clone --branch v0.3.5 --depth=1 \
-            https://github.com/akvelon/flutter-code-editor.git \
-            "$GITHUB_WORKSPACE/third_party/flutter_code_editor"
+            "$MIRROR_BASE/flutter-code-editor.git" \
+            third_party/flutter_code_editor
           echo "flutter_code_editor cloned:"
-          git -C "$GITHUB_WORKSPACE/third_party/flutter_code_editor" log -1 --oneline
+          git -C third_party/flutter_code_editor log -1 --oneline
 
       # ── Source verification ─────────────────────────────────────────────────
       - name: Print build source info
