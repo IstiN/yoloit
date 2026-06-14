@@ -460,10 +460,10 @@ jobs:
           DMGS=$(ls dmgs/*.dmg)
           echo "DMGs to upload: $DMGS"
 
-          if gh release view "$RELEASE_TAG" &>/dev/null; then
+          if gh release view "$RELEASE_TAG" --repo ${{ github.repository }} &>/dev/null; then
             echo "Release $RELEASE_TAG already exists — uploading macOS assets..."
             for dmg in $DMGS; do
-              gh release upload "$RELEASE_TAG" "$dmg" --clobber
+              gh release upload "$RELEASE_TAG" "$dmg" --clobber --repo ${{ github.repository }}
             done
             echo "✅ Uploaded macOS assets to existing release $RELEASE_TAG"
           else
@@ -471,6 +471,7 @@ jobs:
               "$RELEASE_TAG" "${{ github.run_number }}" > release-notes.md
 
             gh release create "$RELEASE_TAG" \
+              --repo ${{ github.repository }} \
               --title "YoLoIT $RELEASE_TAG" \
               --notes-file release-notes.md \
               --latest \
