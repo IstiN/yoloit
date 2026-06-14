@@ -29,7 +29,7 @@ jobs:
     steps:
       # ── Checkout ─────────────────────────────────────────────────────────────
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           submodules: recursive
 
@@ -131,7 +131,7 @@ jobs:
 
       # ── Upload artifact ──────────────────────────────────────────────────────
       - name: Upload zip artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: YoLoIT-windows
           path: ${{ steps.package.outputs.zip_name }}
