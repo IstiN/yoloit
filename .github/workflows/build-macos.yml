@@ -17,12 +17,56 @@ on:
           - 'false'
 
 jobs:
+  version:
+    name: Derive version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - name: Derive build version
+        id: version
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          INPUT="${{ inputs.version }}"
+          if [ -z "$INPUT" ] || [ "$INPUT" = "auto" ]; then
+            LATEST=$(gh release list --limit 10 --json tagName \
+              --jq '[.[] | select(.tagName | test("^v[0-9]+\\.[0-9]+\\.[0-9]+$"))] | first | .tagName' 2>/dev/null || echo "")
+            if [ -z "$LATEST" ]; then
+              TAG="v0.0.1"
+              echo "No previous release found — starting at $TAG"
+            else
+              MAJOR=$(echo "$LATEST" | sed 's/v\([0-9]*\)\.\([0-9]*\)\.\([0-9]*\)/\1/')
+              MINOR=$(echo "$LATEST" | sed 's/v\([0-9]*\)\.\([0-9]*\)\.\([0-9]*\)/\2/')
+              PATCH=$(echo "$LATEST" | sed 's/v\([0-9]*\)\.\([0-9]*\)\.\([0-9]*\)/\3/')
+              PATCH=$((PATCH + 1))
+              TAG="v${MAJOR}.${MINOR}.${PATCH}"
+              echo "Previous release: $LATEST → auto-increment to $TAG"
+            fi
+          else
+            TAG="$INPUT"
+            [[ "$TAG" != v* ]] && TAG="v$TAG"
+            echo "Using manual version: $TAG"
+          fi
+          VERSION_CLEAN="${TAG#v}"
+          echo "version=$VERSION_CLEAN" >> $GITHUB_OUTPUT
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
   build-macos:
-    name: Build macOS App
+    name: Build macOS ${{ matrix.arch }}
+    needs: version
     runs-on: [self-hosted, macOS, ARM64]
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [arm64, x86_64]
     permissions:
-      contents: write   # needed to create GitHub Releases
+      contents: write
     env:
       # Workaround: force .NET (used by the runner) to use SocketsHttpHandler
       # instead of Apple's SSL APIs, avoiding "bad certificate format" errors
@@ -31,8 +75,6 @@ jobs:
 
     steps:
       # ── Prepare persistent local git mirrors ────────────────────────────────
-      # Keeps bare mirrors outside the ephemeral workspace so subsequent runs
-      # only fetch deltas instead of cloning the whole repo + submodules.
       - name: Update local git mirrors
         run: |
           set -euo pipefail
@@ -53,18 +95,13 @@ jobs:
             fi
           }
 
-          # Main repository
           update_mirror https://github.com/IstiN/yoloit.git "$MIRROR_BASE/yoloit.git"
-
-          # Submodules
           update_mirror https://github.com/IstiN/mermaid_renderer_flutter.git \
             "$MIRROR_BASE/mermaid_renderer_flutter.git"
           update_mirror https://github.com/IstiN/flutter_local_models.git \
             "$MIRROR_BASE/flutter_local_models.git"
           update_mirror https://github.com/IstiN/xterm.git \
             "$MIRROR_BASE/xterm.git"
-
-          # flutter_code_editor path dependency (single branch)
           update_mirror https://github.com/akvelon/flutter-code-editor.git \
             "$MIRROR_BASE/flutter-code-editor.git" \
             "--branch v0.3.5 --single-branch"
@@ -76,22 +113,21 @@ jobs:
 
           MIRROR_BASE="$HOME/actions-runner-yoloit/mirror"
           MAIN_MIRROR="$MIRROR_BASE/yoloit.git"
+          ARCH="${{ matrix.arch }}"
+          BUILD_CACHE_DIR="$HOME/actions-runner-yoloit/build-cache/macos-$ARCH"
 
           echo "HOME=$HOME"
           echo "GITHUB_WORKSPACE=$GITHUB_WORKSPACE"
           echo "MAIN_MIRROR=$MAIN_MIRROR"
+          echo "ARCH=$ARCH"
 
-          # Preserve the previous macOS build cache so Xcode can do incremental
-          # builds across CI runs. The cache lives outside the workspace.
-          BUILD_CACHE_DIR="$HOME/actions-runner-yoloit/build-cache/macos"
           if [ -d "$GITHUB_WORKSPACE/build/macos" ]; then
-            echo "Preserving existing macOS build cache..."
+            echo "Preserving existing macOS build cache for $ARCH..."
             rm -rf "$BUILD_CACHE_DIR"
             mkdir -p "$BUILD_CACHE_DIR"
             mv "$GITHUB_WORKSPACE/build/macos" "$BUILD_CACHE_DIR/"
           fi
 
-          # Clean workspace contents (not the dir itself — shell CWD)
           cd /tmp
           rm -rf "$GITHUB_WORKSPACE"
           mkdir -p "$GITHUB_WORKSPACE"
@@ -102,7 +138,6 @@ jobs:
 
           cd "$GITHUB_WORKSPACE"
 
-          # Point submodules to local mirrors for fast shallow update
           git config submodule.packages/mermaid_renderer_flutter.url \
             "$MIRROR_BASE/mermaid_renderer_flutter.git"
           git config submodule.third_party/flutter_local_models.url \
@@ -114,7 +149,6 @@ jobs:
           echo "Submodules initialized:"
           git submodule status
 
-          # Clone flutter_code_editor from local mirror
           rm -rf third_party/flutter_code_editor
           git clone --branch v0.3.5 --depth=1 \
             "$MIRROR_BASE/flutter-code-editor.git" \
@@ -122,41 +156,14 @@ jobs:
           echo "flutter_code_editor cloned:"
           git -C third_party/flutter_code_editor log -1 --oneline
 
-          # Restore macOS build cache for incremental compilation
-          BUILD_CACHE_DIR="$HOME/actions-runner-yoloit/build-cache/macos"
           if [ -d "$BUILD_CACHE_DIR/macos" ]; then
-            echo "Restoring macOS build cache..."
+            echo "Restoring macOS build cache for $ARCH..."
             mkdir -p build
             mv "$BUILD_CACHE_DIR/macos" build/
           fi
 
-      # ── Source verification ─────────────────────────────────────────────────
-      - name: Print build source info
-        run: |
-          echo "=== Main repo ==="
-          git rev-parse HEAD
-          git log -1 --oneline
-          echo ""
-          echo "=== Submodules ==="
-          git submodule status --recursive
-          echo ""
-          echo "=== Submodule HEADs ==="
-          git submodule foreach 'git log -1 --oneline'
-          echo ""
-          echo "=== Working tree status ==="
-          git status --short
-          git diff --shortstat
-          echo ""
-          echo "=== Submodule diffs ==="
-          git diff --submodule || true
-          echo ""
-          echo "=== Last 5 commits ==="
-          git log --oneline -5
-
-      # ── Environment ─────────────────────────────────────────────────────────
       - name: Setup Flutter environment
         run: |
-          # Find Flutter in known locations
           for candidate in "$HOME/development/flutter/bin" "$HOME/.local/flutter/bin" "/Users/Uladzimir_Klyshevich/development/flutter/bin"; do
             if [ -x "$candidate/flutter" ]; then
               echo "$candidate" >> $GITHUB_PATH
@@ -184,17 +191,12 @@ jobs:
           rustup --version
           cargo --version
 
-      # ── Dependencies ────────────────────────────────────────────────────────
       - name: Install Flutter dependencies
         run: |
-          # Avoid flutter clean on self-hosted runner to reuse incremental build
-          # artifacts from previous runs. Source changes are picked up by Xcode's
-          # incremental build.
           flutter pub get
           echo "=== Dependency versions ==="
           flutter pub deps --style=compact
 
-      # ── Generate build info ─────────────────────────────────────────────────
       - name: Generate build info
         run: |
           GIT_COMMIT=$(git rev-parse --short HEAD)
@@ -229,72 +231,6 @@ jobs:
           echo "Build info generated:"
           cat lib/core/services/build_info.dart
 
-      # ── Verify repo and dependency state ────────────────────────────────────
-      - name: Verify repo and dependency state
-        run: |
-          echo "=== Git status ==="
-          git status --short
-          echo ""
-          echo "=== Git diff (shortstat) ==="
-          git diff --shortstat
-          echo ""
-          echo "=== Submodule status ==="
-          git submodule status
-          echo ""
-          echo "=== pubspec.lock flutter_svg ==="
-          grep -A2 'flutter_svg:' pubspec.lock | head -3
-          echo ""
-          echo "=== Mermaid bundle ==="
-          wc -c packages/mermaid_renderer_flutter/assets/mermaid/mermaid-renderer.js
-          shasum -a 256 packages/mermaid_renderer_flutter/assets/mermaid/mermaid-renderer.js
-          echo ""
-          echo "=== flutter pub deps (compact) ==="
-          flutter pub deps --style=compact
-
-      # ── Version ─────────────────────────────────────────────────────────────
-      - name: Derive build version
-        id: version
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          INPUT="${{ inputs.version }}"
-          if [ -z "$INPUT" ] || [ "$INPUT" = "auto" ]; then
-            # Find latest release tag and increment patch version
-            LATEST=$(gh release list --limit 10 --json tagName \
-              --jq '[.[] | select(.tagName | test("^v[0-9]+\\.[0-9]+\\.[0-9]+$"))] | first | .tagName' 2>/dev/null || echo "")
-            if [ -z "$LATEST" ]; then
-              TAG="v0.0.1"
-              echo "No previous release found — starting at $TAG"
-            else
-              # Parse vMAJOR.MINOR.PATCH and increment PATCH
-              MAJOR=$(echo "$LATEST" | sed 's/v\([0-9]*\)\.\([0-9]*\)\.\([0-9]*\)/\1/')
-              MINOR=$(echo "$LATEST" | sed 's/v\([0-9]*\)\.\([0-9]*\)\.\([0-9]*\)/\2/')
-              PATCH=$(echo "$LATEST" | sed 's/v\([0-9]*\)\.\([0-9]*\)\.\([0-9]*\)/\3/')
-              PATCH=$((PATCH + 1))
-              TAG="v${MAJOR}.${MINOR}.${PATCH}"
-              echo "Previous release: $LATEST → auto-increment to $TAG"
-            fi
-          else
-            TAG="$INPUT"
-            # Ensure it starts with 'v'
-            [[ "$TAG" != v* ]] && TAG="v$TAG"
-            echo "Using manual version: $TAG"
-          fi
-          VERSION_CLEAN="${TAG#v}"
-          echo "version=$VERSION_CLEAN" >> $GITHUB_OUTPUT
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
-
-      # ── Code signing (optional) ──────────────────────────────────────────────
-      # These secrets are optional. If not set, app is built unsigned (development only).
-      # Required secrets for signing:
-      #   MACOS_CERTIFICATE_P12_BASE64  — base64-encoded Developer ID Application .p12
-      #   MACOS_CERTIFICATE_PASSWORD    — password for the .p12
-      #   MACOS_CERTIFICATE_ID          — certificate name, e.g. "Developer ID Application: Name (TEAMID)"
-      #   MACOS_KEYCHAIN_PASSWORD       — temp keychain password (any random string)
-      #   MACOS_PROVISION_PROFILE_BASE64 — base64-encoded .provisionprofile (if using hardened runtime)
-      #   MACOS_NOTARIZE_APPLE_ID       — Apple ID for notarization
-      #   MACOS_NOTARIZE_TEAM_ID        — Apple Team ID
-      #   MACOS_NOTARIZE_APP_PASSWORD   — App-specific password for notarization
       - name: Import macOS signing certificate
         id: signing
         env:
@@ -324,78 +260,59 @@ jobs:
             echo "signed=true" >> $GITHUB_OUTPUT
           fi
 
-      # ── Build ────────────────────────────────────────────────────────────────
-      - name: Build macOS release (universal)
+      - name: Build macOS release (${{ matrix.arch }})
         env:
           BUILD_NUMBER: ${{ github.run_number }}
-          BUILD_VERSION: ${{ steps.version.outputs.version }}
+          BUILD_VERSION: ${{ needs.version.outputs.version }}
         run: |
-          # Build universal binary (arm64 + x86_64) via Xcode ARCHS override.
-          # Skipping flutter clean / DerivedData wipe lets the self-hosted runner
-          # reuse the previous build, so only changed files are recompiled.
-          FLUTTER_XCODE_ARCHS="arm64 x86_64" flutter build macos --release \
+          ARCH="${{ matrix.arch }}"
+          echo "Building for architecture: $ARCH"
+          FLUTTER_XCODE_ARCHS="$ARCH" flutter build macos --release \
             --build-name=$BUILD_VERSION \
             --build-number=$BUILD_NUMBER
-          # Verify architectures in the produced binary
           MAIN_BIN=$(find build/macos/Build/Products/Release/YoLoIT.app -name "YoLoIT" -type f | head -1)
           echo "=== Binary architecture verification ==="
           echo "Binary path: $MAIN_BIN"
           file "$MAIN_BIN"
           lipo -info "$MAIN_BIN"
-          lipo -detailed_info "$MAIN_BIN" || true
           echo "=== End binary verification ==="
 
-      # ── Build & bundle web client ─────────────────────────────────────────────
       - name: Build web client
         env:
           BUILD_NUMBER: ${{ github.run_number }}
-          BUILD_VERSION: ${{ steps.version.outputs.version }}
+          BUILD_VERSION: ${{ needs.version.outputs.version }}
         run: |
           if flutter build web --release \
             --target lib/main_web.dart \
             --build-name=$BUILD_VERSION \
             --build-number=$BUILD_NUMBER; then
-            # Bundle into the .app Resources so the HTTP server can serve it
             WEB_DEST="build/macos/Build/Products/Release/YoLoIT.app/Contents/Resources/web_client"
             mkdir -p "$WEB_DEST"
             cp -R build/web/. "$WEB_DEST/"
             echo "Web client bundled → $WEB_DEST"
-            ls "$WEB_DEST" | head -10
           else
             echo "Web build failed (non-critical, continuing without web client)"
           fi
 
-      # ── Package as DMG ───────────────────────────────────────────────────────
       - name: Package as DMG
         id: package
         env:
           SIGNED: ${{ steps.signing.outputs.signed }}
           MACOS_CERTIFICATE_ID: ${{ secrets.MACOS_CERTIFICATE_ID }}
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ needs.version.outputs.version }}
         run: |
+          ARCH="${{ matrix.arch }}"
           APP_PATH="build/macos/Build/Products/Release/YoLoIT.app"
+          DMG_NAME="yoloit-macos-${ARCH}-${VERSION}.dmg"
 
-          # Detect whether we have a universal binary
-          MAIN_BIN=$(find "$APP_PATH" -name "YoLoIT" -type f | head -1)
-          if lipo -info "$MAIN_BIN" 2>/dev/null | grep -q "arm64.*x86_64\|x86_64.*arm64"; then
-            ARCH_LABEL="universal"
-          else
-            ARCH_LABEL=$(lipo -info "$MAIN_BIN" 2>/dev/null | awk -F': ' '{print $NF}' | tr -d ' ' || uname -m)
-          fi
-
-          DMG_NAME="yoloit-macos-${ARCH_LABEL}-${VERSION}.dmg"
-
-          # Clean up any leftover files from previous runs
           rm -f yoloit-macos-*.dmg tmp-yoloit.dmg
           rm -rf dmg-staging
 
-          echo "Packaging: $APP_PATH → $DMG_NAME (arch: $ARCH_LABEL)"
+          echo "Packaging: $APP_PATH → $DMG_NAME (arch: $ARCH)"
 
           if [ "$SIGNED" = "true" ] && [ -n "$MACOS_CERTIFICATE_ID" ]; then
             echo "Signing .app bundle..."
 
-            # Sign nested binaries individually before the bundle sign
-            # (codesign --deep misses binaries in Resources/)
             RESVG_BIN="$APP_PATH/Contents/Resources/resvg"
             if [ -f "$RESVG_BIN" ]; then
               echo "Stripping extended attributes from resvg..."
@@ -407,9 +324,7 @@ jobs:
                 "$RESVG_BIN"
             fi
 
-            # Sign any other nested executables (e.g. helpers, frameworks)
             find "$APP_PATH" -type f \( -perm +111 -o -name '*.dylib' \) | while read -r bin; do
-              # Skip already-signed or the main app binary (signed by --deep)
               if codesign -dv "$bin" 2>/dev/null | grep -q "$MACOS_CERTIFICATE_ID"; then
                 continue
               fi
@@ -432,12 +347,10 @@ jobs:
               if codesign_app; then
                 break
               fi
-
               if [ "$attempt" = "5" ]; then
                 echo "codesign failed after $attempt attempts"
                 exit 1
               fi
-
               sleep_seconds=$((attempt * 30))
               echo "codesign failed, retrying in ${sleep_seconds}s (attempt $attempt/5)..."
               sleep "$sleep_seconds"
@@ -448,14 +361,12 @@ jobs:
             spctl -a -vv "$APP_PATH" 2>/dev/null || true
           fi
 
-          # Create a staging folder with app + Applications symlink (drag-to-install DMG)
           DMG_STAGING="dmg-staging"
           rm -rf "$DMG_STAGING"
           mkdir "$DMG_STAGING"
           cp -R "$APP_PATH" "$DMG_STAGING/"
           ln -s /Applications "$DMG_STAGING/Applications"
 
-          # Create a writable DMG first, then convert to compressed read-only
           TMP_DMG="tmp-yoloit.dmg"
           hdiutil create \
             -volname "YoLoIT $VERSION" \
@@ -464,15 +375,12 @@ jobs:
             -format UDRW \
             "$TMP_DMG"
 
-          # Convert to compressed final DMG
           hdiutil convert "$TMP_DMG" -format UDZO -o "$DMG_NAME"
           rm -f "$TMP_DMG"
           rm -rf "$DMG_STAGING"
 
-          echo "arch_label=$ARCH_LABEL" >> $GITHUB_OUTPUT
           echo "dmg_name=$DMG_NAME" >> $GITHUB_OUTPUT
 
-      # ── Notarize (optional) ──────────────────────────────────────────────────
       - name: Notarize DMG
         if: steps.signing.outputs.signed == 'true'
         env:
@@ -494,74 +402,61 @@ jobs:
           xcrun stapler staple "$DMG_NAME"
           echo "✅ Notarization complete"
 
-      # ── Upload artifact ──────────────────────────────────────────────────────
       - name: Upload DMG artifact
         uses: actions/upload-artifact@v4
         with:
-          name: YoLoIT-macos
+          name: YoLoIT-macos-${{ matrix.arch }}
           path: ${{ steps.package.outputs.dmg_name }}
           retention-days: 14
 
-      # ── GitHub Release ───────────────────────────────────────────────────────
-      - name: Create or update GitHub Release
-        if: inputs.create_release == 'true'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ steps.version.outputs.version }}
-          RELEASE_TAG: ${{ steps.version.outputs.tag }}
-          DMG_NAME: ${{ steps.package.outputs.dmg_name }}
-          ARCH_LABEL: ${{ steps.package.outputs.arch_label }}
-          SIGNED: ${{ steps.signing.outputs.signed }}
-        run: |
-          # Debug PATH and gh availability
-          echo "PATH=$PATH"
-          echo "which gh: $(which gh 2>&1 || true)"
-          echo "ls /opt/homebrew/bin/gh: $(ls -la /opt/homebrew/bin/gh 2>&1 || true)"
-          echo "type gh: $(type gh 2>&1 || true)"
-          
-          # Resolve gh CLI
-          GH=""
-          for p in /opt/homebrew/bin/gh /usr/local/bin/gh /usr/bin/gh; do
-            if [ -x "$p" ]; then GH="$p"; break; fi
-          done
-          if [ -z "$GH" ]; then
-            GH=$(which gh 2>/dev/null || true)
-          fi
-          if [ -z "$GH" ]; then
-            echo "❌ gh CLI not found anywhere — trying brew install"
-            brew install gh 2>/dev/null || true
-            GH=$(which gh 2>/dev/null || true)
-          fi
-          if [ -z "$GH" ]; then
-            echo "❌ gh CLI still not found after install attempt"
-            exit 1
-          fi
-          echo "Using gh: $GH ($($GH --version | head -1))"
-
-          SIGN_NOTE=""
-          if [ "$SIGNED" = "false" ]; then
-            SIGN_NOTE=" (unsigned build)"
-          fi
-
-          if "$GH" release view "$RELEASE_TAG" &>/dev/null; then
-            echo "Release $RELEASE_TAG already exists — uploading macOS asset..."
-            "$GH" release upload "$RELEASE_TAG" "$DMG_NAME" --clobber
-            echo "✅ Uploaded $DMG_NAME to existing release $RELEASE_TAG"
-          else
-            printf 'YoLoIT %s run #${{ github.run_number }}%s\n\nArchitecture: **%s**\n\n## Installation\n- **macOS**: Download the DMG, open it and drag YoLoIT.app to Applications.\n- **Linux**: Download tar.gz, extract and run the `bundle/yoloit` binary.\n- **Windows**: Download zip, extract and run `yoloit.exe`.\n' \
-              "$RELEASE_TAG" "$SIGN_NOTE" "$ARCH_LABEL" > release-notes.md
-
-            "$GH" release create "$RELEASE_TAG" \
-              --title "YoLoIT $RELEASE_TAG" \
-              --notes-file release-notes.md \
-              --latest \
-              "$DMG_NAME"
-            echo "✅ Created release $RELEASE_TAG with $DMG_NAME"
-          fi
-
-      # ── Cleanup ──────────────────────────────────────────────────────────────
       - name: Cleanup keychain
         if: always()
         run: |
           security delete-keychain build.keychain 2>/dev/null || true
           rm -f certificate.p12
+
+  release-macos:
+    name: Create macOS GitHub Release
+    needs: [version, build-macos]
+    runs-on: ubuntu-latest
+    if: inputs.create_release == 'true'
+    permissions:
+      contents: write
+    steps:
+      - name: Download DMG artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dmgs
+          pattern: YoLoIT-macos-*
+          merge-multiple: true
+
+      - name: List downloaded artifacts
+        run: ls -la dmgs/
+
+      - name: Create or update GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+
+          DMGS=$(ls dmgs/*.dmg)
+          echo "DMGs to upload: $DMGS"
+
+          if gh release view "$RELEASE_TAG" &>/dev/null; then
+            echo "Release $RELEASE_TAG already exists — uploading macOS assets..."
+            for dmg in $DMGS; do
+              gh release upload "$RELEASE_TAG" "$dmg" --clobber
+            done
+            echo "✅ Uploaded macOS assets to existing release $RELEASE_TAG"
+          else
+            printf 'YoLoIT %s run #%s\n\n## Installation\n- **macOS**: Download the DMG for your architecture (`arm64` for Apple Silicon, `x86_64` for Intel) and drag YoLoIT.app to Applications.\n- **Linux**: Download tar.gz, extract and run the `bundle/yoloit` binary.\n- **Windows**: Download zip, extract and run `yoloit.exe`.\n' \
+              "$RELEASE_TAG" "${{ github.run_number }}" > release-notes.md
+
+            gh release create "$RELEASE_TAG" \
+              --title "YoLoIT $RELEASE_TAG" \
+              --notes-file release-notes.md \
+              --latest \
+              $DMGS
+            echo "✅ Created release $RELEASE_TAG with macOS assets"
+          fi
