@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:ffi' show Abi;
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -164,14 +165,19 @@ class UpdateService {
 
       // Pick the platform-specific asset
       final assets = json['assets'] as List<dynamic>? ?? [];
+      final expectedAsset = Platform.isMacOS ? _expectedMacosAssetName(version) : null;
       String? downloadUrl;
+      String? fallbackUrl;
       for (final a in assets) {
         final asset = a as Map<String, dynamic>;
         final name = (asset['name'] as String? ?? '').toLowerCase();
         final url = asset['browser_download_url'] as String?;
         if (Platform.isMacOS && name.endsWith('.dmg')) {
-          downloadUrl = url;
-          break;
+          fallbackUrl ??= url;
+          if (expectedAsset != null && name == expectedAsset) {
+            downloadUrl = url;
+            break;
+          }
         } else if (Platform.isWindows && name.endsWith('.zip')) {
           downloadUrl = url;
           break;
@@ -180,6 +186,7 @@ class UpdateService {
           break;
         }
       }
+      downloadUrl ??= fallbackUrl;
 
       return UpdateInfo(
         version: version,
@@ -191,6 +198,19 @@ class UpdateService {
     } finally {
       client.close();
     }
+  }
+
+  /// Returns the expected macOS DMG asset name for the current CPU architecture,
+  /// or `null` if the architecture cannot be determined.
+  static String? _expectedMacosAssetName(String version) {
+    final abi = Abi.current();
+    if (abi == Abi.macosArm64) {
+      return 'yoloit-macos-arm64-$version.dmg';
+    }
+    if (abi == Abi.macosX64) {
+      return 'yoloit-macos-x86_64-$version.dmg';
+    }
+    return null;
   }
 
   /// Returns true when [candidate] is strictly newer than [current].
