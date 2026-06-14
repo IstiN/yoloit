@@ -88,10 +88,24 @@ jobs:
             local extra_args="${3:-}"
             if [ ! -d "$mirror" ]; then
               echo "Creating mirror: $mirror"
-              git clone --mirror $extra_args "$url" "$mirror"
+              if [ -n "$extra_args" ]; then
+                # --mirror conflicts with --single-branch/--branch; use --bare
+                # for branch-specific mirrors (e.g. flutter_code_editor).
+                git clone --bare $extra_args "$url" "$mirror"
+              else
+                git clone --mirror "$url" "$mirror"
+              fi
             else
               echo "Updating mirror: $mirror"
-              git -C "$mirror" fetch origin || true
+              if ! git -C "$mirror" fetch origin 2>/dev/null; then
+                echo "Fetch failed — recreating mirror: $mirror"
+                rm -rf "$mirror"
+                if [ -n "$extra_args" ]; then
+                  git clone --bare $extra_args "$url" "$mirror"
+                else
+                  git clone --mirror "$url" "$mirror"
+                fi
+              fi
             fi
           }
 
