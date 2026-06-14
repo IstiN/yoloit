@@ -152,12 +152,15 @@ jobs:
 
           cd "$GITHUB_WORKSPACE"
 
+          # Allow local file-protocol clones used by the submodule mirrors.
+          git config --global protocol.file.allow always
+
           git config submodule.packages/mermaid_renderer_flutter.url \
-            "$MIRROR_BASE/mermaid_renderer_flutter.git"
+            "file://$MIRROR_BASE/mermaid_renderer_flutter.git"
           git config submodule.third_party/flutter_local_models.url \
-            "$MIRROR_BASE/flutter_local_models.git"
+            "file://$MIRROR_BASE/flutter_local_models.git"
           git config submodule.packages/xterm.url \
-            "$MIRROR_BASE/xterm.git"
+            "file://$MIRROR_BASE/xterm.git"
 
           git submodule update --init --recursive --depth=1 --jobs=8
           echo "Submodules initialized:"
@@ -165,7 +168,7 @@ jobs:
 
           rm -rf third_party/flutter_code_editor
           git clone --branch v0.3.5 --depth=1 \
-            "$MIRROR_BASE/flutter-code-editor.git" \
+            "file://$MIRROR_BASE/flutter-code-editor.git" \
             third_party/flutter_code_editor
           echo "flutter_code_editor cloned:"
           git -C third_party/flutter_code_editor log -1 --oneline
