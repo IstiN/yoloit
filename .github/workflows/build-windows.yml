@@ -19,7 +19,10 @@ on:
 jobs:
   build-windows:
     name: Build Windows App
-    runs-on: windows-latest
+    # windows-latest currently resolves to a Windows Server 2025 / VS 2026 image
+    # that Flutter 3.35.3 does not detect correctly. Pin windows-2022 until Flutter
+    # supports the new VS 2026 runner image.
+    runs-on: windows-2022
     permissions:
       contents: write   # needed to upload release assets
 
