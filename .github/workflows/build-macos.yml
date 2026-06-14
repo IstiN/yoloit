@@ -81,6 +81,16 @@ jobs:
           echo "GITHUB_WORKSPACE=$GITHUB_WORKSPACE"
           echo "MAIN_MIRROR=$MAIN_MIRROR"
 
+          # Preserve the previous macOS build cache so Xcode can do incremental
+          # builds across CI runs. The cache lives outside the workspace.
+          BUILD_CACHE_DIR="$HOME/actions-runner-yoloit/build-cache/macos"
+          if [ -d "$GITHUB_WORKSPACE/build/macos" ]; then
+            echo "Preserving existing macOS build cache..."
+            rm -rf "$BUILD_CACHE_DIR"
+            mkdir -p "$BUILD_CACHE_DIR"
+            mv "$GITHUB_WORKSPACE/build/macos" "$BUILD_CACHE_DIR/"
+          fi
+
           # Clean workspace contents (not the dir itself — shell CWD)
           cd /tmp
           rm -rf "$GITHUB_WORKSPACE"
@@ -111,6 +121,14 @@ jobs:
             third_party/flutter_code_editor
           echo "flutter_code_editor cloned:"
           git -C third_party/flutter_code_editor log -1 --oneline
+
+          # Restore macOS build cache for incremental compilation
+          BUILD_CACHE_DIR="$HOME/actions-runner-yoloit/build-cache/macos"
+          if [ -d "$BUILD_CACHE_DIR/macos" ]; then
+            echo "Restoring macOS build cache..."
+            mkdir -p build
+            mv "$BUILD_CACHE_DIR/macos" build/
+          fi
 
       # ── Source verification ─────────────────────────────────────────────────
       - name: Print build source info
@@ -169,8 +187,9 @@ jobs:
       # ── Dependencies ────────────────────────────────────────────────────────
       - name: Install Flutter dependencies
         run: |
-          # Clean stale build artifacts from self-hosted runner workspace
-          flutter clean
+          # Avoid flutter clean on self-hosted runner to reuse incremental build
+          # artifacts from previous runs. Source changes are picked up by Xcode's
+          # incremental build.
           flutter pub get
           echo "=== Dependency versions ==="
           flutter pub deps --style=compact
@@ -306,23 +325,14 @@ jobs:
           fi
 
       # ── Build ────────────────────────────────────────────────────────────────
-      - name: Clean previous build artifacts
-        run: |
-          rm -rf build/macos
-          # Also clean Xcode DerivedData for this project to avoid stale caches
-          rm -rf ~/Library/Developer/Xcode/DerivedData/Runner-*
-
-      - name: Ensure Xcode Metal toolchain is installed
-        run: |
-          xcodebuild -runFirstLaunch || true
-          xcodebuild -downloadComponent MetalToolchain
-
       - name: Build macOS release (universal)
         env:
           BUILD_NUMBER: ${{ github.run_number }}
           BUILD_VERSION: ${{ steps.version.outputs.version }}
         run: |
-          # Build universal binary (arm64 + x86_64) via Xcode ARCHS override
+          # Build universal binary (arm64 + x86_64) via Xcode ARCHS override.
+          # Skipping flutter clean / DerivedData wipe lets the self-hosted runner
+          # reuse the previous build, so only changed files are recompiled.
           FLUTTER_XCODE_ARCHS="arm64 x86_64" flutter build macos --release \
             --build-name=$BUILD_VERSION \
             --build-number=$BUILD_NUMBER
