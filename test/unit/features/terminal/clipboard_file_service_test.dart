@@ -106,6 +106,32 @@ void main() {
       expect(await file.exists(), isTrue);
       expect(await file.readAsString(), 'sample content');
     });
+
+    test('normalizes text by trimming trailing whitespace and blank runs', () async {
+      final path = await ClipboardFileService.instance.saveTextToFile(
+        '\n\n   \nhello   \n\n\n\nworld\n   \n\n',
+      );
+      addTearDown(() async {
+        final file = File(path);
+        if (await file.exists()) await file.delete();
+      });
+
+      final content = await File(path).readAsString();
+      expect(content, 'hello\n\nworld');
+    });
+
+    test('strips ANSI escape sequences during normalization', () async {
+      final path = await ClipboardFileService.instance.saveTextToFile(
+        '\x1B[31merror\x1B[0m\n\x1B[1mbold\x1B[0m',
+      );
+      addTearDown(() async {
+        final file = File(path);
+        if (await file.exists()) await file.delete();
+      });
+
+      final content = await File(path).readAsString();
+      expect(content, 'error\nbold');
+    });
   });
 
   group('ClipboardFileService.isSafeInlineText', () {

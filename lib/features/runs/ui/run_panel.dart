@@ -2,9 +2,9 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:yoloit/core/utils/clipboard_utils.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/core/utils/clipboard_utils.dart';
 import 'package:yoloit/features/runs/bloc/run_cubit.dart';
 import 'package:yoloit/features/runs/bloc/run_state.dart';
 import 'package:yoloit/features/runs/models/run_config.dart';
@@ -112,6 +112,7 @@ class _RunPanelViewState extends State<_RunPanelView> {
   final _scrollController = ScrollController();
   bool _workspaceLoadInFlight = false;
   String? _attachedSessionId;
+  static const _autoScrollThreshold = 50.0;
 
   @override
   void initState() {
@@ -152,13 +153,16 @@ class _RunPanelViewState extends State<_RunPanelView> {
   }
 
   void _scrollToBottom() {
-    if (_scrollController.hasClients) {
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 100),
-        curve: Curves.easeOut,
-      );
-    }
+    if (!_scrollController.hasClients) return;
+    final position = _scrollController.position;
+    // Only auto-scroll if the user is already near the bottom. This avoids
+    // jumping away while they scroll up to select text.
+    if (position.extentAfter > _autoScrollThreshold) return;
+    position.animateTo(
+      position.maxScrollExtent,
+      duration: const Duration(milliseconds: 100),
+      curve: Curves.easeOut,
+    );
   }
 
   void _ensureWorkspaceLoaded() {
@@ -1714,57 +1718,55 @@ class _ConsoleState extends State<_Console> {
   }
 }
 
-/// Renders all output lines as a single selectable block.
-/// Ctrl+A / ⌘A selects everything; ⌘C copies the selection.
+/// Renders output lines with ListView.builder so only visible lines are
+/// laid out. Selection is enabled via [SelectionArea]; copy-all is handled
+/// by the parent [_ConsoleState] keyboard shortcut.
 class _FullLogView extends StatelessWidget {
   const _FullLogView({required this.output, required this.scrollController});
 
   final List<RunOutputLine> output;
   final ScrollController scrollController;
 
+  Color _lineColor(RunOutputLine line, AppColorScheme colors) {
+    final t = _stripAnsi(line.text);
+    if (t.startsWith('\n[Process exited')) {
+      return colors.textMuted;
+    }
+    if (t.startsWith('Reloaded') || t.contains('🔥')) {
+      return colors.accentGreen;
+    }
+    if (line.isError) {
+      return colors.accentRed;
+    }
+    if (t.toLowerCase().contains('error')) {
+      return colors.accentOrange;
+    }
+    return colors.terminalText;
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
 
-    // Build a TextSpan that colours error lines red / orange.
-    final spans = <TextSpan>[];
-    for (final line in output) {
-      final t = _stripAnsi(line.text);
-      final Color color;
-      if (t.startsWith('\n[Process exited')) {
-        color = colors.textMuted;
-      } else if (t.startsWith('Reloaded') || t.contains('🔥')) {
-        color = colors.accentGreen;
-      } else if (line.isError) {
-        color = colors.accentRed;
-      } else if (t.toLowerCase().contains('error')) {
-        color = colors.accentOrange;
-      } else {
-        color = colors.terminalText;
-      }
-      spans.add(TextSpan(text: '$t\n', style: TextStyle(color: color)));
-    }
-
     return Scrollbar(
       controller: scrollController,
-      child: SingleChildScrollView(
-        controller: scrollController,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        child: SelectableText.rich(
-          TextSpan(
-            style: const TextStyle(
-              fontSize: 12,
-              fontFamily: 'monospace',
-              height: 1.4,
-            ),
-            children: spans,
-          ),
-          // Let the OS handle Ctrl+A / ⌘A for select-all within this widget.
-          contextMenuBuilder:
-              (context, editableTextState) =>
-                  AdaptiveTextSelectionToolbar.editableText(
-                    editableTextState: editableTextState,
-                  ),
+      child: SelectionArea(
+        child: ListView.builder(
+          controller: scrollController,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          itemCount: output.length,
+          itemBuilder: (context, index) {
+            final line = output[index];
+            return Text(
+              _stripAnsi(line.text),
+              style: TextStyle(
+                color: _lineColor(line, colors),
+                fontSize: 12,
+                fontFamily: 'monospace',
+                height: 1.4,
+              ),
+            );
+          },
         ),
       ),
     );
@@ -1922,7 +1924,7 @@ class _PulsingDotState extends State<_PulsingDot>
     return AnimatedBuilder(
       animation: _anim,
       builder:
-          (_, __) => Container(
+          (context, child) => Container(
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: widget.color.withAlpha((_anim.value * 255).round()),

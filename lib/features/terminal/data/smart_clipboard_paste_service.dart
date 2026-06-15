@@ -44,6 +44,10 @@ class SmartClipboardPasteService {
 
     if (text == null || text.isEmpty) return null;
 
+    text = ClipboardFileService.instance.normalizeText(text);
+
+    if (text.isEmpty) return null;
+
     // If the clipboard contains a single existing file path, return it as-is
     // instead of wrapping it in a .txt file.
     final filePath = await ClipboardFileService.instance.tryResolveTextAsFilePath(text);

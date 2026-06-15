@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -12,6 +13,11 @@ class RunCubit extends Cubit<RunState> {
   RunCubit() : super(const RunState());
 
   static const _maxOutputLines = 5000;
+  static const _outputFlushInterval = Duration(milliseconds: 100);
+  static const _pendingOutputThreshold = 200;
+
+  final _pendingOutput = <String, List<RunOutputLine>>{};
+  final _flushTimers = <String, Timer>{};
 
   Future<void> loadForWorkspace(String workspacePath) async {
     final configs = await RunConfigStorage.instance.load(workspacePath);
@@ -115,6 +121,8 @@ class RunCubit extends Cubit<RunState> {
     if (existing == null) return null;
 
     RunService.instance.stop(sessionId);
+    _flushTimers.remove(sessionId)?.cancel();
+    _pendingOutput.remove(sessionId);
 
     final workspacePath = state.workspacePath ?? existing.workspacePath;
     final restarted = existing.copyWith(
@@ -170,6 +178,8 @@ class RunCubit extends Cubit<RunState> {
   }
 
   void clearOutput(String sessionId) {
+    _flushTimers.remove(sessionId)?.cancel();
+    _pendingOutput.remove(sessionId);
     _updateSession(sessionId, (s) => s.copyWith(output: []));
     _persistSessions();
   }
@@ -191,6 +201,8 @@ class RunCubit extends Cubit<RunState> {
 
   void removeSession(String sessionId) {
     RunService.instance.stop(sessionId);
+    _flushTimers.remove(sessionId)?.cancel();
+    _pendingOutput.remove(sessionId);
     final sessions = state.sessions.where((s) => s.id != sessionId).toList();
     final activeId =
         state.activeSessionId == sessionId
@@ -263,28 +275,56 @@ class RunCubit extends Cubit<RunState> {
   }
 
   void _appendOutput(String sessionId, String line, bool isError) {
+    final pending = _pendingOutput.putIfAbsent(sessionId, () => <RunOutputLine>[]);
+    pending.add(RunOutputLine(text: line, isError: isError, timestamp: DateTime.now()));
+
+    if (pending.length >= _pendingOutputThreshold) {
+      _flushOutput(sessionId);
+      return;
+    }
+
+    if (!_flushTimers.containsKey(sessionId)) {
+      _flushTimers[sessionId] = Timer(_outputFlushInterval, () {
+        _flushOutput(sessionId);
+      });
+    }
+  }
+
+  void _flushOutput(String sessionId) {
+    _flushTimers.remove(sessionId)?.cancel();
+    final pending = _pendingOutput.remove(sessionId);
+    if (pending == null || pending.isEmpty) return;
+
     _updateSession(sessionId, (s) {
-      final lines = [
-        ...s.output,
-        RunOutputLine(text: line, isError: isError, timestamp: DateTime.now()),
-      ];
-      return s.copyWith(
-        output:
-            lines.length > _maxOutputLines
-                ? lines.sublist(lines.length - _maxOutputLines)
-                : lines,
-      );
+      if (s.output.length + pending.length > _maxOutputLines) {
+        final keep = _maxOutputLines - pending.length;
+        final kept = keep > 0 ? s.output.sublist(s.output.length - keep) : <RunOutputLine>[];
+        return s.copyWith(output: [...kept, ...pending]);
+      }
+      return s.copyWith(output: [...s.output, ...pending]);
     });
   }
 
   void _onExit(String sessionId, int code) {
-    _appendOutput(sessionId, '\n[Process exited with code $code]', code != 0);
+    _flushOutput(sessionId);
+    final exitLine = RunOutputLine(
+      text: '\n[Process exited with code $code]',
+      isError: code != 0,
+      timestamp: DateTime.now(),
+    );
     _updateSession(
       sessionId,
-      (s) => s.copyWith(
-        status: code == 0 ? RunStatus.stopped : RunStatus.failed,
-        exitCode: code,
-      ),
+      (s) {
+        final output = [...s.output, exitLine];
+        return s.copyWith(
+          output:
+              output.length > _maxOutputLines
+                  ? output.sublist(output.length - _maxOutputLines)
+                  : output,
+          status: code == 0 ? RunStatus.stopped : RunStatus.failed,
+          exitCode: code,
+        );
+      },
     );
     _persistSessions();
   }
@@ -330,6 +370,16 @@ class RunCubit extends Cubit<RunState> {
   String _groupIdSuffix(String group) {
     final cleaned = group.replaceAll(RegExp(r'[^a-zA-Z0-9]+'), '_');
     return cleaned.isEmpty ? 'group' : cleaned;
+  }
+
+  @override
+  Future<void> close() {
+    for (final timer in _flushTimers.values) {
+      timer.cancel();
+    }
+    _flushTimers.clear();
+    _pendingOutput.clear();
+    return super.close();
   }
 
   bool _sameConfigs(List<RunConfig> a, List<RunConfig> b) {

@@ -1079,7 +1079,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
   /// sequences before [TerminalView] can process the raw key event.
   ///
   /// Mapping (readline / bash compatible):
-  ///   Cmd+V              → paste as file reference (existing behaviour)
+  ///   Cmd+V              → smart paste: safe short text inline, otherwise file ref
   ///   Cmd+Backspace      → Ctrl+U  (\x15) — erase to start of line
   ///   Opt+Backspace      → Ctrl+W  (\x17) — erase word backward
   ///   Ctrl+Backspace     → Ctrl+W  (\x17) — erase word backward (PC style)
@@ -1161,7 +1161,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
       return true;
     }
 
-    // Cmd+V → paste as file ref (no raw paste)
+    // Cmd+V → smart paste (safe short text inline, otherwise file ref).
     if (isCmd && !isCtrl && !isAlt && key == LogicalKeyboardKey.keyV) {
       _pasteAsFileRef();
       return true;
@@ -1332,11 +1332,12 @@ class TerminalWidgetState extends State<TerminalWidget> {
   }
 
   Future<void> _pasteAsFileRef() async {
-    // Use the same smart-paste logic as chat: URLs and existing file paths
-    // are pasted inline; everything else (images, plain text) becomes a
-    // temp-file reference so the terminal never receives raw escape sequences.
-    final pasted =
-        await SmartClipboardPasteService.instance.readInlineTextOrSavedFilePath();
+    // Use the same smart-paste logic as chat: URLs, existing file paths and
+    // safe short single-line text are pasted inline; everything else (images,
+    // long text, multi-line text) becomes a temp-file reference so the
+    // terminal never receives raw escape sequences.
+    final pasted = await SmartClipboardPasteService.instance
+        .readInlineTextOrSavedFilePath(allowInlineText: true);
     if (pasted == null || !mounted) return;
     TerminalBackendService.instance.write(widget.session.id, pasted);
   }
