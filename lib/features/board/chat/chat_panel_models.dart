@@ -26,7 +26,6 @@ List<(String, String)> buildChatProviderOptions(Iterable<AgentConfig> configs) {
     if (cfg.streamAdapter == null || !cfg.visible) continue;
     byId[cfg.id] = cfg.displayName;
   }
-  byId.putIfAbsent('local', () => 'Local LLM');
   return byId.entries.map((e) => (e.key, e.value)).toList();
 }
 

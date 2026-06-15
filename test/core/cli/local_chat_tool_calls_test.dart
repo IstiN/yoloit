@@ -83,7 +83,6 @@ void main() {
         'nap', // note:append
         'kadk', // kanban:add-card
         'rls', // run:list
-        'mls', // models:list
       ]),
     );
     expect(names.toSet(), hasLength(names.length));

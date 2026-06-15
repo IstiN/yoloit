@@ -55,7 +55,6 @@ class ChatSetupViewState extends State<ChatSetupView> {
   bool? _cursorApiKeyConfigured; // null = unknown, true/false = checked
 
   String _providerLabel(String id) {
-    if (id == 'local') return 'Local LLM';
     final cfg = AgentConfigService.instance.configForAgent(id);
     if (cfg != null) return cfg.displayName;
     return id;
@@ -93,7 +92,6 @@ class ChatSetupViewState extends State<ChatSetupView> {
     // Fallback to hardcoded lists
     return switch (adapter) {
       'cursor' => kCursorModels,
-      'local' => kLocalModels,
       'codex' => kCodexModels,
       'kimi' => kKimiModels,
       'copilot' => kCopilotModels,
@@ -213,10 +211,6 @@ class ChatSetupViewState extends State<ChatSetupView> {
   }
 
   Future<void> _checkProviderInstalled(String provider) async {
-    if (provider == 'local') {
-      if (mounted) setState(() => _providerInstalled = true);
-      return;
-    }
     final cfg = AgentConfigService.instance.configForAgent(provider);
     final rawCommand = cfg?.launchCommand.trim() ?? '';
     if (rawCommand.isEmpty) {

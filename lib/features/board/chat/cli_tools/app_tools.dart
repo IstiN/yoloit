@@ -92,76 +92,6 @@ final List<YoloitCliTool> appTools = <YoloitCliTool>[
   ),
 
   const YoloitCliTool(
-    command: 'models:list',
-    alias: 'mls',
-    description: 'List local AI model states',
-    group: 'models',
-  ),
-
-  YoloitCliTool(
-    command: 'models:download',
-    alias: 'mdl',
-    description: 'Manage a local model download/install state',
-    group: 'models',
-    params: <YoloitCliToolParam>[
-      modelIdParam(),
-    ],
-  ),
-
-  YoloitCliTool(
-    command: 'models:resume',
-    alias: 'mrs',
-    description: 'Manage a local model download/install state',
-    group: 'models',
-    params: <YoloitCliToolParam>[modelIdParam()],
-  ),
-
-  YoloitCliTool(
-    command: 'models:pause',
-    alias: 'mps',
-    description: 'Manage a local model download/install state',
-    group: 'models',
-    params: <YoloitCliToolParam>[modelIdParam()],
-  ),
-
-  YoloitCliTool(
-    command: 'models:cancel',
-    alias: 'mcn',
-    description: 'Manage a local model download/install state',
-    group: 'models',
-    destructive: true,
-    params: <YoloitCliToolParam>[modelIdParam()],
-  ),
-
-  YoloitCliTool(
-    command: 'models:stop',
-    alias: 'mst',
-    description: 'Manage a local model download/install state',
-    group: 'models',
-    params: <YoloitCliToolParam>[modelIdParam()],
-  ),
-
-  YoloitCliTool(
-    command: 'models:delete',
-    alias: 'mdt',
-    description: 'Manage a local model download/install state',
-    group: 'models',
-    destructive: true,
-    params: <YoloitCliToolParam>[modelIdParam()],
-  ),
-
-  YoloitCliTool(
-    command: 'models:select',
-    alias: 'msl',
-    description: 'Select active local chat or ASR model',
-    group: 'models',
-    params: <YoloitCliToolParam>[
-      toolParam('kind', 'chat or asr', required: true, shortKey: 'k'),
-      modelIdParam(),
-    ],
-  ),
-
-  const YoloitCliTool(
     command: 'agent:list',
     alias: 'agl',
     description:
@@ -468,13 +398,13 @@ final List<YoloitCliTool> appTools = <YoloitCliTool>[
   YoloitCliTool(
     command: 'cloud:provider',
     alias: 'cpp',
-    description: 'Get or set assistant provider type (local or cloud)',
+    description: 'Get or set assistant provider type (cloud only)',
     group: 'cloud',
     params: <YoloitCliToolParam>[
       toolParam(
         'provider',
         'Provider type (omit to show current)',
-        enumValues: const <String>['local', 'cloud'],
+        enumValues: const <String>['cloud'],
         shortKey: 'p',
       ),
     ],

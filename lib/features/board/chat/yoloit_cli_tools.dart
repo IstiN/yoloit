@@ -10,6 +10,7 @@ import 'package:yoloit/core/cli/cli_server.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
 
 import 'package:yoloit/features/board/chat/cli_tools/app_tools.dart';
+import 'package:yoloit/features/board/chat/cli_tools/auto_tools.dart';
 import 'package:yoloit/features/board/chat/cli_tools/board_tools.dart';
 import 'package:yoloit/features/board/chat/cli_tools/file_tools.dart';
 import 'package:yoloit/features/board/chat/cli_tools/group_tools.dart';
@@ -1286,6 +1287,7 @@ class YoloitCliToolExecutor implements YoloitToolExecutor {
 // Compact alias system: 67 tools with short aliases + shortKey params reduce
 // local LLM tool schema token count by ~60-70% compared to verbose format.
 final List<YoloitCliTool> _tools = <YoloitCliTool>[
+  ...autoTools,
   ...appTools,
   ...boardTools,
   ...panelTools,

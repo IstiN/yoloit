@@ -106,7 +106,7 @@ class AgentConfigService {
   String? _defaultAgentId;
 
   // Global default ASR config (applied to agents whose asrMode == 'default').
-  String _defaultAsrMode = 'local';
+  String _defaultAsrMode = 'cloud';
   String? _defaultAsrCloudConfigId;
   String? _defaultAsrCloudModel;
   TerminalBackendMode _terminalBackendMode = TerminalBackendMode.runtime;
@@ -223,9 +223,13 @@ class AgentConfigService {
         final prefs =
             jsonDecode(await prefsFile.readAsString()) as Map<String, dynamic>;
         _defaultAgentId = prefs['defaultAgentId'] as String?;
-        _defaultAsrMode = prefs['defaultAsrMode'] as String? ?? 'local';
+        final savedAsrMode = prefs['defaultAsrMode'] as String?;
+        _defaultAsrMode = savedAsrMode == 'local' ? 'cloud' : (savedAsrMode ?? 'cloud');
         _defaultAsrCloudConfigId = prefs['defaultAsrCloudConfigId'] as String?;
         _defaultAsrCloudModel = prefs['defaultAsrCloudModel'] as String?;
+        if (_defaultAsrMode == 'cloud') {
+          await _savePrefs();
+        }
         _terminalRenderEngine = TerminalRenderEngine.xterm;
         _terminalBackendMode = TerminalBackendModeX.fromId(
           prefs['terminalBackendMode'] as String?,
@@ -357,7 +361,7 @@ class AgentConfigService {
   ) {
     final cfg = configForAgent(agentId);
     final mode = cfg?.asrMode ?? 'default';
-    if (mode == 'default') {
+    if (mode == 'default' || mode == 'local') {
       return (
         mode: _defaultAsrMode,
         configId: _defaultAsrCloudConfigId,

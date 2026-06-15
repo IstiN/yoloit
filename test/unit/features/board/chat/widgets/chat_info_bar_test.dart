@@ -12,8 +12,6 @@ void main() {
       String? reasoningEffort,
       int totalOutputTokens = 0,
       bool isProcessing = false,
-      int enabledLocalToolCount = 0,
-      int totalLocalToolCount = 10,
       VoidCallback? onAutopilotToggle,
       VoidCallback? onCycleReasoningEffort,
       VoidCallback? onCopySession,
@@ -29,8 +27,6 @@ void main() {
             reasoningEffort: reasoningEffort,
             totalOutputTokens: totalOutputTokens,
             isProcessing: isProcessing,
-            enabledLocalToolCount: enabledLocalToolCount,
-            totalLocalToolCount: totalLocalToolCount,
             onAutopilotToggle: onAutopilotToggle ?? () {},
             onCycleReasoningEffort: onCycleReasoningEffort ?? () {},
             onCopySession: onCopySession ?? () {},
@@ -46,18 +42,6 @@ void main() {
 
       expect(find.text('proj'), findsOneWidget);
       expect(find.text('claude'), findsOneWidget);
-    });
-
-    testWidgets('shows local tools icon for local provider', (tester) async {
-      await tester.pumpWidget(buildBar(provider: 'local'));
-
-      expect(find.byIcon(Icons.construction), findsOneWidget);
-    });
-
-    testWidgets('hides local tools icon for non-local provider', (tester) async {
-      await tester.pumpWidget(buildBar(provider: 'copilot'));
-
-      expect(find.byIcon(Icons.construction), findsNothing);
     });
 
     testWidgets('toggles autopilot on tap', (tester) async {

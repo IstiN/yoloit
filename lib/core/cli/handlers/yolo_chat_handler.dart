@@ -103,15 +103,38 @@ Future<shelf.Response> handleYoloChat(
       if (target == null) {
         return error('No board.terminal panel found (or target not found)');
       }
-      final config = _terminalConfigForPanel(target.panel);
-      if (!config.isConfigured || config.sessionId.trim().isEmpty) {
+      var config = _terminalConfigForPanel(target.panel);
+      if (!config.isConfigured) {
         return error('Target terminal panel is not configured');
+      }
+      if (config.sessionId.trim().isEmpty) {
+        final session = await BoardTerminalSessionManager.instance.createSession(
+          sessionName: config.sessionName.trim().isEmpty
+              ? target.panel.title
+              : config.sessionName,
+          workingDir: config.workingDir,
+          envGroupIds: config.envGroupIds,
+        );
+        config = config.copyWith(
+          sessionId: session.id,
+          sessionName: session.displayName,
+        );
+        await cubit.updatePanel(
+          target.panel.id,
+          (panel) => panel.copyWith(
+            state: {
+              ...panel.state,
+              'config': config.toJson(),
+            },
+          ),
+          boardId: target.board.id,
+        );
       }
       await BoardTerminalSessionManager.instance.ensureSession(config);
       sessionId = config.sessionId;
     }
 
-    final payload = appendNewline ? '$text\n' : text;
+    final payload = appendNewline ? '$text\r' : text;
     TerminalBackendService.instance.write(sessionId, payload);
     return json({
       'ok': true,
@@ -315,7 +338,7 @@ Future<shelf.Response> handleYoloChat(
     final buf = StringBuffer();
     buf.writeln('=== YoLoIT Chat Logs ===');
     buf.writeln('Board: ${target.board.name}');
-    buf.writeln('Panel: ${target.panel.title ?? target.panel.id}');
+    buf.writeln('Panel: ${target.panel.title}');
     buf.writeln('Provider: ${session?.config.provider ?? "unknown"}');
     buf.writeln('Model: ${session?.config.model ?? "unknown"}');
     buf.writeln('Messages: ${messages.length}');

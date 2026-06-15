@@ -47,7 +47,7 @@ void main() {
       expect(providers, contains(('copilot', 'Copilot')));
       expect(providers.map((p) => p.$1), isNot(contains('hidden')));
       expect(providers.map((p) => p.$1), isNot(contains('no-stream')));
-      expect(providers, contains(('local', 'Local LLM')));
+      expect(providers.map((p) => p.$1), isNot(contains('local')));
     });
 
     test('falls back to first available provider for stale selection', () {

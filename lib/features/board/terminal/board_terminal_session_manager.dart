@@ -25,6 +25,18 @@ class BoardTerminalSessionManager extends ChangeNotifier {
   AgentSession? sessionFor(String id) => _sessions[id];
   bool isLive(String id) => _sessions.containsKey(id);
 
+  @visibleForTesting
+  void setSessionForTesting(String sessionId, AgentSession session) {
+    _sessions[sessionId] = session;
+    notifyListeners();
+  }
+
+  @visibleForTesting
+  void clearSessionsForTesting() {
+    _sessions.clear();
+    _envGroupIdsBySession.clear();
+  }
+
   Future<AgentSession> ensureSession(
     BoardTerminalConfig config, {
     RemoteBoardInfo? remoteInfo,

@@ -38,9 +38,9 @@ class BoardGroupOverlay extends StatelessWidget {
   static const double _headerHeight = 28;
   static const double _borderRadius = 12;
 
-  static Color _contrastColor(Color background) {
+  static Color _contrastColor(Color background, AppColorScheme colors) {
     final luminance = background.computeLuminance();
-    return luminance > 0.5 ? Colors.black : Colors.white;
+    return luminance > 0.5 ? colors.textPrimary : colors.background;
   }
 
   @override
@@ -60,7 +60,7 @@ class BoardGroupOverlay extends StatelessWidget {
           group.color != null
               ? Color(group.color!).withValues(alpha: 0.5)
               : colors.primary.withValues(alpha: 0.5);
-      final iconColor = _contrastColor(borderColor);
+      final iconColor = _contrastColor(borderColor, colors);
 
       final left = bounds.left + origin.dx - _padding;
       final top = bounds.top + origin.dy - _padding - _headerHeight;

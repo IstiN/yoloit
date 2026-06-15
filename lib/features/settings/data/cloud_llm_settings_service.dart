@@ -351,7 +351,12 @@ class CloudLlmSettingsService {
   /// Whether the assistant should use cloud provider ('cloud') or local ('local').
   Future<String> loadAssistantProviderType() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_assistantProviderPrefKey) ?? 'local';
+    final value = prefs.getString(_assistantProviderPrefKey);
+    if (value == null || value == 'local') {
+      await prefs.setString(_assistantProviderPrefKey, 'cloud');
+      return 'cloud';
+    }
+    return value;
   }
 
   /// Set the assistant provider type.
@@ -365,9 +370,18 @@ class CloudLlmSettingsService {
     final raw = prefs.getString(_voiceSettingsPrefKey);
     if (raw == null || raw.isEmpty) return const VoiceSettings();
     try {
-      return VoiceSettings.fromJson(
+      final settings = VoiceSettings.fromJson(
         Map<String, dynamic>.from(jsonDecode(raw) as Map),
       );
+      if (!settings.useCloudAsr) {
+        final migrated = settings.copyWith(
+          useCloudAsr: true,
+          useChatModelForCloudAsr: true,
+        );
+        await saveVoiceSettings(migrated);
+        return migrated;
+      }
+      return settings;
     } catch (_) {
       return const VoiceSettings();
     }
@@ -382,7 +396,7 @@ class CloudLlmSettingsService {
 @JsonSerializable()
 class VoiceSettings {
   const VoiceSettings({
-    this.useCloudAsr = false,
+    this.useCloudAsr = true,
     this.convertWavToMp3 = false,
     this.useChatModelForCloudAsr = true,
     this.cloudAsrConfigId,

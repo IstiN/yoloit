@@ -19,7 +19,7 @@ class BoardSelectionToolbar extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final isLight = Theme.of(context).brightness == Brightness.light;
-    final bg = isLight ? Colors.white : colors.surfaceElevated;
+    final bg = isLight ? colors.background : colors.surfaceElevated;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
@@ -28,7 +28,7 @@ class BoardSelectionToolbar extends StatelessWidget {
         border: Border.all(color: colors.border.withAlpha(180)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withAlpha(isLight ? 18 : 70),
+            color: colors.textPrimary.withAlpha(isLight ? 18 : 70),
             blurRadius: 18,
             offset: const Offset(0, 8),
           ),

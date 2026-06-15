@@ -17,8 +17,6 @@ import 'package:yoloit/core/cli/handlers/apps_handler.dart';
 import 'package:yoloit/core/cli/handlers/board_handler.dart';
 import 'package:yoloit/core/cli/handlers/cloud_providers_handler.dart';
 import 'package:yoloit/core/cli/handlers/drawings_handler.dart';
-import 'package:yoloit/core/cli/handlers/lm_generate_handler.dart';
-import 'package:yoloit/core/cli/handlers/local_models_handler.dart';
 import 'package:yoloit/core/cli/handlers/panel_handler.dart';
 import 'package:yoloit/core/cli/handlers/search_handler.dart';
 import 'package:yoloit/core/cli/handlers/server_helpers.dart';
@@ -280,19 +278,6 @@ class CliServer {
       );
     }
 
-    // /api/local-models/...
-    if (path.isNotEmpty && path[0] == 'local-models') {
-      return _handleLocalModels(method, path.sublist(1), request);
-    }
-
-    // POST /api/lm/generate  { messages: [...], systemPrompt?: "...", maxTokens?: 512 }
-    if (path.length == 2 &&
-        path[0] == 'lm' &&
-        path[1] == 'generate' &&
-        method == 'POST') {
-      return _handleLmGenerate(request);
-    }
-
     // /api/yolochat/...
     if (path.isNotEmpty && path[0] == 'yolochat') {
       return _handleYoloChat(method, path.sublist(1), request, cubit);
@@ -370,24 +355,6 @@ class CliServer {
     }
 
     return _notFound('Unknown route');
-  }
-
-  // ── Board routes ────────────────────────────────────────────────────────
-
-  Future<shelf.Response> _handleLocalModels(
-    String method,
-    List<String> sub,
-    shelf.Request request,
-  ) async {
-    return handleLocalModels(
-      method,
-      sub,
-      request,
-      body: _body,
-      json: _json,
-      error: _error,
-      notFound: _notFound,
-    );
   }
 
   // ── Cloud provider routes ──────────────────────────────────────────────
@@ -489,10 +456,6 @@ class CliServer {
       error: _error,
       notFound: _notFound,
     );
-  }
-
-  Future<shelf.Response> _handleLmGenerate(shelf.Request request) async {
-    return handleLmGenerate(request, body: _body, json: _json, error: _error);
   }
 
   Future<shelf.Response> _handleYoloChat(

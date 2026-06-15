@@ -25,6 +25,8 @@ class RunConfigsCliHandler extends PanelCliHandler {
     'input',
     'output',
     'config',
+    'close',
+    'logs',
   ];
 
   @override
@@ -255,6 +257,59 @@ class RunConfigsCliHandler extends PanelCliHandler {
           data: RunBridge.instance.serializeSession(session),
         );
 
+      case 'close':
+        try {
+          final session = await RunBridge.instance.removeSession(
+            args['sessionId'] as String? ??
+                args['id'] as String? ??
+                args['name'] as String?,
+            actionGroup,
+          );
+          return CliActionResult(
+            message: 'Closed "${session.config.name}"',
+            data: RunBridge.instance.serializeSession(session),
+          );
+        } on StateError catch (error) {
+          return CliActionResult(ok: false, message: error.message);
+        }
+
+      case 'logs':
+        final session = RunBridge.instance.findSession(
+          args['sessionId'] as String? ??
+              args['id'] as String? ??
+              args['name'] as String?,
+          group: actionGroup,
+        );
+        if (session == null) {
+          return const CliActionResult(
+            ok: false,
+            message: 'Run session not found',
+          );
+        }
+        final limit = args['limit'] as int?;
+        final outputLines = session.output;
+        final effectiveLines =
+            limit != null && limit > 0 && limit < outputLines.length
+                ? outputLines.sublist(outputLines.length - limit)
+                : outputLines;
+        return CliActionResult(
+          data: {
+            ...RunBridge.instance.serializeSession(session),
+            'outputLines':
+                effectiveLines
+                    .map(
+                      (line) => {
+                        'text': line.text,
+                        'isError': line.isError,
+                        'timestamp': line.timestamp.toIso8601String(),
+                      },
+                    )
+                    .toList(),
+            'output': effectiveLines.map((line) => line.text).join('\n'),
+            'limit': limit,
+          },
+        );
+
       case 'config':
         final config = RunBridge.instance.findConfig(
           args['id'] as String? ?? args['name'] as String?,
@@ -380,6 +435,29 @@ class RunConfigsCliHandler extends PanelCliHandler {
         'name': 'Configuration name',
         'group': 'Group scope override (optional)',
       },
+    ),
+    'close': const CliActionHelp(
+      description: 'Close a run session tab and remove it from the panel',
+      params: {
+        'sessionId': 'Run session ID',
+        'id': 'Configuration ID',
+        'name': 'Configuration name',
+        'group': 'Group scope override (optional)',
+      },
+      example:
+          'yoloit do "<board>" "<run-configs>" close \'{"sessionId":"sess_123"}\'',
+    ),
+    'logs': const CliActionHelp(
+      description: 'Read full output/logs of a run session by id or name',
+      params: {
+        'sessionId': 'Run session ID',
+        'id': 'Configuration ID',
+        'name': 'Configuration name',
+        'group': 'Group scope override (optional)',
+        'limit': 'Maximum number of output lines to return (optional)',
+      },
+      example:
+          'yoloit do "<board>" "<run-configs>" logs \'{"name":"Flutter Run","limit":100}\'',
     ),
     'config': const CliActionHelp(
       description: 'Get full details of a configuration',

@@ -32,16 +32,13 @@ import 'package:yoloit/features/board/chat/widgets/chat_model_suggestions.dart';
 import 'package:yoloit/features/board/chat/widgets/chat_panel_suggestions.dart';
 import 'package:yoloit/features/board/chat/widgets/chat_setup_view.dart';
 import 'package:yoloit/features/board/chat/widgets/chat_slash_chips.dart';
-import 'package:yoloit/features/board/chat/widgets/local_tools_dialog.dart';
 import 'package:yoloit/features/board/chat/widgets/model_search_dialog.dart';
 import 'package:yoloit/features/board/chat/widgets/session_history_dialog.dart';
-import 'package:yoloit/features/board/chat/yoloit_cli_tools.dart';
 import 'package:yoloit/features/board/events/board_event_bus.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/settings/data/agent_config_service.dart';
 import 'package:yoloit/features/settings/data/cloud_llm_settings_service.dart';
-import 'package:yoloit/features/settings/data/local_ai_models_service.dart';
 import 'package:yoloit/features/settings/data/tool_call_settings_service.dart';
 import 'package:yoloit/features/settings/ui/settings_page.dart';
 import 'package:yoloit/features/terminal/data/smart_clipboard_paste_service.dart';
@@ -1633,8 +1630,6 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
             reasoningEffort: _config.reasoningEffort,
             totalOutputTokens: _totalOutputTokens,
             isProcessing: _isProcessing,
-            enabledLocalToolCount: _enabledLocalToolCount(),
-            totalLocalToolCount: YoloitCliToolCatalog.tools.length,
             onAutopilotToggle: () {
               setState(() {
                 _config = _config.copyWith(autopilot: !_config.autopilot);
@@ -1686,29 +1681,6 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       _config = _config.copyWith(reasoningEffort: () => levels[nextIdx]);
     });
     _persistMessages();
-  }
-
-  Set<String> _disabledLocalTools() =>
-      _config.disabledLocalToolNames.map((name) => name.trim()).toSet();
-
-  int _enabledLocalToolCount() =>
-      YoloitCliToolCatalog.tools.length - _disabledLocalTools().length;
-
-  Future<void> _showLocalToolsDialog() async {
-    await showDialog<void>(
-      context: context,
-      builder: (_) => LocalToolsDialog(
-        disabledToolNames: _disabledLocalTools(),
-        enabledCount: _enabledLocalToolCount(),
-        onChanged: (disabled) {
-          final sorted = disabled.toList()..sort();
-          setState(() {
-            _config = _config.copyWith(disabledLocalToolNames: sorted);
-          });
-          _persistMessages();
-        },
-      ),
-    );
   }
 
   Widget _buildInputBar() {
@@ -1838,20 +1810,6 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                     ),
               ),
               const SizedBox(width: 8),
-              if (_config.provider == 'local') ...[
-                ChatActionButton(
-                  icon: Icons.settings_input_component_outlined,
-                  onTap: _showLocalToolsDialog,
-                  tooltip:
-                      'Choose local YoLoIT tools (${_enabledLocalToolCount()} enabled)',
-                  backgroundColor: colors.surfaceElevated,
-                  iconColor:
-                      _config.disabledLocalToolNames.isEmpty
-                          ? colors.terminalPrompt
-                          : Theme.of(context).colorScheme.secondary,
-                ),
-                const SizedBox(width: 8),
-              ],
               Expanded(
                 child: Focus(
                   onKeyEvent: (node, event) {
@@ -2056,20 +2014,17 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         effectiveAsr.configId != null &&
         effectiveAsr.configId!.isNotEmpty;
     if (!useCloudAsr) {
-      await LocalAiModelsService.instance.initialize();
-      if (!LocalAiModelsService.instance.hasSelectedAsrInstalled) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Install ASR model first. Opening Settings → AI Models…',
-            ),
-            duration: Duration(seconds: 2),
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Configure a cloud ASR provider in Settings → AI Models.',
           ),
-        );
-        await SettingsPage.show(context, initialCategory: 'AI Models');
-        return;
-      }
+          duration: Duration(seconds: 2),
+        ),
+      );
+      await SettingsPage.show(context, initialCategory: 'AI Models');
+      return;
     }
 
     if (_isRecordingMic) {
@@ -2141,7 +2096,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
           effectiveAsr.configId != null &&
           effectiveAsr.configId!.isNotEmpty;
 
-      String transcript;
+      String transcript = '';
       if (useCloud) {
         final cloudCfg = await CloudLlmSettingsService.instance.loadConfigById(
           effectiveAsr.configId!,
@@ -2167,9 +2122,6 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
           audioPath: path,
           voiceSettings: voiceSettings,
         );
-      } else {
-        transcript = await LocalAiModelsService.instance
-            .transcribeWithSelectedAsr(path);
       }
 
       if (!mounted) return;

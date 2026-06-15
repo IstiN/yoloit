@@ -12,8 +12,6 @@ class ChatInfoBar extends StatelessWidget {
     required this.reasoningEffort,
     required this.totalOutputTokens,
     required this.isProcessing,
-    required this.enabledLocalToolCount,
-    required this.totalLocalToolCount,
     required this.onAutopilotToggle,
     required this.onCycleReasoningEffort,
     required this.onCopySession,
@@ -29,8 +27,6 @@ class ChatInfoBar extends StatelessWidget {
   final String? reasoningEffort;
   final int totalOutputTokens;
   final bool isProcessing;
-  final int enabledLocalToolCount;
-  final int totalLocalToolCount;
   final VoidCallback onAutopilotToggle;
   final VoidCallback onCycleReasoningEffort;
   final VoidCallback onCopySession;
@@ -70,14 +66,6 @@ class ChatInfoBar extends StatelessWidget {
             ),
           ),
           ChatProviderIcon(provider: provider, size: 14, color: muted),
-          if (provider == 'local') ...[
-            const SizedBox(width: 6),
-            Tooltip(
-              message:
-                  'Local tools: $enabledLocalToolCount/$totalLocalToolCount enabled',
-              child: Icon(Icons.construction, size: 12, color: muted),
-            ),
-          ],
           const SizedBox(width: 8),
           GestureDetector(
             onTap: onAutopilotToggle,

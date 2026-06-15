@@ -50,15 +50,15 @@ void main() {
       final options = buildChatProviderOptions(configs);
       expect(
         options.map((e) => e.$1).toList(),
-        containsAll(<String>['openai', 'local']),
+        containsAll(<String>['openai']),
       );
       expect(options.map((e) => e.$1).toList(), isNot(contains('hidden')));
       expect(options.map((e) => e.$1).toList(), isNot(contains('nostream')));
     });
 
-    test('always includes local fallback', () {
+    test('returns empty list when no visible stream providers', () {
       final options = buildChatProviderOptions(<AgentConfig>[]);
-      expect(options.single.$1, 'local');
+      expect(options, isEmpty);
     });
   });
 

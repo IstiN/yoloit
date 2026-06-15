@@ -90,6 +90,14 @@ graph LR
   g_panel --> g_panel_15["panel:types"]
   g_panel --> g_panel_16["filetree:create · ftc"]
   g_panel --> g_panel_17["filetree:set-root · ftsr"]
+  g_panel --> g_panel_18["terminal:output"]
+  g_panel --> g_panel_19["terminal:config"]
+  g_panel --> g_panel_20["terminal:set-dir"]
+  g_panel --> g_panel_21["filetree:list"]
+  g_panel --> g_panel_22["filetree:open"]
+  g_panel --> g_panel_23["filetree:expand"]
+  g_panel --> g_panel_24["filetree:collapse"]
+  g_panel --> g_panel_25["filetree:refresh"]
   root --> g_run(("run"))
   g_run --> g_run_0["run:list"]
   g_run --> g_run_1["run:input"]
@@ -97,19 +105,22 @@ graph LR
   g_run --> g_run_3["run:popout"]
   g_run --> g_run_4["run:output"]
   g_run --> g_run_5["run:detach"]
+  g_run --> g_run_6["run:add"]
+  g_run --> g_run_7["run:update"]
+  g_run --> g_run_8["run:remove"]
+  g_run --> g_run_9["run:run"]
+  g_run --> g_run_10["run:stop"]
+  g_run --> g_run_11["run:config"]
+  g_run --> g_run_12["run:close"]
+  g_run --> g_run_13["run:logs"]
   root --> g_timer(("timer"))
   g_timer --> g_timer_0["timer:create"]
-  root --> g_models(("models"))
-  g_models --> g_models_0["models:list"]
-  g_models --> g_models_1["models:download"]
-  g_models --> g_models_2["models:resume"]
-  g_models --> g_models_3["models:pause"]
-  g_models --> g_models_4["models:cancel"]
-  g_models --> g_models_5["models:stop"]
-  g_models --> g_models_6["models:delete"]
-  g_models --> g_models_7["models:select"]
-  g_models --> g_models_8["lm:generate"]
-  g_models --> g_models_9["process-command · pc"]
+  g_timer --> g_timer_1["timer:status"]
+  g_timer --> g_timer_2["timer:set"]
+  g_timer --> g_timer_3["timer:start"]
+  g_timer --> g_timer_4["timer:pause"]
+  g_timer --> g_timer_5["timer:resume"]
+  g_timer --> g_timer_6["timer:reset"]
   root --> g_cloud(("cloud"))
   g_cloud --> g_cloud_0["cloud:list"]
   g_cloud --> g_cloud_1["cloud:add"]
@@ -135,6 +146,8 @@ graph LR
   g_yolochat --> g_yolochat_8["yolochat:status"]
   g_yolochat --> g_yolochat_9["yolochat:stop"]
   g_yolochat --> g_yolochat_10["yolochat:logs"]
+  g_yolochat --> g_yolochat_11["yolochat:config"]
+  g_yolochat --> g_yolochat_12["yolochat:follow-up"]
   root --> g_files(("files"))
   g_files --> g_files_0["files:search"]
   g_files --> g_files_1["files:list"]
@@ -156,11 +169,23 @@ graph LR
   g_note --> g_note_3["note:append"]
   g_note --> g_note_4["note:wrap"]
   g_note --> g_note_5["note:nowrap"]
+  g_note --> g_note_6["note:get"]
+  g_note --> g_note_7["sticky:get"]
+  g_note --> g_note_8["sticky:set"]
+  g_note --> g_note_9["sticky:append"]
+  g_note --> g_note_10["sticky:color"]
+  g_note --> g_note_11["shape:get"]
+  g_note --> g_note_12["shape:set"]
+  g_note --> g_note_13["code:get"]
+  g_note --> g_note_14["code:set"]
   root --> g_checklist(("checklist"))
   g_checklist --> g_checklist_0["checklist:add · cl:a"]
   g_checklist --> g_checklist_1["checklist:new · cl:n"]
   g_checklist --> g_checklist_2["checklist:check · cl:ch"]
   g_checklist --> g_checklist_3["checklist:uncheck · cl:u"]
+  g_checklist --> g_checklist_4["checklist:items"]
+  g_checklist --> g_checklist_5["checklist:remove"]
+  g_checklist --> g_checklist_6["checklist:rename"]
   root --> g_kanban(("kanban"))
   g_kanban --> g_kanban_0["kanban:columns · k:col"]
   g_kanban --> g_kanban_1["kanban:add-column · k:c"]
@@ -172,6 +197,7 @@ graph LR
   g_kanban --> g_kanban_7["kanban:update-card · k:up"]
   g_kanban --> g_kanban_8["kanban:cards · k:ls"]
   g_kanban --> g_kanban_9["kanban:paste · k:p"]
+  g_kanban --> g_kanban_10["kanban:send-card-to-chat"]
   root --> g_playlist(("playlist"))
   g_playlist --> g_playlist_0["play"]
   g_playlist --> g_playlist_1["pause · pause"]
@@ -179,8 +205,17 @@ graph LR
   g_playlist --> g_playlist_3["next · next"]
   g_playlist --> g_playlist_4["prev · prev"]
   g_playlist --> g_playlist_5["playlist:list · pll"]
+  g_playlist --> g_playlist_6["playlist:add"]
+  g_playlist --> g_playlist_7["playlist:remove"]
   root --> g_webpage(("webpage"))
   g_webpage --> g_webpage_0["web:open"]
+  g_webpage --> g_webpage_1["web:get"]
+  g_webpage --> g_webpage_2["web:exec"]
+  g_webpage --> g_webpage_3["web:content"]
+  g_webpage --> g_webpage_4["web:title"]
+  g_webpage --> g_webpage_5["web:url"]
+  g_webpage --> g_webpage_6["web:scroll"]
+  g_webpage --> g_webpage_7["web:click"]
 ```
 
 ## Common commands
@@ -381,6 +416,30 @@ graph LR
 - **`filetree:set-root`** *(aliases: ftsr)* — Change root path of an existing File Tree panel.
   - params: board*, panel*, path*
   - example: `yoloit filetree:set-root "My Board" "Project Tree" ~/git/project`
+- **`terminal:output`** — Read terminal output
+  - params: board*, panel*, session
+  - example: `yoloit terminal:output "My Board" "Terminal"`
+- **`terminal:config`** — Get terminal configuration
+  - params: board*, panel*
+  - example: `yoloit terminal:config "My Board" "Terminal"`
+- **`terminal:set-dir`** — Set terminal working directory
+  - params: board*, panel*, dir*
+  - example: `yoloit terminal:set-dir "My Board" "Terminal" ~/project`
+- **`filetree:list`** — List file tree nodes
+  - params: board*, panel*
+  - example: `yoloit filetree:list "My Board" "Project Tree"`
+- **`filetree:open`** — Open a path in the file tree panel
+  - params: board*, panel*, path*
+  - example: `yoloit filetree:open "My Board" "Project Tree" lib/main.dart`
+- **`filetree:expand`** — Expand a file tree node
+  - params: board*, panel*, path*
+  - example: `yoloit filetree:expand "My Board" "Project Tree" lib`
+- **`filetree:collapse`** — Collapse a file tree node
+  - params: board*, panel*, path*
+  - example: `yoloit filetree:collapse "My Board" "Project Tree" lib`
+- **`filetree:refresh`** — Refresh file tree contents
+  - params: board*, panel*
+  - example: `yoloit filetree:refresh "My Board" "Project Tree"`
 
 ### run
 - **`run:list`** — List run configurations and sessions
@@ -401,42 +460,53 @@ graph LR
 - **`run:detach`** — Detach run session from panel
   - params: board*, panel*, sessionId|id|name
   - example: `yoloit run:detach "My Board" "Run"`
+- **`run:add`** — Add a run configuration
+  - params: board*, panel*, name*, command*, --working-dir, --flutter
+  - example: `yoloit run:add "My Board" "Run" "Test" "flutter test"`
+- **`run:update`** — Update a run configuration
+  - params: board*, panel*, id|name*, --name, --command, --working-dir, --flutter
+  - example: `yoloit run:update "My Board" "Run" "Test" --command "flutter test integration_test"`
+- **`run:remove`** — Remove a run configuration
+  - params: board*, panel*, id|name*
+  - example: `yoloit run:remove "My Board" "Run" "Test"`
+- **`run:run`** — Start a run configuration
+  - params: board*, panel*, id|name*
+  - example: `yoloit run:run "My Board" "Run" "macOS"`
+- **`run:stop`** — Stop a running session
+  - params: board*, panel*, sessionId|id|name*
+  - example: `yoloit run:stop "My Board" "Run" "macOS"`
+- **`run:config`** — Show run configuration details
+  - params: board*, panel*, id|name*
+  - example: `yoloit run:config "My Board" "Run" "macOS"`
+- **`run:close`** — Remove a run session tab from the panel
+  - params: board*, panel*, sessionId|id|name*
+  - example: `yoloit run:close "My Board" "Run" sess_123`
+- **`run:logs`** — Read the full output of a run session
+  - params: board*, panel*, sessionId|id|name*, --limit
+  - example: `yoloit run:logs "My Board" "Run" sess_123 --limit 100`
 
 ### timer
 - **`timer:create`** — Create and optionally start a timer
   - params: duration, --label, --start
   - example: `yoloit timer:create 600 --label "Pomodoro" --start`
-
-### models
-- **`models:list`** — List local AI model states, progress, and selected models
-  - example: `yoloit models:list`
-- **`models:download`** — Start or update model download
-  - params: model-id*
-  - example: `yoloit models:download gemma4-e2b-it-4bit`
-- **`models:resume`** — Resume failed or paused model download
-  - params: model-id*
-  - example: `yoloit models:resume qwen3-8b-4bit`
-- **`models:pause`** — Pause active model download (resumable)
-  - params: model-id*
-  - example: `yoloit models:pause qwen3-8b-4bit`
-- **`models:cancel`** — Cancel active model download (discard partial download)
-  - params: model-id*
-  - example: `yoloit models:cancel qwen3-8b-4bit`
-- **`models:stop`** — Alias of models:pause
-  - params: model-id*
-  - example: `yoloit models:stop qwen3-8b-4bit`
-- **`models:delete`** — Delete installed local model files
-  - params: model-id*
-  - example: `yoloit models:delete qwen3-8b-4bit`
-- **`models:select`** — Select active local model for chat or ASR
-  - params: chat|asr*, model-id*
-  - example: `yoloit models:select chat gemma4-e2b-it-4bit`
-- **`lm:generate`** — Run a single inference on the local LLM and show timings
-  - params: message*, --model model-id, --system prompt, --max-tokens N
-  - example: `yoloit lm:generate "привет" --model qwen3-0.6b-4bit`
-- **`process-command`** *(aliases: pc)* — Route natural language to CLI command via local AI model
-  - params: text*
-  - example: `yoloit process-command "создай заметку покупки"`
+- **`timer:status`** — Show timer status
+  - params: board*, panel*
+  - example: `yoloit timer:status "My Board" "Timer"`
+- **`timer:set`** — Set timer duration and label without starting
+  - params: board*, panel*, duration, --label
+  - example: `yoloit timer:set "My Board" "Timer" 600 --label "Pomodoro"`
+- **`timer:start`** — Start (or restart) the timer
+  - params: board*, panel*, duration, --label
+  - example: `yoloit timer:start "My Board" "Timer" 600`
+- **`timer:pause`** — Pause the running timer
+  - params: board*, panel*
+  - example: `yoloit timer:pause "My Board" "Timer"`
+- **`timer:resume`** — Resume a paused timer
+  - params: board*, panel*
+  - example: `yoloit timer:resume "My Board" "Timer"`
+- **`timer:reset`** — Reset timer to full duration
+  - params: board*, panel*
+  - example: `yoloit timer:reset "My Board" "Timer"`
 
 ### cloud
 - **`cloud:list`** — List cloud LLM providers and active config
@@ -504,6 +574,12 @@ graph LR
 - **`yolochat:logs`** — Export full chat session log as plain text (for debugging/copy-paste)
   - params: --board id|name, --panel id|title
   - example: `yoloit yolochat:logs --board "Main"`
+- **`yolochat:config`** — Get chat panel configuration
+  - params: --board, --panel
+  - example: `yoloit yolochat:config --board "My Board" --panel "AI Chat"`
+- **`yolochat:follow-up`** — Set follow-up question suggestions
+  - params: --board, --panel, questions*
+  - example: `yoloit yolochat:follow-up --board "My Board" --panel "AI Chat" "Q1" "Q2"`
 
 ### files
 - **`files:search`** — Read-only search for files and folders (default root: home)
@@ -563,6 +639,33 @@ graph LR
 - **`note:nowrap`** — Disable note auto-height wrapping
   - params: board*, panel*
   - example: `yoloit note:nowrap "My Board" "Notes"`
+- **`note:get`** — Read note content
+  - params: board*, panel*
+  - example: `yoloit note:get "My Board" "Notes"`
+- **`sticky:get`** — Read sticky note content
+  - params: board*, panel*
+  - example: `yoloit sticky:get "My Board" "Idea"`
+- **`sticky:set`** — Set sticky note text
+  - params: board*, panel*, text*
+  - example: `yoloit sticky:set "My Board" "Idea" "Buy milk"`
+- **`sticky:append`** — Append text to a sticky note
+  - params: board*, panel*, text*
+  - example: `yoloit sticky:append "My Board" "Idea" " tomorrow"`
+- **`sticky:color`** — Set sticky note color
+  - params: board*, panel*, color*
+  - example: `yoloit sticky:color "My Board" "Idea" #FEF08A`
+- **`shape:get`** — Get shape panel state
+  - params: board*, panel*
+  - example: `yoloit shape:get "My Board" "Diamond"`
+- **`shape:set`** — Set shape panel properties
+  - params: board*, panel*, --text, --fill, --stroke, --stroke-width
+  - example: `yoloit shape:set "My Board" "Diamond" --text "Go"`
+- **`code:get`** — Get code snippet content
+  - params: board*, panel*
+  - example: `yoloit code:get "My Board" "Snippet"`
+- **`code:set`** — Set code snippet content
+  - params: board*, panel*, code*
+  - example: `yoloit code:set "My Board" "Snippet" "print(1)"`
 
 ### checklist
 - **`checklist:add`** *(aliases: cl:a)* — Add checklist item — board and panel optional (alias: cl:a)
@@ -577,6 +680,15 @@ graph LR
 - **`checklist:uncheck`** *(aliases: cl:u)* — Uncheck checklist item — board and panel optional (alias: cl:u)
   - params: item*, [panel], [board]
   - example: `yoloit checklist:uncheck "Купить кофе"`
+- **`checklist:items`** — List checklist items
+  - params: board*, panel*
+  - example: `yoloit checklist:items "My Board" "Shopping"`
+- **`checklist:remove`** — Remove a checklist item
+  - params: board*, panel*, item*
+  - example: `yoloit checklist:remove "My Board" "Shopping" "milk"`
+- **`checklist:rename`** — Rename a checklist item
+  - params: board*, panel*, old*, new*
+  - example: `yoloit checklist:rename "My Board" "Shopping" "milk" "oat milk"`
 
 ### kanban
 - **`kanban:columns`** *(aliases: k:col)* — List kanban columns — board and panel optional (alias: k:col)
@@ -609,6 +721,9 @@ graph LR
 - **`kanban:paste`** *(aliases: k:p)* — Create a kanban card from text — board and panel optional (alias: k:p)
   - params: text*, [column], [panel], [board]
   - example: `yoloit kanban:paste "Fix bug\nDescription here"`
+- **`kanban:send-card-to-chat`** — Send a kanban card to a chat panel
+  - params: board*, panel*, cardId*
+  - example: `yoloit kanban:send-card-to-chat "My Board" "Kanban" card_123`
 
 ### playlist
 - **`play`** — Start playlist playback (optionally add media first)
@@ -629,11 +744,38 @@ graph LR
 - **`playlist:list`** *(aliases: pll)* — List tracks in a playlist panel
   - params: board, panel
   - example: `yoloit playlist:list music`
+- **`playlist:add`** — Add a track to a playlist
+  - params: board*, panel*, path*
+  - example: `yoloit playlist:add "My Board" music ~/song.mp3`
+- **`playlist:remove`** — Remove a track from a playlist
+  - params: board*, panel*, index*
+  - example: `yoloit playlist:remove "My Board" music 2`
 
 ### webpage
 - **`web:open`** — Open URL in webpage panel
   - params: board*, panel*, url*
   - example: `yoloit web:open "My Board" "Web" https://example.com`
+- **`web:get`** — Get webpage panel state
+  - params: board*, panel*
+  - example: `yoloit web:get "My Board" "Web"`
+- **`web:exec`** — Execute JavaScript in the panel WebView
+  - params: board*, panel*, js*
+  - example: `yoloit web:exec "My Board" "Web" "document.title"`
+- **`web:content`** — Return the current page HTML
+  - params: board*, panel*
+  - example: `yoloit web:content "My Board" "Web"`
+- **`web:title`** — Return the current page title
+  - params: board*, panel*
+  - example: `yoloit web:title "My Board" "Web"`
+- **`web:url`** — Return the current live URL from the WebView
+  - params: board*, panel*
+  - example: `yoloit web:url "My Board" "Web"`
+- **`web:scroll`** — Scroll the page to or by coordinates
+  - params: board*, panel*, x, y, --by
+  - example: `yoloit web:scroll "My Board" "Web" 0 500`
+- **`web:click`** — Click the first element matching a CSS selector
+  - params: board*, panel*, selector*
+  - example: `yoloit web:click "My Board" "Web" "button.submit"`
 
 ## Tool schemas
 

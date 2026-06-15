@@ -134,6 +134,15 @@ class RunBridge {
     return session;
   }
 
+  Future<RunSession> removeSession([String? identifier, String? group]) async {
+    final session = findSession(identifier, group: group);
+    if (session == null) {
+      throw StateError('Run session not found');
+    }
+    _requireCubit.removeSession(session.id);
+    return session;
+  }
+
   Future<RunSession> attachSession({
     String? identifier,
     String? group,

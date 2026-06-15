@@ -4,6 +4,8 @@ import 'package:yoloit/core/cli/handlers/run_configs_handler.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/runs/bloc/run_cubit.dart';
 import 'package:yoloit/features/runs/data/run_bridge.dart';
+import 'package:yoloit/features/runs/models/run_config.dart';
+import 'package:yoloit/features/runs/models/run_session.dart';
 
 BoardPanelInstance _panel({Map<String, dynamic> state = const {}}) =>
     BoardPanelInstance(
@@ -15,11 +17,13 @@ BoardPanelInstance _panel({Map<String, dynamic> state = const {}}) =>
     );
 
 void main() {
-  final handler = const RunConfigsCliHandler();
+  const handler = RunConfigsCliHandler();
+  late RunCubit cubit;
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
-    RunBridge.instance.attach(RunCubit());
+    cubit = RunCubit();
+    RunBridge.instance.attach(cubit);
   });
 
   test('typeId matches', () {
@@ -29,7 +33,17 @@ void main() {
   test('supportedActions contains expected actions', () {
     expect(
       handler.supportedActions,
-      containsAll(['list', 'add', 'remove', 'run', 'stop', 'output', 'config']),
+      containsAll([
+        'list',
+        'add',
+        'remove',
+        'run',
+        'stop',
+        'output',
+        'config',
+        'close',
+        'logs',
+      ]),
     );
   });
 
@@ -133,6 +147,99 @@ void main() {
       expect(r.ok, isTrue);
       expect(r.data!['name'], 'MyTest');
       expect(r.data!['command'], 'echo hello');
+    });
+
+    test('close returns error when session not found', () async {
+      final r = await handler.handleAction('close', {'sessionId': 'nope'}, _panel());
+      expect(r.ok, isFalse);
+      expect(r.message, contains('not found'));
+    });
+
+    test('close removes an existing session', () async {
+      const config = RunConfig(
+        id: 'cfg_1',
+        name: 'Test',
+        command: 'echo hi',
+        group: 'p1',
+      );
+      const session = RunSession(
+        id: 'sess_1',
+        config: config,
+        workspacePath: '/tmp',
+        status: RunStatus.stopped,
+      );
+      cubit.emit(cubit.state.copyWith(sessions: [session]));
+
+      final r = await handler.handleAction('close', {'sessionId': 'sess_1'}, _panel());
+      expect(r.ok, isTrue);
+      expect(r.message, contains('Closed'));
+      expect(RunBridge.instance.state.sessions, isEmpty);
+    });
+
+    test('logs returns error when session not found', () async {
+      final r = await handler.handleAction('logs', {'sessionId': 'nope'}, _panel());
+      expect(r.ok, isFalse);
+      expect(r.message, contains('not found'));
+    });
+
+    test('logs returns full output for an existing session', () async {
+      final now = DateTime(2025, 1, 1);
+      const config = RunConfig(
+        id: 'cfg_1',
+        name: 'Test',
+        command: 'echo hi',
+        group: 'p1',
+      );
+      final session = RunSession(
+        id: 'sess_1',
+        config: config,
+        workspacePath: '/tmp',
+        status: RunStatus.stopped,
+        output: [
+          RunOutputLine(text: 'line 1', isError: false, timestamp: now),
+          RunOutputLine(text: 'line 2', isError: true, timestamp: now.add(const Duration(seconds: 1))),
+          RunOutputLine(text: 'line 3', isError: false, timestamp: now.add(const Duration(seconds: 2))),
+        ],
+      );
+      cubit.emit(cubit.state.copyWith(sessions: [session]));
+
+      final r = await handler.handleAction('logs', {'sessionId': 'sess_1'}, _panel());
+      expect(r.ok, isTrue);
+      final lines = r.data!['outputLines'] as List<Map<String, dynamic>>;
+      expect(lines.length, 3);
+      expect(lines[0]['text'], 'line 1');
+      expect(lines[1]['isError'], isTrue);
+      expect(r.data!['output'], 'line 1\nline 2\nline 3');
+    });
+
+    test('logs respects limit', () async {
+      final now = DateTime(2025, 1, 1);
+      const config = RunConfig(
+        id: 'cfg_1',
+        name: 'Test',
+        command: 'echo hi',
+        group: 'p1',
+      );
+      final session = RunSession(
+        id: 'sess_1',
+        config: config,
+        workspacePath: '/tmp',
+        status: RunStatus.stopped,
+        output: [
+          RunOutputLine(text: 'a', isError: false, timestamp: now),
+          RunOutputLine(text: 'b', isError: false, timestamp: now.add(const Duration(seconds: 1))),
+          RunOutputLine(text: 'c', isError: false, timestamp: now.add(const Duration(seconds: 2))),
+        ],
+      );
+      cubit.emit(cubit.state.copyWith(sessions: [session]));
+
+      final r = await handler.handleAction('logs', {'sessionId': 'sess_1', 'limit': 2}, _panel());
+      expect(r.ok, isTrue);
+      final lines = r.data!['outputLines'] as List<Map<String, dynamic>>;
+      expect(lines.length, 2);
+      expect(lines[0]['text'], 'b');
+      expect(lines[1]['text'], 'c');
+      expect(r.data!['limit'], 2);
     });
 
     test('unknown action returns error', () async {

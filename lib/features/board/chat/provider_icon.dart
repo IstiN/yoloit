@@ -63,7 +63,6 @@ class ChatProviderIcon extends StatelessWidget {
           ),
         ),
       ),
-      'local' => Icon(Icons.memory_rounded, size: size, color: iconColor),
       'opencode' => Icon(Icons.code_rounded, size: size, color: iconColor),
       'codex' => Icon(Icons.terminal_rounded, size: size, color: iconColor),
       'kimi' => _TextProviderIcon(label: 'K', size: size, color: iconColor),
