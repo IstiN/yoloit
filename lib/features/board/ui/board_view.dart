@@ -1379,6 +1379,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     final cancelToken = CancelToken();
     _boardOverviewLog('bgCapture.start count=${toCapture.length} (offscreen)');
     final watch = Stopwatch()..start();
+    final captured = <String, Uint8List>{};
 
     for (final board in toCapture) {
       if (_cancelBgCapture || !mounted || !_isBoardOverviewOpen) {
@@ -1404,9 +1405,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
           break;
         }
         if (png != null) {
-          setState(() {
-            _boardPreviewPngs[board.id] = png;
-          });
+          captured[board.id] = png;
           _saveBoardPreviewPngToDisk(board.id, png);
           _boardOverviewLog(
             'bgCapture.captured board=${board.id} bytes=${png.length} elapsed=${boardWatch.elapsedMilliseconds}ms',
@@ -1421,6 +1420,12 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
           'bgCapture.error board=${board.id} $e elapsed=${boardWatch.elapsedMilliseconds}ms',
         );
       }
+    }
+
+    if (captured.isNotEmpty && mounted) {
+      setState(() {
+        _boardPreviewPngs.addAll(captured);
+      });
     }
 
     _boardOverviewLog('bgCapture.done elapsed=${watch.elapsedMilliseconds}ms');

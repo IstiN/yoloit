@@ -426,7 +426,11 @@ class _PreviewSafePanelShell extends StatelessWidget {
             OverlayEntry(
               builder: (context) => TooltipVisibility(
                 visible: false,
-                child: child,
+                // Disable text selection inside scaled/headless previews so that
+                // plugins containing SelectionArea do not schedule post-dispose
+                // updates on inactive elements when the preview tree is torn
+                // down during board switches.
+                child: SelectionContainer.disabled(child: child),
               ),
             ),
           ],
