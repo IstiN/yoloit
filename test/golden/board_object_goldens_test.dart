@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golden_toolkit/golden_toolkit.dart';
 import 'package:yoloit/core/theme/app_theme.dart';
+import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/markdown_note_plugin.dart';
@@ -23,16 +25,19 @@ Widget _pluginShell({
   required Widget Function(BuildContext context) builder,
   Size size = const Size(520, 360),
 }) {
-  return MaterialApp(
-    key: const ValueKey('board-chrome-app'),
-    theme: AppThemePreset.neonPurple.theme,
-    home: Scaffold(
-      backgroundColor: const Color(0xFF10131C),
-      body: Center(
-        child: SizedBox(
-          width: size.width,
-          height: size.height,
-          child: Builder(builder: builder),
+  return BlocProvider<BoardCubit>.value(
+    value: BoardCubit(),
+    child: MaterialApp(
+      key: const ValueKey('board-chrome-app'),
+      theme: AppThemePreset.neonPurple.theme,
+      home: Scaffold(
+        backgroundColor: const Color(0xFF10131C),
+        body: Center(
+          child: SizedBox(
+            width: size.width,
+            height: size.height,
+            child: Builder(builder: builder),
+          ),
         ),
       ),
     ),

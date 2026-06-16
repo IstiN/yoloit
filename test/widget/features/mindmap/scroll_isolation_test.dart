@@ -64,6 +64,8 @@ void main() {
       // the scroll event. It can then use the resolver to claim priority.
       expect(childReceivedScroll, isTrue,
           reason: 'Inner Listener must receive the scroll event');
+      expect(parentReceivedScroll, isTrue,
+          reason: 'Parent Listener should also receive the scroll event');
     });
 
     testWidgets('TerminalEmbed-style widget does not auto-request focus',

@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:yoloit/features/workspaces/data/worktree_service.dart';
-import 'package:yoloit/features/workspaces/models/worktree_model.dart';
 
 // ---------------------------------------------------------------------------
 // Helpers

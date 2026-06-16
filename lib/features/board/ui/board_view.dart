@@ -1,15 +1,12 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_colorpicker/flutter_colorpicker.dart';
-import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:yoloit/core/cli/board_screenshot_service.dart';
 import 'package:yoloit/core/remote/board_share_server.dart';
 import 'package:yoloit/core/remote/yoloit_remote_client.dart';
@@ -19,7 +16,6 @@ import 'package:yoloit/core/ui/adaptive_dialog.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/bloc/board_state.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
-import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
 import 'package:yoloit/features/board/plugins/builtin/webpage_plugin.dart';
 import 'package:yoloit/features/board/services/board_offscreen_renderer.dart';
 import 'package:yoloit/features/board/tools/board_tool.dart';
@@ -33,7 +29,9 @@ import 'package:yoloit/features/board/ui/board_links_painter.dart';
 import 'package:yoloit/features/board/ui/board_math.dart';
 import 'package:yoloit/features/board/ui/board_overview_layer.dart';
 import 'package:yoloit/features/board/ui/board_overview_widgets.dart';
+import 'package:yoloit/features/board/ui/board_panel_actions.dart';
 import 'package:yoloit/features/board/ui/board_panel_card.dart';
+import 'package:yoloit/features/board/ui/board_panel_layer.dart';
 import 'package:yoloit/features/board/ui/board_toolbar.dart';
 import 'package:yoloit/features/board/ui/board_tools_panel.dart';
 import 'package:yoloit/features/board/ui/dialogs/board_settings_dialog.dart';
@@ -46,13 +44,11 @@ import 'package:yoloit/features/board/ui/widgets/board_selection_toolbar.dart';
 import 'package:yoloit/features/board/ui/widgets/board_top_right_controls.dart';
 import 'package:yoloit/features/board/ui/widgets/cancel_connection_bar.dart';
 import 'package:yoloit/features/board/ui/widgets/link_delete_badges.dart';
-import 'package:yoloit/features/board/ui/widgets/text_editing_utils.dart';
 import 'package:yoloit/features/board/ui/yolo_badge_with_chat.dart';
 import 'package:yoloit/features/board/utils/board_grid_layout.dart';
-import 'package:yoloit/features/board/widgets/widget_engine_manager.dart';
 import 'package:yoloit/features/mindmap/widgets/canvas_interaction_lock.dart';
 import 'package:yoloit/features/search/ui/file_search_overlay.dart';
-import 'package:yoloit/ui/components/buttons/markdown_tool_button.dart';
+
 
 class BoardView extends StatefulWidget {
   const BoardView({super.key, this.skipOverviewPreviewCapture = false});
@@ -671,329 +667,28 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                     panels: activeBoard.panels,
                                                     origin: _canvasOrigin,
                                                   ),
-                                                ...(() {
-                                                  final visiblePanels =
-                                                      activeBoard.panels
-                                                          .where(
-                                                            (panel) =>
-                                                                !panel.hidden,
-                                                          )
-                                                          .toList()
-                                                        ..sort(
-                                                          (a, b) => a.zIndex
-                                                              .compareTo(
-                                                                b.zIndex,
-                                                              ),
-                                                        );
-                                                  return visiblePanels.map((
-                                                    panel,
-                                                  ) {
-                                                    final boardCubit =
-                                                        context
-                                                            .read<BoardCubit>();
-                                                    final isInCollapsedGroup =
-                                                        activeBoard
-                                                            .groups
-                                                            .any(
-                                                              (group) =>
-                                                                  group
-                                                                      .collapsed &&
-                                                                  group
-                                                                      .panelIds
-                                                                      .contains(
-                                                                        panel
-                                                                            .id,
-                                                                      ),
-                                                            );
-                                                    final card = BoardPanelCard(
-                                                      key: ValueKey(panel.id),
-                                                      panel: panel,
-                                                      positionOffset:
-                                                          _canvasOrigin,
-                                                      capturingScreenshot:
-                                                          _isCapturingScreenshot,
-                                                      selected:
-                                                          !isInCollapsedGroup &&
-                                                          selectedPanelIds
-                                                              .contains(
-                                                                panel.id,
-                                                              ),
-                                                      onTap:
-                                                          () => boardCubit
-                                                              .focusPanel(
-                                                                panel.id,
-                                                              ),
-                                                      onMove:
-                                                          (details) =>
-                                                              _movePanelWithEdgePan(
-                                                                context,
-                                                                panel.id,
-                                                                details,
-                                                              ),
-                                                      onResize:
-                                                          (update) =>
-                                                              _resizePanelWithEdgePan(
-                                                                context,
-                                                                panel,
-                                                                update,
-                                                              ),
-                                                      onDragStart:
-                                                          (details) =>
-                                                              _handlePanelDragStart(
-                                                                panel.id,
-                                                                details,
-                                                              ),
-                                                      onDragEnd:
-                                                          _handlePanelDragEnd,
-                                                      onDelete: () async {
-                                                        if (panel.type ==
-                                                            'board.widget.custom') {
-                                                          WidgetEngineManager
-                                                              .instance
-                                                              .remove(panel.id);
-                                                        }
-                                                        await boardCubit
-                                                            .removePanel(
-                                                              panel.id,
-                                                            );
-                                                      },
-                                                      onEditColor:
-                                                          () =>
-                                                              _showPanelColorDialog(
-                                                                context,
-                                                                panel,
-                                                              ),
-                                                      onEditNote:
-                                                          _editPanelCallback(
-                                                            context,
-                                                            panel,
-                                                          ),
-                                                      onBringToFront: () {
-                                                        final board =
-                                                            boardCubit
-                                                                .state
-                                                                .activeBoard;
-                                                        if (board == null) {
-                                                          return;
-                                                        }
-                                                        final maxZ = board
-                                                            .panels
-                                                            .fold<int>(
-                                                              0,
-                                                              (value, panel) =>
-                                                                  panel.zIndex >
-                                                                          value
-                                                                      ? panel
-                                                                          .zIndex
-                                                                      : value,
-                                                            );
-                                                        boardCubit.updatePanel(
-                                                          panel.id,
-                                                          (p) => p.copyWith(
-                                                            zIndex: maxZ + 1,
-                                                          ),
-                                                        );
-                                                      },
-                                                      onSendToBack: () {
-                                                        final board =
-                                                            boardCubit
-                                                                .state
-                                                                .activeBoard;
-                                                        if (board == null) {
-                                                          return;
-                                                        }
-                                                        final minZ = board
-                                                            .panels
-                                                            .fold<int>(
-                                                              0,
-                                                              (value, panel) =>
-                                                                  panel.zIndex <
-                                                                          value
-                                                                      ? panel
-                                                                          .zIndex
-                                                                      : value,
-                                                            );
-                                                        boardCubit.updatePanel(
-                                                          panel.id,
-                                                          (p) => p.copyWith(
-                                                            zIndex: minZ - 1,
-                                                          ),
-                                                        );
-                                                      },
-                                                      onUpdateState: (
-                                                        newState,
-                                                      ) {
-                                                        boardCubit.updatePanel(
-                                                          panel.id,
-                                                          (p) => p.copyWith(
-                                                            state: newState,
-                                                          ),
-                                                        );
-                                                      },
-                                                      onCreateLinkedPanel: (
-                                                        typeId,
-                                                        state,
-                                                        title,
-                                                      ) async {
-                                                        final cubit =
-                                                            boardCubit;
-                                                        final plugin =
-                                                            BoardPluginRegistry
-                                                                .instance
-                                                                .pluginFor(
-                                                                  typeId,
-                                                                );
-                                                        final size =
-                                                            plugin
-                                                                ?.defaultSize ??
-                                                            const Size(
-                                                              460,
-                                                              380,
-                                                            );
-                                                        final board =
-                                                            cubit
-                                                                .state
-                                                                .activeBoard;
-                                                        if (board == null) {
-                                                          return null;
-                                                        }
-                                                        final currentBounds =
-                                                            panel.bounds;
-                                                        // Place to the right of the source panel, then
-                                                        // stack downward if that slot is already taken.
-                                                        final baseX =
-                                                            currentBounds.x +
-                                                            currentBounds
-                                                                .width +
-                                                            40;
-                                                        var baseY =
-                                                            currentBounds.y;
-                                                        final occupiedRects =
-                                                            board.panels
-                                                                .where(
-                                                                  (p) =>
-                                                                      !p.hidden,
-                                                                )
-                                                                .map(
-                                                                  (
-                                                                    p,
-                                                                  ) => Rect.fromLTWH(
-                                                                    p.bounds.x,
-                                                                    p.bounds.y,
-                                                                    p
-                                                                        .bounds
-                                                                        .width,
-                                                                    p
-                                                                        .bounds
-                                                                        .height,
-                                                                  ),
-                                                                )
-                                                                .toList();
-                                                        var candidate =
-                                                            Rect.fromLTWH(
-                                                              baseX,
-                                                              baseY,
-                                                              size.width,
-                                                              size.height,
-                                                            );
-                                                        // Shift down until no overlap with existing panels.
-                                                        var attempts = 0;
-                                                        while (attempts < 50 &&
-                                                            occupiedRects.any(
-                                                              (r) => r.overlaps(
-                                                                candidate,
-                                                              ),
-                                                            )) {
-                                                          baseY +=
-                                                              size.height + 20;
-                                                          candidate =
-                                                              Rect.fromLTWH(
-                                                                baseX,
-                                                                baseY,
-                                                                size.width,
-                                                                size.height,
-                                                              );
-                                                          attempts++;
-                                                        }
-                                                        final newBounds =
-                                                            BoardPanelBounds(
-                                                              x: baseX,
-                                                              y: baseY,
-                                                              width: size.width,
-                                                              height:
-                                                                  size.height,
-                                                            );
-                                                        final ts =
-                                                            DateTime.now()
-                                                                .microsecondsSinceEpoch;
-                                                        final newPanel =
-                                                            BoardPanelInstance(
-                                                              id: 'panel-$ts',
-                                                              type: typeId,
-                                                              title: title,
-                                                              bounds: newBounds,
-                                                              state: state,
-                                                              zIndex:
-                                                                  board.panels.fold<
-                                                                    int
-                                                                  >(
-                                                                    0,
-                                                                    (v, p) =>
-                                                                        p.zIndex >
-                                                                                v
-                                                                            ? p.zIndex
-                                                                            : v,
-                                                                  ) +
-                                                                  1,
-                                                            );
-                                                        await cubit.addPanel(
-                                                          newPanel,
-                                                        );
-                                                        await cubit.upsertLink(
-                                                          BoardPanelLink(
-                                                            id: 'link-$ts',
-                                                            fromPanelId:
-                                                                panel.id,
-                                                            toPanelId:
-                                                                newPanel.id,
-                                                            style:
-                                                                BoardLinkStyle
-                                                                    .arrow,
-                                                            behavior:
-                                                                BoardLinkBehavior
-                                                                    .dynamic,
-                                                            geometry:
-                                                                BoardLinkGeometry
-                                                                    .bezier,
-                                                          ),
-                                                        );
-                                                        return newPanel.id;
-                                                      },
-                                                      connectMode:
-                                                          _activeTool ==
-                                                          BoardToolId.connect,
-                                                      connectSourceId:
-                                                          _connectSourceId,
-                                                      onConnectTap:
-                                                          _activeTool ==
-                                                                  BoardToolId
-                                                                      .connect
-                                                              ? () =>
-                                                                  _handleConnectTap(
-                                                                    context,
-                                                                    activeBoard,
-                                                                    panel.id,
-                                                                  )
-                                                              : null,
-                                                    );
-                                                    if (isInCollapsedGroup) {
-                                                      return IgnorePointer(
-                                                        child: card,
-                                                      );
-                                                    }
-                                                    return card;
-                                                  }).toList();
-                                                })(),
+                                                BoardPanelLayer(
+                                                  board: activeBoard,
+                                                  canvasOrigin: _canvasOrigin,
+                                                  isCapturingScreenshot:
+                                                      _isCapturingScreenshot,
+                                                  preview:
+                                                      _isViewportInteracting,
+                                                  selectedPanelIds:
+                                                      selectedPanelIds.toSet(),
+                                                  activeTool: _activeTool,
+                                                  connectSourceId:
+                                                      _connectSourceId,
+                                                  onMovePanel:
+                                                      _movePanelWithEdgePan,
+                                                  onResizePanel:
+                                                      _resizePanelWithEdgePan,
+                                                  onDragStart:
+                                                      _handlePanelDragStart,
+                                                  onDragEnd: _handlePanelDragEnd,
+                                                  onConnectTap:
+                                                      _handleConnectTap,
+                                                ),
                                                 // ── Drawing layer (above panels visually;
                                                 //    only intercepts gestures on actual stroke
                                                 //    pixels via path-based hitTest) ──────────
@@ -1191,8 +886,9 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                   if (activeBoard.panels.isEmpty)
                                     BoardEmptyState(
                                       onAddNote:
-                                          () =>
-                                              _showMarkdownNoteDialog(context),
+                                          () => BoardPanelActions.showAddNoteDialog(
+                                            context,
+                                          ),
                                     ),
                                   if (!_isBoardOverviewOpen &&
                                       !_isCapturingScreenshot)
@@ -1294,7 +990,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                       !_showHistoryPanel,
                                             ),
                                         onAddNote:
-                                            () => _showMarkdownNoteDialog(
+                                            () => BoardPanelActions.showAddNoteDialog(
                                               context,
                                             ),
                                         onAddChat:
@@ -2905,319 +2601,6 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     );
     if (!context.mounted || shouldDelete != true) return;
     await context.read<BoardCubit>().deleteRemoteBoardOnServer(board.id);
-  }
-
-  VoidCallback? _editPanelCallback(
-    BuildContext context,
-    BoardPanelInstance panel,
-  ) {
-    if (panel.type == 'board.note.markdown') {
-      return () => _showMarkdownNoteDialog(context, panel: panel);
-    }
-    final plugin = BoardPluginRegistry.instance.pluginFor(panel.type);
-    if (plugin?.hasEditor != true) return null;
-    return () async {
-      await plugin!.showEditor(context, panel, (newState) {
-        context.read<BoardCubit>().updatePanel(
-          panel.id,
-          (p) => p.copyWith(state: newState),
-        );
-      });
-    };
-  }
-
-  Future<void> _showMarkdownNoteDialog(
-    BuildContext context, {
-    BoardPanelInstance? panel,
-  }) async {
-    final initialTitle = panel?.title ?? 'Note';
-    final initialMarkdown = panel?.state['markdown'] as String? ?? '';
-    Color? selectedColor = panel?.color;
-    final titleController = TextEditingController(text: initialTitle);
-    final markdownController = TextEditingController(text: initialMarkdown);
-    final result = await showAdaptiveYoloDialog<
-      ({String title, String markdown, Color? color})
-    >(
-      context: context,
-      builder: (dialogContext) {
-        var isPreview = false;
-        return AlertDialog(
-          title: Text(
-            panel == null ? 'Add markdown note' : 'Edit markdown note',
-          ),
-          content: SizedBox(
-            width: 760,
-            child: StatefulBuilder(
-              builder:
-                  (context, setDialogState) => Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      TextField(
-                        controller: titleController,
-                        decoration: const InputDecoration(labelText: 'Title'),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          MarkdownToolButton(
-                            icon: Icons.title,
-                            tooltip: 'Heading',
-                            onTap: () {
-                              prefixSelectedLines(markdownController, '# ');
-                              setDialogState(() {});
-                            },
-                          ),
-                          MarkdownToolButton(
-                            icon: Icons.format_bold,
-                            tooltip: 'Bold',
-                            onTap: () {
-                              wrapSelection(
-                                markdownController,
-                                before: '**',
-                                after: '**',
-                                placeholder: 'bold',
-                              );
-                              setDialogState(() {});
-                            },
-                          ),
-                          MarkdownToolButton(
-                            icon: Icons.format_italic,
-                            tooltip: 'Italic',
-                            onTap: () {
-                              wrapSelection(
-                                markdownController,
-                                before: '*',
-                                after: '*',
-                                placeholder: 'italic',
-                              );
-                              setDialogState(() {});
-                            },
-                          ),
-                          MarkdownToolButton(
-                            icon: Icons.format_list_bulleted,
-                            tooltip: 'Bullet list',
-                            onTap: () {
-                              prefixSelectedLines(markdownController, '- ');
-                              setDialogState(() {});
-                            },
-                          ),
-                          MarkdownToolButton(
-                            icon: Icons.check_box_outlined,
-                            tooltip: 'Checklist',
-                            onTap: () {
-                              prefixSelectedLines(markdownController, '- [ ] ');
-                              setDialogState(() {});
-                            },
-                          ),
-                          MarkdownToolButton(
-                            icon: Icons.link,
-                            tooltip: 'Link',
-                            onTap: () {
-                              wrapSelection(
-                                markdownController,
-                                before: '[',
-                                after: '](https://)',
-                                placeholder: 'text',
-                              );
-                              setDialogState(() {});
-                            },
-                          ),
-                          MarkdownToolButton(
-                            icon: Icons.code,
-                            tooltip: 'Code block',
-                            onTap: () {
-                              wrapSelection(
-                                markdownController,
-                                before: '```\n',
-                                after: '\n```',
-                                placeholder: 'code',
-                              );
-                              setDialogState(() {});
-                            },
-                          ),
-                          const Spacer(),
-                          InkWell(
-                            onTap: () async {
-                              final color = await _showInlineColorDialog(
-                                dialogContext,
-                                selectedColor,
-                              );
-                              if (color == null && !dialogContext.mounted) {
-                                return;
-                              }
-                              setDialogState(() {
-                                selectedColor = color;
-                              });
-                            },
-                            borderRadius: BorderRadius.circular(999),
-                            child: Container(
-                              width: 28,
-                              height: 28,
-                              decoration: BoxDecoration(
-                                color:
-                                    selectedColor ?? context.appColors.primary,
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: context.appColors.textPrimary
-                                      .withAlpha(90),
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          SegmentedButton<bool>(
-                            segments: const [
-                              ButtonSegment<bool>(
-                                value: false,
-                                icon: Icon(Icons.edit_outlined),
-                                label: Text('Write'),
-                              ),
-                              ButtonSegment<bool>(
-                                value: true,
-                                icon: Icon(Icons.preview_outlined),
-                                label: Text('Preview'),
-                              ),
-                            ],
-                            selected: {isPreview},
-                            onSelectionChanged: (selection) {
-                              setDialogState(() {
-                                isPreview = selection.first;
-                              });
-                            },
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Container(
-                        height: 360,
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          border: Border.all(
-                            color: Theme.of(context).dividerColor,
-                          ),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child:
-                            isPreview
-                                ? SingleChildScrollView(
-                                  padding: const EdgeInsets.all(16),
-                                  child: MarkdownBody(
-                                    data:
-                                        markdownController.text.isEmpty
-                                            ? '*Empty note*'
-                                            : markdownController.text,
-                                  ),
-                                )
-                                : TextField(
-                                  controller: markdownController,
-                                  expands: true,
-                                  minLines: null,
-                                  maxLines: null,
-                                  textAlignVertical: TextAlignVertical.top,
-                                  decoration: const InputDecoration(
-                                    border: InputBorder.none,
-                                    contentPadding: EdgeInsets.all(16),
-                                    hintText:
-                                        'Write your markdown note here...',
-                                  ),
-                                  onChanged: (_) => setDialogState(() {}),
-                                ),
-                      ),
-                    ],
-                  ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed:
-                  () => Navigator.of(dialogContext).pop((
-                    title: titleController.text.trim(),
-                    markdown: markdownController.text,
-                    color: selectedColor,
-                  )),
-              child: Text(panel == null ? 'Add' : 'Save'),
-            ),
-          ],
-        );
-      },
-    );
-    titleController.dispose();
-    markdownController.dispose();
-
-    if (!context.mounted || result == null) return;
-    final cubit = context.read<BoardCubit>();
-    if (panel == null) {
-      await cubit.createMarkdownNote(
-        title: result.title,
-        markdown: result.markdown,
-      );
-      final createdPanelId = cubit.state.activeBoard?.viewport.focusedPanelId;
-      if (result.color != null && createdPanelId != null) {
-        await cubit.updatePanelColor(createdPanelId, color: result.color);
-      }
-      return;
-    }
-    await cubit.updateMarkdownNote(
-      panel.id,
-      title: result.title,
-      markdown: result.markdown,
-    );
-    await cubit.updatePanelColor(panel.id, color: result.color);
-  }
-
-  Future<void> _showPanelColorDialog(
-    BuildContext context,
-    BoardPanelInstance panel,
-  ) async {
-    final color = await _showInlineColorDialog(context, panel.color);
-    if (!context.mounted) return;
-    await context.read<BoardCubit>().updatePanelColor(panel.id, color: color);
-  }
-
-  Future<Color?> _showInlineColorDialog(
-    BuildContext context,
-    Color? initialColor,
-  ) {
-    var selectedColor = initialColor ?? context.appColors.primary;
-    return showAdaptiveYoloDialog<Color?>(
-      context: context,
-      builder:
-          (dialogContext) => AlertDialog(
-            title: const Text('Panel color'),
-            content: SizedBox(
-              width: 420,
-              child: SingleChildScrollView(
-                child: ColorPicker(
-                  pickerColor: selectedColor,
-                  onColorChanged: (color) {
-                    selectedColor = color;
-                  },
-                  enableAlpha: false,
-                  displayThumbColor: true,
-                  portraitOnly: true,
-                ),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(null),
-                child: const Text('Reset'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(dialogContext).pop(selectedColor),
-                child: const Text('Apply'),
-              ),
-            ],
-          ),
-    );
   }
 
   Future<String?> _showTextDialog(

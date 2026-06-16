@@ -282,15 +282,10 @@ class BoardOffscreenRenderer {
       }
     }
 
-    // Final build, layout pass before we allow animations and decoders to settle.
-    buildOwner.buildScope(rootElement);
-    pipelineOwner.flushLayout();
-
-    // Give image decoders and AnimatedOpacity fade-in transitions (140ms)
-    // 300ms to completely finish and settle on the canvas.
-    await Future<void>.delayed(const Duration(milliseconds: 300));
-
-    // Final composite and paint pass immediately before capture.
+    // Final composite and paint pass immediately before capture. The adaptive
+    // polling above already debounced 200ms after the last active task, which
+    // is enough time for short fade-in transitions and image decoders to settle
+    // without an artificial fixed delay.
     buildOwner.buildScope(rootElement);
     pipelineOwner.flushLayout();
     pipelineOwner.flushCompositingBits();

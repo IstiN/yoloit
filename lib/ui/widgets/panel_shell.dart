@@ -109,7 +109,7 @@ class _PanelHeader extends StatelessWidget {
           // Collapse button
           if (onCollapse != null) ...[
             const SizedBox(width: 2),
-            _PanelHeaderBtn(
+            PanelActionBtn(
               icon: collapseIcon,
               tooltip: 'Collapse',
               onTap: onCollapse!,
@@ -119,7 +119,7 @@ class _PanelHeader extends StatelessWidget {
           // Close button
           if (onClose != null) ...[
             const SizedBox(width: 2),
-            _PanelHeaderBtn(
+            PanelActionBtn(
               icon: Icons.close,
               tooltip: 'Close',
               onTap: onClose!,
@@ -132,73 +132,20 @@ class _PanelHeader extends StatelessWidget {
   }
 }
 
-class _PanelHeaderBtn extends StatefulWidget {
-  const _PanelHeaderBtn({
-    required this.icon,
-    required this.tooltip,
-    required this.onTap,
-    required this.colors,
-  });
-
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onTap;
-  final AppColorScheme colors;
-
-  @override
-  State<_PanelHeaderBtn> createState() => _PanelHeaderBtnState();
-}
-
-class _PanelHeaderBtnState extends State<_PanelHeaderBtn> {
-  bool _hovering = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: widget.tooltip,
-      child: MouseRegion(
-        onEnter: (_) => setState(() => _hovering = true),
-        onExit: (_) => setState(() => _hovering = false),
-        child: GestureDetector(
-          onTap: widget.onTap,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 100),
-            width: 20,
-            height: 20,
-            decoration: BoxDecoration(
-              color:
-                  _hovering
-                      ? widget.colors.surfaceElevated
-                      : Colors.transparent,
-              borderRadius: BorderRadius.circular(3),
-            ),
-            child: Icon(
-              widget.icon,
-              size: 13,
-              color:
-                  _hovering
-                      ? widget.colors.textPrimary
-                      : widget.colors.textMuted,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// An action button suitable for use in PanelShell.actions.
+/// An action button suitable for use in PanelShell.actions or headers.
 class PanelActionBtn extends StatefulWidget {
   const PanelActionBtn({
     super.key,
     required this.icon,
     required this.tooltip,
     required this.onTap,
+    this.colors,
   });
 
   final IconData icon;
   final String tooltip;
   final VoidCallback onTap;
+  final AppColorScheme? colors;
 
   @override
   State<PanelActionBtn> createState() => _PanelActionBtnState();
@@ -209,7 +156,7 @@ class _PanelActionBtnState extends State<PanelActionBtn> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.appColors;
+    final colors = widget.colors ?? context.appColors;
     return Tooltip(
       message: widget.tooltip,
       child: MouseRegion(

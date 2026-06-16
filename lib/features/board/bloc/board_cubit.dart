@@ -2430,6 +2430,18 @@ class BoardCubit extends Cubit<BoardState> {
   String _nextId(String prefix) =>
       '$prefix-${DateTime.now().microsecondsSinceEpoch}';
 
+  /// Public API for external widgets (e.g. [BoardPanelLayer]) that need to
+  /// place a new panel without duplicating the search logic.
+  BoardPanelBounds nextAvailableBounds(
+    BoardDocument board, {
+    required double preferredWidth,
+    required double preferredHeight,
+  }) => _nextAvailableBounds(
+    board,
+    preferredWidth: preferredWidth,
+    preferredHeight: preferredHeight,
+  );
+
   BoardPanelBounds _nextAvailableBounds(
     BoardDocument board, {
     required double preferredWidth,
