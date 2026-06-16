@@ -18,7 +18,6 @@ class BoardPanelLayer extends StatelessWidget {
     required this.board,
     required this.canvasOrigin,
     required this.isCapturingScreenshot,
-    required this.preview,
     required this.selectedPanelIds,
     required this.activeTool,
     required this.connectSourceId,
@@ -32,7 +31,6 @@ class BoardPanelLayer extends StatelessWidget {
   final BoardDocument board;
   final Offset canvasOrigin;
   final bool isCapturingScreenshot;
-  final bool preview;
   final Set<String> selectedPanelIds;
   final BoardToolId activeTool;
   final String? connectSourceId;
@@ -73,7 +71,6 @@ class BoardPanelLayer extends StatelessWidget {
               capturingScreenshot: isCapturingScreenshot,
               selected:
                   !isInCollapsedGroup && selectedPanelIds.contains(panel.id),
-              preview: preview,
               onTap: () => boardCubit.focusPanel(panel.id),
               onMove: (details) => onMovePanel(context, panel.id, details),
               onResize: (update) => onResizePanel(context, panel, update),

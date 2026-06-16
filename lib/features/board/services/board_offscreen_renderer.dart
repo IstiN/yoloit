@@ -212,7 +212,11 @@ class BoardOffscreenRenderer {
                       color: colors.textSecondary,
                       size: 14,
                     ),
-                    child: child,
+                    // Disable text selection in headless snapshots: SelectionArea
+                    // registers async selection updates that can call
+                    // findRenderObject() after the tree is finalized, causing
+                    // "inactive element" exceptions.
+                    child: SelectionContainer.disabled(child: child),
                   ),
                 ),
               ),

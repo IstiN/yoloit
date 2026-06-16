@@ -672,8 +672,6 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                   canvasOrigin: _canvasOrigin,
                                                   isCapturingScreenshot:
                                                       _isCapturingScreenshot,
-                                                  preview:
-                                                      _isViewportInteracting,
                                                   selectedPanelIds:
                                                       selectedPanelIds.toSet(),
                                                   activeTool: _activeTool,

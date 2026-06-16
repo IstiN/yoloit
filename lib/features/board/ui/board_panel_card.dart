@@ -87,7 +87,6 @@ class BoardPanelCard extends StatefulWidget {
     this.onConnectTap,
     this.capturingScreenshot = false,
     this.selected = false,
-    this.preview = false,
   });
 
   final BoardPanelInstance panel;
@@ -114,7 +113,6 @@ class BoardPanelCard extends StatefulWidget {
   final VoidCallback? onConnectTap;
   final bool capturingScreenshot;
   final bool selected;
-  final bool preview;
 
   @override
   State<BoardPanelCard> createState() => BoardPanelCardState();
@@ -603,10 +601,7 @@ class BoardPanelCardState extends State<BoardPanelCard>
                                               panel.type == 'board.webpage'
                                           ? EdgeInsets.zero
                                           : const EdgeInsets.all(12),
-                                  child:
-                                      widget.preview
-                                          ? _buildPreviewContent(context, panel)
-                                          : _buildPanelContent(context, panel),
+                                  child: _buildPanelContent(context, panel),
                                 ),
                               ),
                             ],
@@ -816,40 +811,6 @@ class BoardPanelCardState extends State<BoardPanelCard>
     // Fallback for unknown types
     return Center(
       child: Text('Unknown: ${panel.type}'),
-    );
-  }
-
-  /// Cheap placeholder shown during canvas pan/zoom to avoid re-rendering
-  /// heavy plugin content (terminals, chats, webviews) on every frame.
-  Widget _buildPreviewContent(BuildContext context, BoardPanelInstance panel) {
-    final colors = context.appColors;
-    final plugin = BoardPluginRegistry.instance.pluginFor(panel.type);
-    final icon = plugin?.icon ?? Icons.widgets_outlined;
-    return DecoratedBox(
-      decoration: BoxDecoration(color: colors.surface),
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: colors.textMuted, size: 24),
-            const SizedBox(height: 8),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Text(
-                panel.title,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: colors.textSecondary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
