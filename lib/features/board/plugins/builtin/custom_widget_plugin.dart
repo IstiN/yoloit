@@ -168,7 +168,9 @@ class _CustomWidgetContentState extends State<_CustomWidgetContent> {
   void dispose() {
     HeadlessRenderRegistry.activeTasks.remove('widget:${widget.panel.id}');
     ThemeManager.instance.removeListener(_onThemeChanged);
-    WidgetEngineManager.instance.detach(widget.panel.id);
+    // Fully dispose the JS engine so setInterval / requestAnimationFrame timers
+    // do not keep ticking after the panel leaves the tree (e.g. board switch).
+    WidgetEngineManager.instance.remove(widget.panel.id);
     super.dispose();
   }
 

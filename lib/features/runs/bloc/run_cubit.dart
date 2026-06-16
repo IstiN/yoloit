@@ -46,13 +46,27 @@ class RunCubit extends Cubit<RunState> {
       ),
     );
 
-    // Reconnect to any sessions that were running when the app last closed
+    // Stop tailing log files for sessions that are no longer part of this
+    // workspace so switching boards/workspaces does not leave background
+    // pollers burning CPU for invisible sessions.
+    final newSessionIds = savedSessions.map((s) => s.id).toSet();
+    final pausedSessionIds = <String>{};
+    for (final sessionId in RunService.instance.activeSessionIds) {
+      if (!newSessionIds.contains(sessionId)) {
+        RunService.instance.pausePolling(sessionId);
+        pausedSessionIds.add(sessionId);
+      }
+    }
+
+    // Reconnect to any sessions that were running when the app last closed.
+    // Skip sessions that are already being polled to avoid duplicate timers.
     for (final session in savedSessions.where(
-      (s) => s.status == RunStatus.running,
+      (s) => s.status == RunStatus.running && !RunService.instance.isRunning(s.id),
     )) {
       final alive = await RunService.instance.reconnect(
         sessionId: session.id,
         configId: session.config.id,
+        fromStart: !pausedSessionIds.contains(session.id),
         onOutput: (line, isError) => _appendOutput(session.id, line, isError),
         onExit: (code) => _onExit(session.id, code),
       );
@@ -275,6 +289,13 @@ class RunCubit extends Cubit<RunState> {
   }
 
   void _appendOutput(String sessionId, String line, bool isError) {
+    // Ignore output for sessions that no longer belong to the active workspace.
+    if (!state.sessions.any((s) => s.id == sessionId)) {
+      _flushTimers.remove(sessionId)?.cancel();
+      _pendingOutput.remove(sessionId);
+      return;
+    }
+
     final pending = _pendingOutput.putIfAbsent(sessionId, () => <RunOutputLine>[]);
     pending.add(RunOutputLine(text: line, isError: isError, timestamp: DateTime.now()));
 
@@ -306,6 +327,11 @@ class RunCubit extends Cubit<RunState> {
   }
 
   void _onExit(String sessionId, int code) {
+    if (!state.sessions.any((s) => s.id == sessionId)) {
+      _flushTimers.remove(sessionId)?.cancel();
+      _pendingOutput.remove(sessionId);
+      return;
+    }
     _flushOutput(sessionId);
     final exitLine = RunOutputLine(
       text: '\n[Process exited with code $code]',

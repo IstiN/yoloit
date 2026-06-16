@@ -179,6 +179,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    _cancelBgCapture = true;
     _stopPanAnimation();
     _transformController.removeListener(_scheduleCanvasExpansionIfNeeded);
     _panController.dispose();
@@ -1341,14 +1342,19 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
             .toList();
     if (missing.isEmpty) return;
 
+    final cancelToken = CancelToken();
     _boardOverviewLog('offscreen.start count=${missing.length}');
     final watch = Stopwatch()..start();
     for (final board in missing) {
-      if (!mounted) break;
+      if (!mounted || _cancelBgCapture) {
+        cancelToken.cancel();
+        break;
+      }
       final png = await BoardOffscreenRenderer.instance.renderBoard(
         board,
         size: const Size(480, 320),
         pixelRatio: 1.0,
+        cancelToken: cancelToken,
       );
       if (png != null && mounted) {
         _boardPreviewPngs[board.id] = png;
@@ -1370,11 +1376,13 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
             .toList();
     if (toCapture.isEmpty) return;
 
+    final cancelToken = CancelToken();
     _boardOverviewLog('bgCapture.start count=${toCapture.length} (offscreen)');
     final watch = Stopwatch()..start();
 
     for (final board in toCapture) {
       if (_cancelBgCapture || !mounted || !_isBoardOverviewOpen) {
+        cancelToken.cancel();
         _boardOverviewLog('bgCapture.canceled loop broken (transition active)');
         break;
       }
@@ -1384,8 +1392,12 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
         _boardOverviewLog(
           'bgCapture.render board=${board.id} (${board.name}) started',
         );
-        final png = await BoardOffscreenRenderer.instance.renderBoard(board);
+        final png = await BoardOffscreenRenderer.instance.renderBoard(
+          board,
+          cancelToken: cancelToken,
+        );
         if (_cancelBgCapture || !mounted || !_isBoardOverviewOpen) {
+          cancelToken.cancel();
           _boardOverviewLog(
             'bgCapture.render board=${board.id} completed but discarded (transition active)',
           );

@@ -137,6 +137,7 @@ class RunService {
     required String configId,
     required OutputCallback onOutput,
     required ExitCallback onExit,
+    bool fromStart = true,
   }) async {
     if (Platform.isWindows) return false;
     final name = tmuxName(configId);
@@ -145,7 +146,7 @@ class RunService {
     _sessionTmux[sessionId] = name;
     final log = await logPath(configId);
     await _tailLog(
-      sessionId: sessionId, log: log, fromStart: true,
+      sessionId: sessionId, log: log, fromStart: fromStart,
       onOutput: onOutput, onExit: onExit,
     );
     return true;
@@ -180,6 +181,10 @@ class RunService {
     }
     _logFiles[sessionId] = raf;
     _lineBuffers[sessionId] = '';
+
+    // Cancel any existing poller/RAF for this session so reconnects do not leak
+    // timers that keep reading the same log file in parallel.
+    _pollers.remove(sessionId)?.cancel();
 
     _pollers[sessionId] = Timer.periodic(
       const Duration(milliseconds: 50),
@@ -233,6 +238,19 @@ class RunService {
   }
 
   bool isRunning(String sessionId) => _pollers.containsKey(sessionId);
+
+  /// All session IDs that currently have an active log poller.
+  Set<String> get activeSessionIds => Set<String>.from(_pollers.keys);
+
+  /// Stop polling the log file for [sessionId] without killing the underlying
+  /// tmux session. Used when the user switches to a workspace where this
+  /// session is no longer visible, so we do not waste CPU tailing its output.
+  void pausePolling(String sessionId) {
+    _pollers.remove(sessionId)?.cancel();
+    _logFiles.remove(sessionId)?.close();
+    _lineBuffers.remove(sessionId);
+    // Keep _sessionTmux entry so the tmux session remains alive.
+  }
 
   void _cleanup(String sessionId) {
     _pollers.remove(sessionId)?.cancel();

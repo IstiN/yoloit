@@ -13,6 +13,13 @@ import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
 import 'package:yoloit/features/board/ui/board_overview_preview.dart';
 
+/// Cooperative cancellation token for long-running offscreen renders.
+class CancelToken {
+  bool _cancelled = false;
+  void cancel() => _cancelled = true;
+  bool get isCancelled => _cancelled;
+}
+
 /// Renders a [BoardDocument] to a PNG image offscreen, without needing the
 /// board to be mounted in the live widget tree.
 ///
@@ -29,10 +36,13 @@ class BoardOffscreenRenderer {
   /// Render [board] to PNG at the given [size] and [pixelRatio].
   ///
   /// Returns null if the board has no visible panels or rendering fails.
+  /// Pass [cancelToken] to abort early when the user switches boards or closes
+  /// the overview, preventing wasted CPU cycles.
   Future<Uint8List?> renderBoard(
     BoardDocument board, {
     Size size = const Size(1400, 900),
     double pixelRatio = 1.5,
+    CancelToken? cancelToken,
   }) async {
     final panels = board.panels.where((p) => !p.hidden).toList();
     if (panels.isEmpty) return null;
@@ -58,6 +68,7 @@ class BoardOffscreenRenderer {
         _buildBoardPreview(board, headlessCubit, theme, colors),
         size,
         pixelRatio,
+        cancelToken: cancelToken,
       ),
     );
   }
@@ -69,6 +80,7 @@ class BoardOffscreenRenderer {
     BoardDocument board,
     BoardPanelInstance panel, {
     double pixelRatio = 2.0,
+    CancelToken? cancelToken,
   }) async {
     final theme = ThemeManager.instance.theme;
     final colors =
@@ -89,6 +101,7 @@ class BoardOffscreenRenderer {
         _buildPanelPreview(board, panel, headlessCubit, theme, colors),
         panelSize,
         pixelRatio,
+        cancelToken: cancelToken,
       ),
     );
   }
@@ -231,8 +244,9 @@ class BoardOffscreenRenderer {
   Future<Uint8List?> _renderWidgetToImage(
     Widget widget,
     Size size,
-    double pixelRatio,
-  ) async {
+    double pixelRatio, {
+    CancelToken? cancelToken,
+  }) async {
     final repaintBoundary = RenderRepaintBoundary();
 
     // RenderView needs a FlutterView.
@@ -271,10 +285,17 @@ class BoardOffscreenRenderer {
     var emptyTurns = 0;
 
     while (watch.elapsedMilliseconds < 15000) {
+      if (cancelToken?.isCancelled ?? false) {
+        break;
+      }
       buildOwner.buildScope(rootElement);
       pipelineOwner.flushLayout();
 
       await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      if (cancelToken?.isCancelled ?? false) {
+        break;
+      }
 
       if (HeadlessRenderRegistry.activeTasks.isEmpty) {
         emptyTurns++;
@@ -284,6 +305,11 @@ class BoardOffscreenRenderer {
       } else {
         emptyTurns = 0;
       }
+    }
+
+    if (cancelToken?.isCancelled ?? false) {
+      buildOwner.finalizeTree();
+      return null;
     }
 
     // Final composite and paint pass immediately before capture. The adaptive
