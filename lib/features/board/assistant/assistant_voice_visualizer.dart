@@ -39,8 +39,8 @@ class _AssistantVoiceVisualizerState extends State<AssistantVoiceVisualizer>
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: _duration)
-      ..repeat();
+    _controller = AnimationController(vsync: this, duration: _duration);
+    _startIfNeeded();
   }
 
   @override
@@ -48,8 +48,19 @@ class _AssistantVoiceVisualizerState extends State<AssistantVoiceVisualizer>
     super.didUpdateWidget(old);
     if (old.state != widget.state) {
       _controller.duration = _duration;
-      if (!_controller.isAnimating) _controller.repeat();
+      _startIfNeeded();
     }
+  }
+
+  void _startIfNeeded() {
+    // Idle state shows a static frame; animating it wastes GPU/battery when
+    // the assistant panel is open but not actively listening/speaking.
+    if (widget.state == VoiceVisualizerState.idle) {
+      _controller.stop();
+      _controller.value = 0;
+      return;
+    }
+    if (!_controller.isAnimating) _controller.repeat();
   }
 
   Duration get _duration {

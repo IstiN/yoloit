@@ -347,6 +347,10 @@ class YoloBadgeWithChatState extends State<YoloBadgeWithChat>
                 : _lastUserMessage);
     return YoloVoiceOverlay(
       status: _voiceOverlayHidden ? 'idle' : _assistantStatus,
+      // Animate only when the overlay is actually visible and active.
+      // The idle orb loop would otherwise run continuously in the background
+      // and waste GPU/battery.
+      animate: !_voiceOverlayHidden && _assistantStatus != 'idle',
       title: _voiceOverlayTitle,
       hint: _voiceOverlayHint,
       transcript: transcript,
