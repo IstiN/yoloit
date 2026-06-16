@@ -780,7 +780,7 @@ class _ResponseCardState extends State<_ResponseCard>
   /// Fade-in controller: animates 0→1 when streaming stops.
   late final AnimationController _crossfadeAnim;
   late final ScrollController _scrollCtrl;
-  int _visibleChars = 0;
+  final _visibleChars = ValueNotifier<int>(0);
   String _lastResponse = '';
   bool _isCrossfading = false;
 
@@ -805,7 +805,7 @@ class _ResponseCardState extends State<_ResponseCard>
     });
 
     _lastResponse = widget.response;
-    _visibleChars = widget.streaming ? 0 : widget.response.length;
+    _visibleChars.value = widget.streaming ? 0 : widget.response.length;
     _typingAnim = AnimationController(
       vsync: this,
       duration: Duration(
@@ -815,13 +815,13 @@ class _ResponseCardState extends State<_ResponseCard>
     if (widget.streaming && widget.animate && widget.response.isNotEmpty) {
       _typingAnim.forward();
     }
-    _typingAnim.addListener(_updateVisibleChars);
+    _typingAnim.addListener(_onTypingTick);
   }
 
-  void _updateVisibleChars() {
+  void _onTypingTick() {
     final target = (_typingAnim.value * _lastResponse.length).round();
-    if (target != _visibleChars) {
-      setState(() => _visibleChars = target);
+    if (target != _visibleChars.value) {
+      _visibleChars.value = target;
     }
   }
 
@@ -851,7 +851,7 @@ class _ResponseCardState extends State<_ResponseCard>
     if (widget.response != old.response) {
       _lastResponse = widget.response;
       if (widget.streaming && widget.animate) {
-        final oldLen = _visibleChars;
+        final oldLen = _visibleChars.value;
         _typingAnim.dispose();
         _typingAnim = AnimationController(
           vsync: this,
@@ -866,14 +866,14 @@ class _ResponseCardState extends State<_ResponseCard>
             0.99,
           ),
         );
-        _typingAnim.addListener(_updateVisibleChars);
+        _typingAnim.addListener(_onTypingTick);
         _typingAnim.forward();
       } else {
-        _visibleChars = widget.response.length;
+        _visibleChars.value = widget.response.length;
       }
     }
     if (!widget.streaming) {
-      _visibleChars = widget.response.length;
+      _visibleChars.value = widget.response.length;
     }
     // Auto-scroll to bottom when new tool log lines are added
     if (widget.response.length > old.response.length) {
@@ -895,6 +895,7 @@ class _ResponseCardState extends State<_ResponseCard>
     _borderAnim.dispose();
     _typingAnim.dispose();
     _crossfadeAnim.dispose();
+    _visibleChars.dispose();
     _scrollCtrl.dispose();
     super.dispose();
   }
@@ -916,12 +917,6 @@ class _ResponseCardState extends State<_ResponseCard>
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    final displayText = _displayText(
-      widget.response,
-      streaming: widget.streaming,
-      visibleChars: _visibleChars,
-    );
-    final hasMermaid = displayText.contains('```mermaid');
     return LayoutBuilder(
       builder: (context, constraints) {
         // Total available height (bounded by parent ConstrainedBox, e.g. 170px).
@@ -933,24 +928,39 @@ class _ResponseCardState extends State<_ResponseCard>
         // ↑ 40 = AnimatedContainer padding (20 top + 20 bottom)
 
         // Build the content body, optionally with fade-in animation on final answer.
-        final newBody = _buildContentBody(displayText, hasMermaid, contentMaxH);
-        final body =
-            _isCrossfading
-                ? AnimatedBuilder(
-                  animation: _crossfadeAnim,
-                  builder: (context, child) {
-                    final t = Curves.easeOut.transform(_crossfadeAnim.value);
-                    return Opacity(
-                      opacity: t,
-                      child: Transform.translate(
-                        offset: Offset(0, (1.0 - t) * 12),
-                        child: child,
-                      ),
-                    );
-                  },
-                  child: newBody,
-                )
-                : newBody;
+        // Use ValueListenableBuilder so typing animation only rebuilds the body,
+        // not the whole card.
+        final body = ValueListenableBuilder<int>(
+          valueListenable: _visibleChars,
+          builder: (context, visibleChars, child) {
+            final displayText = _displayText(
+              widget.response,
+              streaming: widget.streaming,
+              visibleChars: visibleChars,
+            );
+            final hasMermaid = displayText.contains('```mermaid');
+            final newBody = _buildContentBody(
+              displayText,
+              hasMermaid,
+              contentMaxH,
+            );
+            if (!_isCrossfading) return newBody;
+            return AnimatedBuilder(
+              animation: _crossfadeAnim,
+              builder: (context, child) {
+                final t = Curves.easeOut.transform(_crossfadeAnim.value);
+                return Opacity(
+                  opacity: t,
+                  child: Transform.translate(
+                    offset: Offset(0, (1.0 - t) * 12),
+                    child: child,
+                  ),
+                );
+              },
+              child: newBody,
+            );
+          },
+        );
 
         // Column(mainAxisSize.min) shrinks to content.
         // AnimatedContainer contains ConstrainedBox(maxH=contentMaxH) + CustomScrollView(shrinkWrap).

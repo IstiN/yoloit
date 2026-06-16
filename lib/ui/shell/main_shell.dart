@@ -986,16 +986,16 @@ class _TitleBar extends StatelessWidget {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  colors.surface.withOpacity(0.12),
-                  colors.surface.withOpacity(0.32),
+                  colors.surface.withAlpha(31),
+                  colors.surface.withAlpha(82),
                 ],
               ),
               border: Border(
-                bottom: BorderSide(color: colors.border.withOpacity(0.65)),
+                bottom: BorderSide(color: colors.border.withAlpha(166)),
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.18),
+                  color: Colors.black.withAlpha(46),
                   blurRadius: 12,
                   offset: const Offset(0, 3),
                 ),
@@ -1075,13 +1075,13 @@ class _PanelToggleButtonState extends State<_PanelToggleButton> {
               height: 28,
               decoration: BoxDecoration(
                 color: widget.active
-                    ? colors.primary.withOpacity(0.18)
+                    ? colors.primary.withAlpha(46)
                     : _hovered
-                        ? colors.surfaceHighlight.withOpacity(0.6)
+                        ? colors.surfaceHighlight.withAlpha(153)
                         : Colors.transparent,
                 borderRadius: BorderRadius.circular(8),
                 border: widget.active
-                    ? Border.all(color: colors.primary.withOpacity(0.25))
+                    ? Border.all(color: colors.primary.withAlpha(64))
                     : null,
               ),
               child: Icon(
@@ -1291,9 +1291,9 @@ class _ResourceChipState extends State<_ResourceChip> {
         height: 24,
         padding: const EdgeInsets.symmetric(horizontal: 10),
         decoration: BoxDecoration(
-          color: colors.surface.withOpacity(0.5),
+          color: colors.surface.withAlpha(128),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: colors.border.withOpacity(0.6)),
+          border: Border.all(color: colors.border.withAlpha(153)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
