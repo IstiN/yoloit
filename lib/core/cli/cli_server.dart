@@ -25,6 +25,7 @@ import 'package:yoloit/core/cli/handlers/voice_settings_handler.dart';
 import 'package:yoloit/core/cli/handlers/widgets_handler.dart';
 import 'package:yoloit/core/cli/handlers/yolo_chat_handler.dart';
 import 'package:yoloit/core/cli/panel_cli_handler.dart';
+import 'package:yoloit/core/theme/theme_manager.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/chat/chat_panel_plugin.dart';
 import 'package:yoloit/features/board/chat/yoloit_cli_tools.dart';
@@ -35,6 +36,7 @@ import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
 import 'package:yoloit/features/board/plugins/builtin/playlist_player_registry.dart';
 import 'package:yoloit/features/board/plugins/builtin/timer_manager.dart';
 import 'package:yoloit/features/board/services/board_offscreen_renderer.dart';
+import 'package:yoloit/features/board/services/board_preview_cache.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_panel_plugin.dart';
 import 'package:yoloit/features/board/widgets/widget_engine_manager.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_cubit.dart';
@@ -712,13 +714,11 @@ class CliServer {
     }
 
     // Also save to the preview cache directory for the overview.
-    try {
-      final cacheDir = Directory(
-        '${Directory.systemTemp.path}/yoloit_board_previews',
-      );
-      if (!cacheDir.existsSync()) cacheDir.createSync(recursive: true);
-      File('${cacheDir.path}/${board.id}.png').writeAsBytesSync(png);
-    } catch (_) {}
+    final theme = ThemeManager.instance;
+    final themeKey =
+        '${theme.current.name}:${theme.brightness.name}:'
+        '${theme.activeCustomThemeId ?? ''}';
+    BoardPreviewCache.instance.save(board, png, themeKey: themeKey);
 
     return shelf.Response.ok(png, headers: {'content-type': 'image/png'});
   }

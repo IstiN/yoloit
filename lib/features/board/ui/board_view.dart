@@ -12,12 +12,14 @@ import 'package:yoloit/core/remote/board_share_server.dart';
 import 'package:yoloit/core/remote/yoloit_remote_client.dart';
 import 'package:yoloit/core/services/support_log_service.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/core/theme/theme_manager.dart';
 import 'package:yoloit/core/ui/adaptive_dialog.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/bloc/board_state.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/builtin/webpage_plugin.dart';
 import 'package:yoloit/features/board/services/board_offscreen_renderer.dart';
+import 'package:yoloit/features/board/services/board_preview_cache.dart';
 import 'package:yoloit/features/board/tools/board_tool.dart';
 import 'package:yoloit/features/board/ui/board_constants.dart';
 import 'package:yoloit/features/board/ui/board_drawing_widgets.dart';
@@ -111,11 +113,13 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   bool _showToolsPanel = true;
   bool _showHistoryPanel = false;
   bool _isBoardOverviewOpen = false;
+  bool _isOpeningBoardOverview = false;
   bool _cancelBgCapture = false;
   bool _boardSwitchPreviewVisible = false;
   BoardDocument? _boardSwitchPreviewBoard;
   Uint8List? _boardSwitchPreviewPng;
   final Map<String, Uint8List> _boardPreviewPngs = {};
+  final BoardPreviewCache _previewCache = BoardPreviewCache.instance;
 
   /// When true, panel chrome (borders, accents, sidebar, minimap) is hidden
   /// to produce a clean screenshot without purple-tinted decorations.
@@ -1285,6 +1289,9 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
       );
       return;
     }
+    final board = context.read<BoardCubit>().state.boards.firstWhere(
+      (candidate) => candidate.id == boardId,
+    );
     setState(() {
       _boardPreviewPngs[boardId] = bytes;
     });
@@ -1292,37 +1299,23 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
       'capture.stored board=$boardId elapsed=${watch.elapsedMilliseconds}ms',
     );
     // Persist to disk so previews survive hot restart.
-    _saveBoardPreviewPngToDisk(boardId, bytes);
+    _previewCache.save(board, bytes, themeKey: _previewThemeKey);
   }
 
-  static Directory get _previewCacheDir {
-    final dir = Directory('${Directory.systemTemp.path}/yoloit_board_previews');
-    if (!dir.existsSync()) dir.createSync(recursive: true);
-    return dir;
-  }
-
-  static File _previewFile(String boardId) =>
-      File('${_previewCacheDir.path}/$boardId.png');
-
-  void _saveBoardPreviewPngToDisk(String boardId, Uint8List bytes) {
-    try {
-      _previewFile(boardId).writeAsBytesSync(bytes);
-    } catch (_) {
-      // Best-effort — don't crash if disk write fails.
-    }
+  String get _previewThemeKey {
+    final theme = ThemeManager.instance;
+    return '${theme.current.name}:${theme.brightness.name}:'
+        '${theme.activeCustomThemeId ?? ''}';
   }
 
   void _loadBoardPreviewPngsFromDisk() {
     final boards = context.read<BoardCubit>().state.boards;
     for (final board in boards) {
-      if (_boardPreviewPngs.containsKey(board.id)) continue;
-      final file = _previewFile(board.id);
-      if (file.existsSync()) {
-        try {
-          _boardPreviewPngs[board.id] = file.readAsBytesSync();
-        } catch (_) {
-          // Ignore corrupt/unreadable files.
-        }
+      final bytes = _previewCache.loadPng(board, themeKey: _previewThemeKey);
+      if (bytes != null) {
+        _boardPreviewPngs[board.id] = bytes;
+      } else {
+        _boardPreviewPngs.remove(board.id);
       }
     }
   }
@@ -1337,7 +1330,9 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
         allBoards
             .where(
               (b) =>
-                  !_boardPreviewPngs.containsKey(b.id) && b.id != activeBoardId,
+                  b.id != activeBoardId &&
+                  !_boardPreviewPngs.containsKey(b.id) &&
+                  !_previewCache.isFresh(b, themeKey: _previewThemeKey),
             )
             .toList();
     if (missing.isEmpty) return;
@@ -1345,8 +1340,9 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     final cancelToken = CancelToken();
     _boardOverviewLog('offscreen.start count=${missing.length}');
     final watch = Stopwatch()..start();
+    final captured = <String, Uint8List>{};
     for (final board in missing) {
-      if (!mounted || _cancelBgCapture) {
+      if (!mounted || _cancelBgCapture || !_isBoardOverviewOpen) {
         cancelToken.cancel();
         break;
       }
@@ -1356,9 +1352,15 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
         pixelRatio: 1.0,
         cancelToken: cancelToken,
       );
-      if (png != null && mounted) {
-        _boardPreviewPngs[board.id] = png;
+      if (png != null) {
+        captured[board.id] = png;
+        _previewCache.save(board, png, themeKey: _previewThemeKey);
       }
+    }
+    if (captured.isNotEmpty && mounted && _isBoardOverviewOpen) {
+      setState(() {
+        _boardPreviewPngs.addAll(captured);
+      });
     }
     _boardOverviewLog(
       'offscreen.done count=${missing.length} elapsed=${watch.elapsedMilliseconds}ms',
@@ -1372,7 +1374,12 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     final allBoards = context.read<BoardCubit>().state.boards;
     final toCapture =
         allBoards
-            .where((b) => b.id != activeBoardId && b.panels.isNotEmpty)
+            .where(
+              (b) =>
+                  b.id != activeBoardId &&
+                  b.panels.isNotEmpty &&
+                  !_previewCache.isFresh(b, themeKey: _previewThemeKey),
+            )
             .toList();
     if (toCapture.isEmpty) return;
 
@@ -1406,7 +1413,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
         }
         if (png != null) {
           captured[board.id] = png;
-          _saveBoardPreviewPngToDisk(board.id, png);
+          _previewCache.save(board, png, themeKey: _previewThemeKey);
           _boardOverviewLog(
             'bgCapture.captured board=${board.id} bytes=${png.length} elapsed=${boardWatch.elapsedMilliseconds}ms',
           );
@@ -1431,47 +1438,71 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     _boardOverviewLog('bgCapture.done elapsed=${watch.elapsedMilliseconds}ms');
   }
 
+  Future<void> _warmBoardPreviewCaptures(String activeBoardId) async {
+    try {
+      final boards = context.read<BoardCubit>().state.boards;
+      final activeBoard = boards.firstWhere((board) => board.id == activeBoardId);
+      if (!_previewCache.isFresh(activeBoard, themeKey: _previewThemeKey)) {
+        await _captureBoardPreviewPng(activeBoardId);
+      }
+      if (!mounted || _cancelBgCapture || !_isBoardOverviewOpen) return;
+
+      await _generateMissingBoardPreviews(activeBoardId);
+      if (!mounted || _cancelBgCapture || !_isBoardOverviewOpen) return;
+
+      await _refreshBoardPreviewsInBackground(activeBoardId);
+    } catch (error, stackTrace) {
+      _boardOverviewLog('warmPreviews.error $error');
+      assert(() {
+        debugPrintStack(stackTrace: stackTrace);
+        return true;
+      }());
+    }
+  }
+
   Future<void> _openBoardOverview(BoardDocument activeBoard) async {
+    if (_isBoardOverviewOpen || _isOpeningBoardOverview) {
+      _boardOverviewLog(
+        'open.skip board=${activeBoard.id} '
+        'open=$_isBoardOverviewOpen opening=$_isOpeningBoardOverview',
+      );
+      return;
+    }
+
     final watch = Stopwatch()..start();
+    _isOpeningBoardOverview = true;
     _boardOverviewLog(
       'open.request board=${activeBoard.id} boards=${context.read<BoardCubit>().state.boards.length}',
     );
-    try {
-      await context.read<BoardCubit>().refreshRemoteBoards();
-    } catch (error) {
-      _boardOverviewLog('open.remoteRefresh.error $error');
-    }
-    if (!mounted) return;
-    // Load real cached PNGs from disk (from previous CLI captures or sessions).
-    _loadBoardPreviewPngsFromDisk();
-    if (!widget.skipOverviewPreviewCapture) {
-      // Capture a real screenshot of the active board.
-      await _captureBoardPreviewPng(activeBoard.id);
-      if (!mounted) return;
-    }
 
-    // Generate synthetic previews for boards still missing a PNG
-    // (instant — just canvas drawing, no widget rendering).
-    if (!widget.skipOverviewPreviewCapture) {
-      await _generateMissingBoardPreviews(activeBoard.id);
-      if (!mounted) return;
-    }
+    unawaited(
+      context.read<BoardCubit>().refreshRemoteBoards().catchError((
+        Object error,
+      ) {
+        _boardOverviewLog('open.remoteRefresh.error $error');
+      }),
+    );
+
+    _loadBoardPreviewPngsFromDisk();
 
     _boardOverviewLog(
       'open.showOverlay board=${activeBoard.id} elapsed=${watch.elapsedMilliseconds}ms',
     );
+    if (!mounted) {
+      _isOpeningBoardOverview = false;
+      return;
+    }
+
     setState(() {
       _isBoardOverviewOpen = true;
       _cancelBgCapture = false;
       _connectSourceId = null;
       _connectPreviewPointer = null;
     });
+    _isOpeningBoardOverview = false;
 
-    // Refresh previews with real screenshots in the background.
-    // The overview is already visible with synthetic/cached previews —
-    // as each real screenshot arrives, the card updates live.
     if (!widget.skipOverviewPreviewCapture) {
-      _refreshBoardPreviewsInBackground(activeBoard.id);
+      unawaited(_warmBoardPreviewCaptures(activeBoard.id));
     }
   }
 
