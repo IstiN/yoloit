@@ -409,17 +409,17 @@ jobs:
           fi
           MANIFEST_NAME="latest-mac-${MANIFEST_ARCH}.yml"
           RELEASE_DATE=$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")
-          cat > "$MANIFEST_NAME" <<EOF
-version: ${VERSION}
-files:
-  - url: ${ZIP_NAME}
-    sha512: ${SHA512}
-    size: ${SIZE}
-    arch: ${MANIFEST_ARCH}
-path: ${ZIP_NAME}
-sha512: ${SHA512}
-releaseDate: '${RELEASE_DATE}'
-EOF
+          printf '%s\n' \
+            "version: ${VERSION}" \
+            "files:" \
+            "  - url: ${ZIP_NAME}" \
+            "    sha512: ${SHA512}" \
+            "    size: ${SIZE}" \
+            "    arch: ${MANIFEST_ARCH}" \
+            "path: ${ZIP_NAME}" \
+            "sha512: ${SHA512}" \
+            "releaseDate: '${RELEASE_DATE}'" \
+            > "$MANIFEST_NAME"
           echo "zip_name=$ZIP_NAME" >> $GITHUB_OUTPUT
           echo "manifest_name=$MANIFEST_NAME" >> $GITHUB_OUTPUT
 
