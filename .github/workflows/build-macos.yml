@@ -398,6 +398,31 @@ jobs:
 
           echo "dmg_name=$DMG_NAME" >> $GITHUB_OUTPUT
 
+          ZIP_NAME="yoloit-macos-${ARCH}-${VERSION}-mac.zip"
+          echo "Packaging ZIP for auto-update: $ZIP_NAME"
+          ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$ZIP_NAME"
+          SHA512=$(openssl dgst -sha512 -binary "$ZIP_NAME" | openssl base64 -A)
+          SIZE=$(stat -f%z "$ZIP_NAME")
+          MANIFEST_ARCH="$ARCH"
+          if [ "$MANIFEST_ARCH" = "x86_64" ]; then
+            MANIFEST_ARCH="x64"
+          fi
+          MANIFEST_NAME="latest-mac-${MANIFEST_ARCH}.yml"
+          RELEASE_DATE=$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")
+          cat > "$MANIFEST_NAME" <<EOF
+version: ${VERSION}
+files:
+  - url: ${ZIP_NAME}
+    sha512: ${SHA512}
+    size: ${SIZE}
+    arch: ${MANIFEST_ARCH}
+path: ${ZIP_NAME}
+sha512: ${SHA512}
+releaseDate: '${RELEASE_DATE}'
+EOF
+          echo "zip_name=$ZIP_NAME" >> $GITHUB_OUTPUT
+          echo "manifest_name=$MANIFEST_NAME" >> $GITHUB_OUTPUT
+
       - name: Notarize DMG
         if: steps.signing.outputs.signed == 'true'
         env:
@@ -419,11 +444,14 @@ jobs:
           xcrun stapler staple "$DMG_NAME"
           echo "✅ Notarization complete"
 
-      - name: Upload DMG artifact
+      - name: Upload macOS artifacts
         uses: actions/upload-artifact@v7
         with:
           name: YoLoIT-macos-${{ matrix.arch }}
-          path: ${{ steps.package.outputs.dmg_name }}
+          path: |
+            ${{ steps.package.outputs.dmg_name }}
+            ${{ steps.package.outputs.zip_name }}
+            ${{ steps.package.outputs.manifest_name }}
           retention-days: 14
 
       - name: Cleanup keychain
@@ -448,26 +476,50 @@ jobs:
           merge-multiple: true
 
       - name: List downloaded artifacts
-        run: ls -la dmgs/
+        run: ls -laR dmgs/
+
+      - name: Merge macOS auto-update manifest
+        run: |
+          chmod +x scripts/merge-mac-update-manifest.sh
+          scripts/merge-mac-update-manifest.sh dmgs dmgs/latest-mac.yml
+          cat dmgs/latest-mac.yml
 
       - name: Create or update GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ needs.version.outputs.tag }}
+          VERSION: ${{ needs.version.outputs.version }}
         run: |
           set -euo pipefail
 
-          DMGS=$(ls dmgs/*.dmg)
+          DMGS=$(ls dmgs/*.dmg 2>/dev/null || true)
+          ZIPS=$(ls dmgs/*-mac.zip 2>/dev/null || true)
+          MANIFEST="dmgs/latest-mac.yml"
           echo "DMGs to upload: $DMGS"
+          echo "ZIPs to upload: $ZIPS"
+
+          STABLE_COPIES=()
+          for zip in $ZIPS; do
+            base=$(basename "$zip")
+            if [[ "$base" == *arm64* ]]; then
+              cp "$zip" "dmgs/yoloit-macos-arm64-mac.zip"
+              STABLE_COPIES+=("dmgs/yoloit-macos-arm64-mac.zip")
+            elif [[ "$base" == *x86_64* ]]; then
+              cp "$zip" "dmgs/yoloit-macos-x64-mac.zip"
+              STABLE_COPIES+=("dmgs/yoloit-macos-x64-mac.zip")
+            fi
+          done
+
+          ASSETS=($DMGS $ZIPS $MANIFEST "${STABLE_COPIES[@]}")
 
           if gh release view "$RELEASE_TAG" --repo ${{ github.repository }} &>/dev/null; then
             echo "Release $RELEASE_TAG already exists — uploading macOS assets..."
-            for dmg in $DMGS; do
-              gh release upload "$RELEASE_TAG" "$dmg" --clobber --repo ${{ github.repository }}
+            for asset in "${ASSETS[@]}"; do
+              gh release upload "$RELEASE_TAG" "$asset" --clobber --repo ${{ github.repository }}
             done
             echo "✅ Uploaded macOS assets to existing release $RELEASE_TAG"
           else
-            printf 'YoLoIT %s run #%s\n\n## Installation\n- **macOS**: Download the DMG for your architecture (`arm64` for Apple Silicon, `x86_64` for Intel) and drag YoLoIT.app to Applications.\n- **Linux**: Download tar.gz, extract and run the `bundle/yoloit` binary.\n- **Windows**: Download zip, extract and run `yoloit.exe`.\n' \
+            printf 'YoLoIT %s run #%s\n\n## Installation\n- **macOS**: Download the DMG for your architecture (`arm64` for Apple Silicon, `x86_64` for Intel) and drag YoLoIT.app to Applications. In-app updates use the ZIP + latest-mac.yml feed.\n- **Linux**: Download tar.gz, extract and run the `bundle/yoloit` binary.\n- **Windows**: Download zip, extract and run `yoloit.exe`.\n' \
               "$RELEASE_TAG" "${{ github.run_number }}" > release-notes.md
 
             gh release create "$RELEASE_TAG" \
@@ -475,6 +527,6 @@ jobs:
               --title "YoLoIT $RELEASE_TAG" \
               --notes-file release-notes.md \
               --latest \
-              $DMGS
+              "${ASSETS[@]}"
             echo "✅ Created release $RELEASE_TAG with macOS assets"
           fi

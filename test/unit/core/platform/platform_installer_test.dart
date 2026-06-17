@@ -5,7 +5,7 @@ import '../../../helpers/fake_process_runner.dart';
 
 void main() {
   tearDown(() {
-    PlatformInstaller.setInstance(const MacosPlatformInstaller());
+    PlatformInstaller.setInstance(MacosPlatformInstaller());
   });
 
   group('MacosPlatformInstaller', () {

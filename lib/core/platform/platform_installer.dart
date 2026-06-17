@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:yoloit/core/platform/macos_update_manifest.dart';
+
 typedef ProcessRunner = Future<ProcessResult> Function(
   String executable,
   List<String> arguments, {
@@ -33,7 +35,7 @@ abstract class PlatformInstaller {
   static void setInstance(PlatformInstaller instance) => _instance = instance;
 
   static PlatformInstaller _create() {
-    if (Platform.isMacOS) return const MacosPlatformInstaller();
+    if (Platform.isMacOS) return MacosPlatformInstaller();
     if (Platform.isLinux) return const LinuxPlatformInstaller();
     if (Platform.isWindows) return const WindowsPlatformInstaller();
     return const LinuxPlatformInstaller();
@@ -50,11 +52,15 @@ abstract class PlatformInstaller {
   ///
   /// Returns a *launch token* (an app path on macOS, a helper-script path on
   /// Windows/Linux) to be passed to [launchAndExit] when the caller is ready.
+  ///
+  /// On macOS pass [releaseTag] (e.g. `v1.0.57`) to download the Squirrel-style
+  /// ZIP from `latest-mac.yml`. [downloadUrl] is ignored on macOS.
   /// [onProgress] is called with 0.0–1.0 during download, null during setup.
   /// Throws on failure.
   Future<String> downloadAndPrepare({
     required String downloadUrl,
     required ProgressCallback onProgress,
+    String? releaseTag,
   });
 
   /// Phase 2 — apply the prepared update and exit the current process.
@@ -70,10 +76,12 @@ abstract class PlatformInstaller {
   Future<void> install({
     required String downloadUrl,
     required ProgressCallback onProgress,
+    String? releaseTag,
   }) async {
     final token = await downloadAndPrepare(
       downloadUrl: downloadUrl,
       onProgress: onProgress,
+      releaseTag: releaseTag,
     );
     await launchAndExit(token);
   }
@@ -113,10 +121,12 @@ Future<void> _downloadFile(
 // ── macOS ─────────────────────────────────────────────────────────────────────
 
 class MacosPlatformInstaller extends PlatformInstaller {
-  const MacosPlatformInstaller({ProcessRunner? processRunner})
+  MacosPlatformInstaller({ProcessRunner? processRunner})
       : _run = processRunner ?? Process.run;
 
   final ProcessRunner _run;
+  String? _shipScriptPath;
+  String? _stagedAppPath;
 
   @override
   bool get supportsInAppInstall => true;
@@ -124,9 +134,7 @@ class MacosPlatformInstaller extends PlatformInstaller {
   @override
   Future<String> getAppVersion({String fallback = '0.0.0'}) async {
     try {
-      final executable = Platform.resolvedExecutable;
-      final appBundle = executable.split('/Contents/').first;
-      final plistPath = '$appBundle/Contents/Info.plist';
+      final plistPath = '${_currentAppBundlePath()}/Contents/Info.plist';
       final result = await _run(
         '/usr/bin/defaults',
         ['read', plistPath, 'CFBundleShortVersionString'],
@@ -143,106 +151,143 @@ class MacosPlatformInstaller extends PlatformInstaller {
   Future<String> downloadAndPrepare({
     required String downloadUrl,
     required ProgressCallback onProgress,
+    String? releaseTag,
   }) async {
-    // 1. Download DMG
+    final tag = releaseTag?.trim();
+    if (tag == null || tag.isEmpty) {
+      throw ArgumentError('releaseTag is required for macOS zip updates');
+    }
+
+    onProgress(null, 'Reading update manifest…');
+    final manifest = await MacosUpdateManifest.fetch(
+      feedUrl: MacosUpdateManifest.feedUrlForTag(tag),
+    );
+    final file = manifest.fileForCurrentArch();
+    final zipUrl = manifest.downloadUrlFor(file, tagName: tag);
+
     onProgress(0.0, 'Downloading…');
     final tmpDir = Directory.systemTemp.createTempSync('yoloit_update_');
-    final dmgFile = File('${tmpDir.path}/YoLoIT.dmg');
-    await _downloadFile(downloadUrl, dmgFile, onProgress, 'Downloading…');
+    final zipFile = File('${tmpDir.path}/${file.url.split('/').last}');
+    await _downloadFile(zipUrl, zipFile, onProgress, 'Downloading…');
 
-    // 2. Mount DMG
-    onProgress(null, 'Mounting…');
-    final mountPoint = '${tmpDir.path}/vol';
-    await Directory(mountPoint).create();
-    final mount = await _run('hdiutil', [
-      'attach', dmgFile.path, '-nobrowse', '-mountpoint', mountPoint,
-    ]);
-    if (mount.exitCode != 0) {
-      throw Exception('Mount failed: ${mount.stderr}');
+    onProgress(null, 'Verifying…');
+    final bytes = await zipFile.readAsBytes();
+    if (file.size != null && bytes.length != file.size) {
+      throw StateError(
+        'Downloaded size mismatch (expected ${file.size}, got ${bytes.length})',
+      );
+    }
+    verifySha512Base64(bytes, file.sha512);
+
+    onProgress(null, 'Extracting…');
+    final extractDir = Directory('${tmpDir.path}/extracted');
+    await extractDir.create(recursive: true);
+    final extract = await _run('ditto', ['-x', '-k', zipFile.path, extractDir.path]);
+    if (extract.exitCode != 0) {
+      throw Exception('Extract failed: ${extract.stderr}');
     }
 
-    try {
-      // 3. Find .app inside mounted volume and copy to /Applications
-      onProgress(null, 'Installing…');
-      final volDir = Directory(mountPoint);
-      final appEntry = volDir
-          .listSync()
-          .whereType<Directory>()
-          .firstWhere(
-            (d) => d.path.endsWith('.app'),
-            orElse: () => throw Exception('No .app found in DMG'),
-          );
-
-      final appName = appEntry.path.split('/').last;
-      final dest = '/Applications/$appName';
-      final ditto = await _run('ditto', [appEntry.path, dest]);
-      if (ditto.exitCode != 0) {
-        throw Exception('Install failed: ${ditto.stderr}');
-      }
-      await _installCliSymlink(dest);
-      return dest; // launch token = installed .app path
-    } finally {
-      await _run('hdiutil', ['detach', mountPoint, '-force']);
-      try { tmpDir.deleteSync(recursive: true); } catch (_) {}
-    }
-  }
-
-  Future<void> _installCliSymlink(String appPath) async {
-    final cliSource = File(
-      '$appPath/Contents/Frameworks/App.framework/Versions/A/Resources/flutter_assets/tools/yoloit',
-    );
-    if (!cliSource.existsSync()) return;
-
-    final home = Platform.environment['HOME'] ?? '';
-    if (home.isEmpty) return;
-
-    // Always install a user-local symlink so resolveYoloitBin() can find it.
-    final userDir = '$home/.config/yoloit';
-    await Directory(userDir).create(recursive: true);
-    final userLink = File('$userDir/yoloit');
-    if (userLink.existsSync()) userLink.deleteSync();
-    final userResult = await _run('ln', ['-s', cliSource.path, userLink.path]);
-    if (userResult.exitCode != 0) {
-      // Best-effort: ignore user-local symlink failures.
+    final stagedApp = _findAppBundle(extractDir);
+    if (stagedApp == null) {
+      throw Exception('No .app bundle found in update ZIP');
     }
 
-    // Best-effort system-wide symlink in /usr/local/bin.
-    const systemDir = '/usr/local/bin';
-    const systemLink = '$systemDir/yoloit';
-    final systemResult = await _run('ln', ['-sf', cliSource.path, systemLink]);
-    if (systemResult.exitCode != 0) {
-      await _run('mkdir', ['-p', systemDir]);
-      await _run('ln', ['-sf', cliSource.path, systemLink]);
-    }
+    final targetApp = _resolveTargetAppPath(stagedApp.path.split('/').last);
+    _stagedAppPath = stagedApp.path;
+    _shipScriptPath = await _writeShipItScript(tmpDir.path);
+
+    onProgress(null, 'Ready to install');
+    return targetApp;
   }
 
   @override
   Future<void> launchAndExit(String launchToken) async {
-    final currentPid = pid;
+    final script = _shipScriptPath;
+    final stagedApp = _stagedAppPath;
+    if (script == null || stagedApp == null) {
+      await _run('open', [launchToken]);
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      exit(0);
+    }
 
-    // Remove macOS quarantine attribute so Gatekeeper doesn't block the relaunch.
-    await _run('xattr', ['-dr', 'com.apple.quarantine', launchToken]);
-
-    // Launch a truly detached background job via nohup + disown.
-    // ProcessStartMode.detached uses setsid() but some Flutter/macOS builds
-    // still get SIGHUP when the parent exits. nohup+disown is the portable
-    // Unix way to fully escape the parent's process group.
-    //
-    // We run this inline (Process.run, blocking) so the background job is
-    // registered with the OS before we call exit(0).
     final logFile = '${Directory.systemTemp.path}/yoloit_relaunch.log';
-    final shellCmd = [
-      'nohup', '/bin/sh', '-c',
-      // Wait for old PID, timeout after 15 s, then open new app.
-      'i=0; while kill -0 $currentPid 2>/dev/null && [ \$i -lt 75 ]; do '
-          'sleep 0.2; i=\$((i+1)); done; '
-          'sleep 0.5; '
-          'open -n "$launchToken" >> $logFile 2>&1',
-    ].join(' ');
-    await _run('/bin/bash', ['-c', '$shellCmd </dev/null >$logFile 2>&1 & disown']);
+    final cmd =
+        '/bin/bash "$script" $pid "$stagedApp" "$launchToken" "$logFile" '
+        '</dev/null >>"$logFile" 2>&1 & disown';
+    await _run('/bin/bash', ['-c', cmd]);
 
-    await Future.delayed(const Duration(milliseconds: 400));
+    await Future<void>.delayed(const Duration(milliseconds: 400));
     exit(0);
+  }
+
+  String _currentAppBundlePath() {
+    return Platform.resolvedExecutable.split('/Contents/').first;
+  }
+
+  String _resolveTargetAppPath(String appFileName) {
+    final current = _currentAppBundlePath();
+    if (current.startsWith('/Applications/')) return current;
+    return '/Applications/$appFileName';
+  }
+
+  Directory? _findAppBundle(Directory root) {
+    if (root.path.endsWith('.app')) return root;
+    for (final entity in root.listSync(followLinks: false)) {
+      if (entity is Directory) {
+        if (entity.path.endsWith('.app')) return entity;
+        final nested = _findAppBundle(entity);
+        if (nested != null) return nested;
+      }
+    }
+    return null;
+  }
+
+  Future<String> _writeShipItScript(String tmpDirPath) async {
+    const scriptBody = r'''#!/bin/bash
+set -euo pipefail
+PID="$1"
+NEW_APP="$2"
+TARGET_APP="$3"
+LOG="$4"
+
+i=0
+while kill -0 "$PID" 2>/dev/null && [ "$i" -lt 75 ]; do
+  sleep 0.2
+  i=$((i + 1))
+done
+sleep 0.5
+
+BACKUP="${TARGET_APP}.yoloit.old"
+rm -rf "$BACKUP"
+if [ -d "$TARGET_APP" ]; then
+  mv "$TARGET_APP" "$BACKUP"
+fi
+mv "$NEW_APP" "$TARGET_APP"
+rm -rf "$BACKUP"
+
+xattr -dr com.apple.quarantine "$TARGET_APP" 2>/dev/null || true
+LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+if [ -x "$LSREGISTER" ]; then
+  "$LSREGISTER" -f -R -trusted "$TARGET_APP" 2>/dev/null || true
+fi
+
+CLI_SOURCE="$TARGET_APP/Contents/Frameworks/App.framework/Versions/A/Resources/flutter_assets/tools/yoloit"
+if [ -f "$CLI_SOURCE" ]; then
+  if [ -n "${HOME:-}" ]; then
+    USER_DIR="$HOME/.config/yoloit"
+    mkdir -p "$USER_DIR"
+    ln -sf "$CLI_SOURCE" "$USER_DIR/yoloit" 2>/dev/null || true
+  fi
+  mkdir -p /usr/local/bin 2>/dev/null || true
+  ln -sf "$CLI_SOURCE" /usr/local/bin/yoloit 2>/dev/null || true
+fi
+
+open "$TARGET_APP" >>"$LOG" 2>&1
+''';
+    final scriptFile = File('$tmpDirPath/yoloit_shipit.sh');
+    await scriptFile.writeAsString(scriptBody);
+    await _run('chmod', ['+x', scriptFile.path]);
+    return scriptFile.path;
   }
 }
 
@@ -261,6 +306,7 @@ class LinuxPlatformInstaller extends PlatformInstaller {
   Future<String> downloadAndPrepare({
     required String downloadUrl,
     required ProgressCallback onProgress,
+    String? releaseTag,
   }) async {
     // 1. Download tar.gz
     onProgress(0.0, 'Downloading…');
@@ -360,6 +406,7 @@ class WindowsPlatformInstaller extends PlatformInstaller {
   Future<String> downloadAndPrepare({
     required String downloadUrl,
     required ProgressCallback onProgress,
+    String? releaseTag,
   }) async {
     // 1. Download ZIP
     onProgress(0.0, 'Downloading…');

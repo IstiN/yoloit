@@ -98,7 +98,12 @@ class UpdateService {
 
   static Future<bool> _ensureInAppInstall(UpdateInfo info) async {
     final installer = PlatformInstaller.instance;
-    if (!installer.supportsInAppInstall || info.downloadUrl == null) {
+    if (!installer.supportsInAppInstall) {
+      await openRelease(info);
+      return false;
+    }
+    if (Platform.isMacOS) return true;
+    if (info.downloadUrl == null) {
       await openRelease(info);
       return false;
     }
@@ -114,7 +119,8 @@ class UpdateService {
   }) async {
     if (!await _ensureInAppInstall(info)) return null;
     return PlatformInstaller.instance.downloadAndPrepare(
-      downloadUrl: info.downloadUrl!,
+      downloadUrl: info.downloadUrl ?? '',
+      releaseTag: info.tagName,
       onProgress: onProgress,
     );
   }
@@ -132,7 +138,8 @@ class UpdateService {
   }) async {
     if (!await _ensureInAppInstall(info)) return;
     await PlatformInstaller.instance.install(
-      downloadUrl: info.downloadUrl!,
+      downloadUrl: info.downloadUrl ?? '',
+      releaseTag: info.tagName,
       onProgress: onProgress,
     );
   }
