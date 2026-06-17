@@ -468,6 +468,9 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Download DMG artifacts
         uses: actions/download-artifact@v8
         with:
@@ -480,6 +483,7 @@ jobs:
 
       - name: Merge macOS auto-update manifest
         run: |
+          python3 -m pip install --user pyyaml
           chmod +x scripts/merge-mac-update-manifest.sh
           scripts/merge-mac-update-manifest.sh dmgs dmgs/latest-mac.yml
           cat dmgs/latest-mac.yml
