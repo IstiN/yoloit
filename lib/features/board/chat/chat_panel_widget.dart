@@ -37,6 +37,7 @@ import 'package:yoloit/features/board/chat/widgets/session_history_dialog.dart';
 import 'package:yoloit/features/board/events/board_event_bus.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
+import 'package:yoloit/features/board/utils/panel_scroll_memory.dart';
 import 'package:yoloit/features/settings/data/agent_config_service.dart';
 import 'package:yoloit/features/settings/data/cloud_llm_settings_service.dart';
 import 'package:yoloit/features/settings/data/tool_call_settings_service.dart';
@@ -83,6 +84,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
 
   final _inputController = TextEditingController();
   late ScrollController _scrollController;
+  PanelScrollSaveHandle? _scrollSave;
   final _inputFocusNode = FocusNode();
   late AnimationController _glowCtrl;
 
@@ -228,10 +230,19 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     // the correct position without a visible jump after the first frame.
     // double.maxFinite is clamped to maxScrollExtent on the first layout,
     // effectively starting at the bottom for non-empty chats.
-    final savedOffset = _session?.savedScrollOffset;
+    final savedOffset =
+        _session?.savedScrollOffset ??
+        PanelScrollMemory.read(widget.panel.state);
     _scrollController = ScrollController(
-      initialScrollOffset:
-          savedOffset ?? (_messages.isNotEmpty ? double.maxFinite : 0.0),
+      initialScrollOffset: savedOffset ?? 0.0,
+    );
+    _scrollSave = PanelScrollMemory.attachAutoSave(
+      controller: _scrollController,
+      readState: () => widget.panel.state,
+      onUpdateState: (state) {
+        if (_session?.isProcessing ?? false) return;
+        widget.onUpdateState(state);
+      },
     );
 
     // Restore sessionID for opencode
@@ -548,6 +559,12 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   }
 
   @override
+  void deactivate() {
+    _scrollSave?.flush();
+    super.deactivate();
+  }
+
+  @override
   void dispose() {
     ToolCallSettingsService.instance.ignoredToolsListenable.removeListener(
       _handleIgnoredToolsChanged,
@@ -584,8 +601,15 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     // the bottom on re-mount instead of restoring a stale middle position.
     final session = _session;
     if (session != null && _scrollController.hasClients) {
-      session.savedScrollOffset =
-          session.isProcessing ? null : _scrollController.offset;
+      if (!session.isProcessing) {
+        final offset = _scrollController.offset;
+        session.savedScrollOffset = offset;
+        widget.onUpdateState(
+          PanelScrollMemory.write(widget.panel.state, offset),
+        );
+      } else {
+        session.savedScrollOffset = null;
+      }
     }
     // Detach from session — session keeps its stream subscription alive.
     // The session already has accurate messages via _handleCoreEvent.
@@ -594,6 +618,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     _session = null;
     _kanbanToChatSub?.cancel();
     _draftSaveTimer?.cancel();
+    _scrollSave?.dispose();
     _inputController.dispose();
     _scrollController.dispose();
     _inputFocusNode.dispose();
@@ -629,17 +654,18 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   /// Restores the previously saved scroll offset after the widget re-mounts.
   /// Falls back to jumping to the bottom when no offset was saved.
   void _restoreScrollOffset() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_scrollController.hasClients) return;
-      final saved = _session?.savedScrollOffset;
-      if (saved != null &&
-          saved >= 0 &&
-          saved <= _scrollController.position.maxScrollExtent) {
-        _scrollController.jumpTo(saved);
-      } else {
-        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
-      }
-    });
+    final saved =
+        _session?.savedScrollOffset ??
+        PanelScrollMemory.read(widget.panel.state);
+    if (saved != null && saved > 0) {
+      PanelScrollMemory.restoreAfterLayout(
+        _scrollController,
+        offset: saved,
+        isActive: () => mounted,
+      );
+      return;
+    }
+    _scrollToBottom(animate: false);
   }
 
   /// Called when the session changes via ChangeNotifier (e.g. CLI-driven

@@ -6,6 +6,7 @@ import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/utils/clipboard_utils.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
+import 'package:yoloit/features/board/utils/panel_scroll_memory.dart';
 import 'package:yoloit/features/preview/widgets/markdown_document_preview.dart';
 import 'package:yoloit/ui/components/dialog/editor_dialog_actions.dart';
 
@@ -63,7 +64,12 @@ class MarkdownNotePlugin extends BoardPanelPlugin {
       );
     }
 
-    return _ScrollableNoteContent(markdown: markdown, autoScroll: autoScroll);
+    return _ScrollableNoteContent(
+      markdown: markdown,
+      autoScroll: autoScroll,
+      panel: panel,
+      onUpdateState: renderContext.onUpdateState,
+    );
   }
 
   @override
@@ -93,10 +99,14 @@ class MarkdownNotePlugin extends BoardPanelPlugin {
 class _ScrollableNoteContent extends StatefulWidget {
   const _ScrollableNoteContent({
     required this.markdown,
+    required this.panel,
+    required this.onUpdateState,
     this.autoScroll = false,
   });
 
   final String markdown;
+  final BoardPanelInstance panel;
+  final ValueChanged<Map<String, dynamic>>? onUpdateState;
   final bool autoScroll;
 
   @override
@@ -104,9 +114,33 @@ class _ScrollableNoteContent extends StatefulWidget {
 }
 
 class _ScrollableNoteContentState extends State<_ScrollableNoteContent> {
-  final _scrollCtrl = ScrollController();
+  late final ScrollController _scrollCtrl;
+  PanelScrollSaveHandle? _scrollSave;
   bool _isHovered = false;
   bool _copied = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final saved = PanelScrollMemory.read(widget.panel.state);
+    _scrollCtrl = ScrollController(
+      initialScrollOffset: saved ?? 0.0,
+    );
+    if (!widget.autoScroll) {
+      _scrollSave = PanelScrollMemory.attachAutoSave(
+        controller: _scrollCtrl,
+        readState: () => widget.panel.state,
+        onUpdateState: widget.onUpdateState,
+      );
+    }
+    if (!widget.autoScroll && saved != null && saved > 0) {
+      PanelScrollMemory.restoreAfterLayout(
+        _scrollCtrl,
+        offset: saved,
+        isActive: () => mounted,
+      );
+    }
+  }
 
   @override
   void didUpdateWidget(_ScrollableNoteContent old) {
@@ -117,7 +151,14 @@ class _ScrollableNoteContentState extends State<_ScrollableNoteContent> {
   }
 
   @override
+  void deactivate() {
+    _scrollSave?.flush();
+    super.deactivate();
+  }
+
+  @override
   void dispose() {
+    _scrollSave?.dispose();
     _scrollCtrl.dispose();
     super.dispose();
   }

@@ -94,7 +94,7 @@ abstract class TerminalBackend {
 
   void resize(String sessionId, int columns, int rows);
 
-  void kill(String sessionId);
+  Future<void> kill(String sessionId);
 }
 
 class LocalPtyTerminalBackend implements TerminalBackend {
@@ -133,7 +133,7 @@ class LocalPtyTerminalBackend implements TerminalBackend {
       ptyService.resize(sessionId, columns, rows);
 
   @override
-  void kill(String sessionId) => ptyService.kill(sessionId);
+  Future<void> kill(String sessionId) async => ptyService.kill(sessionId);
 }
 
 class TmuxTerminalBackend extends LocalPtyTerminalBackend {
@@ -188,11 +188,25 @@ class RuntimeTerminalBackend implements TerminalBackend {
     Map<String, String>? extraEnv,
   }) async {
     await _client.ensureStarted();
-    final attachedExisting = await _client.createSession(
+    final env = _runtimeEnv(extraEnv);
+    final shell = PlatformShell.instance.defaultShell;
+    var attachedExisting = await _client.createSession(
       sessionId: sessionId,
       cwd: workspacePath,
-      env: _runtimeEnv(extraEnv),
+      command: shell,
+      env: env,
     );
+    // yoloitd re-attaches to alive sessions without re-applying env — force a
+    // fresh shell when that happens so env group changes actually take effect.
+    if (attachedExisting) {
+      await _client.kill(sessionId);
+      attachedExisting = await _client.createSession(
+        sessionId: sessionId,
+        cwd: workspacePath,
+        command: shell,
+        env: env,
+      );
+    }
     return TerminalProcess(
       output: _client.streamSession(sessionId),
       exitCode: Completer<int>().future,
@@ -215,12 +229,16 @@ class RuntimeTerminalBackend implements TerminalBackend {
       _client.resize(sessionId, columns, rows);
 
   @override
-  void kill(String sessionId) => _client.kill(sessionId);
+  Future<void> kill(String sessionId) => _client.kill(sessionId);
 
   Map<String, String> _runtimeEnv(Map<String, String>? extraEnv) {
     final shell = PlatformShell.instance;
-    final merged = <String, String>{...?extraEnv};
-    final basePath = merged['PATH'] ?? Platform.environment['PATH'] ?? '';
+    final merged = <String, String>{
+      ...Platform.environment,
+      ...?extraEnv,
+    };
+    final basePath = merged['PATH'] ?? '';
+    merged['SHELL'] = shell.defaultShell;
     merged['TERM'] = 'xterm-256color';
     merged['COLORTERM'] = 'truecolor';
     merged['PATH'] = shell.enrichedPath(basePath);

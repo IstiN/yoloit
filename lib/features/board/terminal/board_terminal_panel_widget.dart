@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -57,16 +59,26 @@ class _BoardTerminalPanelWidgetState extends State<BoardTerminalPanelWidget> {
   void didUpdateWidget(covariant BoardTerminalPanelWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
     final nextConfig = _readConfig(widget.panel.state);
+    final envChanged =
+        nextConfig.envGroupIds.join('\u0000') !=
+        _config.envGroupIds.join('\u0000');
     if (nextConfig.sessionId != _config.sessionId ||
         nextConfig.sessionName != _config.sessionName ||
         nextConfig.workingDir != _config.workingDir ||
-        nextConfig.envGroupIds.join('\u0000') !=
-            _config.envGroupIds.join('\u0000')) {
+        envChanged) {
+      final previousConfig = _config;
       _config = nextConfig;
       _session =
           _config.sessionId.isEmpty
               ? null
               : _manager.sessionFor(_config.sessionId);
+      if (envChanged &&
+          _session != null &&
+          _config.sessionId.isNotEmpty &&
+          previousConfig.sessionId == _config.sessionId) {
+        unawaited(_respawnSessionWithEnvGroups(_config.envGroupIds));
+        return;
+      }
       _ensureConfiguredSession();
     }
   }
@@ -554,29 +566,38 @@ class _BoardTerminalPanelWidgetState extends State<BoardTerminalPanelWidget> {
     );
   }
 
-  Future<void> _onEnvGroupsChanged(List<String> envGroupIds) async {
+  Future<void> _respawnSessionWithEnvGroups(List<String> envGroupIds) async {
     final nextConfig = _config.copyWith(envGroupIds: envGroupIds);
     _config = nextConfig;
-    widget.onUpdateState({'config': nextConfig.toJson()});
-    // Respawn terminal with new env vars
-    if (_config.sessionId.isNotEmpty && _session != null) {
-      setState(() => _restoring = true);
-      await _manager.killSession(_config.sessionId);
-      final session = await _manager.createSession(
-        sessionName: _config.sessionName,
-        workingDir: _config.workingDir,
-        envGroupIds: envGroupIds,
-        remoteInfo: widget.remoteInfo,
-      );
-      if (!mounted) return;
-      final updatedConfig = _config.copyWith(sessionId: session.id);
-      _config = updatedConfig;
-      widget.onUpdateState({'config': updatedConfig.toJson()});
-      setState(() {
-        _session = session;
-        _restoring = false;
-      });
-    }
+    widget.onUpdateState({
+      ...widget.panel.state,
+      'config': nextConfig.toJson(),
+    });
+    if (_config.sessionId.isEmpty || _session == null) return;
+    setState(() => _restoring = true);
+    await _manager.killSession(_config.sessionId);
+    final session = await _manager.createSession(
+      sessionName: _config.sessionName,
+      workingDir: _config.workingDir,
+      envGroupIds: envGroupIds,
+      remoteInfo: widget.remoteInfo,
+      metadata: _resourceMetadata(sessionName: _config.sessionName),
+    );
+    if (!mounted) return;
+    final updatedConfig = _config.copyWith(sessionId: session.id);
+    _config = updatedConfig;
+    widget.onUpdateState({
+      ...widget.panel.state,
+      'config': updatedConfig.toJson(),
+    });
+    setState(() {
+      _session = session;
+      _restoring = false;
+    });
+  }
+
+  Future<void> _onEnvGroupsChanged(List<String> envGroupIds) async {
+    await _respawnSessionWithEnvGroups(envGroupIds);
   }
 
   @override

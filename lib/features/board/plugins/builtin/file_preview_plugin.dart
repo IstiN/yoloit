@@ -17,6 +17,7 @@ import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/board/services/board_offscreen_renderer.dart';
 import 'package:yoloit/features/board/ui/board_file_picker.dart';
+import 'package:yoloit/features/board/utils/panel_scroll_memory.dart';
 import 'package:yoloit/features/editor/bloc/file_editor_cubit.dart';
 import 'package:yoloit/features/editor/ui/file_editor_panel.dart';
 import 'package:yoloit/features/editor/utils/editor_language_registry.dart';
@@ -211,6 +212,10 @@ class _FilePreviewContentState extends State<_FilePreviewContent> {
     }
   }
 
+  void _persistPanelState(Map<String, dynamic> state) {
+    widget.renderContext.onUpdateState?.call(state);
+  }
+
   Future<void> _pickFile() async {
     final file = await BoardFilePicker.pickFile(
       context,
@@ -347,11 +352,20 @@ class _FilePreviewContentState extends State<_FilePreviewContent> {
       );
     }
     if (_isMarkdownExt(ext)) {
-      // No key change — stateful widget handles its own reload + scroll preservation.
-      return _MarkdownPreview(key: ValueKey(path), path: path);
+      return _MarkdownPreview(
+        key: ValueKey(path),
+        path: path,
+        readPanelState: () => widget.panel.state,
+        onUpdatePanelState: _persistPanelState,
+      );
     }
     if (_isDotEnvPath(path) || _isTextExt(ext) || _looksLikeTextFile(path)) {
-      return _CodePreview(key: ValueKey(path), path: path);
+      return _CodePreview(
+        key: ValueKey(path),
+        path: path,
+        readPanelState: () => widget.panel.state,
+        onUpdatePanelState: _persistPanelState,
+      );
     }
 
     // Other file types (binary, etc.)
@@ -765,8 +779,15 @@ class _PdfPreview extends StatelessWidget {
 // ─── Markdown Preview with Mermaid support ────────────────────────────────────
 
 class _MarkdownPreview extends StatefulWidget {
-  const _MarkdownPreview({super.key, required this.path});
+  const _MarkdownPreview({
+    super.key,
+    required this.path,
+    required this.readPanelState,
+    required this.onUpdatePanelState,
+  });
   final String path;
+  final Map<String, dynamic> Function() readPanelState;
+  final void Function(Map<String, dynamic>)? onUpdatePanelState;
 
   @override
   State<_MarkdownPreview> createState() => _MarkdownPreviewState();
@@ -774,14 +795,34 @@ class _MarkdownPreview extends StatefulWidget {
 
 class _MarkdownPreviewState extends State<_MarkdownPreview> {
   late String _content;
+  late final ScrollController _scrollCtrl;
+  PanelScrollSaveHandle? _scrollSave;
   StreamSubscription<BoardFileModifiedEvent>? _fileSub;
 
   @override
   void initState() {
     super.initState();
+    final saved = PanelScrollMemory.read(widget.readPanelState());
+    _scrollCtrl = ScrollController(initialScrollOffset: saved ?? 0.0);
+    _scrollSave = PanelScrollMemory.attachAutoSave(
+      controller: _scrollCtrl,
+      readState: widget.readPanelState,
+      onUpdateState: widget.onUpdatePanelState,
+    );
     _content = _readFile();
     _fileSub = BoardEventBus.instance.on<BoardFileModifiedEvent>().listen(
       _onFileModified,
+    );
+    if (saved != null && saved > 0) {
+      _restoreScroll(saved);
+    }
+  }
+
+  void _restoreScroll(double? offset) {
+    PanelScrollMemory.restoreAfterLayout(
+      _scrollCtrl,
+      offset: offset,
+      isActive: () => mounted,
     );
   }
 
@@ -794,7 +835,15 @@ class _MarkdownPreviewState extends State<_MarkdownPreview> {
   }
 
   @override
+  void deactivate() {
+    _scrollSave?.flush();
+    super.deactivate();
+  }
+
+  @override
   void dispose() {
+    _scrollSave?.dispose();
+    _scrollCtrl.dispose();
     _fileSub?.cancel();
     super.dispose();
   }
@@ -810,8 +859,13 @@ class _MarkdownPreviewState extends State<_MarkdownPreview> {
 
   void _onFileModified(BoardFileModifiedEvent event) {
     if (!mounted || event.path != widget.path) return;
-    // Re-read file but let MarkdownDocumentPreview preserve its own scroll.
+    final offset = _scrollCtrl.hasClients ? _scrollCtrl.offset : 0.0;
     setState(() => _content = _readFile());
+    PanelScrollMemory.restoreAfterLayout(
+      _scrollCtrl,
+      offset: offset,
+      isActive: () => mounted,
+    );
   }
 
   @override
@@ -825,7 +879,15 @@ class _MarkdownPreviewState extends State<_MarkdownPreview> {
         ),
       );
     }
-    return RepaintBoundary(child: MarkdownDocumentPreview(content: _content));
+    return RepaintBoundary(
+      child: MarkdownDocumentPreview(
+        content: _content,
+        scrollController: _scrollCtrl,
+        onContentLayoutChanged: () {
+          _restoreScroll(PanelScrollMemory.read(widget.readPanelState()));
+        },
+      ),
+    );
   }
 }
 
@@ -833,8 +895,15 @@ class _MarkdownPreviewState extends State<_MarkdownPreview> {
 // ─── Code / Text Preview ──────────────────────────────────────────────────────
 
 class _CodePreview extends StatefulWidget {
-  const _CodePreview({super.key, required this.path});
+  const _CodePreview({
+    super.key,
+    required this.path,
+    required this.readPanelState,
+    required this.onUpdatePanelState,
+  });
   final String path;
+  final Map<String, dynamic> Function() readPanelState;
+  final void Function(Map<String, dynamic>)? onUpdatePanelState;
 
   @override
   State<_CodePreview> createState() => _CodePreviewState();
@@ -848,7 +917,8 @@ class _CodePreviewState extends State<_CodePreview> {
   late List<String> _lines;
   late String _extension;
   late String _languageId;
-  final _scrollCtrl = ScrollController();
+  late final ScrollController _scrollCtrl;
+  PanelScrollSaveHandle? _scrollSave;
   StreamSubscription<BoardFileModifiedEvent>? _fileSub;
   Timer? _fileChangeDebounce;
   bool _wasTruncated = false;
@@ -857,6 +927,13 @@ class _CodePreviewState extends State<_CodePreview> {
   @override
   void initState() {
     super.initState();
+    final saved = PanelScrollMemory.read(widget.readPanelState());
+    _scrollCtrl = ScrollController(initialScrollOffset: saved ?? 0.0);
+    _scrollSave = PanelScrollMemory.attachAutoSave(
+      controller: _scrollCtrl,
+      readState: widget.readPanelState,
+      onUpdateState: widget.onUpdatePanelState,
+    );
     _extension = p.extension(widget.path).replaceFirst('.', '').toLowerCase();
     _languageId = EditorLanguageRegistry.forPath(widget.path).id;
     final result = _readLines();
@@ -866,6 +943,13 @@ class _CodePreviewState extends State<_CodePreview> {
     _fileSub = BoardEventBus.instance.on<BoardFileModifiedEvent>().listen(
       _onFileModified,
     );
+    if (saved != null && saved > 0) {
+      PanelScrollMemory.restoreAfterLayout(
+        _scrollCtrl,
+        offset: saved,
+        isActive: () => mounted,
+      );
+    }
   }
 
   @override
@@ -882,9 +966,16 @@ class _CodePreviewState extends State<_CodePreview> {
   }
 
   @override
+  void deactivate() {
+    _scrollSave?.flush();
+    super.deactivate();
+  }
+
+  @override
   void dispose() {
     _fileChangeDebounce?.cancel();
     _fileSub?.cancel();
+    _scrollSave?.dispose();
     _scrollCtrl.dispose();
     super.dispose();
   }

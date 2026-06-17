@@ -28,7 +28,8 @@ class TerminalBackendService {
     final mode = backend.mode;
     SupportLogService.instance.add(
       'terminal-backend',
-      'session=$sessionId mode=${mode.id} label=$label',
+      'session=$sessionId mode=${mode.id} label=$label '
+      'envKeys=${extraEnv?.keys.toList() ?? const []}',
     );
     _bySession[sessionId] = backend;
     return backend.launch(
@@ -54,8 +55,8 @@ class TerminalBackendService {
     (_bySession[sessionId] ?? _local).resize(sessionId, columns, rows);
   }
 
-  void kill(String sessionId) {
-    (_bySession.remove(sessionId) ?? _local).kill(sessionId);
+  Future<void> kill(String sessionId) async {
+    await (_bySession.remove(sessionId) ?? _local).kill(sessionId);
   }
 
   TerminalBackendMode modeFor(String sessionId) {

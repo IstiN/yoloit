@@ -8,9 +8,16 @@ import 'package:yoloit/features/board/services/board_offscreen_renderer.dart';
 import 'package:yoloit/features/preview/widgets/mermaid/mermaid_widgets.dart';
 
 class MarkdownDocumentPreview extends StatefulWidget {
-  const MarkdownDocumentPreview({super.key, required this.content});
+  const MarkdownDocumentPreview({
+    super.key,
+    required this.content,
+    this.scrollController,
+    this.onContentLayoutChanged,
+  });
 
   final String content;
+  final ScrollController? scrollController;
+  final VoidCallback? onContentLayoutChanged;
 
   @override
   State<MarkdownDocumentPreview> createState() =>
@@ -30,7 +37,9 @@ class _MarkdownDocumentPreviewState extends State<MarkdownDocumentPreview> {
     _initFuture ??= _sharedRenderer.init();
     _initFuture!
         .then((_) {
-          if (mounted) setState(() => _rendererReady = true);
+          if (!mounted) return;
+          setState(() => _rendererReady = true);
+          widget.onContentLayoutChanged?.call();
         })
         .catchError((Object e) {
           assert(() { debugPrint('[Mermaid] init() FAILED: $e'); return true; }());
@@ -69,6 +78,7 @@ class _MarkdownDocumentPreviewState extends State<MarkdownDocumentPreview> {
       ),
     );
     final Widget mdBody = SingleChildScrollView(
+      controller: widget.scrollController,
       padding: const EdgeInsets.all(12),
       child: MarkdownBody(
         key: ValueKey(_rendererReady),

@@ -56,16 +56,21 @@ class GlobalEnvGroupsService {
 
   /// Loads all env groups.  Values come from secure storage; only metadata
   /// (id, name, keys) lives in the JSON file.
+  ///
+  /// Returns a mutable deep copy so callers can edit groups in UI without
+  /// mutating the internal cache.
   Future<List<GlobalEnvGroup>> loadAll() async {
     final signature = _storageFileSignature();
     final cached = _loadAllCache;
-    if (cached != null && _loadAllCacheSignature == signature) return cached;
+    if (cached != null && _loadAllCacheSignature == signature) {
+      return _cloneGroups(cached);
+    }
     return _loadAllInFlight ??= _loadAllUncached().then(
       (groups) {
         _loadAllCacheSignature = _storageFileSignature();
-        _loadAllCache = groups;
+        _loadAllCache = List<GlobalEnvGroup>.unmodifiable(groups);
         _loadAllInFlight = null;
-        return groups;
+        return _cloneGroups(groups);
       },
       onError: (Object error, StackTrace stackTrace) {
         _loadAllInFlight = null;
@@ -291,6 +296,16 @@ class GlobalEnvGroupsService {
   }
 
   // ── Private helpers ──────────────────────────────────────────────────────
+
+  List<GlobalEnvGroup> _cloneGroups(List<GlobalEnvGroup> groups) {
+    return groups
+        .map(
+          (group) => group.copyWith(
+            values: Map<String, String>.from(group.values),
+          ),
+        )
+        .toList();
+  }
 
   /// Writes group metadata JSON (id, name, keys — no values).
   Future<void> _writeMetaFile(List<GlobalEnvGroup> groups) async {

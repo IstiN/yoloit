@@ -23,6 +23,7 @@ void main() {
       extraEnv: {'CUSTOM': 'value'},
     );
 
+    expect(client.lastCommand, isNotNull);
     expect(client.lastEnv?['CUSTOM'], 'value');
     expect(client.lastEnv?['TERM'], 'xterm-256color');
     expect(client.lastEnv?['COLORTERM'], 'truecolor');
@@ -36,6 +37,7 @@ class _FakeRuntimeTerminalClient extends RuntimeTerminalClient {
   _FakeRuntimeTerminalClient() : super(runtimeHome: '/tmp/yoloit-test-runtime');
 
   Map<String, String>? lastEnv;
+  String? lastCommand;
 
   @override
   Future<void> ensureStarted() async {}
@@ -50,6 +52,7 @@ class _FakeRuntimeTerminalClient extends RuntimeTerminalClient {
     int rows = 30,
   }) async {
     lastEnv = env;
+    lastCommand = command;
     return false;
   }
 

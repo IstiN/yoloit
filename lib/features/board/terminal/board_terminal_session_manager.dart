@@ -97,7 +97,7 @@ class BoardTerminalSessionManager extends ChangeNotifier {
 
   Future<void> killSession(String sessionId) async {
     _outputSubs.remove(sessionId)?.cancel();
-    _backendService.kill(sessionId);
+    await _backendService.kill(sessionId);
     final session = _sessions.remove(sessionId);
     if (session != null) {
       await BoardTerminalSessionHistory.instance.upsert(

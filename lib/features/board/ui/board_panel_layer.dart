@@ -117,6 +117,7 @@ class BoardPanelLayer extends StatelessWidget {
                 boardCubit.updatePanel(
                   panel.id,
                   (p) => p.copyWith(state: newState),
+                  boardId: board.id,
                 );
               },
               onCreateLinkedPanel: (typeId, state, title) async {

@@ -51,7 +51,23 @@ void main() {
       expect(groups, isEmpty);
     });
 
-    test('saveAll and loadAll round-trip', () async {
+    test('loadAll returns mutable copies that can be edited', () async {
+      await GlobalEnvGroupsService.instance.saveAll([
+        const GlobalEnvGroup(
+          id: 'g1',
+          name: 'test',
+          values: {'TOKEN': 'my_token'},
+        ),
+      ]);
+
+      final loaded = await GlobalEnvGroupsService.instance.loadAll();
+      expect(() => loaded.add(
+        const GlobalEnvGroup(id: 'g2', name: 'new', values: {}),
+      ), returnsNormally);
+      expect(() => loaded[0] = loaded[0].copyWith(name: 'renamed'), returnsNormally);
+    });
+
+    test('loadAll round-trip after save uses cache without breaking edits', () async {
       final data = [
         const GlobalEnvGroup(
           id: 'g1',

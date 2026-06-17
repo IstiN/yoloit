@@ -75,7 +75,11 @@ class _GlobalEnvGroupsSectionState extends State<GlobalEnvGroupsSection> {
                     : group.name.trim(),
             values: Map<String, String>.fromEntries(
               group.values.entries
-                  .where((e) => e.key.trim().isNotEmpty)
+                  .where(
+                    (e) =>
+                        e.key.trim().isNotEmpty &&
+                        !_isDraftEnvKey(e.key),
+                  )
                   .map((e) => MapEntry(e.key.trim(), e.value)),
             ),
           ),
@@ -142,9 +146,19 @@ class _GlobalEnvGroupsSectionState extends State<GlobalEnvGroupsSection> {
     _service.deleteGroupSecrets(groupId);
   }
 
+  static bool _isDraftEnvKey(String key) => key.startsWith('__draft_');
+
+  String _nextDraftEnvKey(Map<String, String> values) {
+    var draftKey = '__draft_${DateTime.now().microsecondsSinceEpoch}';
+    while (values.containsKey(draftKey)) {
+      draftKey = '__draft_${DateTime.now().microsecondsSinceEpoch}';
+    }
+    return draftKey;
+  }
+
   void _addVariable(int index) {
     final values = Map<String, String>.from(_groups[index].values);
-    values[''] = '';
+    values[_nextDraftEnvKey(values)] = '';
     setState(() {
       _groups[index] = _groups[index].copyWith(values: values);
     });
@@ -288,7 +302,8 @@ class _GlobalEnvGroupsSectionState extends State<GlobalEnvGroupsSection> {
                               Expanded(
                                 flex: 2,
                                 child: _EnvField(
-                                  initialValue: key,
+                                  initialValue:
+                                      _isDraftEnvKey(key) ? '' : key,
                                   hint: 'KEY',
                                   onChanged:
                                       (newKey) => _renameVariable(

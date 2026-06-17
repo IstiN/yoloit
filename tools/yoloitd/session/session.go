@@ -84,7 +84,9 @@ func New(req *CreateRequest) (*Session, error) {
 	if strings.Contains(req.Command, " ") {
 		cmd = exec.Command("sh", "-c", req.Command)
 	} else {
-		cmd = exec.Command(req.Command, "-l")
+		// Plain interactive shell — login shells (-l) can re-source profile files
+		// and drop env vars injected by YoLoIT env groups.
+		cmd = exec.Command(req.Command)
 	}
 	cmd.Dir = req.Cwd
 

@@ -78,9 +78,9 @@ class RemoteYoloitTerminalBackend implements TerminalBackend {
   }
 
   @override
-  void kill(String sessionId) {
+  Future<void> kill(String sessionId) async {
     _pollers.remove(sessionId)?.cancel();
-    unawaited(_controllers.remove(sessionId)?.close());
-    unawaited(_client.stopTerminal(sessionId));
+    await _controllers.remove(sessionId)?.close();
+    await _client.stopTerminal(sessionId);
   }
 }
