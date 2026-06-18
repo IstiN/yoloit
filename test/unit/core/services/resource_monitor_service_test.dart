@@ -172,4 +172,52 @@ void main() {
       expect(snapshot.totalSystemMemoryBytes, 16);
     });
   });
+
+  group('isProcessOwnedByYoloit', () {
+    test('returns true when ancestor is a yoloit root pid', () {
+      final byPid = {
+        100: const ProcessInfo(pid: 100, ppid: 0, cpu: 0, memoryBytes: 0),
+        200: const ProcessInfo(pid: 200, ppid: 100, cpu: 0, memoryBytes: 0),
+        300: const ProcessInfo(pid: 300, ppid: 200, cpu: 0, memoryBytes: 0),
+      };
+      expect(
+        isProcessOwnedByYoloit(
+          processPid: 300,
+          byPid: byPid,
+          rootPids: {100},
+        ),
+        isTrue,
+      );
+    });
+
+    test('returns false for unrelated processes', () {
+      final byPid = {
+        500: const ProcessInfo(pid: 500, ppid: 0, cpu: 0, memoryBytes: 0),
+      };
+      expect(
+        isProcessOwnedByYoloit(
+          processPid: 500,
+          byPid: byPid,
+          rootPids: {100},
+        ),
+        isFalse,
+      );
+    });
+  });
+
+  group('ResourceMonitorScopeX', () {
+    test('defaults to yoloit only', () {
+      expect(
+        ResourceMonitorScopeX.fromId(null),
+        ResourceMonitorScope.yoloitOnly,
+      );
+    });
+
+    test('parses all agents', () {
+      expect(
+        ResourceMonitorScopeX.fromId('all_agents'),
+        ResourceMonitorScope.allAgents,
+      );
+    });
+  });
 }

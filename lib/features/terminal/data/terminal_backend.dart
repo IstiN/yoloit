@@ -88,6 +88,7 @@ abstract class TerminalBackend {
     String? label,
     ResourceSessionMetadata? metadata,
     Map<String, String>? extraEnv,
+    bool forceNewShell = false,
   });
 
   void write(String sessionId, String data);
@@ -113,6 +114,7 @@ class LocalPtyTerminalBackend implements TerminalBackend {
     String? label,
     ResourceSessionMetadata? metadata,
     Map<String, String>? extraEnv,
+    bool forceNewShell = false,
   }) async {
     final pty = ptyService.launch(
       sessionId: sessionId,
@@ -152,6 +154,7 @@ class TmuxTerminalBackend extends LocalPtyTerminalBackend {
     String? label,
     ResourceSessionMetadata? metadata,
     Map<String, String>? extraEnv,
+    bool forceNewShell = false,
   }) async {
     final pty = ptyService.launchTmux(
       sessionId: sessionId,
@@ -186,25 +189,37 @@ class RuntimeTerminalBackend implements TerminalBackend {
     String? label,
     ResourceSessionMetadata? metadata,
     Map<String, String>? extraEnv,
+    bool forceNewShell = false,
   }) async {
     await _client.ensureStarted();
     final env = _runtimeEnv(extraEnv);
     final shell = PlatformShell.instance.defaultShell;
-    var attachedExisting = await _client.createSession(
+    var createResult = await _client.createSession(
       sessionId: sessionId,
       cwd: workspacePath,
       command: shell,
       env: env,
     );
-    // yoloitd re-attaches to alive sessions without re-applying env — force a
-    // fresh shell when that happens so env group changes actually take effect.
-    if (attachedExisting) {
+    var attachedExisting = createResult.existing;
+    // Re-attach to an alive yoloitd session after app restart/update. Only
+    // force a fresh shell when the caller explicitly requests it (e.g. env
+    // group respawn on the same session id).
+    if (attachedExisting && forceNewShell) {
       await _client.kill(sessionId);
-      attachedExisting = await _client.createSession(
+      createResult = await _client.createSession(
         sessionId: sessionId,
         cwd: workspacePath,
         command: shell,
         env: env,
+      );
+      attachedExisting = createResult.existing;
+    }
+    if (metadata != null) {
+      ResourceMonitorService.instance.registerRuntimeShellSession(
+        sessionId: sessionId,
+        shellPid: createResult.shellPid,
+        label: label ?? sessionId,
+        metadata: metadata,
       );
     }
     return TerminalProcess(
@@ -229,7 +244,10 @@ class RuntimeTerminalBackend implements TerminalBackend {
       _client.resize(sessionId, columns, rows);
 
   @override
-  Future<void> kill(String sessionId) => _client.kill(sessionId);
+  Future<void> kill(String sessionId) async {
+    ResourceMonitorService.instance.unregisterRuntimeSession(sessionId);
+    await _client.kill(sessionId);
+  }
 
   Map<String, String> _runtimeEnv(Map<String, String>? extraEnv) {
     final shell = PlatformShell.instance;

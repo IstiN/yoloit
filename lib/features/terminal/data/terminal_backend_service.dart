@@ -23,13 +23,15 @@ class TerminalBackendService {
     ResourceSessionMetadata? metadata,
     Map<String, String>? extraEnv,
     TerminalBackend? backendOverride,
+    bool forceNewShell = false,
   }) async {
     final backend = backendOverride ?? _selectBackend();
     final mode = backend.mode;
     SupportLogService.instance.add(
       'terminal-backend',
       'session=$sessionId mode=${mode.id} label=$label '
-      'envKeys=${extraEnv?.keys.toList() ?? const []}',
+      'envKeys=${extraEnv?.keys.toList() ?? const []} '
+      'forceNewShell=$forceNewShell',
     );
     _bySession[sessionId] = backend;
     return backend.launch(
@@ -38,6 +40,7 @@ class TerminalBackendService {
       label: label,
       metadata: metadata,
       extraEnv: extraEnv,
+      forceNewShell: forceNewShell,
     );
   }
 

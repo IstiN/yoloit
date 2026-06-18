@@ -4,27 +4,25 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart' show kDebugMode, ValueNotifier;
 import 'package:flutter/services.dart' show rootBundle;
-import 'package:yoloit/core/platform/platform_dirs.dart';
+import 'package:yoloit/features/terminal/data/runtime_paths.dart';
+
+class RuntimeSessionCreateResult {
+  const RuntimeSessionCreateResult({
+    required this.existing,
+    required this.shellPid,
+  });
+
+  final bool existing;
+  final int shellPid;
+}
 
 class RuntimeTerminalClient {
   RuntimeTerminalClient({String? runtimeHome})
-    : runtimeHome =
-          runtimeHome ??
-          (kDebugMode
-              ? _debugRuntimeHome()
-              : '${PlatformDirs.instance.configDir}/runtime');
+    : runtimeHome = runtimeHome ?? RuntimePaths.home;
 
   final String runtimeHome;
   final HttpClient _http = HttpClient();
   int? _port;
-
-  static String _debugRuntimeHome() {
-    final home =
-        Platform.environment['HOME'] ??
-        Platform.environment['USERPROFILE'] ??
-        Directory.systemTemp.path;
-    return '$home/.config/yoloit-dev/runtime';
-  }
 
   String get _portPath => '$runtimeHome/runtime.port';
   String get _pidPath => '$runtimeHome/runtime.pid';
@@ -147,7 +145,7 @@ class RuntimeTerminalClient {
     await mtimeFile.writeAsString('$currentMtime');
   }
 
-  Future<bool> createSession({
+  Future<RuntimeSessionCreateResult> createSession({
     required String sessionId,
     required String cwd,
     String? command,
@@ -163,7 +161,17 @@ class RuntimeTerminalClient {
       'cols': cols,
       'rows': rows,
     });
-    return response['existing'] == true;
+    final session = response['session'];
+    var shellPid = 0;
+    if (session is Map) {
+      final rawPid = session['pid'];
+      shellPid =
+          rawPid is int ? rawPid : int.tryParse(rawPid?.toString() ?? '') ?? 0;
+    }
+    return RuntimeSessionCreateResult(
+      existing: response['existing'] == true,
+      shellPid: shellPid,
+    );
   }
 
   Stream<String> streamSession(String sessionId) async* {

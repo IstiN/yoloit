@@ -1,6 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
+
+import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:yoloit/features/terminal/data/runtime_paths.dart';
 
 // ── Data models ─────────────────────────────────────────────────────────────
 
@@ -42,6 +47,7 @@ class SessionStat {
     required this.cpuPercent,
     required this.memoryBytes,
     this.metadata,
+    this.sessionKey,
   });
 
   final int pid;
@@ -49,6 +55,27 @@ class SessionStat {
   final double cpuPercent;
   final int memoryBytes; // subtree RSS bytes
   final ResourceSessionMetadata? metadata;
+
+  /// yoloitd / CLI session id (e.g. board_terminal_123).
+  final String? sessionKey;
+
+  SessionStat copyWith({
+    int? pid,
+    String? label,
+    double? cpuPercent,
+    int? memoryBytes,
+    ResourceSessionMetadata? metadata,
+    String? sessionKey,
+  }) {
+    return SessionStat(
+      pid: pid ?? this.pid,
+      label: label ?? this.label,
+      cpuPercent: cpuPercent ?? this.cpuPercent,
+      memoryBytes: memoryBytes ?? this.memoryBytes,
+      metadata: metadata ?? this.metadata,
+      sessionKey: sessionKey ?? this.sessionKey,
+    );
+  }
 }
 
 /// Optional board context attached by the component that spawned a process.
@@ -74,15 +101,47 @@ class ResourceSessionMetadata {
   final String? provider;
 
   String get displayLabel {
+    final board = boardName?.trim();
     final title = panelTitle?.trim();
+    final kindLabel = formatResourceKindLabel(kind);
+    if (board != null && board.isNotEmpty) {
+      if (title != null && title.isNotEmpty) {
+        return '$kindLabel · $board · $title';
+      }
+      return '$kindLabel · $board';
+    }
     if (title != null && title.isNotEmpty) {
-      return '${formatResourceKindLabel(kind)} · $title';
+      return '$kindLabel · $title';
     }
     final providerLabel = provider?.trim();
     if (providerLabel != null && providerLabel.isNotEmpty) {
-      return '${formatResourceKindLabel(kind)} · ${formatSessionLabel(providerLabel)}';
+      return '$kindLabel · ${formatSessionLabel(providerLabel)}';
     }
-    return formatResourceKindLabel(kind);
+    return kindLabel;
+  }
+
+  Map<String, dynamic> toJson() => {
+    'kind': kind,
+    if (boardId != null) 'boardId': boardId,
+    if (boardName != null) 'boardName': boardName,
+    if (panelId != null) 'panelId': panelId,
+    if (panelTitle != null) 'panelTitle': panelTitle,
+    if (panelType != null) 'panelType': panelType,
+    if (workspacePath != null) 'workspacePath': workspacePath,
+    if (provider != null) 'provider': provider,
+  };
+
+  factory ResourceSessionMetadata.fromJson(Map<String, dynamic> json) {
+    return ResourceSessionMetadata(
+      kind: json['kind'] as String? ?? 'terminal',
+      boardId: json['boardId'] as String?,
+      boardName: json['boardName'] as String?,
+      panelId: json['panelId'] as String?,
+      panelTitle: json['panelTitle'] as String?,
+      panelType: json['panelType'] as String?,
+      workspacePath: json['workspacePath'] as String?,
+      provider: json['provider'] as String?,
+    );
   }
 }
 
@@ -161,6 +220,60 @@ class ResourceSnapshot {
   );
 }
 
+/// Which processes appear in the resource monitor totals and list.
+enum ResourceMonitorScope {
+  /// YoLoIT.app, yoloitd, and explicitly registered board sessions only.
+  yoloitOnly,
+
+  /// Legacy mode: also scan the whole system for well-known agent names.
+  allAgents,
+}
+
+extension ResourceMonitorScopeX on ResourceMonitorScope {
+  String get id => switch (this) {
+    ResourceMonitorScope.yoloitOnly => 'yoloit_only',
+    ResourceMonitorScope.allAgents => 'all_agents',
+  };
+
+  String get label => switch (this) {
+    ResourceMonitorScope.yoloitOnly => 'YoLoIT only',
+    ResourceMonitorScope.allAgents => 'All agents',
+  };
+
+  static ResourceMonitorScope fromId(String? id) => switch (id) {
+    'all_agents' => ResourceMonitorScope.allAgents,
+    _ => ResourceMonitorScope.yoloitOnly,
+  };
+}
+
+class _RuntimeSessionRegistration {
+  const _RuntimeSessionRegistration({
+    required this.label,
+    required this.metadata,
+  });
+
+  final String label;
+  final ResourceSessionMetadata metadata;
+}
+
+@visibleForTesting
+bool isProcessOwnedByYoloit({
+  required int processPid,
+  required Map<int, ProcessInfo> byPid,
+  required Set<int> rootPids,
+}) {
+  var current = processPid;
+  final visited = <int>{};
+  while (current > 0 && !visited.contains(current)) {
+    if (rootPids.contains(current)) return true;
+    visited.add(current);
+    final info = byPid[current];
+    if (info == null) return false;
+    current = info.ppid;
+  }
+  return false;
+}
+
 // ── Service ──────────────────────────────────────────────────────────────────
 
 /// Polls OS process information periodically to get CPU/RAM for this app,
@@ -182,14 +295,24 @@ class ResourceMonitorService {
     'python',
   ];
 
+  static const _scopeKey = 'resource_monitor_scope_v1';
+  static const _runtimeSessionsKey = 'resource_runtime_sessions_v1';
+
   final _controller = StreamController<ResourceSnapshot>.broadcast();
+  final scopeNotifier = ValueNotifier<ResourceMonitorScope>(
+    ResourceMonitorScope.yoloitOnly,
+  );
   Timer? _timer;
   ResourceSnapshot _last = ResourceSnapshot.empty;
   bool _interactive = true;
+  ResourceMonitorScope _scope = ResourceMonitorScope.yoloitOnly;
 
   /// Registered PTY / run sessions: pid → label.
   final Map<int, String> _sessions = {};
   final Map<int, ResourceSessionMetadata> _sessionMetadata = {};
+  final Map<String, _RuntimeSessionRegistration> _runtimeSessions = {};
+  final Set<int> _runtimeSessionPids = <int>{};
+  final Map<int, String> _sessionKeyForPid = <int, String>{};
 
   // Process-tree maps rebuilt each poll.
   Map<int, ProcessInfo> _byPid = {};
@@ -200,11 +323,107 @@ class ResourceMonitorService {
 
   Stream<ResourceSnapshot> get stream => _controller.stream;
   ResourceSnapshot get current => _last;
+  ResourceMonitorScope get scope => _scope;
 
   /// Exposes the set of currently registered pids for UI differentiation.
   Set<int> get registeredPids => _sessions.keys.toSet();
 
+  Future<void> loadScopePreference() async {
+    final prefs = await SharedPreferences.getInstance();
+    _scope = ResourceMonitorScopeX.fromId(prefs.getString(_scopeKey));
+    scopeNotifier.value = _scope;
+    await _loadPersistedRuntimeSessions();
+  }
+
+  ResourceSessionMetadata? metadataForRuntimeSession(String sessionId) =>
+      _runtimeSessions[sessionId]?.metadata;
+
+  Future<void> setScope(ResourceMonitorScope scope) async {
+    if (_scope == scope) return;
+    _scope = scope;
+    scopeNotifier.value = scope;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_scopeKey, scope.id);
+    pollNow();
+  }
+
   // ── Session registration ────────────────────────────────────────────────
+
+  void registerRuntimeSession(
+    String sessionId,
+    String label, {
+    required ResourceSessionMetadata metadata,
+  }) {
+    _runtimeSessions[sessionId] = _RuntimeSessionRegistration(
+      label: label,
+      metadata: metadata,
+    );
+    unawaited(_persistRuntimeSessions());
+  }
+
+  /// Registers a yoloitd board terminal immediately after spawn so the resource
+  /// panel can show it before the next HTTP sync poll.
+  void registerRuntimeShellSession({
+    required String sessionId,
+    required int shellPid,
+    required String label,
+    required ResourceSessionMetadata metadata,
+  }) {
+    registerRuntimeSession(sessionId, label, metadata: metadata);
+    if (shellPid > 0) {
+      registerSession(shellPid, label, metadata: metadata);
+      _sessionKeyForPid[shellPid] = sessionId;
+      _runtimeSessionPids.add(shellPid);
+    }
+    pollNow();
+  }
+
+  void unregisterRuntimeSession(String sessionId) {
+    _runtimeSessions.remove(sessionId);
+    unawaited(_persistRuntimeSessions());
+  }
+
+  Future<void> _loadPersistedRuntimeSessions() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_runtimeSessionsKey);
+      if (raw == null || raw.isEmpty) return;
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return;
+      for (final entry in decoded.entries) {
+        final sessionId = entry.key.toString();
+        final value = entry.value;
+        if (value is! Map) continue;
+        final map = Map<String, dynamic>.from(value);
+        final metadataRaw = map['metadata'];
+        if (metadataRaw is! Map) continue;
+        _runtimeSessions[sessionId] = _RuntimeSessionRegistration(
+          label: map['label'] as String? ?? sessionId,
+          metadata: ResourceSessionMetadata.fromJson(
+            Map<String, dynamic>.from(metadataRaw),
+          ),
+        );
+      }
+    } catch (_) {
+      // ignore corrupt cache
+    }
+  }
+
+  Future<void> _persistRuntimeSessions() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final encoded = <String, dynamic>{
+        for (final entry in _runtimeSessions.entries)
+          entry.key: {
+            'label': entry.value.label,
+            'metadata': entry.value.metadata.toJson(),
+          },
+      };
+      await prefs.setString(_runtimeSessionsKey, jsonEncode(encoded));
+    } catch (_) {
+      // ignore persistence failures
+    }
+  }
 
   void registerSession(
     int pid,
@@ -222,6 +441,7 @@ class ResourceMonitorService {
   void unregisterSession(int pid) {
     _sessions.remove(pid);
     _sessionMetadata.remove(pid);
+    _sessionKeyForPid.remove(pid);
   }
 
   bool stopProcess(int processPid) {
@@ -242,6 +462,7 @@ class ResourceMonitorService {
 
   void start() {
     _timer?.cancel();
+    unawaited(loadScopePreference());
     _scheduleTimer();
     _poll();
   }
@@ -327,6 +548,12 @@ class ResourceMonitorService {
     final appCpu = appTree.cpu;
     final appMem = appTree.mem;
 
+    final yoloitdPid = await _readYoloitdPid();
+
+    if (_scope == ResourceMonitorScope.yoloitOnly) {
+      await _syncRuntimeSessions(yoloitdPid);
+    }
+
     // Registered sessions.
     final registeredSessions = <SessionStat>[];
     final registeredPids = <int>{};
@@ -341,36 +568,51 @@ class ResourceMonitorService {
           cpuPercent: res.cpu,
           memoryBytes: res.mem,
           metadata: _sessionMetadata[sessionPid],
+          sessionKey: _sessionKeyForPid[sessionPid],
         ),
       );
       registeredPids.addAll(_getSubtreePids(sessionPid));
     }
 
-    // Scan for unregistered well-known agent names.
+    // Scan for unregistered well-known agent names (all-agents mode only).
     final agentSessions = <SessionStat>[];
-    final seenPids = <int>{appPid, ...registeredPids};
-    for (final entry in _byPid.entries) {
-      final p = entry.key;
-      if (seenPids.contains(p)) continue;
-      // Name stored in a side map populated during collection.
-      final name = _processNames[p] ?? '';
-      if (_agentNames.any((a) => name.toLowerCase().contains(a))) {
-        seenPids.add(p);
-        final res = _getSubtreeResources(p);
-        agentSessions.add(
-          SessionStat(
-            pid: p,
-            label: name.split('/').last,
-            cpuPercent: res.cpu,
-            memoryBytes: res.mem,
-          ),
-        );
+    if (_scope == ResourceMonitorScope.allAgents) {
+      final seenPids = <int>{appPid, ...registeredPids};
+      for (final entry in _byPid.entries) {
+        final p = entry.key;
+        if (seenPids.contains(p)) continue;
+        final name = _processNames[p] ?? '';
+        if (_agentNames.any((a) => name.toLowerCase().contains(a))) {
+          seenPids.add(p);
+          final res = _getSubtreeResources(p);
+          agentSessions.add(
+            SessionStat(
+              pid: p,
+              label: name.split('/').last,
+              cpuPercent: res.cpu,
+              memoryBytes: res.mem,
+            ),
+          );
+        }
       }
     }
 
     final allSessions = [...registeredSessions, ...agentSessions];
-    final totalMem = allSessions.fold(appMem, (s, e) => s + e.memoryBytes);
-    final totalCpu = allSessions.fold(appCpu, (s, e) => s + e.cpuPercent);
+
+    int totalMem;
+    double totalCpu;
+    if (_scope == ResourceMonitorScope.yoloitOnly) {
+      final runtimeTree =
+          yoloitdPid == null
+              ? (cpu: 0.0, mem: 0)
+              : _getSubtreeResources(yoloitdPid);
+      totalMem = appMem + runtimeTree.mem;
+      totalCpu = appCpu + runtimeTree.cpu;
+    } else {
+      totalMem = allSessions.fold(appMem, (s, e) => s + e.memoryBytes);
+      totalCpu = allSessions.fold(appCpu, (s, e) => s + e.cpuPercent);
+    }
+
     final host = await _collectHost();
 
     return ResourceSnapshot(
@@ -381,6 +623,90 @@ class ResourceMonitorService {
       totalMemoryBytes: math.max(0, totalMem),
       totalCpuPercent: math.max(0.0, totalCpu),
     );
+  }
+
+  Future<void> _syncRuntimeSessions(int? yoloitdPid) async {
+    final remoteSessions = await _fetchRuntimeSessions();
+    if (remoteSessions == null) return;
+
+    final nextRuntimePids = <int>{};
+    for (final remote in remoteSessions) {
+      if (remote.pid <= 0) continue;
+      nextRuntimePids.add(remote.pid);
+      final reg = _runtimeSessions[remote.id];
+      final label = reg?.label ?? remote.id;
+      registerSession(
+        remote.pid,
+        label,
+        metadata: reg?.metadata,
+      );
+      _sessionKeyForPid[remote.pid] = remote.id;
+    }
+    for (final stalePid in _runtimeSessionPids.difference(nextRuntimePids)) {
+      unregisterSession(stalePid);
+      _sessionKeyForPid.remove(stalePid);
+    }
+    _runtimeSessionPids
+      ..clear()
+      ..addAll(nextRuntimePids);
+
+    if (yoloitdPid != null && yoloitdPid > 0) {
+      // Keep yoloitd itself out of the per-session list — it is included in totals.
+      _sessions.remove(yoloitdPid);
+      _sessionMetadata.remove(yoloitdPid);
+    }
+  }
+
+  Future<int?> _readYoloitdPid() async {
+    try {
+      final file = File(RuntimePaths.pidFile);
+      if (!await file.exists()) return null;
+      return int.tryParse((await file.readAsString()).trim());
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<List<({String id, int pid})>?> _fetchRuntimeSessions() async {
+    try {
+      final portFile = File(RuntimePaths.portFile);
+      if (!await portFile.exists()) return const [];
+      final port = int.tryParse((await portFile.readAsString()).trim());
+      if (port == null) return const [];
+
+      final client = HttpClient();
+      try {
+        final request = await client.getUrl(
+          Uri.parse('http://127.0.0.1:$port/sessions'),
+        );
+        final response = await request.close().timeout(
+          const Duration(seconds: 1),
+        );
+        if (response.statusCode != 200) return null;
+        final body = await response.transform(utf8.decoder).join();
+        final decoded = jsonDecode(body) as Map<String, dynamic>;
+        final raw = decoded['sessions'];
+        if (raw is! List) return const [];
+        final result = <({String id, int pid})>[];
+        for (final item in raw) {
+          if (item is! Map) continue;
+          final map = Map<String, dynamic>.from(item);
+          final id = map['id']?.toString() ?? '';
+          final shellPid = map['pid'];
+          final pid =
+              shellPid is int
+                  ? shellPid
+                  : int.tryParse(shellPid?.toString() ?? '') ?? 0;
+          if (id.isEmpty || pid <= 0) continue;
+          result.add((id: id, pid: pid));
+        }
+        return result;
+      } finally {
+        client.close();
+      }
+    } catch (_) {
+      return null;
+    }
   }
 
   /// pid → process name, populated alongside _byPid each poll cycle.

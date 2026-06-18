@@ -14,6 +14,7 @@ import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/bloc/board_state.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
+import 'package:yoloit/features/board/model/terminal_panel_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
 import 'package:yoloit/features/board/ui/board_view.dart';
 import 'package:yoloit/features/editor/bloc/file_editor_cubit.dart';
@@ -1259,20 +1260,25 @@ class _ResourceChipState extends State<_ResourceChip> {
       _overlay = null;
       return;
     }
+    final boardCubit = context.read<BoardCubit>();
     final box = context.findRenderObject()! as RenderBox;
     final offset = box.localToGlobal(Offset.zero);
     _overlay = OverlayEntry(
       builder:
-          (_) => _ResourcePanel(
-            snapshot: _snap,
-            position: Offset(
-              offset.dx - 260 + box.size.width,
-              offset.dy + box.size.height + 4,
+          (_) => BlocProvider.value(
+            value: boardCubit,
+            child: _ResourcePanel(
+              boardCubit: boardCubit,
+              snapshot: _snap,
+              position: Offset(
+                offset.dx - 260 + box.size.width,
+                offset.dy + box.size.height + 4,
+              ),
+              onClose: () {
+                _overlay?.remove();
+                _overlay = null;
+              },
             ),
-            onClose: () {
-              _overlay?.remove();
-              _overlay = null;
-            },
           ),
     );
     Overlay.of(context).insert(_overlay!);
@@ -1318,10 +1324,12 @@ class _ResourceChipState extends State<_ResourceChip> {
 
 class _ResourcePanel extends StatefulWidget {
   const _ResourcePanel({
+    required this.boardCubit,
     required this.snapshot,
     required this.position,
     required this.onClose,
   });
+  final BoardCubit boardCubit;
   final ResourceSnapshot snapshot;
   final Offset position;
   final VoidCallback onClose;
@@ -1372,8 +1380,14 @@ class _ResourcePanelState extends State<_ResourcePanel> {
     // Separate registered sessions from agent-scanned ones.
     final monitorService = ResourceMonitorService.instance;
     final registeredPids = monitorService.registeredPids;
+    final boards = widget.boardCubit.state.boards;
+    final scope = monitorService.scope;
     final registeredSessions =
-        _snap.sessions.where((s) => registeredPids.contains(s.pid)).toList();
+        _snap.sessions
+            .where((s) => registeredPids.contains(s.pid))
+            .map((s) => enrichResourceSessionFromBoards(s, boards))
+            .where((s) => shouldShowYoloitResourceSession(s, scope))
+            .toList();
     final agentSessions =
         _snap.sessions.where((s) => !registeredPids.contains(s.pid)).toList();
 
@@ -1450,6 +1464,46 @@ class _ResourcePanelState extends State<_ResourcePanel> {
                     ),
                   ),
                   Divider(height: 1, color: colors.border),
+
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
+                    child: ValueListenableBuilder<ResourceMonitorScope>(
+                      valueListenable:
+                          ResourceMonitorService.instance.scopeNotifier,
+                      builder: (context, scope, _) {
+                        return SegmentedButton<ResourceMonitorScope>(
+                          segments: ResourceMonitorScope.values
+                              .map(
+                                (value) => ButtonSegment(
+                                  value: value,
+                                  label: Text(
+                                    value.label,
+                                    style: const TextStyle(fontSize: 10),
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                          selected: {scope},
+                          onSelectionChanged: (selection) {
+                            if (selection.isEmpty) return;
+                            unawaited(
+                              ResourceMonitorService.instance.setScope(
+                                selection.first,
+                              ),
+                            );
+                          },
+                          style: ButtonStyle(
+                            visualDensity: VisualDensity.compact,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            padding: WidgetStatePropertyAll(
+                              EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 8),
 
                   // 3-column metric grid: CPU total%, Memory total, RAM share%
                   Padding(
@@ -1559,13 +1613,16 @@ class _ResourcePanelState extends State<_ResourcePanel> {
                     },
                   ),
 
-                  // SESSIONS section (registered PTYs)
+                  // SESSIONS section (registered PTYs + yoloitd board terminals)
                   if (registeredSessions.isNotEmpty) ...[
                     Divider(height: 1, color: colors.border),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
                       child: Text(
-                        'SESSIONS',
+                        ResourceMonitorService.instance.scope ==
+                                ResourceMonitorScope.yoloitOnly
+                            ? 'YOLOIT PROCESSES'
+                            : 'SESSIONS',
                         style: TextStyle(
                           color: mutedColor,
                           fontSize: 9,
@@ -1573,7 +1630,13 @@ class _ResourcePanelState extends State<_ResourcePanel> {
                         ),
                       ),
                     ),
-                    ...registeredSessions.map((s) => _SessionRow(session: s)),
+                    ...registeredSessions.map(
+                      (s) => _SessionRow(
+                        session: s,
+                        boardCubit: widget.boardCubit,
+                        onClose: widget.onClose,
+                      ),
+                    ),
                   ],
 
                   // AGENTS section (ps-scanned unregistered agents)
@@ -1590,7 +1653,13 @@ class _ResourcePanelState extends State<_ResourcePanel> {
                         ),
                       ),
                     ),
-                    ...agentSessions.map((s) => _SessionRow(session: s)),
+                    ...agentSessions.map(
+                      (s) => _SessionRow(
+                        session: s,
+                        boardCubit: widget.boardCubit,
+                        onClose: widget.onClose,
+                      ),
+                    ),
                   ],
 
                   const SizedBox(height: 8),
@@ -1802,16 +1871,93 @@ String resourcePanelTypeLabel(String type) {
       .replaceAll('_', ' ');
 }
 
+@visibleForTesting
+SessionStat enrichResourceSessionFromBoards(
+  SessionStat session,
+  List<BoardDocument> boards,
+) {
+  if (session.metadata?.panelId?.isNotEmpty ?? false) {
+    return session;
+  }
+  final sessionKey = session.sessionKey ?? _sessionKeyFromLabel(session.label);
+  if (sessionKey != null && sessionKey.isNotEmpty) {
+    final persisted = ResourceMonitorService.instance.metadataForRuntimeSession(
+      sessionKey,
+    );
+    if (persisted?.panelId?.isNotEmpty ?? false) {
+      return session.copyWith(metadata: persisted);
+    }
+  }
+  if (sessionKey == null || sessionKey.isEmpty) {
+    return session;
+  }
+  for (final board in boards) {
+    for (final panel in board.panels) {
+      if (panel.type != 'board.terminal') continue;
+      final rawConfig = panel.state['config'];
+      if (rawConfig is! Map) continue;
+      final config = BoardTerminalConfig.fromJson(
+        Map<String, dynamic>.from(rawConfig),
+      );
+      if (config.sessionId != sessionKey) continue;
+      final sessionName = config.sessionName.trim();
+      final panelTitle =
+          panel.title.trim().isEmpty
+              ? (sessionName.isEmpty ? 'Terminal' : sessionName)
+              : panel.title.trim();
+      return session.copyWith(
+        metadata: ResourceSessionMetadata(
+          kind: 'terminal',
+          boardId: board.id,
+          boardName: board.name,
+          panelId: panel.id,
+          panelTitle: panelTitle,
+          panelType: panel.type,
+          workspacePath: config.workingDir.trim(),
+          provider: 'terminal',
+        ),
+      );
+    }
+  }
+  return session;
+}
+
+@visibleForTesting
+bool shouldShowYoloitResourceSession(
+  SessionStat session,
+  ResourceMonitorScope scope,
+) {
+  if (scope != ResourceMonitorScope.yoloitOnly) return true;
+  final panelId = session.metadata?.panelId;
+  return panelId != null && panelId.isNotEmpty;
+}
+
+String? _sessionKeyFromLabel(String label) {
+  final trimmed = label.trim();
+  if (trimmed.startsWith('board_terminal_')) return trimmed;
+  return null;
+}
+
 class _SessionRow extends StatelessWidget {
-  const _SessionRow({required this.session});
+  const _SessionRow({
+    required this.session,
+    required this.boardCubit,
+    this.onClose,
+  });
+
   final SessionStat session;
+  final BoardCubit boardCubit;
+  final VoidCallback? onClose;
 
   Future<void> _open(BuildContext context) async {
-    final metadata = session.metadata;
-    final panelId = metadata?.panelId;
+    onClose?.call();
+    final resolved = enrichResourceSessionFromBoards(
+      session,
+      boardCubit.state.boards,
+    );
+    final panelId = resolved.metadata?.panelId;
+    final boardId = resolved.metadata?.boardId;
     if (panelId != null && panelId.isNotEmpty) {
-      final boardCubit = context.read<BoardCubit>();
-      final boardId = metadata?.boardId;
       if (boardId != null &&
           boardId.isNotEmpty &&
           boardCubit.state.activeBoardId != boardId) {
@@ -1820,7 +1966,12 @@ class _SessionRow extends StatelessWidget {
       await boardCubit.focusPanel(panelId, boardId: boardId, zoomOnFocus: true);
       return;
     }
-    _showResourceSessionDetails(context, session);
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    messenger?.showSnackBar(
+      const SnackBar(
+        content: Text('Could not find a board terminal panel for this process'),
+      ),
+    );
   }
 
   @override
@@ -1831,6 +1982,7 @@ class _SessionRow extends StatelessWidget {
         context.appColors.textMuted;
     final metadata = session.metadata;
     final label = metadata?.displayLabel ?? formatSessionLabel(session.label);
+    final canFocus = metadata?.panelId?.isNotEmpty ?? false;
     final canStop = resourceSessionCanStop(session);
     final details = [
       if (metadata?.boardName?.trim().isNotEmpty ?? false)
@@ -1841,9 +1993,9 @@ class _SessionRow extends StatelessWidget {
     ].join(' · ');
     return Tooltip(
       message:
-          metadata?.panelId?.isNotEmpty ?? false
-              ? 'Show on board\n$details'
-              : 'Show process details\n$details',
+          canFocus
+              ? 'Open on board\n$details'
+              : 'Terminal panel not linked',
       waitDuration: const Duration(milliseconds: 350),
       child: InkWell(
         onTap: () => _open(context),
@@ -1852,10 +2004,10 @@ class _SessionRow extends StatelessWidget {
           child: Row(
             children: [
               Icon(
-                metadata?.panelId?.isNotEmpty ?? false
+                canFocus
                     ? Icons.center_focus_strong_outlined
                     : Icons.circle,
-                size: metadata?.panelId?.isNotEmpty ?? false ? 9 : 5,
+                size: canFocus ? 9 : 5,
                 color: colors.primary,
               ),
               const SizedBox(width: 8),
@@ -1871,10 +2023,12 @@ class _SessionRow extends StatelessWidget {
                     if (metadata != null)
                       Text(
                         [
-                          if (metadata.provider?.trim().isNotEmpty ?? false)
-                            formatSessionLabel(metadata.provider!),
+                          if (metadata.boardName?.trim().isNotEmpty ?? false)
+                            metadata.boardName!.trim(),
+                          if (metadata.workspacePath?.trim().isNotEmpty ?? false)
+                            metadata.workspacePath!.trim(),
                           'pid ${session.pid}',
-                        ].join(' · '),
+                        ].where((part) => part.isNotEmpty).join(' · '),
                         style: TextStyle(color: mutedColor, fontSize: 8.5),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -1974,117 +2128,6 @@ Future<void> _confirmStopResourceSession(
             : 'Could not stop $label. It may have already exited.',
       ),
     ),
-  );
-}
-
-void _showResourceSessionDetails(BuildContext context, SessionStat session) {
-  final colors = context.appColors;
-  final metadata = session.metadata;
-  final canStop = resourceSessionCanStop(session);
-  final lines = <MapEntry<String, String>>[
-    MapEntry('PID', session.pid.toString()),
-    MapEntry('Label', formatSessionLabel(session.label)),
-    MapEntry('CPU', '${session.cpuPercent.toStringAsFixed(1)}%'),
-    MapEntry('Memory', formatBytes(session.memoryBytes)),
-    if (metadata?.provider?.trim().isNotEmpty ?? false)
-      MapEntry('Provider', formatSessionLabel(metadata!.provider!)),
-    if (metadata?.boardName?.trim().isNotEmpty ?? false)
-      MapEntry('Board', metadata!.boardName!.trim()),
-    if (metadata?.panelTitle?.trim().isNotEmpty ?? false)
-      MapEntry('Panel', metadata!.panelTitle!.trim()),
-    if (metadata?.workspacePath?.trim().isNotEmpty ?? false)
-      MapEntry('Working dir', metadata!.workspacePath!.trim()),
-  ];
-  showDialog<void>(
-    context: context,
-    builder:
-        (dialogContext) => Dialog(
-          backgroundColor: colors.surface,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: colors.border),
-          ),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: Padding(
-              padding: const EdgeInsets.all(18),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.memory_outlined,
-                        color: colors.primary,
-                        size: 18,
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          metadata?.displayLabel ??
-                              formatSessionLabel(session.label),
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      IconButton(
-                        visualDensity: VisualDensity.compact,
-                        onPressed: () => Navigator.of(dialogContext).pop(),
-                        icon: const Icon(Icons.close),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  ...lines.map(
-                    (line) => Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          SizedBox(
-                            width: 92,
-                            child: Text(
-                              line.key,
-                              style: TextStyle(
-                                color:
-                                    context.appColors.textMuted,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                          Expanded(
-                            child: SelectableText(
-                              line.value,
-                              style: const TextStyle(fontSize: 12),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  if (canStop) ...[
-                    const SizedBox(height: 12),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: FilledButton.icon(
-                        onPressed: () async {
-                          Navigator.of(dialogContext).pop();
-                          await _confirmStopResourceSession(context, session);
-                        },
-                        icon: const Icon(Icons.stop_circle_outlined),
-                        label: const Text('Stop session'),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-        ),
   );
 }
 

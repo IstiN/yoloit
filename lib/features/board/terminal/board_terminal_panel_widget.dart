@@ -262,11 +262,20 @@ class _BoardTerminalPanelWidgetState extends State<BoardTerminalPanelWidget> {
     setState(() => _session = null);
   }
 
+  BoardDocument? _boardForPanel(BoardCubit cubit) {
+    for (final board in cubit.state.boards) {
+      if (board.panels.any((panel) => panel.id == widget.panel.id)) {
+        return board;
+      }
+    }
+    return cubit.state.activeBoard;
+  }
+
   ResourceSessionMetadata _resourceMetadata({
     required String sessionName,
     String? workingDirOverride,
   }) {
-    final board = context.read<BoardCubit>().state.activeBoard;
+    final board = _boardForPanel(context.read<BoardCubit>());
     return ResourceSessionMetadata(
       kind: 'terminal',
       boardId: board?.id,

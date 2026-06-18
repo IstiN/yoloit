@@ -28,6 +28,7 @@ class RemoteYoloitTerminalBackend implements TerminalBackend {
     String? label,
     ResourceSessionMetadata? metadata,
     Map<String, String>? extraEnv,
+    bool forceNewShell = false,
   }) async {
     await _client.createTerminal(
       id: sessionId,
