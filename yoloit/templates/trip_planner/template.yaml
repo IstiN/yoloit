@@ -1,0 +1,118 @@
+id: trip-planner
+name: Trip Planner
+icon: trip
+description: |
+  Plan a trip with stages, packing checklist, itinerary notes, inspiration webpage, and decorative shapes.
+
+parameters:
+  - name: destination
+    type: string
+    label: Destination
+    required: true
+    default: Paris
+
+  - name: departureDate
+    type: string
+    label: Departure Date
+    description: e.g. 2026-07-15
+    required: false
+
+operations:
+  - op: panel.create
+    type: board.kanban
+    title: "{{destination}} Stages"
+    x: 40
+    y: 40
+    width: 640
+    height: 420
+    state:
+      columns: [Research, Booked, Packed, Done]
+      cards:
+        - title: "Find flights to {{destination}}"
+          column: Research
+        - title: "Book accommodation"
+          column: Research
+        - title: "Reserve restaurants"
+          column: Research
+
+  - op: panel.create
+    type: board.checklist
+    title: "Packing List"
+    x: 710
+    y: 40
+    width: 340
+    height: 420
+    state:
+      items:
+        - id: p1
+          text: Passport & documents
+          done: false
+        - id: p2
+          text: Chargers & adapters
+          done: false
+        - id: p3
+          text: Comfortable shoes
+          done: false
+        - id: p4
+          text: Travel insurance
+          done: false
+        - id: p5
+          text: Snacks & water bottle
+          done: false
+
+  - op: panel.create
+    type: board.note.markdown
+    title: "Itinerary: {{destination}}"
+    x: 40
+    y: 490
+    width: 480
+    height: 360
+    state:
+      markdown: |
+        # {{destination}} Itinerary
+
+        Departure: {{departureDate}}
+
+        ## Day 1
+        - Arrive & check in
+        - Explore the neighborhood
+
+        ## Day 2
+        - Museums & landmarks
+        - Dinner reservation
+
+  - op: panel.create
+    type: board.webpage
+    title: "Inspiration: {{destination}}"
+    x: 550
+    y: 490
+    width: 500
+    height: 360
+    state:
+      url: "https://www.google.com/search?q=things+to+do+in+{{destination}}"
+
+  - op: panel.create
+    type: board.sticky
+    title: "Travel Tip"
+    x: 1080
+    y: 490
+    width: 260
+    height: 180
+    state:
+      text: "Take photos of important documents!"
+      color: "#93C5FD"
+
+  - op: panel.create
+    type: board.shape
+    title: ""
+    x: 1080
+    y: 690
+    width: 120
+    height: 120
+    state:
+      shape: triangle
+      fillColor: "#F472B6"
+      strokeColor: "#F472B6"
+      strokeWidth: 2
+
+  - op: board.fit

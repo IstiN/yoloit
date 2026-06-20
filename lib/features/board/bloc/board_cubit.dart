@@ -16,6 +16,7 @@ import 'package:yoloit/features/board/model/terminal_panel_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
 import 'package:yoloit/features/board/plugins/builtin/playlist_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/webview_manager.dart';
+import 'package:yoloit/features/board/services/board_operation_applier.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_panel_plugin.dart';
 import 'package:yoloit/features/board/utils/board_grid_layout.dart';
 import 'package:yoloit/features/settings/data/agent_config_service.dart';
@@ -120,6 +121,20 @@ class BoardCubit extends Cubit<BoardState> {
     final updated = [...current, board];
     await _setBoards(updated, activeBoardId: board.id);
     return board;
+  }
+
+  /// Creates a board and applies a list of `board:apply`-style operations to it.
+  ///
+  /// This is used by the template system to instantiate a board from a
+  /// parameterized template.
+  Future<BoardDocument?> createBoardFromOperations({
+    String? name,
+    required List<Map<String, dynamic>> operations,
+  }) async {
+    final board = await createBoard(name: name);
+    if (board == null) return null;
+    const applier = BoardOperationApplier();
+    return applier.apply(this, board, operations);
   }
 
   Future<List<BoardDocument>> connectRemoteBoards({
@@ -507,6 +522,21 @@ class BoardCubit extends Cubit<BoardState> {
     final nextActive =
         state.activeBoardId == id ? updated.first.id : state.activeBoardId;
     await _setBoards(updated, activeBoardId: nextActive);
+  }
+
+  Future<void> archiveBoard(String id) async {
+    final isActive = state.activeBoardId == id;
+    await _updateBoard(id, (board) => board.copyWith(archived: true));
+    if (isActive) {
+      final next = state.activeBoards.firstOrNull;
+      if (next != null) {
+        await setActiveBoard(next.id);
+      }
+    }
+  }
+
+  Future<void> unarchiveBoard(String id) async {
+    await _updateBoard(id, (board) => board.copyWith(archived: false));
   }
 
   Future<void> updateViewport(BoardViewport viewport, {String? boardId}) async {

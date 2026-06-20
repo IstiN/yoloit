@@ -11,6 +11,7 @@ class BoardToolbar extends StatelessWidget {
     super.key,
     required this.board,
     required this.onCreateBoard,
+    required this.onCreateBoardFromTemplate,
     required this.onConnectRemote,
     required this.onShareBoard,
     required this.onBoardSettings,
@@ -21,6 +22,7 @@ class BoardToolbar extends StatelessWidget {
 
   final BoardDocument board;
   final VoidCallback onCreateBoard;
+  final VoidCallback onCreateBoardFromTemplate;
   final VoidCallback onConnectRemote;
   final VoidCallback onShareBoard;
   final VoidCallback onBoardSettings;
@@ -145,6 +147,8 @@ class BoardToolbar extends StatelessWidget {
                         onSearch();
                       case 'new':
                         onCreateBoard();
+                      case 'newFromTemplate':
+                        onCreateBoardFromTemplate();
                       case 'remote':
                         onConnectRemote();
                       case 'share':
@@ -163,7 +167,11 @@ class BoardToolbar extends StatelessWidget {
                         ),
                         const PopupMenuItem(
                           value: 'new',
-                          child: Text('New board'),
+                          child: Text('Blank board'),
+                        ),
+                        const PopupMenuItem(
+                          value: 'newFromTemplate',
+                          child: Text('From template...'),
                         ),
                         const PopupMenuItem(
                           value: 'remote',
@@ -184,10 +192,10 @@ class BoardToolbar extends StatelessWidget {
                       ],
                 )
               else if (compact) ...[
-                IconButton(
-                  tooltip: 'New board',
-                  onPressed: onCreateBoard,
-                  icon: const Icon(Icons.add),
+                _NewBoardMenuButton(
+                  onCreateBoard: onCreateBoard,
+                  onCreateBoardFromTemplate: onCreateBoardFromTemplate,
+                  compact: true,
                 ),
                 IconButton(
                   tooltip: 'Connect remote YoLoIT',
@@ -210,11 +218,9 @@ class BoardToolbar extends StatelessWidget {
                   icon: Icon(deleteIcon),
                 ),
               ] else ...[
-                OutlinedButton.icon(
-                  style: _toolbarButtonStyle(),
-                  onPressed: onCreateBoard,
-                  icon: const Icon(Icons.add),
-                  label: const Text('New board'),
+                _NewBoardMenuButton(
+                  onCreateBoard: onCreateBoard,
+                  onCreateBoardFromTemplate: onCreateBoardFromTemplate,
                 ),
                 const SizedBox(width: 8),
                 OutlinedButton.icon(
@@ -266,6 +272,61 @@ class BoardToolbar extends StatelessWidget {
     final parts = normalized.split(Platform.pathSeparator);
     if (parts.length >= 2) return '…${Platform.pathSeparator}${parts.last}';
     return '…${normalized.substring(normalized.length - 27)}';
+  }
+}
+
+class _NewBoardMenuButton extends StatelessWidget {
+  const _NewBoardMenuButton({
+    required this.onCreateBoard,
+    required this.onCreateBoardFromTemplate,
+    this.compact = false,
+  });
+
+  final VoidCallback onCreateBoard;
+  final VoidCallback onCreateBoardFromTemplate;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = MenuController();
+    return MenuAnchor(
+      controller: controller,
+      menuChildren: [
+        MenuItemButton(
+          leadingIcon: const Icon(Icons.add),
+          onPressed: onCreateBoard,
+          child: const Text('Blank board'),
+        ),
+        MenuItemButton(
+          leadingIcon: const Icon(Icons.dashboard_customize_outlined),
+          onPressed: onCreateBoardFromTemplate,
+          child: const Text('From template...'),
+        ),
+      ],
+      builder: (context, controller, child) {
+        if (compact) {
+          return IconButton(
+            tooltip: 'New board',
+            onPressed: () => _toggle(controller),
+            icon: const Icon(Icons.add),
+          );
+        }
+        return OutlinedButton.icon(
+          style: BoardToolbar._toolbarButtonStyle(),
+          onPressed: () => _toggle(controller),
+          icon: const Icon(Icons.add),
+          label: const Text('New board'),
+        );
+      },
+    );
+  }
+
+  void _toggle(MenuController controller) {
+    if (controller.isOpen) {
+      controller.close();
+    } else {
+      controller.open();
+    }
   }
 }
 

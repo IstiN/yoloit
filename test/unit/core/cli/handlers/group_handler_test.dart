@@ -134,11 +134,13 @@ void main() {
         board,
         mockCubit,
         request,
-        body: _body,
-        json: _json,
-        error: _error,
-        notFound: _notFound,
-        scheduleRebuild: () => rebuildScheduled = true,
+        (
+          body: _body,
+          json: _json,
+          error: _error,
+          notFound: _notFound,
+          scheduleRebuild: () => rebuildScheduled = true,
+        ),
       );
 
   group('handleGroup', () {

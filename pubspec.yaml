@@ -36,6 +36,7 @@ dependencies:
   bloc: ^9.0.0
   equatable: ^2.0.7
   flutter_pty: ^0.4.2
+  meta: ^1.16.0
   xterm:
     path: packages/xterm
   window_manager: ^0.5.1

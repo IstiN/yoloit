@@ -1,0 +1,118 @@
+id: brainstorm
+name: Brainstorm Canvas
+icon: lightbulb
+description: |
+  A creative board for brainstorming with sticky notes, a kanban for ideas, a chat panel, shapes, and an inspiration webpage.
+
+parameters:
+  - name: topic
+    type: string
+    label: Topic
+    description: What are you brainstorming about?
+    required: true
+    default: New Ideas
+
+operations:
+  - op: panel.create
+    type: board.note.markdown
+    title: "Brief: {{topic}}"
+    x: 40
+    y: 40
+    width: 420
+    height: 320
+    state:
+      markdown: |
+        # {{topic}}
+
+        ## Goal
+        -
+
+        ## Constraints
+        -
+
+        ## Success criteria
+        -
+
+  - op: panel.create
+    type: board.kanban
+    title: "Idea Pipeline"
+    x: 490
+    y: 40
+    width: 700
+    height: 420
+    state:
+      columns: [Raw, Promising, Refined, Selected]
+      cards:
+        - title: "Wild idea for {{topic}}"
+          column: Raw
+        - title: "Combine two concepts"
+          column: Promising
+
+  - op: panel.create
+    type: board.sticky
+    title: "Idea 1"
+    x: 40
+    y: 390
+    width: 240
+    height: 180
+    state:
+      text: "What if...?"
+      color: "#93C5FD"
+
+  - op: panel.create
+    type: board.sticky
+    title: "Idea 2"
+    x: 300
+    y: 390
+    width: 240
+    height: 180
+    state:
+      text: "How might we...?"
+      color: "#FDE047"
+
+  - op: panel.create
+    type: board.sticky
+    title: "Idea 3"
+    x: 40
+    y: 590
+    width: 240
+    height: 180
+    state:
+      text: "Riskiest assumption"
+      color: "#FCA5A5"
+
+  - op: panel.create
+    type: board.shape
+    title: ""
+    x: 300
+    y: 590
+    width: 180
+    height: 180
+    state:
+      shape: diamond
+      fillColor: "#C084FC"
+      strokeColor: "#A855F7"
+      strokeWidth: 3
+      text: "Focus"
+      fontSize: 24
+      textColor: "#FFFFFF"
+
+  - op: panel.create
+    type: board.chat
+    title: "Brainstorm Chat"
+    x: 1220
+    y: 40
+    width: 360
+    height: 420
+
+  - op: panel.create
+    type: board.webpage
+    title: "Inspiration"
+    x: 1220
+    y: 490
+    width: 360
+    height: 280
+    state:
+      url: "https://www.google.com/search?q={{topic}}+examples"
+
+  - op: board.fit

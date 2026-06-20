@@ -1,0 +1,116 @@
+id: weekly-review
+name: Weekly Review
+icon: weekly
+description: |
+  Reflect on the past week with notes, kanban, action checklist, sticky priorities, and a mood tracker shape.
+
+parameters:
+  - name: weekLabel
+    type: string
+    label: Week
+    description: e.g. "Week 25" or "June 16-22"
+    required: true
+    default: This Week
+
+operations:
+  - op: panel.create
+    type: board.note.markdown
+    title: "Review: {{weekLabel}}"
+    x: 40
+    y: 40
+    width: 440
+    height: 420
+    state:
+      markdown: |
+        # {{weekLabel}} Review
+
+        ## Wins
+        -
+
+        ## Blockers
+        -
+
+        ## Learnings
+        -
+
+        ## Next Week Priorities
+        -
+
+  - op: panel.create
+    type: board.kanban
+    title: "{{weekLabel}} Kanban"
+    x: 520
+    y: 40
+    width: 700
+    height: 420
+    state:
+      columns: [Goals, Achievements, Blockers, Next Week]
+      cards:
+        - title: Define weekly goals
+          column: Goals
+        - title: Review last week's blockers
+          column: Blockers
+        - title: Plan next week priorities
+          column: Next Week
+
+  - op: panel.create
+    type: board.checklist
+    title: "Action Items"
+    x: 40
+    y: 490
+    width: 400
+    height: 340
+    state:
+      items:
+        - id: a1
+          text: Schedule 1:1s
+          done: false
+        - id: a2
+          text: Update project timeline
+          done: false
+        - id: a3
+          text: Celebrate a win
+          done: false
+        - id: a4
+          text: Set 3 top priorities
+          done: false
+
+  - op: panel.create
+    type: board.sticky
+    title: "Top Priority"
+    x: 470
+    y: 490
+    width: 260
+    height: 200
+    state:
+      text: "The ONE thing that will make this week a success."
+      color: "#FEF08A"
+
+  - op: panel.create
+    type: board.shape
+    title: "Mood"
+    x: 470
+    y: 710
+    width: 120
+    height: 120
+    state:
+      shape: circle
+      fillColor: "#FBBF24"
+      strokeColor: "#F59E0B"
+      strokeWidth: 3
+      text: "😊"
+      fontSize: 48
+
+  - op: panel.create
+    type: board.timer
+    title: "Review Timer"
+    x: 760
+    y: 490
+    width: 300
+    height: 360
+    state:
+      duration: 1800
+      remaining: 1800
+      label: "Weekly review"
+
+  - op: board.fit

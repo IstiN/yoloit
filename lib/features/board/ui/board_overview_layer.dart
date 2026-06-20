@@ -16,6 +16,7 @@ class BoardOverviewLayer extends StatefulWidget {
     required this.previewPngs,
     required this.onSelectedBoard,
     required this.onCreateBoard,
+    required this.onCreateBoardFromTemplate,
     required this.onDisconnectRemoteBoard,
     required this.onDeleteRemoteBoard,
     required this.onDisconnectRemoteUrl,
@@ -29,6 +30,7 @@ class BoardOverviewLayer extends StatefulWidget {
   final void Function(BoardDocument board, Uint8List? previewPng)
   onSelectedBoard;
   final VoidCallback onCreateBoard;
+  final VoidCallback onCreateBoardFromTemplate;
   final ValueChanged<BoardDocument> onDisconnectRemoteBoard;
   final ValueChanged<BoardDocument> onDeleteRemoteBoard;
   final ValueChanged<String> onDisconnectRemoteUrl;
@@ -142,6 +144,18 @@ class BoardOverviewLayerState extends State<BoardOverviewLayer>
       'create.reverseDone elapsed=${watch.elapsedMilliseconds}ms',
     );
     widget.onCreateBoard();
+  }
+
+  Future<void> _createBoardFromTemplate() async {
+    if (_closing) return;
+    widget.debugLog('createFromTemplate.start');
+    setState(() {
+      _closing = true;
+      _zoomBoardId = null;
+    });
+    await _controller.reverse();
+    if (!mounted) return;
+    widget.onCreateBoardFromTemplate();
   }
 
   List<BoardDocument> get _orderedBoards {
@@ -362,7 +376,10 @@ class BoardOverviewLayerState extends State<BoardOverviewLayer>
                     )!,
                 child: Opacity(
                   opacity: fade,
-                  child: CreateBoardOverviewCard(onTap: _createBoard),
+                  child: CreateBoardOverviewCard(
+                    onTap: _createBoard,
+                    onTemplateTap: _createBoardFromTemplate,
+                  ),
                 ),
               ),
             );

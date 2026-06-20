@@ -51,26 +51,28 @@ graph LR
   g_board --> g_board_9["board:rename"]
   g_board --> g_board_10["board:folder · bfold"]
   g_board --> g_board_11["board:delete"]
-  g_board --> g_board_12["board:focus"]
-  g_board --> g_board_13["board:undo · bundo"]
-  g_board --> g_board_14["board:zoom"]
-  g_board --> g_board_15["board:fit"]
-  g_board --> g_board_16["board:arrange"]
-  g_board --> g_board_17["board:grid"]
-  g_board --> g_board_18["select"]
-  g_board --> g_board_19["board:use"]
-  g_board --> g_board_20["board:current"]
-  g_board --> g_board_21["board:translate"]
-  g_board --> g_board_22["sticky:create · sticky:new"]
-  g_board --> g_board_23["shape:create · shape:new"]
-  g_board --> g_board_24["frame:create · frame:new"]
-  g_board --> g_board_25["draw:list · drl"]
-  g_board --> g_board_26["draw:add · dra"]
-  g_board --> g_board_27["draw:remove · drr"]
-  g_board --> g_board_28["draw:clear · drc"]
-  g_board --> g_board_29["draw:svg · drsvg"]
-  g_board --> g_board_30["draw:export · drex"]
-  g_board --> g_board_31["draw:file · drf"]
+  g_board --> g_board_12["board:archive"]
+  g_board --> g_board_13["board:unarchive"]
+  g_board --> g_board_14["board:focus"]
+  g_board --> g_board_15["board:undo · bundo"]
+  g_board --> g_board_16["board:zoom"]
+  g_board --> g_board_17["board:fit"]
+  g_board --> g_board_18["board:arrange"]
+  g_board --> g_board_19["board:grid"]
+  g_board --> g_board_20["select"]
+  g_board --> g_board_21["board:use"]
+  g_board --> g_board_22["board:current"]
+  g_board --> g_board_23["board:translate"]
+  g_board --> g_board_24["sticky:create · sticky:new"]
+  g_board --> g_board_25["shape:create · shape:new"]
+  g_board --> g_board_26["frame:create · frame:new"]
+  g_board --> g_board_27["draw:list · drl"]
+  g_board --> g_board_28["draw:add · dra"]
+  g_board --> g_board_29["draw:remove · drr"]
+  g_board --> g_board_30["draw:clear · drc"]
+  g_board --> g_board_31["draw:svg · drsvg"]
+  g_board --> g_board_32["draw:export · drex"]
+  g_board --> g_board_33["draw:file · drf"]
   root --> g_panel(("panel"))
   g_panel --> g_panel_0["panels"]
   g_panel --> g_panel_1["panel"]
@@ -266,14 +268,15 @@ graph LR
   - example: `yoloit app:demo-view calculator`
 
 ### board
-- **`boards`** — List all boards
-  - example: `yoloit boards`
+- **`boards`** — List boards
+  - params: --archived
+  - example: `yoloit boards --archived`
 - **`board`** — Show board details
   - params: id|name*
   - example: `yoloit board "My Board"`
-- **`board:create`** — Create a new board
-  - params: name*
-  - example: `yoloit board:create "My Board"`
+- **`board:create`** — Create a new board, optionally from a template
+  - params: name*, --template <id>, --params <json|k=v,...>
+  - example: `yoloit board:create "My Board" --template flutter-project --params projectPath=/projects/shop`
 - **`board:snapshot`** — Text snapshot of board layout
   - params: id|name*, --format md|mermaid
   - example: `yoloit board:snapshot "My Board" --format mermaid`
@@ -301,6 +304,12 @@ graph LR
 - **`board:delete`** — Delete a board
   - params: id|name*
   - example: `yoloit board:delete "Scratch"`
+- **`board:archive`** — Archive a board (hide from overview and previews)
+  - params: id|name*
+  - example: `yoloit board:archive "Old Project"`
+- **`board:unarchive`** — Restore an archived board
+  - params: id|name*
+  - example: `yoloit board:unarchive "Old Project"`
 - **`board:focus`** — Focus a board
   - params: id|name*
   - example: `yoloit board:focus "My Board"`

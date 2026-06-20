@@ -1,0 +1,114 @@
+id: flutter-project
+name: Flutter Development
+icon: flutter
+author: yoloit
+description: |
+  A complete Flutter development board with file tree, terminal, run configs group, and kanban.
+
+parameters:
+  - name: projectName
+    type: string
+    label: Project Name
+    description: Display name used in panel titles
+    required: true
+    default: My Flutter App
+
+  - name: projectPath
+    type: path
+    label: Project Folder
+    description: Root folder of the Flutter project
+    required: true
+    picker: directory
+
+  - name: includeKanban
+    type: boolean
+    label: Add Kanban Board
+    description: Include a kanban board for task tracking
+    default: true
+
+  - name: runCommand
+    type: choice
+    label: Default Run Command
+    description: Default command to register in the run configs group
+    options:
+      - value: flutter run
+        label: flutter run
+      - value: flutter test
+        label: flutter test
+      - value: flutter build macos
+        label: flutter build macos
+    default: flutter run
+
+operations:
+  - op: board.configure
+    defaultFolder: "{{projectPath}}"
+
+  - op: panel.create
+    type: board.filetree
+    title: "Files: {{projectName}}"
+    x: 40
+    y: 40
+    width: 320
+    height: 520
+    state:
+      rootPath: "{{projectPath}}"
+
+  - op: panel.create
+    type: board.terminal
+    title: "Terminal: {{projectName}}"
+    x: 390
+    y: 40
+    width: 560
+    height: 360
+    state:
+      config:
+        sessionId: "{{projectName}}-terminal"
+        sessionName: "{{projectName}}"
+        workingDir: "{{projectPath}}"
+        envGroupIds: []
+
+  - op: panel.create
+    type: board.run_configs
+    title: "Run Configs: {{projectName}}"
+    x: 390
+    y: 430
+    width: 560
+    height: 400
+    state:
+      group: "{{projectPath}}"
+
+  - op: panel.create
+    type: board.note.markdown
+    title: "Commands: {{projectName}}"
+    x: 980
+    y: 40
+    width: 420
+    height: 360
+    state:
+      markdown: |
+        # {{projectName}}
+
+        Common commands:
+
+        - `{{runCommand}}`
+        - `flutter analyze`
+        - `flutter test`
+        - `flutter build macos`
+
+  - op: panel.create
+    type: board.kanban
+    title: "Kanban: {{projectName}}"
+    x: 980
+    y: 430
+    width: 640
+    height: 420
+    condition: "{{includeKanban}}"
+    state:
+      columns: [Backlog, Todo, In Progress, Done]
+      cards:
+        - title: "Setup {{projectName}}"
+          column: Todo
+        - title: "Run first build"
+          column: Backlog
+
+  - op: board.fit

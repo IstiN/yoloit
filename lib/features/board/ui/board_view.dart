@@ -50,6 +50,7 @@ import 'package:yoloit/features/board/ui/yolo_badge_with_chat.dart';
 import 'package:yoloit/features/board/utils/board_grid_layout.dart';
 import 'package:yoloit/features/mindmap/widgets/canvas_interaction_lock.dart';
 import 'package:yoloit/features/search/ui/file_search_overlay.dart';
+import 'package:yoloit/features/templates/ui/template_wizard_dialog.dart';
 
 
 class BoardView extends StatefulWidget {
@@ -242,6 +243,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                 BoardToolbar(
                   board: activeBoard,
                   onCreateBoard: () => _createBoard(context),
+                  onCreateBoardFromTemplate:
+                      () => _createBoardFromTemplate(context),
                   onConnectRemote: () => _connectRemoteYoloit(context),
                   onShareBoard: () => _shareBoard(context),
                   onBoardSettings:
@@ -1073,7 +1076,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                               Positioned.fill(
                                 child: BoardOverviewLayer(
                                   activeBoardId: activeBoard.id,
-                                  boards: state.boards,
+                                  boards: state.activeBoards,
                                   previewPngs: _boardPreviewPngs,
                                   debugLog: _boardOverviewLog,
                                   onDisconnectRemoteBoard:
@@ -1105,6 +1108,15 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                       _cancelBgCapture = true;
                                     });
                                     _createBoard(context);
+                                  },
+                                  onCreateBoardFromTemplate: () {
+                                    if (!mounted) return;
+                                    _boardOverviewLog('createFromTemplate.parent');
+                                    setState(() {
+                                      _isBoardOverviewOpen = false;
+                                      _cancelBgCapture = true;
+                                    });
+                                    _createBoardFromTemplate(context);
                                   },
                                   onSelectedBoard: (board, previewPng) {
                                     if (!mounted) return;
@@ -2484,6 +2496,10 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     await context.read<BoardCubit>().createBoard(name: name);
   }
 
+  Future<void> _createBoardFromTemplate(BuildContext context) async {
+    await TemplateWizardDialog.show(context);
+  }
+
   Future<void> _connectRemoteYoloit(BuildContext context) async {
     final result = await showAdaptiveYoloDialog<RemoteYoloitConnection>(
       context: context,
@@ -2539,12 +2555,15 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   ) async {
     final remote = remoteInfoForBoard(board);
     final result =
-        await showAdaptiveYoloDialog<({String name, String defaultFolder})>(
+        await showAdaptiveYoloDialog<
+          ({String name, String defaultFolder, bool archived})
+        >(
           context: context,
           builder:
               (_) => BoardSettingsDialog(
                 initialName: board.name,
                 initialDefaultFolder: board.defaultFolder,
+                initialArchived: board.archived,
                 remoteInfo: remote,
               ),
         );
@@ -2552,6 +2571,11 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     final cubit = context.read<BoardCubit>();
     await cubit.renameBoard(board.id, result.name);
     await cubit.updateBoardDefaultFolder(board.id, result.defaultFolder);
+    if (result.archived && !board.archived) {
+      await cubit.archiveBoard(board.id);
+    } else if (!result.archived && board.archived) {
+      await cubit.unarchiveBoard(board.id);
+    }
   }
 
   Future<void> _openBoardSearch(BuildContext context) {

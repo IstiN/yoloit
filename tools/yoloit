@@ -211,7 +211,7 @@ commands = [{'group': 'app',
   'params': [],
   'example': 'yoloit remote:status',
   'aliases': ['rst']},
- {'group': 'board', 'name': 'boards', 'description': 'List all boards', 'params': [], 'example': 'yoloit boards'},
+ {'group': 'board', 'name': 'boards', 'description': 'List boards', 'params': [['--archived', 'Include archived boards', False]], 'example': 'yoloit boards --archived'},
  {'group': 'board',
   'name': 'board',
   'description': 'Show board details',
@@ -219,9 +219,26 @@ commands = [{'group': 'app',
   'example': 'yoloit board "My Board"'},
  {'group': 'board',
   'name': 'board:create',
-  'description': 'Create a new board',
-  'params': [['name', 'New board name', True]],
-  'example': 'yoloit board:create "My Board"'},
+  'description': 'Create a new board, optionally from a template',
+  'params': [['name', 'New board name', True],
+             ['--template <id>', 'Template id', False],
+             ['--params <json|k=v,...>', 'Template parameters', False]],
+  'example': 'yoloit board:create "My Board" --template flutter-project --params projectPath=/projects/shop'},
+ {'group': 'template',
+  'name': 'template:list',
+  'description': 'List available board templates',
+  'params': [],
+  'example': 'yoloit template:list'},
+ {'group': 'template',
+  'name': 'template:sync',
+  'description': 'Refresh templates from configured sources',
+  'params': [['--source <id>', 'Sync only this source', False]],
+  'example': 'yoloit template:sync'},
+ {'group': 'template',
+  'name': 'template:info',
+  'description': 'Show template details and parameters',
+  'params': [['id', 'Template id', True]],
+  'example': 'yoloit template:info flutter-project'},
  {'group': 'board',
   'name': 'board:snapshot',
   'description': 'Text snapshot of board layout',
@@ -656,6 +673,16 @@ commands = [{'group': 'app',
   'description': 'Delete a board',
   'params': [['id|name', 'Board identifier or board name', True]],
   'example': 'yoloit board:delete "Scratch"'},
+ {'group': 'board',
+  'name': 'board:archive',
+  'description': 'Archive a board (hide from overview and previews)',
+  'params': [['id|name', 'Board identifier or board name', True]],
+  'example': 'yoloit board:archive "Old Project"'},
+ {'group': 'board',
+  'name': 'board:unarchive',
+  'description': 'Restore an archived board',
+  'params': [['id|name', 'Board identifier or board name', True]],
+  'example': 'yoloit board:unarchive "Old Project"'},
  {'group': 'board',
   'name': 'board:focus',
   'description': 'Focus a board',
@@ -2086,7 +2113,14 @@ PYEOF
     fi
     ;;
   boards)
-    _get "/boards" | python3 -m json.tool 2>/dev/null || _get "/boards"
+    include_archived=""
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --archived|-a) include_archived="?includeArchived=true" ;;
+      esac
+      shift
+    done
+    _get "/boards${include_archived}" | python3 -m json.tool 2>/dev/null || _get "/boards${include_archived}"
     ;;
   board)
     bid_raw=$(_board "${1:-}")
@@ -2094,9 +2128,50 @@ PYEOF
     bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
     _get "/boards/${bid}" | python3 -m json.tool 2>/dev/null || _get "/boards/${bid}"
     ;;
-  board:create)
-    [[ $# -lt 1 ]] && { echo "Usage: yoloit board:create <name>" >&2; exit 1; }
-    _post "/boards" "{\"name\":\"$1\"}" | python3 -m json.tool 2>/dev/null
+  board:create|bmk)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit board:create <name> [--template <id>] [--params <json|key=val,...>]" >&2; exit 1; }
+    local board_name="$1"
+    local template_id=""
+    local template_params="{}"
+    shift
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --template|-t)
+          template_id="$2"
+          shift 2
+          ;;
+        --params|-p)
+          template_params="$2"
+          shift 2
+          ;;
+        *)
+          echo "Unknown option: $1" >&2
+          exit 1
+          ;;
+      esac
+    done
+    local payload
+    if [[ -n "$template_id" ]]; then
+      payload=$(python3 -c '
+import json, sys
+name, template_id, params_raw = sys.argv[1:4]
+payload = {"name": name, "templateId": template_id}
+params_raw = params_raw.strip()
+if params_raw.startswith("{"):
+    payload["templateParams"] = json.loads(params_raw)
+else:
+    params = {}
+    for part in params_raw.split(","):
+        if "=" in part:
+            k, v = part.split("=", 1)
+            params[k.strip()] = v.strip()
+    payload["templateParams"] = params
+print(json.dumps(payload))
+' "$board_name" "$template_id" "$template_params")
+    else
+      payload="{\"name\":\"$board_name\"}"
+    fi
+    _post "/boards" "$payload" | python3 -m json.tool 2>/dev/null
     ;;
   board:rename)
     [[ $# -lt 2 ]] && { echo "Usage: yoloit board:rename <board> <new>" >&2; exit 1; }
@@ -2119,6 +2194,18 @@ PYEOF
     bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
     _delete "/boards/${bid}" | python3 -m json.tool 2>/dev/null
     ;;
+  board:archive)
+    bid_raw=$(_board "${1:-}")
+    [[ -z "$bid_raw" ]] && { echo "Usage: yoloit board:archive [board]" >&2; exit 1; }
+    bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
+    _post "/boards/${bid}/archive" "{}" | python3 -m json.tool 2>/dev/null
+    ;;
+  board:unarchive)
+    bid_raw=$(_board "${1:-}")
+    [[ -z "$bid_raw" ]] && { echo "Usage: yoloit board:unarchive [board]" >&2; exit 1; }
+    bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
+    _post "/boards/${bid}/unarchive" "{}" | python3 -m json.tool 2>/dev/null
+    ;;
   board:focus)
     bid_raw=$(_board "${1:-}")
     [[ -z "$bid_raw" ]] && { echo "Usage: yoloit board:focus [board]" >&2; exit 1; }
@@ -2139,6 +2226,32 @@ PYEOF
       echo "No current board found" >&2
       exit 1
     fi
+    ;;
+  template:list|tls)
+    _get "/templates" | python3 -m json.tool 2>/dev/null
+    ;;
+  template:sync|tsy)
+    local source_id=""
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --source|-s)
+          source_id="$2"
+          shift 2
+          ;;
+        *)
+          shift
+          ;;
+      esac
+    done
+    if [[ -n "$source_id" ]]; then
+      _post "/templates" "{\"sourceId\":\"$source_id\"}" | python3 -m json.tool 2>/dev/null
+    else
+      _post "/templates" "{}" | python3 -m json.tool 2>/dev/null
+    fi
+    ;;
+  template:info|tinfo)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit template:info <id>" >&2; exit 1; }
+    _get "/templates/$(_encode "$1")" | python3 -m json.tool 2>/dev/null
     ;;
   board:apply)
     [[ $# -lt 1 ]] && { echo "Usage: yoloit board:apply <id|name> [file|-]" >&2; exit 1; }

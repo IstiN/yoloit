@@ -1,0 +1,107 @@
+id: home-notes
+name: Home Notes & Tasks
+icon: home
+description: |
+  Personal productivity board with notes, tasks, kanban, timers, and sticky notes for home projects.
+
+parameters:
+  - name: boardName
+    type: string
+    label: Board Name
+    required: true
+    default: Home
+
+  - name: defaultFolder
+    type: path
+    label: Default Notes Folder
+    description: Folder where notes and files will live
+    required: false
+    picker: directory
+
+operations:
+  - op: panel.create
+    type: board.note.markdown
+    title: "Notes: {{boardName}}"
+    x: 40
+    y: 40
+    width: 420
+    height: 360
+    state:
+      markdown: "# {{boardName}} Notes\n\nQuick thoughts, ideas, and reference material."
+
+  - op: panel.create
+    type: board.checklist
+    title: "Tasks: {{boardName}}"
+    x: 490
+    y: 40
+    width: 360
+    height: 360
+    state:
+      items:
+        - id: t1
+          text: Review weekly goals
+          done: false
+        - id: t2
+          text: Clean inbox
+          done: false
+        - id: t3
+          text: Buy groceries
+          done: false
+        - id: t4
+          text: Schedule home maintenance
+          done: false
+
+  - op: panel.create
+    type: board.kanban
+    title: "Projects: {{boardName}}"
+    x: 40
+    y: 430
+    width: 640
+    height: 420
+    state:
+      columns: [Ideas, Todo, In Progress, Done]
+      cards:
+        - title: Plan weekend
+          column: Ideas
+        - title: Organize closet
+          column: Todo
+        - title: Fix leaky faucet
+          column: In Progress
+
+  - op: panel.create
+    type: board.sticky
+    title: "Quick idea"
+    x: 700
+    y: 430
+    width: 260
+    height: 200
+    state:
+      text: "Drop quick ideas here!"
+      color: "#FDE047"
+
+  - op: panel.create
+    type: board.timer
+    title: "Pomodoro"
+    x: 980
+    y: 430
+    width: 300
+    height: 360
+    state:
+      duration: 1500
+      remaining: 1500
+      label: "Focus"
+
+  - op: panel.create
+    type: board.shape
+    title: ""
+    x: 700
+    y: 650
+    width: 140
+    height: 140
+    state:
+      shape: hexagon
+      fillColor: "#60A5FA"
+      strokeColor: "#60A5FA"
+      strokeWidth: 2
+
+  - op: board.fit

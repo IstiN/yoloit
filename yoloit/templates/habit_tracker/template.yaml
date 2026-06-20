@@ -1,0 +1,111 @@
+id: habit-tracker
+name: Habit Tracker
+icon: habit
+description: |
+  Track weekly habits with a kanban-style day board, checklists, focus timer, and motivational sticky notes.
+
+parameters:
+  - name: habits
+    type: text
+    label: Habits
+    description: Comma-separated list of habits to track
+    required: true
+    default: "Exercise, Read, Meditate"
+
+  - name: accentColor
+    type: color
+    label: Accent Color
+    required: false
+    default: "#22C55E"
+
+operations:
+  - op: panel.create
+    type: board.note.markdown
+    title: "My Habits"
+    x: 40
+    y: 40
+    width: 360
+    height: 340
+    state:
+      markdown: |
+        # My Habits
+
+        {{habits}}
+
+        Track consistency, not perfection.
+
+  - op: panel.create
+    type: board.checklist
+    title: "Today's Habits"
+    x: 430
+    y: 40
+    width: 360
+    height: 340
+    state:
+      items:
+        - id: h1
+          text: Exercise
+          done: false
+        - id: h2
+          text: Read
+          done: false
+        - id: h3
+          text: Meditate
+          done: false
+        - id: h4
+          text: Drink water
+          done: false
+
+  - op: panel.create
+    type: board.kanban
+    title: "This Week"
+    x: 820
+    y: 40
+    width: 760
+    height: 420
+    state:
+      columns: [Mon, Tue, Wed, Thu, Fri, Sat, Sun]
+      cards:
+        - title: Morning routine
+          column: Mon
+        - title: Evening review
+          column: Sun
+
+  - op: panel.create
+    type: board.timer
+    title: "Focus Timer"
+    x: 40
+    y: 410
+    width: 300
+    height: 360
+    state:
+      duration: 1500
+      remaining: 1500
+      label: "Deep work"
+
+  - op: panel.create
+    type: board.note.sticky
+    title: "Motivation"
+    x: 360
+    y: 410
+    width: 280
+    height: 220
+    state:
+      text: "Small steps every day."
+      color: "{{accentColor}}"
+
+  - op: panel.create
+    type: board.shape
+    title: ""
+    x: 360
+    y: 650
+    width: 120
+    height: 120
+    state:
+      shape: circle
+      fillColor: "{{accentColor}}"
+      strokeColor: "{{accentColor}}"
+      strokeWidth: 2
+      text: ""
+
+  - op: board.fit

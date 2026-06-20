@@ -21,7 +21,7 @@ final List<YoloitCliTool> boardTools = <YoloitCliTool>[
   YoloitCliTool(
     command: 'board:create',
     alias: 'bmk',
-    description: 'Create a board',
+    description: 'Create a board, optionally from a template',
     group: 'board',
     humanVariants: const {
       'ru': [
@@ -34,6 +34,18 @@ final List<YoloitCliTool> boardTools = <YoloitCliTool>[
     },
     params: <YoloitCliToolParam>[
       toolParam('name', 'New board name', required: true, shortKey: 'n'),
+      toolParam(
+        'template',
+        'Template id to instantiate',
+        flag: '--template',
+        shortKey: 't',
+      ),
+      toolParam(
+        'params',
+        'Template parameters as JSON object or comma-separated key=value pairs',
+        flag: '--params',
+        shortKey: 'p',
+      ),
     ],
   ),
 
@@ -92,6 +104,30 @@ final List<YoloitCliTool> boardTools = <YoloitCliTool>[
     humanVariants: const {
       'ru': ['удали борд {board}', 'удали доску {board}', 'убери борд {board}'],
       'en': ['delete board {board}', 'remove board {board}'],
+    },
+    params: <YoloitCliToolParam>[boardParam('id_or_name')],
+  ),
+
+  YoloitCliTool(
+    command: 'board:archive',
+    alias: 'barch',
+    description: 'Archive a board (hide from overview and previews)',
+    group: 'board',
+    humanVariants: const {
+      'ru': ['заархивируй борд {board}', 'архивируй доску {board}'],
+      'en': ['archive board {board}', 'hide board {board}'],
+    },
+    params: <YoloitCliToolParam>[boardParam('id_or_name')],
+  ),
+
+  YoloitCliTool(
+    command: 'board:unarchive',
+    alias: 'bunarch',
+    description: 'Restore an archived board',
+    group: 'board',
+    humanVariants: const {
+      'ru': ['разархивируй борд {board}', 'верни доску {board} из архива'],
+      'en': ['unarchive board {board}', 'restore board {board}'],
     },
     params: <YoloitCliToolParam>[boardParam('id_or_name')],
   ),
@@ -447,6 +483,50 @@ final List<YoloitCliTool> boardTools = <YoloitCliTool>[
       toolParam('y', 'Y position offset (default 100)'),
       toolParam('color', 'Stroke color override as #RRGGBB hex', shortKey: 'c'),
       toolParam('width', 'Stroke width in pixels', shortKey: 'w'),
+    ],
+  ),
+
+  const YoloitCliTool(
+    command: 'template:list',
+    alias: 'tls',
+    description: 'List available board templates',
+    group: 'template',
+    humanVariants: {
+      'ru': ['покажи шаблоны', 'список шаблонов', 'какие шаблоны есть'],
+      'en': ['show templates', 'list templates', 'what templates are available'],
+    },
+  ),
+
+  YoloitCliTool(
+    command: 'template:sync',
+    alias: 'tsy',
+    description: 'Refresh templates from all configured sources',
+    group: 'template',
+    humanVariants: const {
+      'ru': ['обнови шаблоны', 'синхронизируй шаблоны'],
+      'en': ['sync templates', 'refresh templates'],
+    },
+    params: <YoloitCliToolParam>[
+      toolParam(
+        'source',
+        'Optional source id to sync only one source',
+        flag: '--source',
+        shortKey: 's',
+      ),
+    ],
+  ),
+
+  YoloitCliTool(
+    command: 'template:info',
+    alias: 'tinfo',
+    description: 'Show template details and parameters',
+    group: 'template',
+    humanVariants: const {
+      'ru': ['инфо о шаблоне {id}', 'параметры шаблона {id}'],
+      'en': ['template info {id}', 'template parameters {id}'],
+    },
+    params: <YoloitCliToolParam>[
+      toolParam('id', 'Template id', required: true),
     ],
   ),
 

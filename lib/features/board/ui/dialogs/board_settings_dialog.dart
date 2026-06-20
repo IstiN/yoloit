@@ -11,10 +11,12 @@ class BoardSettingsDialog extends StatefulWidget {
     required this.initialName,
     required this.initialDefaultFolder,
     required this.remoteInfo,
+    this.initialArchived = false,
   });
 
   final String initialName;
   final String initialDefaultFolder;
+  final bool initialArchived;
   final ({String url, String? token, String boardId, int? revision})?
       remoteInfo;
 
@@ -25,6 +27,7 @@ class BoardSettingsDialog extends StatefulWidget {
 class _BoardSettingsDialogState extends State<BoardSettingsDialog> {
   late final TextEditingController _nameController;
   late final TextEditingController _folderController;
+  late bool _archived;
 
   @override
   void initState() {
@@ -33,6 +36,7 @@ class _BoardSettingsDialogState extends State<BoardSettingsDialog> {
     _folderController = TextEditingController(
       text: widget.initialDefaultFolder,
     );
+    _archived = widget.initialArchived;
   }
 
   @override
@@ -99,6 +103,16 @@ class _BoardSettingsDialogState extends State<BoardSettingsDialog> {
                 ),
               ],
             ),
+            const SizedBox(height: 16),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Archived'),
+              subtitle: const Text(
+                'Archived boards are hidden from the overview and previews.',
+              ),
+              value: _archived,
+              onChanged: (value) => setState(() => _archived = value),
+            ),
           ],
         ),
       ),
@@ -107,6 +121,7 @@ class _BoardSettingsDialogState extends State<BoardSettingsDialog> {
           applyResultBuilder: () => (
             name: _nameController.text.trim(),
             defaultFolder: _folderController.text.trim(),
+            archived: _archived,
           ),
           applyLabel: 'Save',
         ),

@@ -537,6 +537,7 @@ class BoardDocument extends Equatable {
     this.drawings = const [],
     this.groups = const [],
     this.metadata = const {},
+    this.archived = false,
   });
 
   final String id;
@@ -547,6 +548,7 @@ class BoardDocument extends Equatable {
   final List<BoardDrawingElement> drawings;
   final List<BoardPanelGroup> groups;
   final Map<String, dynamic> metadata;
+  final bool archived;
 
   String get defaultFolder =>
       (metadata['defaultFolder'] as String? ?? '').trim();
@@ -574,6 +576,7 @@ class BoardDocument extends Equatable {
     List<BoardDrawingElement>? drawings,
     List<BoardPanelGroup>? groups,
     Map<String, dynamic>? metadata,
+    bool? archived,
   }) {
     return BoardDocument(
       id: id ?? this.id,
@@ -584,6 +587,7 @@ class BoardDocument extends Equatable {
       drawings: drawings ?? this.drawings,
       groups: groups ?? this.groups,
       metadata: metadata ?? this.metadata,
+      archived: archived ?? this.archived,
     );
   }
 
@@ -596,6 +600,7 @@ class BoardDocument extends Equatable {
     'drawings': drawings.map((d) => d.toJson()).toList(),
     'groups': groups.map((g) => g.toJson()).toList(),
     'metadata': metadata,
+    'archived': archived,
   };
 
   factory BoardDocument.fromJson(Map<String, dynamic> json) {
@@ -606,6 +611,7 @@ class BoardDocument extends Equatable {
     return BoardDocument(
       id: json['id'] as String,
       name: json['name'] as String? ?? 'Board',
+      archived: json['archived'] as bool? ?? false,
       viewport: BoardViewport.fromJson(
         Map<String, dynamic>.from(json['viewport'] as Map? ?? const {}),
       ),
@@ -655,5 +661,6 @@ class BoardDocument extends Equatable {
     drawings,
     groups,
     metadata,
+    archived,
   ];
 }

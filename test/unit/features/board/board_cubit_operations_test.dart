@@ -969,5 +969,130 @@ void main() {
         expect(cubit.state.selectedPanelIds, isEmpty);
       });
     });
+
+    group('archiveBoard', () {
+      test('archiving a board excludes it from activeBoards', () async {
+        final cubit = await createLoadedCubit(
+          boards: [
+            const BoardDocument(id: 'b1', name: 'First', panels: []),
+            const BoardDocument(id: 'b2', name: 'Second', panels: []),
+          ],
+          activeBoardId: 'b1',
+        );
+        addTearDown(cubit.close);
+
+        await cubit.archiveBoard('b1');
+
+        expect(cubit.state.activeBoards.map((b) => b.id), ['b2']);
+        expect(cubit.state.archivedBoards.map((b) => b.id), ['b1']);
+      });
+
+      test('archiving active board switches active to next unarchived', () async {
+        final cubit = await createLoadedCubit(
+          boards: [
+            const BoardDocument(id: 'b1', name: 'First', panels: []),
+            const BoardDocument(id: 'b2', name: 'Second', panels: []),
+          ],
+          activeBoardId: 'b1',
+        );
+        addTearDown(cubit.close);
+
+        await cubit.archiveBoard('b1');
+
+        expect(cubit.state.activeBoardId, 'b2');
+      });
+
+      test('unarchiveBoard restores board to activeBoards', () async {
+        final cubit = await createLoadedCubit(
+          boards: [
+            const BoardDocument(
+              id: 'b1',
+              name: 'First',
+              panels: [],
+              archived: true,
+            ),
+            const BoardDocument(id: 'b2', name: 'Second', panels: []),
+          ],
+          activeBoardId: 'b2',
+        );
+        addTearDown(cubit.close);
+
+        await cubit.unarchiveBoard('b1');
+
+        expect(cubit.state.activeBoards.length, 2);
+        expect(cubit.state.archivedBoards, isEmpty);
+      });
+    });
+
+    group('createBoardFromOperations', () {
+      test('creates a board with panels from template operations', () async {
+        final cubit = await createLoadedCubit();
+        addTearDown(cubit.close);
+
+        final board = await cubit.createBoardFromOperations(
+          name: 'From Template',
+          operations: [
+            {
+              'op': 'panel.create',
+              'type': 'board.note.markdown',
+              'title': 'Notes',
+              'x': 10.0,
+              'y': 20.0,
+              'width': 300.0,
+              'height': 200.0,
+            },
+            {
+              'op': 'panel.create',
+              'type': 'board.checklist',
+              'title': 'Tasks',
+              'state': {'items': <dynamic>[]},
+            },
+          ],
+        );
+
+        expect(board, isNotNull);
+        expect(board!.name, 'From Template');
+        expect(board.panels.length, 2);
+        expect(board.panels.first.title, 'Notes');
+        expect(board.panels.first.type, 'board.note.markdown');
+        expect(board.panels.last.title, 'Tasks');
+        expect(board.panels.last.type, 'board.checklist');
+      });
+
+      test('creates an empty board when no operations are provided', () async {
+        final cubit = await createLoadedCubit();
+        addTearDown(cubit.close);
+
+        final initialCount = cubit.state.boards.length;
+        final board = await cubit.createBoardFromOperations(
+          name: 'Empty Template',
+          operations: [],
+        );
+
+        expect(board, isNotNull);
+        expect(cubit.state.boards.length, initialCount + 1);
+        expect(board!.panels, isEmpty);
+      });
+
+      test('applies board.configure to set default folder', () async {
+        final cubit = await createLoadedCubit();
+        addTearDown(cubit.close);
+
+        final board = await cubit.createBoardFromOperations(
+          name: 'Configured Template',
+          operations: [
+            {'op': 'board.configure', 'defaultFolder': '/projects'},
+            {
+              'op': 'panel.create',
+              'type': 'board.note.markdown',
+              'title': 'Note',
+            },
+          ],
+        );
+
+        expect(board, isNotNull);
+        expect(board!.defaultFolder, '/projects');
+      });
+    });
   });
 }

@@ -1,17 +1,29 @@
 import 'package:flutter/material.dart';
 
-/// Parse a hex color string (e.g. `'#FF5733'` or `'FF5733'` or `'#80FF5733'`)
-/// into a [Color].
+/// Parses a color string into a [Color].
 ///
-/// Returns `null` if [raw] is null, empty, or not a valid hex color.
-Color? parseHexColor(String? raw) {
-  if (raw == null || raw.trim().isEmpty) return null;
-  final cleaned = raw.trim().replaceFirst('#', '');
-  if (cleaned.isEmpty) return null;
-  final value = int.tryParse(
-    cleaned.length <= 6 ? 'FF${cleaned.padLeft(6, '0')}' : cleaned,
-    radix: 16,
-  );
-  if (value == null) return null;
-  return Color(value);
+/// Supports:
+/// - `'clear'` or empty/blank → `null`
+/// - `'#RRGGBB'` or `'#AARRGGBB'` hex strings
+/// - raw 32-bit integer strings (e.g. `'0xFF123456'`)
+Color? parseColor(String? text) {
+  if (text == null) return null;
+  final normalized = text.trim();
+  if (normalized.isEmpty || normalized == 'clear') return null;
+  if (normalized.startsWith('#')) {
+    final hex = normalized.substring(1);
+    final parsed = int.tryParse(hex, radix: 16);
+    if (parsed != null) {
+      return hex.length == 6 ? Color(0xFF000000 | parsed) : Color(parsed);
+    }
+  }
+  final parsed = int.tryParse(normalized);
+  if (parsed != null) return Color(parsed);
+  return null;
 }
+
+/// Alias for backwards compatibility with existing call sites.
+Color? parseHexColor(String? text) => parseColor(text);
+
+/// Default blue used for panel-to-panel links when no color is specified.
+const Color kDefaultLinkColor = Color(0xFF60A5FA);

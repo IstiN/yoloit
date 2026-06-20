@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui';
 
 import 'package:shelf/shelf.dart' as shelf;
+import 'package:yoloit/core/cli/handlers/handler_helpers.dart';
 import 'package:yoloit/core/cli/handlers/server_helpers.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
@@ -12,13 +13,15 @@ Future<shelf.Response> handleGroup(
   List<String> sub,
   BoardDocument board,
   BoardCubit cubit,
-  shelf.Request request, {
-  required Future<Map<String, dynamic>> Function(shelf.Request) body,
-  required shelf.Response Function(Object) json,
-  required shelf.Response Function(String) error,
-  required shelf.Response Function(String) notFound,
-  required void Function() scheduleRebuild,
-}) async {
+  shelf.Request request,
+  BoardRouteDependencies deps,
+) async {
+  final body = deps.body;
+  final json = deps.json;
+  final error = deps.error;
+  final notFound = deps.notFound;
+  final scheduleRebuild = deps.scheduleRebuild;
+
   // GET /api/boards/:id/groups → list groups
   if (sub.isEmpty && method == 'GET') {
     return json({
@@ -158,16 +161,7 @@ Future<shelf.Response> handleGroup(
   return notFound(unknownRoute('group'));
 }
 
-List<String> _parsePanelIds(dynamic value) {
-  if (value == null) return const [];
-  if (value is String) {
-    return value.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
-  }
-  if (value is List) {
-    return value.whereType<String>().toList();
-  }
-  return const [];
-}
+List<String> _parsePanelIds(dynamic value) => parsePanelIds(value);
 
 int? _parseColor(dynamic value) {
   if (value == null || value == 'clear') return null;

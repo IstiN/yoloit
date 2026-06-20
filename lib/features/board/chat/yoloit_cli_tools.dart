@@ -607,10 +607,13 @@ class YoloitCliToolArgumentNormalizer {
         if (value != null) normalized['y'] = value;
       }
     }
-    if (command == 'board:delete' && _isMissing(normalized['id_or_name'])) {
+    if ((command == 'board:delete' ||
+            command == 'board:archive' ||
+            command == 'board:unarchive') &&
+        _isMissing(normalized['id_or_name'])) {
       final boardName = _extractNamedTarget(
         userMessage,
-        RegExp(r'delete board'),
+        RegExp(r'(delete|archive|unarchive) board'),
       );
       if (boardName != null) normalized['id_or_name'] = boardName;
     }

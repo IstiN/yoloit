@@ -14,14 +14,22 @@ class BoardState extends Equatable {
   final bool isLoaded;
   final Set<String> selectedPanelIds;
 
+  List<BoardDocument> get activeBoards =>
+      boards.where((board) => !board.archived).toList();
+
+  List<BoardDocument> get archivedBoards =>
+      boards.where((board) => board.archived).toList();
+
   BoardDocument? get activeBoard {
     if (boards.isEmpty) return null;
     final activeId = activeBoardId;
-    if (activeId == null) return boards.first;
+    if (activeId == null) {
+      return activeBoards.isNotEmpty ? activeBoards.first : boards.first;
+    }
     for (final board in boards) {
       if (board.id == activeId) return board;
     }
-    return boards.first;
+    return activeBoards.isNotEmpty ? activeBoards.first : boards.first;
   }
 
   BoardState copyWith({

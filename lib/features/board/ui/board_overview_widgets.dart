@@ -330,16 +330,21 @@ class BoardOverviewCard extends StatelessWidget {
 }
 
 class CreateBoardOverviewCard extends StatelessWidget {
-  const CreateBoardOverviewCard({super.key, required this.onTap});
+  const CreateBoardOverviewCard({
+    super.key,
+    required this.onTap,
+    this.onTemplateTap,
+  });
 
   final VoidCallback onTap;
+  final VoidCallback? onTemplateTap;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final mutedColor = context.appColors.textMuted;
     return InkWell(
-      onTap: onTap,
+      onTap: () => _showCreateOptions(context),
       borderRadius: BorderRadius.circular(16),
       child: Container(
         decoration: BoxDecoration(
@@ -369,6 +374,54 @@ class CreateBoardOverviewCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  void _showCreateOptions(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Create board',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: colors.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ListTile(
+                  leading: const Icon(Icons.add),
+                  title: const Text('Blank board'),
+                  subtitle: const Text('Start with an empty board'),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    onTap();
+                  },
+                ),
+                if (onTemplateTap != null)
+                  ListTile(
+                    leading: const Icon(Icons.dashboard_customize_outlined),
+                    title: const Text('From template'),
+                    subtitle: const Text('Use a pre-built board layout'),
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      onTemplateTap!();
+                    },
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

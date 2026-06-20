@@ -39,6 +39,7 @@ import 'package:yoloit/features/board/services/board_offscreen_renderer.dart';
 import 'package:yoloit/features/board/services/board_preview_cache.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_panel_plugin.dart';
 import 'package:yoloit/features/board/widgets/widget_engine_manager.dart';
+import 'package:yoloit/features/templates/data/template_service.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_cubit.dart';
 
 /// Local HTTP server that exposes YoLoIT board functionality via a REST-like
@@ -326,12 +327,27 @@ class CliServer {
       });
     }
 
-    // GET /api/boards
-    if (path.length == 1 && path[0] == 'boards' && method == 'GET') {
-      return _listBoards(cubit);
+    // GET /api/templates
+    if (path.length == 1 && path[0] == 'templates' && method == 'GET') {
+      return _listTemplates();
     }
 
-    // POST /api/boards  { name: "..." }
+    // GET /api/templates/:id
+    if (path.length == 2 && path[0] == 'templates' && method == 'GET') {
+      return _templateDetails(path[1]);
+    }
+
+    // POST /api/templates/sync
+    if (path.length == 1 && path[0] == 'templates' && method == 'POST') {
+      return _syncTemplates(request);
+    }
+
+    // GET /api/boards
+    if (path.length == 1 && path[0] == 'boards' && method == 'GET') {
+      return _listBoards(cubit, request);
+    }
+
+    // POST /api/boards  { name: "...", templateId?, templateParams? }
     if (path.length == 1 && path[0] == 'boards' && method == 'POST') {
       final body = await _body(request);
       return _createBoard(cubit, body);
@@ -549,8 +565,76 @@ class CliServer {
 
   // ── Board implementations ──────────────────────────────────────────────
 
-  shelf.Response _listBoards(BoardCubit cubit) {
-    final boards = cubit.state.boards;
+  Future<shelf.Response> _listTemplates() async {
+    final templates = await BoardTemplateService.instance.loadAll();
+    return _json({
+      'ok': true,
+      'templates':
+          templates
+              .map(
+                (t) => {
+                  'id': t.id,
+                  'name': t.name,
+                  'icon': t.icon,
+                  'author': t.author,
+                  'description': t.description,
+                  'parameterCount': t.parameters.length,
+                  'sourceId': t.sourceId,
+                },
+              )
+              .toList(),
+    });
+  }
+
+  Future<shelf.Response> _templateDetails(String id) async {
+    final template = await BoardTemplateService.instance.resolveById(id);
+    if (template == null) {
+      return _notFound('Template not found: $id');
+    }
+    return _json({
+      'ok': true,
+      'template': {
+        'id': template.id,
+        'name': template.name,
+        'icon': template.icon,
+        'author': template.author,
+        'description': template.description,
+        'parameters': template.parameters.map((p) => p.toJson()).toList(),
+        'operations': template.operations.map((o) => o.toJson()).toList(),
+        'sourceId': template.sourceId,
+      },
+    });
+  }
+
+  Future<shelf.Response> _syncTemplates(shelf.Request request) async {
+    final body = await _body(request);
+    final sourceId = body['sourceId'] as String?;
+    if (sourceId != null && sourceId.isNotEmpty) {
+      // Sync a single source if requested.
+      final sources = await BoardTemplateService.instance.loadAll();
+      final source = sources
+          .where((s) => s.sourceId == sourceId)
+          .firstOrNull;
+      if (source == null) {
+        return _notFound('Template source not found: $sourceId');
+      }
+      await BoardTemplateService.instance.sync();
+    } else {
+      await BoardTemplateService.instance.sync();
+    }
+    final templates = await BoardTemplateService.instance.loadAll();
+    return _json({
+      'ok': true,
+      'templateCount': templates.length,
+      'templates': templates.map((t) => {'id': t.id, 'name': t.name}).toList(),
+    });
+  }
+
+  shelf.Response _listBoards(BoardCubit cubit, shelf.Request request) {
+    final includeArchived =
+        request.url.queryParameters['includeArchived'] == 'true';
+    final boards =
+        includeArchived ? cubit.state.boards : cubit.state.activeBoards;
     final active = cubit.state.activeBoardId;
     return _json({
       'boards': boards.map((b) => _boardSummary(b, activeId: active)).toList(),
@@ -565,6 +649,7 @@ class CliServer {
       'linkCount': board.links.length,
       'defaultFolder': board.defaultFolder,
       'gridMode': board.gridMode.toJson(),
+      'archived': board.archived,
       if (activeId != null) 'active': board.id == activeId,
     };
   }
@@ -574,6 +659,47 @@ class CliServer {
     Map<String, dynamic> body,
   ) async {
     final name = body['name'] as String? ?? 'New Board';
+    final templateId = body['templateId'] as String? ??
+        body['template'] as String?;
+    final templateParams = _map(body['templateParams'] ?? body['params']) ??
+        const <String, dynamic>{};
+
+    if (templateId != null && templateId.isNotEmpty) {
+      final template = await BoardTemplateService.instance.resolveById(
+        templateId,
+      );
+      if (template == null) {
+        return _notFound('Template not found: $templateId');
+      }
+      final errors = BoardTemplateService.instance.validateParameters(
+        template,
+        templateParams,
+      );
+      if (errors.isNotEmpty) {
+        return shelf.Response(
+          400,
+          body: jsonEncode({'ok': false, 'errors': errors}),
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+      final operations = BoardTemplateService.instance.buildOperations(
+        template,
+        templateParams,
+      );
+      final board = await cubit.createBoardFromOperations(
+        name: name,
+        operations: operations,
+      );
+      _scheduleRebuild();
+      if (board == null) return _error('Failed to create board');
+      return _json({
+        'ok': true,
+        'board': {'id': board.id, 'name': board.name},
+        'templateId': template.id,
+        'panelCount': board.panels.length,
+      });
+    }
+
     final board = await cubit.createBoard(name: name);
     _scheduleRebuild();
     if (board == null) return _error('Failed to create board');

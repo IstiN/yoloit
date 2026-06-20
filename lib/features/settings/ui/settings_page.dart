@@ -23,6 +23,7 @@ import 'package:yoloit/features/settings/ui/widget_permissions_section.dart';
 import 'package:yoloit/features/settings/ui/widgets/theme_selector.dart';
 import 'package:yoloit/features/skills/bloc/skills_cubit.dart';
 import 'package:yoloit/features/skills/ui/skills_panel.dart';
+import 'package:yoloit/features/templates/ui/template_sources_section.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_cubit.dart';
 
 
@@ -40,11 +41,13 @@ const _kCategories = [
   'Apps & Widgets',
   'Support',
   'About',
+  'Templates',
 ];
 
 const _kDebugCategories = [..._kCategories, 'Debug UI'];
 
 const _kSkillsCategoryIndex = 7;
+const _kTemplatesCategoryIndex = 13;
 
 /// Settings overlay shown as a modal dialog with sidebar navigation.
 class SettingsPage extends StatefulWidget {
@@ -318,6 +321,14 @@ class _SettingsPageState extends State<SettingsPage> {
             SectionHeader(title: 'About'),
             SizedBox(height: 12),
             AboutSection(),
+          ],
+        ),
+        _kTemplatesCategoryIndex => const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SectionHeader(title: 'Templates'),
+            SizedBox(height: 12),
+            TemplateSourcesSection(),
           ],
         ),
         _ => kDebugMode ? const DebugUIShell() : const SizedBox.shrink(),

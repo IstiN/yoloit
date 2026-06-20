@@ -4,6 +4,7 @@ import 'dart:ui';
 
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:yoloit/core/cli/handlers/group_handler.dart';
+import 'package:yoloit/core/cli/handlers/handler_helpers.dart';
 import 'package:yoloit/core/cli/handlers/server_helpers.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
@@ -123,6 +124,18 @@ Future<shelf.Response> handleBoard(
     await cubit.deleteBoard(board.id);
     scheduleRebuild();
     return json({'ok': true, 'message': 'Deleted board ${board.name}'});
+  }
+  // POST /api/boards/:id/archive → archive board
+  if (sub.length == 1 && sub[0] == 'archive' && method == 'POST') {
+    await cubit.archiveBoard(board.id);
+    scheduleRebuild();
+    return json({'ok': true, 'message': 'Archived board ${board.name}'});
+  }
+  // POST /api/boards/:id/unarchive → unarchive board
+  if (sub.length == 1 && sub[0] == 'unarchive' && method == 'POST') {
+    await cubit.unarchiveBoard(board.id);
+    scheduleRebuild();
+    return json({'ok': true, 'message': 'Unarchived board ${board.name}'});
   }
   // GET /api/boards/:id/snapshot
   if (sub.length == 1 && sub[0] == 'snapshot' && method == 'GET') {
@@ -245,28 +258,17 @@ Future<shelf.Response> handleBoard(
       board,
       cubit,
       request,
-      body: body,
-      json: json,
-      error: error,
-      notFound: notFound,
-      scheduleRebuild: scheduleRebuild,
+      (
+        body: body,
+        json: json,
+        error: error,
+        notFound: notFound,
+        scheduleRebuild: scheduleRebuild,
+      ),
     );
   }
 
   return notFound('Unknown board route');
 }
 
-List<String> _parsePanelIds(dynamic value) {
-  if (value == null) return const [];
-  if (value is String) {
-    return value
-        .split(',')
-        .map((s) => s.trim())
-        .where((s) => s.isNotEmpty)
-        .toList();
-  }
-  if (value is List) {
-    return value.whereType<String>().toList();
-  }
-  return const [];
-}
+List<String> _parsePanelIds(dynamic value) => parsePanelIds(value);
