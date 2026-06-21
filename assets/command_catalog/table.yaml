@@ -1,0 +1,46 @@
+# Table panel commands
+commands:
+  - id: table:create
+    human:
+      ru:
+        - "создай таблицу {title}"
+        - "добавь таблицу {title}"
+        - "новая таблица {title}"
+        - "сделай таблицу {title}"
+        - "create table {title}"
+      en:
+        - "create table {title}"
+        - "add table {title}"
+        - "new table {title}"
+        - "make table {title}"
+
+  - id: table:add-row
+    human:
+      ru:
+        - "добавь строку в таблицу {panel}"
+        - "новая строка в {panel}"
+        - "add row to {panel}"
+      en:
+        - "add row to table {panel}"
+        - "new row in {panel}"
+        - "insert row into {panel}"
+
+  - id: table:add-column
+    human:
+      ru:
+        - "добавь колонку {id} в таблицу {panel}"
+        - "новая колонка {id} в {panel}"
+        - "add column {id} to {panel}"
+      en:
+        - "add column {id} to table {panel}"
+        - "new column {id} in {panel}"
+
+  - id: table:clear
+    human:
+      ru:
+        - "очисти таблицу {panel}"
+        - "удали все строки из {panel}"
+        - "clear table {panel}"
+      en:
+        - "clear table {panel}"
+        - "empty table {panel}"

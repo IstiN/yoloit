@@ -16,6 +16,7 @@ class BoardPanelRenderContext {
     this.onFindPanelByGroup,
     this.onRevealSessionInPanel,
     this.onFocusPanelById,
+    this.onFindPanelById,
     this.remoteInfo,
     this.isHeadlessPreview = false,
   });
@@ -48,6 +49,10 @@ class BoardPanelRenderContext {
 
   /// Focuses an existing panel by ID.
   final Future<void> Function(String panelId)? onFocusPanelById;
+
+  /// Looks up an existing panel by ID. Used by panels that reference other
+  /// panels, e.g. a chart reading data from a table panel.
+  final BoardPanelInstance? Function(String panelId)? onFindPanelById;
 
   /// Remote board connection metadata. Null means the panel belongs to a local
   /// board and filesystem actions should use the local machine.

@@ -38,11 +38,15 @@ class BoardOffscreenRenderer {
   /// Returns null if the board has no visible panels or rendering fails.
   /// Pass [cancelToken] to abort early when the user switches boards or closes
   /// the overview, preventing wasted CPU cycles.
+  ///
+  /// When [useViewport] is `false` the renderer fits all panels into [size]
+  /// regardless of the board's current viewport — useful for template previews.
   Future<Uint8List?> renderBoard(
     BoardDocument board, {
     Size size = const Size(1400, 900),
     double pixelRatio = 1.5,
     CancelToken? cancelToken,
+    bool useViewport = true,
   }) async {
     final panels = board.panels.where((p) => !p.hidden).toList();
     if (panels.isEmpty) return null;
@@ -65,7 +69,13 @@ class BoardOffscreenRenderer {
       cubit: headlessCubit,
       errorMessage: 'render failed',
       action: () => _renderWidgetToImage(
-        _buildBoardPreview(board, headlessCubit, theme, colors),
+        _buildBoardPreview(
+          board,
+          headlessCubit,
+          theme,
+          colors,
+          useViewport: useViewport,
+        ),
         size,
         pixelRatio,
         cancelToken: cancelToken,
@@ -134,8 +144,9 @@ class BoardOffscreenRenderer {
     BoardDocument board,
     BoardCubit cubit,
     ThemeData theme,
-    AppColorScheme colors,
-  ) {
+    AppColorScheme colors, {
+    required bool useViewport,
+  }) {
     // BlocProvider.value injects headless implementations so all plugins that
     // call context.read<BoardCubit>() receive a properly populated instance.
     // Use explicit MediaQuery/Theme (not MaterialApp) — isolated BuildOwner
@@ -151,7 +162,7 @@ class BoardOffscreenRenderer {
         color: colors.background,
         child: BoardCanvasPreview(
           board: board,
-          useViewport: true,
+          useViewport: useViewport,
         ),
       ),
     );

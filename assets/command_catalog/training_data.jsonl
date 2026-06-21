@@ -372,28 +372,26 @@
 {"input": "i need the board list", "output": "{\"c\": \"boards\", \"a\": []}"}
 {"input": "open board list", "output": "{\"c\": \"boards\", \"a\": []}"}
 {"input": "boards", "output": "{\"c\": \"boards\", \"a\": []}"}
-{"input": "покажи борд MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
 {"input": "детали борда MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
 {"input": "информация о борде MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
 {"input": "что на борде MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
-{"input": "открой борд MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
 {"input": "можно посмотреть борд MyBoard?", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
 {"input": "пожалуйста покажи доску MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
-{"input": "мне нужен борд MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
 {"input": "содержимое борда MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
 {"input": "расскажи про борд MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
 {"input": "покажи доску MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
-{"input": "show board MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
+{"input": "подробности борда MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
+{"input": "инфо о борде MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
 {"input": "board details MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
 {"input": "info about board MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
 {"input": "what is on board MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
-{"input": "open board MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
 {"input": "can i see board MyBoard?", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
-{"input": "please show board MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
-{"input": "i need board MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
+{"input": "please show board details MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
 {"input": "board info MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
 {"input": "tell me about board MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
-{"input": "display board MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
+{"input": "display board info MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
+{"input": "board summary MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
+{"input": "describe board MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
 {"input": "создай борд Work", "output": "{\"c\": \"board:create\", \"a\": [\"Work\"]}"}
 {"input": "создай доску Work", "output": "{\"c\": \"board:create\", \"a\": [\"Work\"]}"}
 {"input": "новый борд Work", "output": "{\"c\": \"board:create\", \"a\": [\"Work\"]}"}
@@ -462,7 +460,6 @@
 {"input": "trash board MyBoard", "output": "{\"c\": \"board:delete\", \"a\": [\"MyBoard\"]}"}
 {"input": "открой борд MyBoard", "output": "{\"c\": \"board:focus\", \"a\": [\"MyBoard\"]}"}
 {"input": "переключись на MyBoard", "output": "{\"c\": \"board:focus\", \"a\": [\"MyBoard\"]}"}
-{"input": "покажи борд MyBoard", "output": "{\"c\": \"board:focus\", \"a\": [\"MyBoard\"]}"}
 {"input": "перейди на MyBoard", "output": "{\"c\": \"board:focus\", \"a\": [\"MyBoard\"]}"}
 {"input": "открой доску MyBoard", "output": "{\"c\": \"board:focus\", \"a\": [\"MyBoard\"]}"}
 {"input": "сфокусируйся на борде MyBoard", "output": "{\"c\": \"board:focus\", \"a\": [\"MyBoard\"]}"}
@@ -470,7 +467,7 @@
 {"input": "пожалуйста перейди на борд MyBoard", "output": "{\"c\": \"board:focus\", \"a\": [\"MyBoard\"]}"}
 {"input": "мне нужен борд MyBoard на экране", "output": "{\"c\": \"board:focus\", \"a\": [\"MyBoard\"]}"}
 {"input": "зафокусить борд MyBoard", "output": "{\"c\": \"board:focus\", \"a\": [\"MyBoard\"]}"}
-{"input": "go to board MyBoard", "output": "{\"c\": \"board:focus\", \"a\": [\"MyBoard\"]}"}
+{"input": "покажи борд MyBoard", "output": "{\"c\": \"board:focus\", \"a\": [\"MyBoard\"]}"}
 {"input": "open board MyBoard", "output": "{\"c\": \"board:focus\", \"a\": [\"MyBoard\"]}"}
 {"input": "switch to board MyBoard", "output": "{\"c\": \"board:focus\", \"a\": [\"MyBoard\"]}"}
 {"input": "go to board MyBoard", "output": "{\"c\": \"board:focus\", \"a\": [\"MyBoard\"]}"}
@@ -489,7 +486,6 @@
 {"input": "работай с бордом MyBoard", "output": "{\"c\": \"board:use\", \"a\": [\"MyBoard\"]}"}
 {"input": "переключись на борд MyBoard", "output": "{\"c\": \"board:use\", \"a\": [\"MyBoard\"]}"}
 {"input": "сменить борд на MyBoard", "output": "{\"c\": \"board:use\", \"a\": [\"MyBoard\"]}"}
-{"input": "задай борд MyBoard", "output": "{\"c\": \"board:use\", \"a\": [\"MyBoard\"]}"}
 {"input": "мой борд MyBoard", "output": "{\"c\": \"board:use\", \"a\": [\"MyBoard\"]}"}
 {"input": "сделай MyBoard активным бордом", "output": "{\"c\": \"board:use\", \"a\": [\"MyBoard\"]}"}
 {"input": "использовать доску MyBoard", "output": "{\"c\": \"board:use\", \"a\": [\"MyBoard\"]}"}
@@ -497,7 +493,6 @@
 {"input": "set board MyBoard", "output": "{\"c\": \"board:use\", \"a\": [\"MyBoard\"]}"}
 {"input": "select board MyBoard", "output": "{\"c\": \"board:use\", \"a\": [\"MyBoard\"]}"}
 {"input": "work with board MyBoard", "output": "{\"c\": \"board:use\", \"a\": [\"MyBoard\"]}"}
-{"input": "switch to MyBoard", "output": "{\"c\": \"board:use\", \"a\": [\"MyBoard\"]}"}
 {"input": "change board to MyBoard", "output": "{\"c\": \"board:use\", \"a\": [\"MyBoard\"]}"}
 {"input": "set active board MyBoard", "output": "{\"c\": \"board:use\", \"a\": [\"MyBoard\"]}"}
 {"input": "make MyBoard the current board", "output": "{\"c\": \"board:use\", \"a\": [\"MyBoard\"]}"}
@@ -724,6 +719,29 @@
 {"input": "drag the view to 100 200", "output": "{\"c\": \"board:translate\", \"a\": [\"100\", \"200\"]}"}
 {"input": "shift the canvas 100 200", "output": "{\"c\": \"board:translate\", \"a\": [\"100\", \"200\"]}"}
 {"input": "move board view 100 200", "output": "{\"c\": \"board:translate\", \"a\": [\"100\", \"200\"]}"}
+{"input": "создай график тест", "output": "{\"c\": \"chart:create\", \"a\": [\"тест\"]}"}
+{"input": "создай диаграмму тест", "output": "{\"c\": \"chart:create\", \"a\": [\"тест\"]}"}
+{"input": "добавь график тест", "output": "{\"c\": \"chart:create\", \"a\": [\"тест\"]}"}
+{"input": "create chart тест", "output": "{\"c\": \"chart:create\", \"a\": [\"тест\"]}"}
+{"input": "create chart тест", "output": "{\"c\": \"chart:create\", \"a\": [\"тест\"]}"}
+{"input": "add chart тест", "output": "{\"c\": \"chart:create\", \"a\": [\"тест\"]}"}
+{"input": "new chart тест", "output": "{\"c\": \"chart:create\", \"a\": [\"тест\"]}"}
+{"input": "make chart тест", "output": "{\"c\": \"chart:create\", \"a\": [\"тест\"]}"}
+{"input": "задай данные для графика p-123", "output": "{\"c\": \"chart:set-data\", \"a\": [\"p-123\"]}"}
+{"input": "установи данные p-123", "output": "{\"c\": \"chart:set-data\", \"a\": [\"p-123\"]}"}
+{"input": "set data for chart p-123", "output": "{\"c\": \"chart:set-data\", \"a\": [\"p-123\"]}"}
+{"input": "set chart data for p-123", "output": "{\"c\": \"chart:set-data\", \"a\": [\"p-123\"]}"}
+{"input": "update chart data p-123", "output": "{\"c\": \"chart:set-data\", \"a\": [\"p-123\"]}"}
+{"input": "смени тип графика p-123 на type", "output": "{\"c\": \"chart:set-type\", \"a\": [\"p-123\", \"type\"]}"}
+{"input": "сделай график p-123 type", "output": "{\"c\": \"chart:set-type\", \"a\": [\"p-123\", \"type\"]}"}
+{"input": "set chart p-123 to type", "output": "{\"c\": \"chart:set-type\", \"a\": [\"p-123\", \"type\"]}"}
+{"input": "set chart p-123 type to type", "output": "{\"c\": \"chart:set-type\", \"a\": [\"p-123\", \"type\"]}"}
+{"input": "change p-123 to type chart", "output": "{\"c\": \"chart:set-type\", \"a\": [\"p-123\", \"type\"]}"}
+{"input": "привяжи график p-123 к таблице tablePanelId", "output": "{\"c\": \"chart:link-table\", \"a\": [\"p-123\", \"tablePanelId\"]}"}
+{"input": "свяжи p-123 с таблицей tablePanelId", "output": "{\"c\": \"chart:link-table\", \"a\": [\"p-123\", \"tablePanelId\"]}"}
+{"input": "link chart p-123 to table tablePanelId", "output": "{\"c\": \"chart:link-table\", \"a\": [\"p-123\", \"tablePanelId\"]}"}
+{"input": "link chart p-123 to table tablePanelId", "output": "{\"c\": \"chart:link-table\", \"a\": [\"p-123\", \"tablePanelId\"]}"}
+{"input": "connect p-123 to table tablePanelId", "output": "{\"c\": \"chart:link-table\", \"a\": [\"p-123\", \"tablePanelId\"]}"}
 {"input": "добавь в чеклист молоко", "output": "{\"c\": \"checklist:add\", \"a\": [\"молоко\"]}"}
 {"input": "добавь пункт молоко", "output": "{\"c\": \"checklist:add\", \"a\": [\"молоко\"]}"}
 {"input": "запиши в список молоко", "output": "{\"c\": \"checklist:add\", \"a\": [\"молоко\"]}"}
@@ -2022,3 +2040,28 @@
 {"input": "activate click on p-123", "output": "{\"c\": \"do\", \"a\": [\"click\", \"p-123\"]}"}
 {"input": "perform click on p-123", "output": "{\"c\": \"do\", \"a\": [\"click\", \"p-123\"]}"}
 {"input": "invoke click for p-123", "output": "{\"c\": \"do\", \"a\": [\"click\", \"p-123\"]}"}
+{"input": "создай таблицу тест", "output": "{\"c\": \"table:create\", \"a\": [\"тест\"]}"}
+{"input": "добавь таблицу тест", "output": "{\"c\": \"table:create\", \"a\": [\"тест\"]}"}
+{"input": "новая таблица тест", "output": "{\"c\": \"table:create\", \"a\": [\"тест\"]}"}
+{"input": "сделай таблицу тест", "output": "{\"c\": \"table:create\", \"a\": [\"тест\"]}"}
+{"input": "create table тест", "output": "{\"c\": \"table:create\", \"a\": [\"тест\"]}"}
+{"input": "create table тест", "output": "{\"c\": \"table:create\", \"a\": [\"тест\"]}"}
+{"input": "add table тест", "output": "{\"c\": \"table:create\", \"a\": [\"тест\"]}"}
+{"input": "new table тест", "output": "{\"c\": \"table:create\", \"a\": [\"тест\"]}"}
+{"input": "make table тест", "output": "{\"c\": \"table:create\", \"a\": [\"тест\"]}"}
+{"input": "добавь строку в таблицу p-123", "output": "{\"c\": \"table:add-row\", \"a\": [\"p-123\"]}"}
+{"input": "новая строка в p-123", "output": "{\"c\": \"table:add-row\", \"a\": [\"p-123\"]}"}
+{"input": "add row to p-123", "output": "{\"c\": \"table:add-row\", \"a\": [\"p-123\"]}"}
+{"input": "add row to table p-123", "output": "{\"c\": \"table:add-row\", \"a\": [\"p-123\"]}"}
+{"input": "new row in p-123", "output": "{\"c\": \"table:add-row\", \"a\": [\"p-123\"]}"}
+{"input": "insert row into p-123", "output": "{\"c\": \"table:add-row\", \"a\": [\"p-123\"]}"}
+{"input": "добавь колонку my-app в таблицу p-123", "output": "{\"c\": \"table:add-column\", \"a\": [\"my-app\", \"p-123\"]}"}
+{"input": "новая колонка my-app в p-123", "output": "{\"c\": \"table:add-column\", \"a\": [\"my-app\", \"p-123\"]}"}
+{"input": "add column my-app to p-123", "output": "{\"c\": \"table:add-column\", \"a\": [\"my-app\", \"p-123\"]}"}
+{"input": "add column my-app to table p-123", "output": "{\"c\": \"table:add-column\", \"a\": [\"my-app\", \"p-123\"]}"}
+{"input": "new column my-app in p-123", "output": "{\"c\": \"table:add-column\", \"a\": [\"my-app\", \"p-123\"]}"}
+{"input": "очисти таблицу p-123", "output": "{\"c\": \"table:clear\", \"a\": [\"p-123\"]}"}
+{"input": "удали все строки из p-123", "output": "{\"c\": \"table:clear\", \"a\": [\"p-123\"]}"}
+{"input": "clear table p-123", "output": "{\"c\": \"table:clear\", \"a\": [\"p-123\"]}"}
+{"input": "clear table p-123", "output": "{\"c\": \"table:clear\", \"a\": [\"p-123\"]}"}
+{"input": "empty table p-123", "output": "{\"c\": \"table:clear\", \"a\": [\"p-123\"]}"}

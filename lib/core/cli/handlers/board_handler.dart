@@ -227,6 +227,35 @@ Future<shelf.Response> handleBoard(
       'selected': cubit.state.selectedPanelIds.toList(),
     });
   }
+  // POST /api/boards/:id/copy → copy panels to clipboard
+  if (sub.length == 1 && sub[0] == 'copy' && method == 'POST') {
+    final requestBody = await body(request);
+    final panelIds = parsePanelIds(requestBody['panels']);
+    final ids = panelIds.isNotEmpty
+        ? panelIds.toSet()
+        : cubit.state.selectedPanelIds;
+    final copied = await cubit.copyPanels(ids);
+    scheduleRebuild();
+    return json({'ok': true, 'copied': copied});
+  }
+  // POST /api/boards/:id/paste → paste panels from clipboard
+  if (sub.length == 1 && sub[0] == 'paste' && method == 'POST') {
+    final pasted = await cubit.pastePanels();
+    scheduleRebuild();
+    return json({'ok': true, 'pasted': pasted});
+  }
+  // POST /api/boards/:id/duplicate → duplicate panels
+  if (sub.length == 1 && sub[0] == 'duplicate' && method == 'POST') {
+    final requestBody = await body(request);
+    final panelIds = parsePanelIds(requestBody['panels']);
+    final ids = panelIds.isNotEmpty
+        ? panelIds.toSet()
+        : cubit.state.selectedPanelIds;
+    final duplicated = await cubit.duplicatePanels(ids);
+    scheduleRebuild();
+    return json({'ok': true, 'duplicated': duplicated});
+  }
+
   // POST /api/boards/:id/select → select panels by id list or rect
   if (sub.length == 1 && sub[0] == 'select' && method == 'POST') {
     final requestBody = await body(request);

@@ -129,6 +129,14 @@ class MiroPanelToolbar extends StatelessWidget {
                     color: textColor,
                   ),
                   MiroToolbarIcon(
+                    tooltip: 'Duplicate panel',
+                    icon: Icons.copy_outlined,
+                    onTap: () {
+                      context.read<BoardCubit>().duplicatePanels({panel.id});
+                    },
+                    color: textColor,
+                  ),
+                  MiroToolbarIcon(
                     tooltip: 'Remove panel',
                     icon: Icons.close_rounded,
                     onTap: onDelete,

@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yoloit/core/cli/cli_server.dart';
 import 'package:yoloit/core/cli/handlers/assistant_handler.dart';
+import 'package:yoloit/core/cli/handlers/calendar_handler.dart';
+import 'package:yoloit/core/cli/handlers/chart_handler.dart';
 import 'package:yoloit/core/cli/handlers/chat_handler.dart';
 import 'package:yoloit/core/cli/handlers/checklist_handler.dart';
 import 'package:yoloit/core/cli/handlers/code_snippet_handler.dart';
@@ -16,6 +18,7 @@ import 'package:yoloit/core/cli/handlers/playlist_handler.dart';
 import 'package:yoloit/core/cli/handlers/run_configs_handler.dart';
 import 'package:yoloit/core/cli/handlers/shape_handler.dart';
 import 'package:yoloit/core/cli/handlers/sticky_note_handler.dart';
+import 'package:yoloit/core/cli/handlers/table_handler.dart';
 import 'package:yoloit/core/cli/handlers/terminal_handler.dart';
 import 'package:yoloit/core/cli/handlers/timer_handler.dart';
 import 'package:yoloit/core/cli/handlers/webpage_handler.dart';
@@ -734,6 +737,9 @@ class _AutoHostShellState extends State<_AutoHostShell> {
     server.registerPanelHandler(const FileTreeCliHandler());
     server.registerPanelHandler(const AssistantCliHandler());
     server.registerPanelHandler(const TimerCliHandler());
+    server.registerPanelHandler(const CalendarCliHandler());
+    server.registerPanelHandler(const TableCliHandler());
+    server.registerPanelHandler(const ChartCliHandler());
     server.registerPanelHandler(const CustomWidgetCliHandler());
     server.start(cubit, terminalCubit: terminalCubit);
     // Wire service managers to BoardCubit for headless state updates

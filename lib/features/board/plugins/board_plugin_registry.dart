@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:yoloit/features/board/chat/chat_panel_plugin.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
+import 'package:yoloit/features/board/plugins/builtin/calendar_plugin.dart';
+import 'package:yoloit/features/board/plugins/builtin/chart_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/checklist_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/code_snippet_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/custom_widget_plugin.dart';
@@ -15,6 +17,7 @@ import 'package:yoloit/features/board/plugins/builtin/run_configs_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/setup_guide_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/shape_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/sticky_note_plugin.dart';
+import 'package:yoloit/features/board/plugins/builtin/table_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/timer_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/webpage_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/yolo_assistant_plugin.dart';
@@ -73,6 +76,9 @@ class BoardPluginRegistry {
     register(const WebpagePlugin());
     register(const CodeSnippetPlugin());
     register(const ChecklistPlugin());
+    register(const CalendarPlugin());
+    register(const TablePlugin());
+    register(const ChartPlugin());
     register(const FilesPlugin());
     register(const FilePreviewPlugin());
     register(const PlaylistPlugin());

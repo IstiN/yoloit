@@ -1,0 +1,113 @@
+id: customer-journey-map
+name: Customer Journey Map
+icon: journey
+description: |
+  Miro-style customer journey map with persona note, stage kanban, emotion shape, and opportunity checklist.
+
+parameters:
+  - name: persona
+    type: string
+    label: Persona
+    description: Customer persona to map
+    required: true
+    default: New Customer
+
+operations:
+  - op: panel.create
+    type: board.note.markdown
+    title: "Persona: {{persona}}"
+    x: 40
+    y: 40
+    width: 420
+    height: 280
+    state:
+      markdown: |
+        # {{persona}}
+
+        ## Needs
+        -
+
+        ## Behaviors
+        -
+
+        ## Touchpoints
+        -
+
+  - op: panel.create
+    type: board.kanban
+    title: "Journey Stages"
+    x: 490
+    y: 40
+    width: 900
+    height: 460
+    state:
+      columns: [Awareness, Consideration, Purchase, Retention, Advocacy]
+      cards:
+        - title: "Learns about the product"
+          column: Awareness
+        - title: "Compares alternatives"
+          column: Consideration
+        - title: "Makes first purchase"
+          column: Purchase
+        - title: "Receives onboarding"
+          column: Retention
+        - title: "Refers a friend"
+          column: Advocacy
+
+  - op: panel.create
+    type: board.sticky
+    title: "Pain Point"
+    x: 40
+    y: 350
+    width: 200
+    height: 160
+    state:
+      text: "Where does {{persona}} struggle?"
+      color: "#FCA5A5"
+
+  - op: panel.create
+    type: board.sticky
+    title: "Delight"
+    x: 260
+    y: 350
+    width: 200
+    height: 160
+    state:
+      text: "What does {{persona}} love?"
+      color: "#86EFAC"
+
+  - op: panel.create
+    type: board.shape
+    title: "Emotion"
+    x: 40
+    y: 540
+    width: 120
+    height: 120
+    state:
+      shape: circle
+      fillColor: "#FCD34D"
+      strokeColor: "#F59E0B"
+      strokeWidth: 3
+      text: "🙂"
+      fontSize: 48
+
+  - op: panel.create
+    type: board.checklist
+    title: "Opportunities"
+    x: 490
+    y: 530
+    width: 440
+    height: 240
+    state:
+      items:
+        - id: o1
+          text: Fix top friction point
+          done: false
+        - id: o2
+          text: Amplify a delight moment
+          done: false
+        - id: o3
+          text: Add a new touchpoint
+          done: false
+
+  - op: board.fit

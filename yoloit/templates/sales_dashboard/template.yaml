@@ -1,0 +1,91 @@
+id: sales-dashboard
+name: Sales Dashboard
+icon: show_chart
+description: |
+  A simple sales table with linked line and bar charts.
+
+parameters:
+  - name: productName
+    type: string
+    label: Product
+    description: Product name used in titles
+    required: false
+    default: Widget
+
+operations:
+  - op: panel.create
+    id: sales-table
+    type: board.table
+    title: "{{productName}} Sales"
+    x: 40
+    y: 40
+    width: 500
+    height: 460
+    state:
+      columns:
+        - id: month
+          title: Month
+          type: text
+        - id: units
+          title: Units Sold
+          type: number
+        - id: revenue
+          title: Revenue
+          type: number
+      rows:
+        - id: r1
+          month: Jan
+          units: 120
+          revenue: 12000
+        - id: r2
+          month: Feb
+          units: 190
+          revenue: 19000
+        - id: r3
+          month: Mar
+          units: 150
+          revenue: 15000
+        - id: r4
+          month: Apr
+          units: 220
+          revenue: 22000
+        - id: r5
+          month: May
+          units: 280
+          revenue: 28000
+        - id: r6
+          month: Jun
+          units: 260
+          revenue: 26000
+
+  - op: panel.create
+    id: sales-line
+    type: board.chart
+    title: "{{productName}} Revenue Trend"
+    x: 560
+    y: 40
+    width: 540
+    height: 260
+    state:
+      type: line
+      xKey: month
+      yKey: revenue
+      tablePanelId: sales-table
+      animated: false
+
+  - op: panel.create
+    id: sales-bar
+    type: board.chart
+    title: "{{productName}} Units Sold"
+    x: 560
+    y: 320
+    width: 540
+    height: 180
+    state:
+      type: bar
+      xKey: month
+      yKey: units
+      tablePanelId: sales-table
+      animated: false
+
+  - op: board.fit

@@ -1,0 +1,79 @@
+id: product-roadmap
+name: Product Roadmap
+icon: roadmap
+description: |
+  A Miro-style product roadmap with vision, Now/Next/Later kanban, milestones calendar, and timeline shape.
+
+parameters:
+  - name: productName
+    type: string
+    label: Product Name
+    description: Name of the product or initiative
+    required: true
+    default: My Product
+
+operations:
+  - op: panel.create
+    type: board.note.markdown
+    title: "Vision: {{productName}}"
+    x: 40
+    y: 40
+    width: 420
+    height: 300
+    state:
+      markdown: |
+        # {{productName}} Vision
+
+        ## Goal
+        -
+
+        ## Success metrics
+        -
+
+        ## Risks
+        -
+
+  - op: panel.create
+    type: board.kanban
+    title: "{{productName}} Roadmap"
+    x: 490
+    y: 40
+    width: 900
+    height: 460
+    state:
+      columns: [Now, Next, Later]
+      cards:
+        - title: "Foundation for {{productName}}"
+          column: Now
+        - title: "Core user flows"
+          column: Next
+        - title: "Platform scale"
+          column: Later
+
+  - op: panel.create
+    type: board.calendar
+    title: "Milestones"
+    x: 40
+    y: 370
+    width: 420
+    height: 340
+    state:
+      view: month
+
+  - op: panel.create
+    type: board.shape
+    title: ""
+    x: 490
+    y: 530
+    width: 260
+    height: 120
+    state:
+      shape: rectangle
+      fillColor: "#E0E7FF"
+      strokeColor: "#6366F1"
+      strokeWidth: 2
+      text: "→ Timeline"
+      fontSize: 20
+      textColor: "#4338CA"
+
+  - op: board.fit

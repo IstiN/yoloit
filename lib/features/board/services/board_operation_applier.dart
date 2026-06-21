@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -31,6 +32,68 @@ class BoardOperationApplier {
     BoardDocument board,
     List<Map<String, dynamic>> operations,
   ) async {
+    final result = _applyOperations(
+      board,
+      operations,
+      onPanel: (panel) => cubit.addPanel(panel, boardId: board.id),
+      onLink: (link) => cubit.upsertLink(link, boardId: board.id),
+      onConfigure: (updated) async {
+        final name = _string(updated['name']);
+        final defaultFolder = _string(updated['defaultFolder']);
+        final archived = _bool(updated['archived']);
+        if (name != null && name.isNotEmpty) {
+          await cubit.renameBoard(board.id, name);
+        }
+        if (defaultFolder != null) {
+          await cubit.updateBoardDefaultFolder(board.id, defaultFolder);
+        }
+        if (archived != null) {
+          if (archived) {
+            await cubit.archiveBoard(board.id);
+          } else {
+            await cubit.unarchiveBoard(board.id);
+          }
+        }
+      },
+      onFit: (viewport) => cubit.updateViewport(viewport, boardId: board.id),
+      onArrange: () => cubit.arrangePanelsByTypeInGrid(board.id),
+    );
+
+    return cubit.state.boards.where((b) => b.id == board.id).firstOrNull ??
+        result;
+  }
+
+  /// Builds a [BoardDocument] from [operations] without touching a real cubit.
+  ///
+  /// This is useful for generating previews, screenshots, or other read-only
+  /// representations of a template before it is persisted.
+  BoardDocument buildDocument(
+    BoardDocument board,
+    List<Map<String, dynamic>> operations,
+  ) {
+    return _applyOperations(
+      board,
+      operations,
+      onPanel: (_) {},
+      onLink: (_) {},
+      onConfigure: (_) async {},
+      onFit: (_) async {},
+    );
+  }
+
+  /// Shared operation loop used by both [apply] and [buildDocument].
+  ///
+  /// Callbacks are invoked so that [apply] can persist changes through a real
+  /// [BoardCubit] while [buildDocument] stays side-effect free.
+  BoardDocument _applyOperations(
+    BoardDocument board,
+    List<Map<String, dynamic>> operations, {
+    required FutureOr<void> Function(BoardPanelInstance panel) onPanel,
+    required FutureOr<void> Function(BoardPanelLink link) onLink,
+    required FutureOr<void> Function(Map<String, dynamic> raw) onConfigure,
+    required FutureOr<void> Function(BoardViewport viewport) onFit,
+    void Function()? onArrange,
+  }) {
     var currentBoard = board;
     final refs = <String, String>{};
     final pendingPanels = <String, BoardPanelInstance>{};
@@ -42,50 +105,43 @@ class BoardOperationApplier {
 
       switch (opName) {
         case 'panel.create':
-          final panel = await _createPanel(
-            cubit,
-            currentBoard,
-            refs,
-            pendingPanels,
-            op,
-          );
+          final panel = _buildPanel(currentBoard, refs, pendingPanels, op);
           if (panel != null) {
+            onPanel(panel);
             currentBoard = currentBoard.copyWith(
               panels: [...currentBoard.panels, panel],
             );
           }
         case 'link.create':
-          final link = await _createLink(
-            cubit,
-            currentBoard,
-            refs,
-            op,
-          );
+          final link = _buildLink(currentBoard, refs, op);
           if (link != null) {
+            onLink(link);
             currentBoard = currentBoard.copyWith(
               links: [...currentBoard.links, link],
             );
           }
         case 'board.configure':
-          currentBoard = await _configureBoard(cubit, currentBoard, op);
+          currentBoard = _applyBoardConfigure(currentBoard, op);
+          onConfigure(op);
         case 'board.fit':
-          await _fitBoard(cubit, currentBoard, op);
+          final viewport = _fitViewport(currentBoard, op);
+          onFit(viewport);
+          currentBoard = currentBoard.copyWith(viewport: viewport);
         case 'board.arrange':
-          await cubit.arrangePanelsByTypeInGrid(board.id);
+          onArrange?.call();
       }
     }
 
-    return cubit.state.boards.where((b) => b.id == board.id).firstOrNull ??
-        currentBoard;
+    return currentBoard;
   }
 
-  Future<BoardPanelInstance?> _createPanel(
-    BoardCubit cubit,
+  /// Builds a panel from a `panel.create` operation without mutating any cubit.
+  BoardPanelInstance? _buildPanel(
     BoardDocument board,
     Map<String, String> refs,
     Map<String, BoardPanelInstance> pendingPanels,
     Map<String, dynamic> raw,
-  ) async {
+  ) {
     final typeId = _string(raw['type'] ?? raw['typeId']);
     if (typeId == null) return null;
 
@@ -125,7 +181,6 @@ class BoardOperationApplier {
       pinned: pinned,
     );
 
-    await cubit.addPanel(panel, boardId: board.id);
     pendingPanels[panel.id] = panel;
     if (ref != null && ref.isNotEmpty) {
       refs[ref] = panel.id;
@@ -134,12 +189,12 @@ class BoardOperationApplier {
     return panel;
   }
 
-  Future<BoardPanelLink?> _createLink(
-    BoardCubit cubit,
+  /// Builds a link from a `link.create` operation without mutating any cubit.
+  BoardPanelLink? _buildLink(
     BoardDocument board,
     Map<String, String> refs,
     Map<String, dynamic> raw,
-  ) async {
+  ) {
     final fromId = _resolvePanelId(raw['from'] ?? raw['fromPanelId'], refs);
     final toId = _resolvePanelId(raw['to'] ?? raw['toPanelId'], refs);
     if (fromId == null || toId == null) return null;
@@ -149,7 +204,7 @@ class BoardOperationApplier {
 
     final style = _string(raw['style']) ?? 'arrow';
     final geometry = _string(raw['geometry']) ?? 'bezier';
-    final link = BoardPanelLink(
+    return BoardPanelLink(
       id: _nextId('link'),
       fromPanelId: fromId,
       toPanelId: toId,
@@ -163,42 +218,39 @@ class BoardOperationApplier {
       ),
       color: _color(raw['color']) ?? kDefaultLinkColor,
     );
-    await cubit.upsertLink(link, boardId: board.id);
-    return link;
   }
 
-  Future<BoardDocument> _configureBoard(
-    BoardCubit cubit,
+  /// Applies `board.configure` fields to a board document without side effects.
+  BoardDocument _applyBoardConfigure(
     BoardDocument board,
     Map<String, dynamic> raw,
-  ) async {
+  ) {
     final name = _string(raw['name']);
     final defaultFolder = _string(raw['defaultFolder']);
     final archived = _bool(raw['archived']);
+
+    var next = board;
     if (name != null && name.isNotEmpty) {
-      await cubit.renameBoard(board.id, name);
+      next = next.copyWith(name: name);
     }
     if (defaultFolder != null) {
-      await cubit.updateBoardDefaultFolder(board.id, defaultFolder);
+      final metadata = Map<String, dynamic>.from(next.metadata);
+      metadata['defaultFolder'] = defaultFolder;
+      next = next.copyWith(metadata: metadata);
     }
     if (archived != null) {
-      if (archived) {
-        await cubit.archiveBoard(board.id);
-      } else {
-        await cubit.unarchiveBoard(board.id);
-      }
+      next = next.copyWith(archived: archived);
     }
-    return cubit.state.boards.where((b) => b.id == board.id).firstOrNull ??
-        board;
+    return next;
   }
 
-  Future<void> _fitBoard(
-    BoardCubit cubit,
+  /// Computes a fitted viewport for `board.fit` without mutating any cubit.
+  BoardViewport _fitViewport(
     BoardDocument board,
     Map<String, dynamic> raw,
-  ) async {
+  ) {
     final panels = board.panels.where((p) => !p.hidden).toList();
-    if (panels.isEmpty) return;
+    if (panels.isEmpty) return board.viewport;
 
     final minX = panels.map((p) => p.bounds.x).reduce(math.min);
     final minY = panels.map((p) => p.bounds.y).reduce(math.min);
@@ -221,10 +273,7 @@ class BoardOperationApplier {
     final tx = (vpW - contentW * scale) / 2 - minX * scale;
     final ty = (vpH - contentH * scale) / 2 - minY * scale;
 
-    await cubit.updateViewport(
-      board.viewport.copyWith(scale: scale, translation: Offset(tx, ty)),
-      boardId: board.id,
-    );
+    return board.viewport.copyWith(scale: scale, translation: Offset(tx, ty));
   }
 
   String? _resolvePanelId(dynamic value, Map<String, String> refs) {

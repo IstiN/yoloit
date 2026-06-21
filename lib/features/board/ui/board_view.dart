@@ -204,14 +204,44 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
       autofocus: false,
       canRequestFocus: false,
       onKeyEvent: (_, event) {
-        if (event is KeyDownEvent &&
-            event.logicalKey == LogicalKeyboardKey.escape) {
-          if (_connectSourceId != null) {
-            setState(() {
-              _connectSourceId = null;
-              _connectPreviewPointer = null;
-            });
-            return KeyEventResult.handled;
+        if (event is KeyDownEvent) {
+          if (event.logicalKey == LogicalKeyboardKey.escape) {
+            if (_connectSourceId != null) {
+              setState(() {
+                _connectSourceId = null;
+                _connectPreviewPointer = null;
+              });
+              return KeyEventResult.handled;
+            }
+            return KeyEventResult.ignored;
+          }
+          final isMeta = HardwareKeyboard.instance.isMetaPressed ||
+              HardwareKeyboard.instance.isControlPressed;
+          final cubit = context.read<BoardCubit>();
+          if (event.logicalKey == LogicalKeyboardKey.delete ||
+              event.logicalKey == LogicalKeyboardKey.backspace) {
+            final ids = cubit.state.selectedPanelIds.toList();
+            if (ids.isNotEmpty) {
+              for (final id in ids) {
+                cubit.removePanel(id);
+              }
+              cubit.clearSelection();
+              return KeyEventResult.handled;
+            }
+          }
+          if (isMeta) {
+            if (event.logicalKey == LogicalKeyboardKey.keyC) {
+              cubit.copyPanels();
+              return KeyEventResult.handled;
+            }
+            if (event.logicalKey == LogicalKeyboardKey.keyV) {
+              cubit.pastePanels();
+              return KeyEventResult.handled;
+            }
+            if (event.logicalKey == LogicalKeyboardKey.keyD) {
+              cubit.duplicatePanels();
+              return KeyEventResult.handled;
+            }
           }
         }
         return KeyEventResult.ignored;
@@ -1065,6 +1095,19 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                 context,
                                                 activeBoard,
                                               ),
+                                          onDuplicate:
+                                              () => context
+                                                  .read<BoardCubit>()
+                                                  .duplicatePanels(),
+                                          onDelete:
+                                              () {
+                                                final cubit = context.read<BoardCubit>();
+                                                final ids = cubit.state.selectedPanelIds.toList();
+                                                for (final id in ids) {
+                                                  cubit.removePanel(id);
+                                                }
+                                                cubit.clearSelection();
+                                              },
                                         ),
                                       ),
                                     ),

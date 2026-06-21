@@ -1,0 +1,44 @@
+# Chart panel commands
+commands:
+  - id: chart:create
+    human:
+      ru:
+        - "создай график {title}"
+        - "создай диаграмму {title}"
+        - "добавь график {title}"
+        - "create chart {title}"
+      en:
+        - "create chart {title}"
+        - "add chart {title}"
+        - "new chart {title}"
+        - "make chart {title}"
+
+  - id: chart:set-data
+    human:
+      ru:
+        - "задай данные для графика {panel}"
+        - "установи данные {panel}"
+        - "set data for chart {panel}"
+      en:
+        - "set chart data for {panel}"
+        - "update chart data {panel}"
+
+  - id: chart:set-type
+    human:
+      ru:
+        - "смени тип графика {panel} на {type}"
+        - "сделай график {panel} {type}"
+        - "set chart {panel} to {type}"
+      en:
+        - "set chart {panel} type to {type}"
+        - "change {panel} to {type} chart"
+
+  - id: chart:link-table
+    human:
+      ru:
+        - "привяжи график {panel} к таблице {tablePanelId}"
+        - "свяжи {panel} с таблицей {tablePanelId}"
+        - "link chart {panel} to table {tablePanelId}"
+      en:
+        - "link chart {panel} to table {tablePanelId}"
+        - "connect {panel} to table {tablePanelId}"

@@ -1,0 +1,100 @@
+id: okr-planning
+name: OKR Planning
+icon: okr
+description: |
+  Miro-style OKR planning board with objective note, key-result kanban, initiative checklist, and focus timer.
+
+parameters:
+  - name: quarter
+    type: string
+    label: Quarter
+    description: e.g. Q3 2026
+    required: true
+    default: Q3 2026
+
+operations:
+  - op: panel.create
+    type: board.note.markdown
+    title: "OKRs: {{quarter}}"
+    x: 40
+    y: 40
+    width: 460
+    height: 300
+    state:
+      markdown: |
+        # {{quarter}} OKRs
+
+        ## Objective
+        - What do we want to achieve?
+
+        ## Ambition level
+        - 70% confidence is the sweet spot.
+
+  - op: panel.create
+    type: board.kanban
+    title: "Key Results"
+    x: 530
+    y: 40
+    width: 860
+    height: 420
+    state:
+      columns: [Committed, Stretch, Achieved]
+      cards:
+        - title: "KR1: measurable outcome"
+          column: Committed
+        - title: "KR2: measurable outcome"
+          column: Committed
+        - title: "KR3: moonshot outcome"
+          column: Stretch
+
+  - op: panel.create
+    type: board.checklist
+    title: "Initiatives"
+    x: 40
+    y: 370
+    width: 460
+    height: 280
+    state:
+      items:
+        - id: i1
+          text: Initiative supporting KR1
+          done: false
+        - id: i2
+          text: Initiative supporting KR2
+          done: false
+        - id: i3
+          text: Initiative supporting KR3
+          done: false
+        - id: i4
+          text: Weekly score check
+          done: false
+
+  - op: panel.create
+    type: board.timer
+    title: "Focus Timer"
+    x: 530
+    y: 490
+    width: 300
+    height: 240
+    state:
+      duration: 1500
+      remaining: 1500
+      label: "Deep work"
+
+  - op: panel.create
+    type: board.shape
+    title: ""
+    x: 860
+    y: 490
+    width: 120
+    height: 120
+    state:
+      shape: hexagon
+      fillColor: "#C084FC"
+      strokeColor: "#A855F7"
+      strokeWidth: 2
+      text: "Target"
+      fontSize: 18
+      textColor: "#FFFFFF"
+
+  - op: board.fit

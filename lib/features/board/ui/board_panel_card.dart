@@ -799,6 +799,19 @@ class BoardPanelCardState extends State<BoardPanelCard>
           },
           onFocusPanelById:
               (panelId) => context.read<BoardCubit>().focusPanel(panelId),
+          onFindPanelById: (panelId) {
+            final board = context.read<BoardCubit>().state.activeBoard;
+            if (board == null) return null;
+            for (final panel in board.panels) {
+              if (panel.id == panelId) return panel;
+              if (panel.type == 'board.table') {
+                final customId =
+                    (panel.state['tableId'] as String?)?.trim() ?? '';
+                if (customId.isNotEmpty && customId == panelId) return panel;
+              }
+            }
+            return null;
+          },
           onResize:
               (w, h) => context.read<BoardCubit>().resizePanel(
                 panel.id,
@@ -949,3 +962,5 @@ class PanelResizeHandleWidget extends StatelessWidget {
     };
   }
 }
+
+

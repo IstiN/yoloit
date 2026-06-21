@@ -145,6 +145,7 @@ YoloitCliToolParam panelTypeParam() {
         'board.terminal = interactive terminal panel; '
         'board.chat = AI chat panel; '
         'board.checklist = checklist; '
+        'board.calendar = calendar with local event storage; '
         'board.webpage = web browser; '
         'board.playlist = media playlist; '
         'board.filetree = FILE TREE BROWSER (use this when user asks for file tree, directory tree, folder browser, or "дерево файлов"); '
@@ -156,6 +157,8 @@ YoloitCliToolParam panelTypeParam() {
         'board.timer = countdown timer; '
         'board.yolo_assistant = YoLo voice assistant; '
         'board.run_configs = run configurations; '
+        'board.table = editable spreadsheet table; '
+        'board.chart = animated chart (line/bar/pie/scatter/radar/area) with inline JSON or linked table data; '
         'board.widget.custom = custom JS widget.',
     required: true,
     aliases: const <String>['panel_type', 'kind'],
@@ -166,6 +169,7 @@ YoloitCliToolParam panelTypeParam() {
       'board.terminal',
       'board.chat',
       'board.checklist',
+      'board.calendar',
       'board.webpage',
       'board.playlist',
       'board.filetree',
@@ -177,6 +181,8 @@ YoloitCliToolParam panelTypeParam() {
       'board.timer',
       'board.yolo_assistant',
       'board.run_configs',
+      'board.table',
+      'board.chart',
       'board.widget.custom',
     ],
     shortKey: 'tp',

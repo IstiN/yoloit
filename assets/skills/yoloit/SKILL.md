@@ -90,16 +90,41 @@ graph LR
   g_panel --> g_panel_13["panel:show"]
   g_panel --> g_panel_14["panel:screenshot · psc"]
   g_panel --> g_panel_15["panel:types"]
-  g_panel --> g_panel_16["filetree:create · ftc"]
-  g_panel --> g_panel_17["filetree:set-root · ftsr"]
-  g_panel --> g_panel_18["terminal:output"]
-  g_panel --> g_panel_19["terminal:config"]
-  g_panel --> g_panel_20["terminal:set-dir"]
-  g_panel --> g_panel_21["filetree:list"]
-  g_panel --> g_panel_22["filetree:open"]
-  g_panel --> g_panel_23["filetree:expand"]
-  g_panel --> g_panel_24["filetree:collapse"]
-  g_panel --> g_panel_25["filetree:refresh"]
+  g_panel --> g_panel_16["panel:copy · pcy"]
+  g_panel --> g_panel_17["panel:paste · ppt"]
+  g_panel --> g_panel_18["panel:duplicate · pdp"]
+  g_panel --> g_panel_19["calendar:create · ccr"]
+  g_panel --> g_panel_20["calendar:events · cev"]
+  g_panel --> g_panel_21["calendar:add-event · cae"]
+  g_panel --> g_panel_22["calendar:delete-event · cde"]
+  g_panel --> g_panel_23["calendar:set-view · csv"]
+  g_panel --> g_panel_24["calendar:focus-date · cfd"]
+  g_panel --> g_panel_25["calendar:scroll-to-time · cstm"]
+  g_panel --> g_panel_26["calendar:scroll-to-event · cse"]
+  g_panel --> g_panel_27["calendar:show-event · csh"]
+  g_panel --> g_panel_28["table:create · tbc"]
+  g_panel --> g_panel_29["table:set · tbs"]
+  g_panel --> g_panel_30["table:add-row · tbar"]
+  g_panel --> g_panel_31["table:update-row · tbur"]
+  g_panel --> g_panel_32["table:remove-row · tbrr"]
+  g_panel --> g_panel_33["table:add-column · tbac"]
+  g_panel --> g_panel_34["table:remove-column · tbrc"]
+  g_panel --> g_panel_35["table:clear · tbcl"]
+  g_panel --> g_panel_36["chart:create · chc"]
+  g_panel --> g_panel_37["chart:set-data · chsd"]
+  g_panel --> g_panel_38["chart:set-type · chst"]
+  g_panel --> g_panel_39["chart:link-table · chlt"]
+  g_panel --> g_panel_40["chart:refresh · chfr"]
+  g_panel --> g_panel_41["filetree:create · ftc"]
+  g_panel --> g_panel_42["filetree:set-root · ftsr"]
+  g_panel --> g_panel_43["terminal:output"]
+  g_panel --> g_panel_44["terminal:config"]
+  g_panel --> g_panel_45["terminal:set-dir"]
+  g_panel --> g_panel_46["filetree:list"]
+  g_panel --> g_panel_47["filetree:open"]
+  g_panel --> g_panel_48["filetree:expand"]
+  g_panel --> g_panel_49["filetree:collapse"]
+  g_panel --> g_panel_50["filetree:refresh"]
   root --> g_run(("run"))
   g_run --> g_run_0["run:list"]
   g_run --> g_run_1["run:input"]
@@ -419,6 +444,81 @@ graph LR
 - **`panel:types`** — List available panel/widget type ids
   - params: board*
   - example: `yoloit panel:types "My Board"`
+- **`panel:copy`** *(aliases: pcy)* — Copy selected panel(s) to the clipboard
+  - params: board*, panels
+  - example: `yoloit panel:copy "My Board" "Notes,Kanban"`
+- **`panel:paste`** *(aliases: ppt)* — Paste copied panels onto the board
+  - params: board*
+  - example: `yoloit panel:paste "My Board"`
+- **`panel:duplicate`** *(aliases: pdp)* — Duplicate selected panel(s)
+  - params: board*, panels
+  - example: `yoloit panel:duplicate "My Board" "Notes"`
+- **`calendar:create`** *(aliases: ccr)* — Create a Calendar panel
+  - params: board*, title*
+  - example: `yoloit calendar:create "My Board" "Sprint Calendar"`
+- **`calendar:events`** *(aliases: cev)* — List events from a Calendar panel
+  - params: board*, panel*, start, end
+  - example: `yoloit calendar:events "My Board" "Sprint Calendar"`
+- **`calendar:add-event`** *(aliases: cae)* — Add an event to a Calendar panel
+  - params: board*, panel*, title*, start*, end, allDay, description, color
+  - example: `yoloit calendar:add-event "My Board" "Sprint Calendar" "Standup" "2026-06-19T10:00:00"`
+- **`calendar:delete-event`** *(aliases: cde)* — Delete an event from a Calendar panel
+  - params: board*, panel*, eventId*
+  - example: `yoloit calendar:delete-event "My Board" "Sprint Calendar" ev-123`
+- **`calendar:set-view`** *(aliases: csv)* — Switch Calendar panel view
+  - params: board*, panel*, view*
+  - example: `yoloit calendar:set-view "My Board" "Sprint Calendar" week`
+- **`calendar:focus-date`** *(aliases: cfd)* — Set the focused date of a Calendar panel
+  - params: board*, panel*, date*
+  - example: `yoloit calendar:focus-date "My Board" "Sprint Calendar" 2026-06-21`
+- **`calendar:scroll-to-time`** *(aliases: cstm)* — Scroll the Calendar timeline to a specific hour
+  - params: board*, panel*, hour*
+  - example: `yoloit calendar:scroll-to-time "My Board" "Sprint Calendar" 14`
+- **`calendar:scroll-to-event`** *(aliases: cse)* — Focus and scroll to a Calendar event
+  - params: board*, panel*, eventId, title
+  - example: `yoloit calendar:scroll-to-event "My Board" "Sprint Calendar" "Standup"`
+- **`calendar:show-event`** *(aliases: csh)* — Show details of a Calendar event
+  - params: board*, panel*, eventId*
+  - example: `yoloit calendar:show-event "My Board" "Sprint Calendar" ev-123`
+- **`table:create`** *(aliases: tbc)* — Create a Table panel on a board
+  - params: board*, title*
+  - example: `yoloit table:create "My Board" "Sales Data"`
+- **`table:set`** *(aliases: tbs)* — Replace Table panel columns and rows (JSON)
+  - params: board*, panel*, columns*, rows*
+  - example: `yoloit table:set "My Board" "Sales Data" '[{"id":"m","title":"Month"}]' '[{"m":"Jan","sales":120}]'`
+- **`table:add-row`** *(aliases: tbar)* — Add a row to a Table panel
+  - params: board*, panel*, cells*
+  - example: `yoloit table:add-row "My Board" "Sales Data" '{"month":"Apr","sales":220}'`
+- **`table:update-row`** *(aliases: tbur)* — Update a row in a Table panel
+  - params: board*, panel*, rowId*, cells*
+  - example: `yoloit table:update-row "My Board" "Sales Data" r-1 '{"sales":999}'`
+- **`table:remove-row`** *(aliases: tbrr)* — Remove a row from a Table panel
+  - params: board*, panel*, rowId*
+  - example: `yoloit table:remove-row "My Board" "Sales Data" r-1`
+- **`table:add-column`** *(aliases: tbac)* — Add a column to a Table panel
+  - params: board*, panel*, id*, title*, type, options
+  - example: `yoloit table:add-column "My Board" "Sales Data" region Region text`
+- **`table:remove-column`** *(aliases: tbrc)* — Remove a column from a Table panel
+  - params: board*, panel*, id*
+  - example: `yoloit table:remove-column "My Board" "Sales Data" region`
+- **`table:clear`** *(aliases: tbcl)* — Remove all rows from a Table panel
+  - params: board*, panel*
+  - example: `yoloit table:clear "My Board" "Sales Data"`
+- **`chart:create`** *(aliases: chc)* — Create a Chart panel on a board
+  - params: board*, title*, type
+  - example: `yoloit chart:create "My Board" "Sales Chart" line`
+- **`chart:set-data`** *(aliases: chsd)* — Set inline data for a Chart panel (JSON array)
+  - params: board*, panel*, data*, xKey, yKey
+  - example: `yoloit chart:set-data "My Board" "Sales Chart" '[{"month":"Jan","sales":120}]'`
+- **`chart:set-type`** *(aliases: chst)* — Change Chart panel type
+  - params: board*, panel*, type*
+  - example: `yoloit chart:set-type "My Board" "Sales Chart" bar`
+- **`chart:link-table`** *(aliases: chlt)* — Link a Chart panel to a Table panel as its data source
+  - params: board*, panel*, tablePanelId*
+  - example: `yoloit chart:link-table "My Board" "Sales Chart" p-123`
+- **`chart:refresh`** *(aliases: chfr)* — Snapshot linked Table panel data into Chart panel state
+  - params: board*, panel*, tablePanelId
+  - example: `yoloit chart:refresh "My Board" "Sales Chart"`
 - **`filetree:create`** *(aliases: ftc)* — Create a File Tree panel bound to a root path (for file tree / directory tree requests).
   - params: board, path*, title
   - example: `yoloit filetree:create "My Board" ~/git/project "Project Tree"`

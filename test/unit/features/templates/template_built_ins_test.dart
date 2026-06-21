@@ -23,8 +23,18 @@ void main() {
         'trip-planner',
         'habit-tracker',
         'brainstorm',
+        'product-roadmap',
+        'user-story-map',
+        'retrospective',
+        'customer-journey-map',
+        'impact-effort-matrix',
+        'okr-planning',
+        'sprint-planning',
+        'personal-expenses',
+        'sales-dashboard',
+        'fitness-progress',
       }));
-      expect(templates.length, 6);
+      expect(templates.length, 16);
     });
   });
 }

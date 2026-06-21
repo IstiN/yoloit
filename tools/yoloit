@@ -816,6 +816,213 @@ commands = [{'group': 'app',
   'params': [['board', 'Board id or name', True]],
   'example': 'yoloit panel:types "My Board"'},
  {'group': 'panel',
+  'name': 'panel:copy',
+  'description': 'Copy selected panel(s) to the clipboard',
+  'params': [['board', 'Board id or name', True],
+             ['panels', 'Comma-separated panel ids or titles (optional)', False]],
+  'example': 'yoloit panel:copy "My Board" "Notes,Kanban"',
+  'aliases': ['pcy']},
+ {'group': 'panel',
+  'name': 'panel:paste',
+  'description': 'Paste copied panels onto the board',
+  'params': [['board', 'Board id or name', True]],
+  'example': 'yoloit panel:paste "My Board"',
+  'aliases': ['ppt']},
+ {'group': 'panel',
+  'name': 'panel:duplicate',
+  'description': 'Duplicate selected panel(s)',
+  'params': [['board', 'Board id or name', True],
+             ['panels', 'Comma-separated panel ids or titles (optional)', False]],
+  'example': 'yoloit panel:duplicate "My Board" "Notes"',
+  'aliases': ['pdp']},
+ {'group': 'panel',
+  'name': 'calendar:create',
+  'description': 'Create a Calendar panel',
+  'params': [['board', 'Board id or name', True],
+             ['title', 'Panel title', True]],
+  'example': 'yoloit calendar:create "My Board" "Sprint Calendar"',
+  'aliases': ['ccr']},
+ {'group': 'panel',
+  'name': 'calendar:events',
+  'description': 'List events from a Calendar panel',
+  'params': [['board', 'Board id or name', True],
+             ['panel', 'Panel id or title', True],
+             ['start', 'Start date/time (ISO8601, optional)', False],
+             ['end', 'End date/time (ISO8601, optional)', False]],
+  'example': 'yoloit calendar:events "My Board" "Sprint Calendar"',
+  'aliases': ['cev']},
+ {'group': 'panel',
+  'name': 'calendar:add-event',
+  'description': 'Add an event to a Calendar panel',
+  'params': [['board', 'Board id or name', True],
+             ['panel', 'Panel id or title', True],
+             ['title', 'Event title', True],
+             ['start', 'Start date/time (ISO8601)', True],
+             ['end', 'End date/time (ISO8601, optional)', False],
+             ['allDay', 'All day event (true/false, optional)', False],
+             ['description', 'Event description (optional)', False],
+             ['color', 'Event color #RRGGBB (optional)', False]],
+  'example': 'yoloit calendar:add-event "My Board" "Sprint Calendar" "Standup" "2026-06-19T10:00:00"',
+  'aliases': ['cae']},
+ {'group': 'panel',
+  'name': 'calendar:delete-event',
+  'description': 'Delete an event from a Calendar panel',
+  'params': [['board', 'Board id or name', True],
+             ['panel', 'Panel id or title', True],
+             ['eventId', 'Event id', True]],
+  'example': 'yoloit calendar:delete-event "My Board" "Sprint Calendar" ev-123',
+  'aliases': ['cde']},
+ {'group': 'panel',
+  'name': 'calendar:set-view',
+  'description': 'Switch Calendar panel view',
+  'params': [['board', 'Board id or name', True],
+             ['panel', 'Panel id or title', True],
+             ['view', 'month | week | workWeek | day | threeDay | list', True]],
+  'example': 'yoloit calendar:set-view "My Board" "Sprint Calendar" week',
+  'aliases': ['csv']},
+ {'group': 'panel',
+  'name': 'calendar:focus-date',
+  'description': 'Set the focused date of a Calendar panel',
+  'params': [['board', 'Board id or name', True],
+             ['panel', 'Panel id or title', True],
+             ['date', 'Date (ISO8601)', True]],
+  'example': 'yoloit calendar:focus-date "My Board" "Sprint Calendar" 2026-06-21',
+  'aliases': ['cfd']},
+ {'group': 'panel',
+  'name': 'calendar:scroll-to-time',
+  'description': 'Scroll the Calendar timeline to a specific hour',
+  'params': [['board', 'Board id or name', True],
+             ['panel', 'Panel id or title', True],
+             ['hour', 'Hour 0-23', True]],
+  'example': 'yoloit calendar:scroll-to-time "My Board" "Sprint Calendar" 14',
+  'aliases': ['cstm']},
+ {'group': 'panel',
+  'name': 'calendar:scroll-to-event',
+  'description': 'Focus and scroll to a Calendar event',
+  'params': [['board', 'Board id or name', True],
+             ['panel', 'Panel id or title', True],
+             ['eventId', 'Event id (optional if title given)', False],
+             ['title', 'Event title substring (optional)', False]],
+  'example': 'yoloit calendar:scroll-to-event "My Board" "Sprint Calendar" "Standup"',
+  'aliases': ['cse']},
+ {'group': 'panel',
+  'name': 'calendar:show-event',
+  'description': 'Show details of a Calendar event',
+  'params': [['board', 'Board id or name', True],
+             ['panel', 'Panel id or title', True],
+             ['eventId', 'Event id', True]],
+  'example': 'yoloit calendar:show-event "My Board" "Sprint Calendar" ev-123',
+  'aliases': ['csh']},
+ {'group': 'panel',
+  'name': 'table:create',
+  'description': 'Create a Table panel on a board',
+  'params': [['board', 'Board id or name', True],
+             ['title', 'Panel title', True]],
+  'example': 'yoloit table:create "My Board" "Sales Data"',
+  'aliases': ['tbc']},
+ {'group': 'panel',
+  'name': 'table:set',
+  'description': 'Replace Table panel columns and rows (JSON)',
+  'params': [['board', 'Board id or name', True],
+             ['panel', 'Panel id or title', True],
+             ['columns', 'JSON array of columns', True],
+             ['rows', 'JSON array of rows', True]],
+  'example': 'yoloit table:set "My Board" "Sales Data" \'[{"id":"m","title":"Month"}]\' \'[{"m":"Jan","sales":120}]\'',
+  'aliases': ['tbs']},
+ {'group': 'panel',
+  'name': 'table:add-row',
+  'description': 'Add a row to a Table panel',
+  'params': [['board', 'Board id or name', True],
+             ['panel', 'Panel id or title', True],
+             ['cells', 'JSON object keyed by column id', True]],
+  'example': 'yoloit table:add-row "My Board" "Sales Data" \'{"month":"Apr","sales":220}\'',
+  'aliases': ['tbar']},
+ {'group': 'panel',
+  'name': 'table:update-row',
+  'description': 'Update a row in a Table panel',
+  'params': [['board', 'Board id or name', True],
+             ['panel', 'Panel id or title', True],
+             ['rowId', 'Row id', True],
+             ['cells', 'JSON object keyed by column id', True]],
+  'example': 'yoloit table:update-row "My Board" "Sales Data" r-1 \'{"sales":999}\'',
+  'aliases': ['tbur']},
+ {'group': 'panel',
+  'name': 'table:remove-row',
+  'description': 'Remove a row from a Table panel',
+  'params': [['board', 'Board id or name', True],
+             ['panel', 'Panel id or title', True],
+             ['rowId', 'Row id', True]],
+  'example': 'yoloit table:remove-row "My Board" "Sales Data" r-1',
+  'aliases': ['tbrr']},
+ {'group': 'panel',
+  'name': 'table:add-column',
+  'description': 'Add a column to a Table panel',
+  'params': [['board', 'Board id or name', True],
+             ['panel', 'Panel id or title', True],
+             ['id', 'Column id', True],
+             ['title', 'Column title', True],
+             ['type', 'text | number | date | select', False],
+             ['options', 'Options for select type (JSON array)', False]],
+  'example': 'yoloit table:add-column "My Board" "Sales Data" region Region text',
+  'aliases': ['tbac']},
+ {'group': 'panel',
+  'name': 'table:remove-column',
+  'description': 'Remove a column from a Table panel',
+  'params': [['board', 'Board id or name', True],
+             ['panel', 'Panel id or title', True],
+             ['id', 'Column id', True]],
+  'example': 'yoloit table:remove-column "My Board" "Sales Data" region',
+  'aliases': ['tbrc']},
+ {'group': 'panel',
+  'name': 'table:clear',
+  'description': 'Remove all rows from a Table panel',
+  'params': [['board', 'Board id or name', True],
+             ['panel', 'Panel id or title', True]],
+  'example': 'yoloit table:clear "My Board" "Sales Data"',
+  'aliases': ['tbcl']},
+ {'group': 'panel',
+  'name': 'chart:create',
+  'description': 'Create a Chart panel on a board',
+  'params': [['board', 'Board id or name', True],
+             ['title', 'Panel title', True],
+             ['type', 'line | bar | pie | scatter | radar | area', False]],
+  'example': 'yoloit chart:create "My Board" "Sales Chart" line',
+  'aliases': ['chc']},
+ {'group': 'panel',
+  'name': 'chart:set-data',
+  'description': 'Set inline data for a Chart panel (JSON array)',
+  'params': [['board', 'Board id or name', True],
+             ['panel', 'Panel id or title', True],
+             ['data', 'JSON array of objects', True],
+             ['xKey', 'Field for X/category', False],
+             ['yKey', 'Field for value', False]],
+  'example': 'yoloit chart:set-data "My Board" "Sales Chart" \'[{"month":"Jan","sales":120}]\'',
+  'aliases': ['chsd']},
+ {'group': 'panel',
+  'name': 'chart:set-type',
+  'description': 'Change Chart panel type',
+  'params': [['board', 'Board id or name', True],
+             ['panel', 'Panel id or title', True],
+             ['type', 'line | bar | pie | scatter | radar | area', True]],
+  'example': 'yoloit chart:set-type "My Board" "Sales Chart" bar',
+  'aliases': ['chst']},
+ {'group': 'panel',
+  'name': 'chart:link-table',
+  'description': 'Link a Chart panel to a Table panel as its data source',
+  'params': [['board', 'Board id or name', True],
+             ['panel', 'Panel id or title', True],
+             ['tablePanelId', 'Table panel id', True]],
+  'example': 'yoloit chart:link-table "My Board" "Sales Chart" p-123',
+  'aliases': ['chlt']},
+ {'group': 'panel',
+  'name': 'chart:refresh',
+  'description': 'Snapshot linked Table panel data into Chart panel state',
+  'params': [['board', 'Board id or name', True],
+             ['panel', 'Panel id or title', True],
+             ['tablePanelId', 'Table panel id (optional if already linked)', False]],
+  'example': 'yoloit chart:refresh "My Board" "Sales Chart"',
+  'aliases': ['chfr']},
+ {'group': 'panel',
   'name': 'filetree:create',
   'description': 'Create a File Tree panel bound to a root path (for file tree / directory tree requests).',
   'params': [['board', 'Board id or name (defaults to active board)', False],
@@ -2842,6 +3049,193 @@ PY
     [[ $# -lt 2 ]] && { echo "Usage: yoloit panel:focus <board> <panel>" >&2; exit 1; }
     bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
     _put "/boards/${bid}/panels/${pid}" '{"focus":true}' | python3 -m json.tool 2>/dev/null
+    ;;
+  panel:copy|pcy)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit panel:copy <board> [panels]" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"
+    panels_arg="${2:-}"
+    body='{}'
+    if [[ -n "$panels_arg" ]]; then
+      panels_json=$(python3 -c "import json,sys; print(json.dumps([p.strip() for p in sys.argv[1].split(',') if p.strip()]))" "$panels_arg")
+      body="{\"panels\":$panels_json}"
+    fi
+    _post "/boards/${bid}/copy" "$body" | python3 -m json.tool 2>/dev/null
+    ;;
+  panel:paste|ppt)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit panel:paste <board>" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"
+    _post "/boards/${bid}/paste" '{}' | python3 -m json.tool 2>/dev/null
+    ;;
+  panel:duplicate|pdp)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit panel:duplicate <board> [panels]" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"
+    panels_arg="${2:-}"
+    body='{}'
+    if [[ -n "$panels_arg" ]]; then
+      panels_json=$(python3 -c "import json,sys; print(json.dumps([p.strip() for p in sys.argv[1].split(',') if p.strip()]))" "$panels_arg")
+      body="{\"panels\":$panels_json}"
+    fi
+    _post "/boards/${bid}/duplicate" "$body" | python3 -m json.tool 2>/dev/null
+    ;;
+  calendar:create|ccr)
+    [[ $# -lt 2 ]] && { echo "Usage: yoloit calendar:create <board> <title>" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"; title="$2"
+    _auto_panel "$bid" "board.calendar" "$title"
+    ;;
+  calendar:events|cev)
+    [[ $# -lt 2 ]] && { echo "Usage: yoloit calendar:events <board> <panel> [start] [end]" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
+    start_arg="${3:-}"; end_arg="${4:-}"
+    body="{\"action\":\"events\""
+    [[ -n "$start_arg" ]] && body+=",\"start\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$start_arg")"
+    [[ -n "$end_arg" ]] && body+=",\"end\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$end_arg")"
+    body+="}"
+    _post "/boards/${bid}/panels/${pid}/action" "$body" | python3 -m json.tool 2>/dev/null
+    ;;
+  calendar:add-event|cae)
+    [[ $# -lt 4 ]] && { echo "Usage: yoloit calendar:add-event <board> <panel> <title> <start> [end] [allDay] [description] [color] [meetingUrl]" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
+    title_json=$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$3")
+    start_json=$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$4")
+    end_json=$(python3 -c "import json,sys; print(json.dumps(sys.argv[1] if sys.argv[1] else None))" "${5:-}")
+    allDay="${6:-false}"
+    desc_json=$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "${7:-}")
+    color_json=$(python3 -c "import json,sys; print(json.dumps(sys.argv[1] if sys.argv[1] else None))" "${8:-}")
+    url_json=$(python3 -c "import json,sys; print(json.dumps(sys.argv[1] if sys.argv[1] else None))" "${9:-}")
+    body="{\"action\":\"create-event\",\"title\":$title_json,\"start\":$start_json"
+    [[ "$end_json" != "null" ]] && body+=",\"end\":$end_json"
+    body+=",\"allDay\":$allDay,\"description\":$desc_json,\"color\":$color_json,\"meetingUrl\":$url_json}"
+    _post "/boards/${bid}/panels/${pid}/action" "$body" | python3 -m json.tool 2>/dev/null
+    ;;
+  calendar:delete-event|cde)
+    [[ $# -lt 3 ]] && { echo "Usage: yoloit calendar:delete-event <board> <panel> <eventId>" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
+    eventId_json=$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$3")
+    _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"delete-event\",\"eventId\":$eventId_json}" | python3 -m json.tool 2>/dev/null
+    ;;
+  calendar:set-view|csv)
+    [[ $# -lt 3 ]] && { echo "Usage: yoloit calendar:set-view <board> <panel> <view>" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
+    view_json=$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$3")
+    _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"set-view\",\"view\":$view_json}" | python3 -m json.tool 2>/dev/null
+    ;;
+  calendar:focus-date|cfd)
+    [[ $# -lt 3 ]] && { echo "Usage: yoloit calendar:focus-date <board> <panel> <date>" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
+    date_json=$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$3")
+    _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"focus-date\",\"date\":$date_json}" | python3 -m json.tool 2>/dev/null
+    ;;
+  calendar:scroll-to-time|cstm)
+    [[ $# -lt 3 ]] && { echo "Usage: yoloit calendar:scroll-to-time <board> <panel> <hour>" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
+    _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"scroll-to-time\",\"hour\":$3}" | python3 -m json.tool 2>/dev/null
+    ;;
+  calendar:scroll-to-event|cse)
+    [[ $# -lt 3 ]] && { echo "Usage: yoloit calendar:scroll-to-event <board> <panel> <title-or-eventId>" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
+    query_json=$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$3")
+    _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"scroll-to-event\",\"title\":$query_json}" | python3 -m json.tool 2>/dev/null
+    ;;
+  calendar:show-event|csh)
+    [[ $# -lt 3 ]] && { echo "Usage: yoloit calendar:show-event <board> <panel> <eventId>" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
+    eventId_json=$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$3")
+    _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"show-event\",\"eventId\":$eventId_json}" | python3 -m json.tool 2>/dev/null
+    ;;
+
+  # ── table / chart panels ──
+  table:create|tbc)
+    [[ $# -lt 2 ]] && { echo "Usage: yoloit table:create <board> <title>" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"; title="$2"
+    _auto_panel "$bid" "board.table" "$title"
+    ;;
+  table:set|tbs)
+    [[ $# -lt 4 ]] && { echo "Usage: yoloit table:set <board> <panel> <columns-json> <rows-json>" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
+    _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"set\",\"columns\":$3,\"rows\":$4}" | python3 -m json.tool 2>/dev/null
+    ;;
+  table:add-row|tbar)
+    [[ $# -lt 4 ]] && { echo "Usage: yoloit table:add-row <board> <panel> <cells-json>" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
+    _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"add-row\",\"cells\":$3}" | python3 -m json.tool 2>/dev/null
+    ;;
+  table:update-row|tbur)
+    [[ $# -lt 5 ]] && { echo "Usage: yoloit table:update-row <board> <panel> <rowId> <cells-json>" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
+    rowId_json=$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$3")
+    _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"update-row\",\"rowId\":$rowId_json,\"cells\":$4}" | python3 -m json.tool 2>/dev/null
+    ;;
+  table:remove-row|tbrr)
+    [[ $# -lt 4 ]] && { echo "Usage: yoloit table:remove-row <board> <panel> <rowId>" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
+    rowId_json=$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$3")
+    _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"remove-row\",\"rowId\":$rowId_json}" | python3 -m json.tool 2>/dev/null
+    ;;
+  table:add-column|tbac)
+    [[ $# -lt 5 ]] && { echo "Usage: yoloit table:add-column <board> <panel> <id> <title> [type] [options-json]" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
+    id_json=$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$3")
+    title_json=$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$4")
+    type_json=$(python3 -c "import json,sys; print(json.dumps(sys.argv[1] if sys.argv[1] else 'text'))" "${5:-text}")
+    options_json=$(python3 -c "import json,sys; print(json.dumps(sys.argv[1] if sys.argv[1] else []))" "${6:-}")
+    _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"add-column\",\"id\":$id_json,\"title\":$title_json,\"type\":$type_json,\"options\":$options_json}" | python3 -m json.tool 2>/dev/null
+    ;;
+  table:remove-column|tbrc)
+    [[ $# -lt 4 ]] && { echo "Usage: yoloit table:remove-column <board> <panel> <id>" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
+    id_json=$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$3")
+    _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"remove-column\",\"id\":$id_json}" | python3 -m json.tool 2>/dev/null
+    ;;
+  table:clear|tbcl)
+    [[ $# -lt 3 ]] && { echo "Usage: yoloit table:clear <board> <panel>" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
+    _post "/boards/${bid}/panels/${pid}/action" '{"action":"clear"}' | python3 -m json.tool 2>/dev/null
+    ;;
+
+  chart:create|chc)
+    [[ $# -lt 2 ]] && { echo "Usage: yoloit chart:create <board> <title> [type]" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"; title="$2"
+    type_arg="${3:-line}"
+    panel_json=$(_auto_panel "$bid" "board.chart" "$title")
+    pid=$(printf '%s' "$panel_json" | python3 -c "import json,sys; print(json.load(sys.stdin)['id'])")
+    if [[ -n "$pid" && -n "$type_arg" ]]; then
+      type_json=$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$type_arg")
+      _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"set-type\",\"type\":$type_json}" >/dev/null
+    fi
+    printf '%s\n' "$panel_json"
+    ;;
+  chart:set-data|chsd)
+    [[ $# -lt 4 ]] && { echo "Usage: yoloit chart:set-data <board> <panel> <data-json> [xKey] [yKey]" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
+    xKey_json=$(python3 -c "import json,sys; print(json.dumps(sys.argv[1] if sys.argv[1] else ''))" "${4:-}")
+    yKey_json=$(python3 -c "import json,sys; print(json.dumps(sys.argv[1] if sys.argv[1] else ''))" "${5:-}")
+    body="{\"action\":\"set-data\",\"data\":$3"
+    [[ "$xKey_json" != "\"\"" ]] && body+=",\"xKey\":$xKey_json"
+    [[ "$yKey_json" != "\"\"" ]] && body+=",\"yKey\":$yKey_json"
+    body+="}"
+    _post "/boards/${bid}/panels/${pid}/action" "$body" | python3 -m json.tool 2>/dev/null
+    ;;
+  chart:set-type|chst)
+    [[ $# -lt 4 ]] && { echo "Usage: yoloit chart:set-type <board> <panel> <type>" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
+    type_json=$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$3")
+    _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"set-type\",\"type\":$type_json}" | python3 -m json.tool 2>/dev/null
+    ;;
+  chart:link-table|chlt)
+    [[ $# -lt 4 ]] && { echo "Usage: yoloit chart:link-table <board> <panel> <tablePanelId>" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
+    tableId_json=$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$3")
+    _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"link-table\",\"tablePanelId\":$tableId_json}" | python3 -m json.tool 2>/dev/null
+    ;;
+  chart:refresh|chfr)
+    [[ $# -lt 3 ]] && { echo "Usage: yoloit chart:refresh <board> <panel> [tablePanelId]" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
+    if [[ $# -ge 4 ]]; then
+      tableId_json=$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$3")
+      _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"refresh\",\"tablePanelId\":$tableId_json}" | python3 -m json.tool 2>/dev/null
+    else
+      _post "/boards/${bid}/panels/${pid}/action" '{"action":"refresh"}' | python3 -m json.tool 2>/dev/null
+    fi
     ;;
 
   # ── panel actions ──

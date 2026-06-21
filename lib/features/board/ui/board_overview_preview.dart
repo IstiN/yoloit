@@ -1,7 +1,9 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
@@ -341,14 +343,35 @@ class BoardOverviewPanelContent extends StatelessWidget {
   final BoardPanelInstance panel;
   final double headerHeight;
 
-  static final BoardPanelRenderContext _noOp = BoardPanelRenderContext(
-    isSelected: false,
-    onFocus: () {},
-    onDelete: () {},
-    onUpdateState: (_) {},
-    onShowEditor: () {},
-    isHeadlessPreview: true,
-  );
+  BoardPanelRenderContext _renderContext(BuildContext context) {
+    BoardPanelInstance? findPanel(String id) {
+      try {
+        final board = context.read<BoardCubit>().state.activeBoard;
+        if (board == null) return null;
+        for (final panel in board.panels) {
+          if (panel.id == id) return panel;
+          if (panel.type == 'board.table') {
+            final customId =
+                (panel.state['tableId'] as String?)?.trim() ?? '';
+            if (customId.isNotEmpty && customId == id) return panel;
+          }
+        }
+        return null;
+      } catch (_) {
+        return null;
+      }
+    }
+
+    return BoardPanelRenderContext(
+      isSelected: false,
+      onFocus: () {},
+      onDelete: () {},
+      onUpdateState: (_) {},
+      onShowEditor: () {},
+      isHeadlessPreview: true,
+      onFindPanelById: findPanel,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -380,7 +403,7 @@ class BoardOverviewPanelContent extends StatelessWidget {
           child = _buildHeadlessMockup(context, panel, plugin);
         } else {
           child = _PreviewSafePanelShell(
-            child: plugin.buildContent(context, panel, _noOp),
+            child: plugin.buildContent(context, panel, _renderContext(context)),
           );
         }
 

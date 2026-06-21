@@ -480,6 +480,9 @@ class PanelCatalogCategoryButton extends StatelessWidget {
         pluginItem('board.kanban'),
         pluginItem('board.checklist'),
         pluginItem('board.timer'),
+        pluginItem('board.calendar'),
+        pluginItem('board.table'),
+        pluginItem('board.chart'),
       ],
       PanelCatalogCategory.advanced => <PopupMenuEntry<String>?>[
         pluginItem('board.setup_guide'),

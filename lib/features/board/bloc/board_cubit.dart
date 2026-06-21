@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yoloit/core/remote/yoloit_remote_client.dart';
+import 'package:yoloit/core/utils/clipboard_utils.dart';
 import 'package:yoloit/features/board/bloc/board_state.dart';
 import 'package:yoloit/features/board/chat/chat_panel_plugin.dart';
 import 'package:yoloit/features/board/history/board_history_event.dart';
@@ -19,20 +20,26 @@ import 'package:yoloit/features/board/plugins/builtin/webview_manager.dart';
 import 'package:yoloit/features/board/services/board_operation_applier.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_panel_plugin.dart';
 import 'package:yoloit/features/board/utils/board_grid_layout.dart';
+import 'package:yoloit/features/calendar/data/calendar_event_storage.dart';
 import 'package:yoloit/features/settings/data/agent_config_service.dart';
 import 'package:yoloit/features/settings/data/provider_model_catalog_service.dart';
 
 class BoardCubit extends Cubit<BoardState> {
-  BoardCubit({BoardHistoryStore? historyStore, String actorId = 'local'})
-    : _historyStore = historyStore ?? const NoopBoardHistoryStore(),
-      _actorId = actorId,
-      super(const BoardState());
+  BoardCubit({
+    BoardHistoryStore? historyStore,
+    String actorId = 'local',
+    ClipboardInterface? clipboard,
+  }) : _historyStore = historyStore ?? const NoopBoardHistoryStore(),
+       _actorId = actorId,
+       _clipboard = clipboard ?? const SystemClipboard(),
+       super(const BoardState());
 
   static const _boardsStorageKey = 'board.documents.v1';
   static const _activeBoardStorageKey = 'board.active.id.v1';
 
   final BoardHistoryStore _historyStore;
   final String _actorId;
+  final ClipboardInterface _clipboard;
   bool _suppressRemoteSync = false;
   Timer? _remoteSyncDebounce;
   List<BoardDocument>? _pendingRemoteSyncBoards;
@@ -1804,6 +1811,130 @@ class BoardCubit extends Cubit<BoardState> {
         );
       },
     );
+  }
+
+  /// Copies [panelIds] (or the current selection) to the system clipboard as a
+  /// JSON payload. Returns the copied panel ids.
+  Future<List<String>> copyPanels([Set<String>? panelIds]) async {
+    final board = state.activeBoard;
+    if (board == null) return const [];
+    final ids = panelIds ?? state.selectedPanelIds;
+    if (ids.isEmpty) return const [];
+    final panels = board.panels.where((p) => ids.contains(p.id)).toList();
+    if (panels.isEmpty) return const [];
+    final linkIds = ids;
+    final links = board.links
+        .where((l) => linkIds.contains(l.fromPanelId) && linkIds.contains(l.toPanelId))
+        .toList();
+    final payload = jsonEncode({
+      'version': 1,
+      'kind': 'yoloit/panels',
+      'panels': panels.map((p) => p.toJson()).toList(),
+      'links': links.map((l) => l.toJson()).toList(),
+    });
+    await _clipboard.setText(payload);
+    return panels.map((p) => p.id).toList();
+  }
+
+  /// Pastes panels from the system clipboard onto the active board. Returns the
+  /// ids of the newly created panels.
+  Future<List<String>> pastePanels({Offset offset = const Offset(40, 40)}) async {
+    final board = state.activeBoard;
+    if (board == null) return const [];
+    final text = await _clipboard.getText();
+    if (text == null || text.isEmpty) return const [];
+    Map<String, dynamic> payload;
+    try {
+      payload = jsonDecode(text) as Map<String, dynamic>;
+    } on FormatException {
+      return const [];
+    }
+    if (payload['kind'] != 'yoloit/panels') return const [];
+    final rawPanels = payload['panels'] as List<dynamic>? ?? const [];
+    final rawLinks = payload['links'] as List<dynamic>? ?? const [];
+    if (rawPanels.isEmpty) return const [];
+
+    final idMap = <String, String>{};
+    var maxZ = board.panels.fold<int>(
+      0,
+      (value, panel) => panel.zIndex > value ? panel.zIndex : value,
+    );
+
+    final copiedPanels = rawPanels.map((raw) {
+      final json = Map<String, dynamic>.from(raw as Map);
+      final oldId = json['id'] as String;
+      final newId = _nextId('panel');
+      idMap[oldId] = newId;
+      final bounds = BoardPanelBounds.fromJson(
+        Map<String, dynamic>.from(json['bounds'] as Map),
+      );
+      final newBounds = bounds.copyWith(
+        x: bounds.x + offset.dx,
+        y: bounds.y + offset.dy,
+      );
+      maxZ++;
+      return BoardPanelInstance.fromJson({
+        ...json,
+        'id': newId,
+        'bounds': newBounds.toJson(),
+        'zIndex': maxZ,
+      });
+    }).toList();
+
+    final copiedLinks = rawLinks.map((raw) {
+      final json = Map<String, dynamic>.from(raw as Map);
+      final newFrom = idMap[json['fromPanelId'] as String];
+      final newTo = idMap[json['toPanelId'] as String];
+      if (newFrom == null || newTo == null) return null;
+      return BoardPanelLink.fromJson({
+        ...json,
+        'id': _nextId('link'),
+        'fromPanelId': newFrom,
+        'toPanelId': newTo,
+      });
+    }).whereType<BoardPanelLink>().toList();
+
+    await _updateBoard(
+      board.id,
+      (b) => b.copyWith(
+        panels: [...b.panels, ...copiedPanels],
+        links: [...b.links, ...copiedLinks],
+      ),
+      historyEvent: (before, after, revision) => _historyEvent(
+        boardId: board.id,
+        type: 'panel.created',
+        entityType: 'panel',
+        entityId: copiedPanels.map((p) => p.id).join(','),
+        revision: revision,
+        after: <String, dynamic>{
+          'panels': copiedPanels.map(_panelSnapshot).toList(),
+        },
+      ),
+    );
+    await _copyCalendarEvents(copiedPanels, idMap);
+    emit(state.copyWith(selectedPanelIds: copiedPanels.map((p) => p.id).toSet()));
+    return copiedPanels.map((p) => p.id).toList();
+  }
+
+  /// Duplicates [panelIds] (or the current selection) in place.
+  Future<List<String>> duplicatePanels([Set<String>? panelIds]) async {
+    final ids = panelIds ?? state.selectedPanelIds;
+    if (ids.isEmpty) return const [];
+    final copied = await copyPanels(ids);
+    if (copied.isEmpty) return const [];
+    final pasted = await pastePanels();
+    return pasted;
+  }
+
+  Future<void> _copyCalendarEvents(
+    List<BoardPanelInstance> pastedPanels,
+    Map<String, String> idMap,
+  ) async {
+    const storage = CalendarEventStorage();
+    for (final panel in pastedPanels.where((p) => p.type == 'board.calendar')) {
+      final oldId = idMap.entries.firstWhere((e) => e.value == panel.id).key;
+      await storage.copyEvents(oldId, panel.id);
+    }
   }
 
   Future<void> movePanel(

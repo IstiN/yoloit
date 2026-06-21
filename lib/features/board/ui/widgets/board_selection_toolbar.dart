@@ -8,11 +8,15 @@ class BoardSelectionToolbar extends StatelessWidget {
     super.key,
     required this.selectedCount,
     required this.onAddToGroup,
+    required this.onDuplicate,
+    required this.onDelete,
     required this.onClear,
   });
 
   final int selectedCount;
   final VoidCallback onAddToGroup;
+  final VoidCallback onDuplicate;
+  final VoidCallback onDelete;
   final VoidCallback onClear;
 
   @override
@@ -57,6 +61,22 @@ class BoardSelectionToolbar extends StatelessWidget {
             onPressed: onAddToGroup,
           ),
           const SizedBox(width: 6),
+          IconButton(
+            icon: const Icon(Icons.copy_outlined, size: 18),
+            tooltip: 'Duplicate selection',
+            onPressed: onDuplicate,
+            splashRadius: 18,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete_outline, size: 18),
+            tooltip: 'Delete selection',
+            onPressed: onDelete,
+            splashRadius: 18,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+          ),
           IconButton(
             icon: const Icon(Icons.clear, size: 18),
             tooltip: 'Clear selection',

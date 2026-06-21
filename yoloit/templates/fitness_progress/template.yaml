@@ -1,0 +1,88 @@
+id: fitness-progress
+name: Fitness Progress
+icon: trending_up
+description: |
+  Log workouts in a table and visualize progress with an area chart.
+
+parameters:
+  - name: exercise
+    type: string
+    label: Exercise
+    description: Exercise shown in the chart title
+    required: false
+    default: Bench Press
+
+operations:
+  - op: panel.create
+    id: workouts-table
+    type: board.table
+    title: "Workouts"
+    x: 40
+    y: 40
+    width: 520
+    height: 420
+    state:
+      columns:
+        - id: week
+          title: Week
+          type: text
+        - id: exercise
+          title: Exercise
+          type: text
+        - id: sets
+          title: Sets
+          type: number
+        - id: reps
+          title: Reps
+          type: number
+        - id: weight
+          title: Weight
+          type: number
+      rows:
+        - id: w1
+          week: "W1"
+          exercise: "{{exercise}}"
+          sets: 3
+          reps: 10
+          weight: 60
+        - id: w2
+          week: "W2"
+          exercise: "{{exercise}}"
+          sets: 3
+          reps: 10
+          weight: 65
+        - id: w3
+          week: "W3"
+          exercise: "{{exercise}}"
+          sets: 4
+          reps: 8
+          weight: 70
+        - id: w4
+          week: "W4"
+          exercise: "{{exercise}}"
+          sets: 4
+          reps: 8
+          weight: 75
+        - id: w5
+          week: "W5"
+          exercise: "{{exercise}}"
+          sets: 4
+          reps: 6
+          weight: 80
+
+  - op: panel.create
+    id: fitness-area
+    type: board.chart
+    title: "{{exercise}} Weight Progress"
+    x: 580
+    y: 40
+    width: 520
+    height: 420
+    state:
+      type: area
+      xKey: week
+      yKey: weight
+      tablePanelId: workouts-table
+      animated: false
+
+  - op: board.fit

@@ -1,0 +1,114 @@
+id: retrospective
+name: Retrospective
+icon: retrospective
+description: |
+  Miro-style team retrospective with Mad/Sad/Glad kanban, action checklist, and a retro timer.
+
+parameters:
+  - name: sprintName
+    type: string
+    label: Sprint
+    description: Name of the sprint or iteration
+    required: true
+    default: Sprint 1
+
+operations:
+  - op: panel.create
+    type: board.note.markdown
+    title: "Retro: {{sprintName}}"
+    x: 40
+    y: 40
+    width: 420
+    height: 220
+    state:
+      markdown: |
+        # {{sprintName}} Retrospective
+
+        - **Mad:** What frustrated us?
+        - **Sad:** What should we change?
+        - **Glad:** What should we keep?
+
+  - op: panel.create
+    type: board.kanban
+    title: "{{sprintName}} Board"
+    x: 490
+    y: 40
+    width: 900
+    height: 460
+    state:
+      columns: [Mad, Sad, Glad, Actions]
+      cards:
+        - title: "Something that blocked us"
+          column: Mad
+        - title: "An experiment to try next time"
+          column: Sad
+        - title: "A win to celebrate"
+          column: Glad
+        - title: "One concrete action"
+          column: Actions
+
+  - op: panel.create
+    type: board.sticky
+    title: "Prompt: Mad"
+    x: 40
+    y: 290
+    width: 200
+    height: 160
+    state:
+      text: "What made you mad?"
+      color: "#FCA5A5"
+
+  - op: panel.create
+    type: board.sticky
+    title: "Prompt: Sad"
+    x: 260
+    y: 290
+    width: 200
+    height: 160
+    state:
+      text: "What made you sad?"
+      color: "#FDE047"
+
+  - op: panel.create
+    type: board.sticky
+    title: "Prompt: Glad"
+    x: 40
+    y: 480
+    width: 200
+    height: 160
+    state:
+      text: "What made you glad?"
+      color: "#86EFAC"
+
+  - op: panel.create
+    type: board.checklist
+    title: "Action Items"
+    x: 490
+    y: 530
+    width: 440
+    height: 240
+    state:
+      items:
+        - id: a1
+          text: Assign owner to top action
+          done: false
+        - id: a2
+          text: Add to next sprint backlog
+          done: false
+        - id: a3
+          text: Schedule follow-up
+          done: false
+
+  - op: panel.create
+    type: board.timer
+    title: "Retro Timer"
+    x: 960
+    y: 530
+    width: 300
+    height: 240
+    state:
+      duration: 1800
+      remaining: 1800
+      label: "Retro"
+
+  - op: board.fit

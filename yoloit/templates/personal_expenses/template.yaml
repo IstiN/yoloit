@@ -1,0 +1,87 @@
+id: personal-expenses
+name: Personal Expenses
+icon: bar_chart
+description: |
+  Track monthly spending with a table and linked bar/pie charts.
+
+parameters:
+  - name: currency
+    type: string
+    label: Currency
+    description: Currency symbol used in chart titles
+    required: false
+    default: "$"
+
+operations:
+  - op: panel.create
+    id: expenses-table
+    type: board.table
+    title: "Expenses"
+    x: 40
+    y: 40
+    width: 480
+    height: 520
+    state:
+      columns:
+        - id: date
+          title: Date
+          type: text
+        - id: category
+          title: Category
+          type: text
+        - id: amount
+          title: Amount
+          type: number
+      rows:
+        - id: r1
+          date: "2024-06-01"
+          category: Groceries
+          amount: 85.4
+        - id: r2
+          date: "2024-06-02"
+          category: Transport
+          amount: 42
+        - id: r3
+          date: "2024-06-05"
+          category: Dining
+          amount: 68.5
+        - id: r4
+          date: "2024-06-08"
+          category: Entertainment
+          amount: 25
+        - id: r5
+          date: "2024-06-10"
+          category: Groceries
+          amount: 112.3
+
+  - op: panel.create
+    id: expenses-bar
+    type: board.chart
+    title: "Expenses by Category ({{currency}})"
+    x: 540
+    y: 40
+    width: 520
+    height: 260
+    state:
+      type: bar
+      xKey: category
+      yKey: amount
+      tablePanelId: expenses-table
+      animated: false
+
+  - op: panel.create
+    id: expenses-pie
+    type: board.chart
+    title: "Share by Category ({{currency}})"
+    x: 540
+    y: 320
+    width: 520
+    height: 240
+    state:
+      type: pie
+      xKey: category
+      yKey: amount
+      tablePanelId: expenses-table
+      animated: false
+
+  - op: board.fit

@@ -1,0 +1,107 @@
+id: sprint-planning
+name: Sprint Planning
+icon: sprint
+description: |
+  Miro-style sprint planning board with sprint goal, backlog kanban, definition-of-done checklist, and timer.
+
+parameters:
+  - name: sprintName
+    type: string
+    label: Sprint Name
+    required: true
+    default: Sprint 1
+
+  - name: velocity
+    type: string
+    label: Velocity
+    description: Planned story points or capacity
+    required: false
+    default: "20"
+
+operations:
+  - op: panel.create
+    type: board.note.markdown
+    title: "Sprint Goal: {{sprintName}}"
+    x: 40
+    y: 40
+    width: 420
+    height: 260
+    state:
+      markdown: |
+        # {{sprintName}} Goal
+
+        ## Objective
+        -
+
+        ## Velocity
+        {{velocity}}
+
+        ## Risks
+        -
+
+  - op: panel.create
+    type: board.kanban
+    title: "{{sprintName}} Board"
+    x: 490
+    y: 40
+    width: 900
+    height: 460
+    state:
+      columns: [Backlog, To Do, In Progress, Done]
+      cards:
+        - title: "Story: core feature"
+          column: Backlog
+        - title: "Task: setup"
+          column: To Do
+        - title: "Bug: polish"
+          column: In Progress
+
+  - op: panel.create
+    type: board.checklist
+    title: "Definition of Done"
+    x: 40
+    y: 330
+    width: 420
+    height: 300
+    state:
+      items:
+        - id: d1
+          text: Code reviewed
+          done: false
+        - id: d2
+          text: Tests pass
+          done: false
+        - id: d3
+          text: Design reviewed
+          done: false
+        - id: d4
+          text: Acceptance criteria met
+          done: false
+        - id: d5
+          text: Deployed to staging
+          done: false
+
+  - op: panel.create
+    type: board.timer
+    title: "Planning Timer"
+    x: 490
+    y: 530
+    width: 300
+    height: 240
+    state:
+      duration: 3600
+      remaining: 3600
+      label: "Planning"
+
+  - op: panel.create
+    type: board.sticky
+    title: "Sprint Risk"
+    x: 820
+    y: 530
+    width: 260
+    height: 180
+    state:
+      text: "Watch out for blockers and scope creep."
+      color: "#FDE047"
+
+  - op: board.fit

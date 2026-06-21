@@ -1230,6 +1230,7 @@ class CliServer {
       '_currentBoardPanelsSummary': board.panels
           .map((p) => '- ${p.title} [${p.type}] (${p.id})')
           .join('\n'),
+      '_currentBoardPanels': board.panels.map((p) => p.toJson()).toList(),
     }, panel);
 
     // Apply state update if provided
@@ -2229,6 +2230,7 @@ class CliServer {
       ...body,
       '_boardId': board.id,
       '_boardName': board.name,
+      '_currentBoardPanels': board.panels.map((p) => p.toJson()).toList(),
     }, panel);
     if (result.stateUpdate != null && result.ok) {
       final mergedState = {...panel.state, ...result.stateUpdate!};

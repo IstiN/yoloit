@@ -268,6 +268,379 @@ final List<YoloitCliTool> panelTools = <YoloitCliTool>[
   ),
 
   YoloitCliTool(
+    command: 'panel:copy',
+    alias: 'pcy',
+    description:
+        'Copy selected panel(s) to the clipboard. '
+        'If no panel ids are given, copies the currently selected panel(s).',
+    group: 'panel',
+    params: <YoloitCliToolParam>[
+      boardParam(),
+      toolParam(
+        'panels',
+        'Comma-separated panel ids or titles (optional)',
+        shortKey: 'ps',
+      ),
+    ],
+  ),
+
+  YoloitCliTool(
+    command: 'panel:paste',
+    alias: 'ppt',
+    description: 'Paste copied panels onto the board',
+    group: 'panel',
+    params: <YoloitCliToolParam>[boardParam()],
+  ),
+
+  YoloitCliTool(
+    command: 'panel:duplicate',
+    alias: 'pdp',
+    description:
+        'Duplicate selected panel(s). '
+        'If no panel ids are given, duplicates the currently selected panel(s).',
+    group: 'panel',
+    params: <YoloitCliToolParam>[
+      boardParam(),
+      toolParam(
+        'panels',
+        'Comma-separated panel ids or titles (optional)',
+        shortKey: 'ps',
+      ),
+    ],
+  ),
+
+  YoloitCliTool(
+    command: 'calendar:create',
+    alias: 'ccr',
+    description: 'Create a Calendar panel on a board',
+    group: 'panel',
+    params: <YoloitCliToolParam>[
+      boardParam(),
+      toolParam('title', 'Panel title', required: true, shortKey: 't'),
+    ],
+  ),
+
+  YoloitCliTool(
+    command: 'calendar:events',
+    alias: 'cev',
+    description: 'List events from a Calendar panel',
+    group: 'panel',
+    params: <YoloitCliToolParam>[
+      boardParam(),
+      panelParam(),
+      toolParam('start', 'Start date/time (ISO8601)', shortKey: 's'),
+      toolParam('end', 'End date/time (ISO8601)', shortKey: 'e'),
+    ],
+  ),
+
+  YoloitCliTool(
+    command: 'calendar:add-event',
+    alias: 'cae',
+    description: 'Add an event to a Calendar panel',
+    group: 'panel',
+    params: <YoloitCliToolParam>[
+      boardParam(),
+      panelParam(),
+      toolParam('title', 'Event title', required: true, shortKey: 't'),
+      toolParam('start', 'Start date/time (ISO8601)', required: true),
+      toolParam('end', 'End date/time (ISO8601)', shortKey: 'e'),
+      toolParam('allDay', 'All day event', kind: YoloitCliToolParamKind.boolean),
+      toolParam('description', 'Event description', shortKey: 'd'),
+      toolParam('color', 'Event color (#RRGGBB)', shortKey: 'c'),
+      toolParam('meetingUrl', 'Optional meeting / video call URL'),
+    ],
+  ),
+
+  YoloitCliTool(
+    command: 'calendar:delete-event',
+    alias: 'cde',
+    description: 'Delete an event from a Calendar panel',
+    group: 'panel',
+    params: <YoloitCliToolParam>[
+      boardParam(),
+      panelParam(),
+      toolParam('eventId', 'Event id', required: true),
+    ],
+  ),
+
+  YoloitCliTool(
+    command: 'calendar:set-view',
+    alias: 'csv',
+    description: 'Switch Calendar panel view',
+    group: 'panel',
+    params: <YoloitCliToolParam>[
+      boardParam(),
+      panelParam(),
+      toolParam(
+        'view',
+        'month | week | workWeek | day | threeDay | list',
+        required: true,
+        enumValues: const <String>[
+          'month',
+          'week',
+          'workWeek',
+          'day',
+          'threeDay',
+          'list',
+        ],
+      ),
+    ],
+  ),
+
+  YoloitCliTool(
+    command: 'calendar:focus-date',
+    alias: 'cfd',
+    description: 'Set the focused date of a Calendar panel',
+    group: 'panel',
+    params: <YoloitCliToolParam>[
+      boardParam(),
+      panelParam(),
+      toolParam('date', 'Date (ISO8601)', required: true),
+    ],
+  ),
+
+  YoloitCliTool(
+    command: 'calendar:scroll-to-time',
+    alias: 'cstm',
+    description: 'Scroll the Calendar timeline to a specific hour',
+    group: 'panel',
+    params: <YoloitCliToolParam>[
+      boardParam(),
+      panelParam(),
+      toolParam('hour', 'Hour 0-23', required: true),
+    ],
+  ),
+
+  YoloitCliTool(
+    command: 'calendar:scroll-to-event',
+    alias: 'cse',
+    description: 'Focus and scroll to a Calendar event',
+    group: 'panel',
+    params: <YoloitCliToolParam>[
+      boardParam(),
+      panelParam(),
+      toolParam('eventId', 'Event id'),
+      toolParam('title', 'Event title substring'),
+    ],
+  ),
+
+  YoloitCliTool(
+    command: 'calendar:show-event',
+    alias: 'csh',
+    description: 'Show details of a Calendar event',
+    group: 'panel',
+    params: <YoloitCliToolParam>[
+      boardParam(),
+      panelParam(),
+      toolParam('eventId', 'Event id', required: true),
+    ],
+  ),
+
+  YoloitCliTool(
+    command: 'table:create',
+    alias: 'tbc',
+    description: 'Create a Table panel on a board',
+    group: 'panel',
+    humanVariants: const {
+      'ru': [
+        'создай таблицу {title}',
+        'добавь таблицу {title}',
+      ],
+      'en': ['create table {title}', 'add table {title}'],
+    },
+    params: <YoloitCliToolParam>[
+      boardParam(),
+      toolParam('title', 'Panel title', required: true, shortKey: 't'),
+    ],
+  ),
+
+  YoloitCliTool(
+    command: 'table:set',
+    alias: 'tbs',
+    description: 'Replace Table panel columns and rows (JSON)',
+    group: 'panel',
+    params: <YoloitCliToolParam>[
+      boardParam(),
+      panelParam(),
+      toolParam('columns', 'JSON array of columns', required: true, shortKey: 'c'),
+      toolParam('rows', 'JSON array of rows', required: true, shortKey: 'r'),
+    ],
+  ),
+
+  YoloitCliTool(
+    command: 'table:add-row',
+    alias: 'tbar',
+    description: 'Add a row to a Table panel',
+    group: 'panel',
+    params: <YoloitCliToolParam>[
+      boardParam(),
+      panelParam(),
+      toolParam('cells', 'JSON object keyed by column id', required: true),
+    ],
+  ),
+
+  YoloitCliTool(
+    command: 'table:update-row',
+    alias: 'tbur',
+    description: 'Update a row in a Table panel',
+    group: 'panel',
+    params: <YoloitCliToolParam>[
+      boardParam(),
+      panelParam(),
+      toolParam('rowId', 'Row id', required: true),
+      toolParam('cells', 'JSON object keyed by column id', required: true),
+    ],
+  ),
+
+  YoloitCliTool(
+    command: 'table:remove-row',
+    alias: 'tbrr',
+    description: 'Remove a row from a Table panel',
+    group: 'panel',
+    params: <YoloitCliToolParam>[
+      boardParam(),
+      panelParam(),
+      toolParam('rowId', 'Row id', required: true),
+    ],
+  ),
+
+  YoloitCliTool(
+    command: 'table:add-column',
+    alias: 'tbac',
+    description: 'Add a column to a Table panel',
+    group: 'panel',
+    params: <YoloitCliToolParam>[
+      boardParam(),
+      panelParam(),
+      toolParam('id', 'Column id', required: true),
+      toolParam('title', 'Column title', required: true, shortKey: 't'),
+      toolParam(
+        'type',
+        'text | number | date | select',
+        enumValues: const <String>['text', 'number', 'date', 'select'],
+      ),
+      toolParam('options', 'Options for select type (JSON array)'),
+    ],
+  ),
+
+  YoloitCliTool(
+    command: 'table:remove-column',
+    alias: 'tbrc',
+    description: 'Remove a column from a Table panel',
+    group: 'panel',
+    params: <YoloitCliToolParam>[
+      boardParam(),
+      panelParam(),
+      toolParam('id', 'Column id', required: true),
+    ],
+  ),
+
+  YoloitCliTool(
+    command: 'table:clear',
+    alias: 'tbcl',
+    description: 'Remove all rows from a Table panel',
+    group: 'panel',
+    params: <YoloitCliToolParam>[boardParam(), panelParam()],
+  ),
+
+  YoloitCliTool(
+    command: 'chart:create',
+    alias: 'chc',
+    description: 'Create a Chart panel on a board',
+    group: 'panel',
+    humanVariants: const {
+      'ru': [
+        'создай график {title}',
+        'добавь график {title}',
+        'создай диаграмму {title}',
+      ],
+      'en': [
+        'create chart {title}',
+        'add chart {title}',
+        'create graph {title}',
+      ],
+    },
+    params: <YoloitCliToolParam>[
+      boardParam(),
+      toolParam('title', 'Panel title', required: true, shortKey: 't'),
+      toolParam(
+        'type',
+        'line | bar | pie | scatter | radar | area',
+        enumValues: const <String>[
+          'line',
+          'bar',
+          'pie',
+          'scatter',
+          'radar',
+          'area',
+        ],
+      ),
+    ],
+  ),
+
+  YoloitCliTool(
+    command: 'chart:set-data',
+    alias: 'chsd',
+    description: 'Set inline data for a Chart panel (JSON array)',
+    group: 'panel',
+    params: <YoloitCliToolParam>[
+      boardParam(),
+      panelParam(),
+      toolParam('data', 'JSON array of objects', required: true, shortKey: 'd'),
+      toolParam('xKey', 'Field for X/category'),
+      toolParam('yKey', 'Field for value'),
+    ],
+  ),
+
+  YoloitCliTool(
+    command: 'chart:set-type',
+    alias: 'chst',
+    description: 'Change Chart panel type',
+    group: 'panel',
+    params: <YoloitCliToolParam>[
+      boardParam(),
+      panelParam(),
+      toolParam(
+        'type',
+        'line | bar | pie | scatter | radar | area',
+        required: true,
+        enumValues: const <String>[
+          'line',
+          'bar',
+          'pie',
+          'scatter',
+          'radar',
+          'area',
+        ],
+      ),
+    ],
+  ),
+
+  YoloitCliTool(
+    command: 'chart:link-table',
+    alias: 'chlt',
+    description: 'Link a Chart panel to a Table panel as its data source',
+    group: 'panel',
+    params: <YoloitCliToolParam>[
+      boardParam(),
+      panelParam(),
+      toolParam('tablePanelId', 'Table panel id', required: true, shortKey: 't'),
+    ],
+  ),
+
+  YoloitCliTool(
+    command: 'chart:refresh',
+    alias: 'chfr',
+    description: 'Snapshot linked Table panel data into Chart panel state',
+    group: 'panel',
+    params: <YoloitCliToolParam>[
+      boardParam(),
+      panelParam(),
+      toolParam('tablePanelId', 'Table panel id (optional if already linked)'),
+    ],
+  ),
+
+  YoloitCliTool(
     command: 'do',
     alias: 'pdo',
     description: 'Execute a panel action',

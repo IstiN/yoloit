@@ -254,6 +254,50 @@ yoloitdPanelDescriptors = <RemotePanelTypeDescriptor>[
     defaultHeight: 360,
     actions: <String>['status', 'set', 'start', 'pause', 'resume', 'reset'],
   ),
+  RemotePanelTypeDescriptor(
+    type: 'board.calendar',
+    displayName: 'Calendar',
+    defaultWidth: 720,
+    defaultHeight: 520,
+    actions: <String>[
+      'events',
+      'create-event',
+      'update-event',
+      'delete-event',
+      'set-view',
+    ],
+  ),
+  RemotePanelTypeDescriptor(
+    type: 'board.table',
+    displayName: 'Table',
+    defaultWidth: 520,
+    defaultHeight: 360,
+    actions: <String>[
+      'get',
+      'set',
+      'add-column',
+      'rename-column',
+      'remove-column',
+      'add-row',
+      'update-row',
+      'remove-row',
+      'clear',
+    ],
+  ),
+  RemotePanelTypeDescriptor(
+    type: 'board.chart',
+    displayName: 'Chart',
+    defaultWidth: 560,
+    defaultHeight: 400,
+    actions: <String>[
+      'get',
+      'set-data',
+      'set-type',
+      'set-options',
+      'link-table',
+      'refresh',
+    ],
+  ),
 ];
 
 final List<Map<String, dynamic>> yoloitdPanelTypes = yoloitdPanelDescriptors
