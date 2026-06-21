@@ -42,6 +42,9 @@ class ChatPanelPlugin extends BoardPanelPlugin {
   bool get hasEditor => false;
 
   @override
+  EdgeInsets get contentPadding => EdgeInsets.zero;
+
+  @override
   List<Widget> buildHeaderActions(
     BuildContext context,
     BoardPanelInstance panel,

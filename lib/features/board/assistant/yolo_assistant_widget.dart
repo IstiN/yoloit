@@ -1514,6 +1514,56 @@ $messagesJson
             tooltip: 'Clear chat',
             onTap: _clearSession,
           ),
+          const SizedBox(width: 4),
+          // More actions (keeps the input bar clean)
+          PopupMenuButton<String>(
+            tooltip: 'Assistant actions',
+            icon: const Icon(Icons.more_vert, size: 18),
+            padding: EdgeInsets.zero,
+            onSelected: (value) {
+              switch (value) {
+                case 'preview':
+                  unawaited(_showChatSessionDialog());
+                case 'debug':
+                  unawaited(_showDebugLogsDialog());
+                case 'copy':
+                  unawaited(_copyFullLogsToClipboard());
+              }
+            },
+            itemBuilder:
+                (context) => <PopupMenuEntry<String>>[
+                  const PopupMenuItem<String>(
+                    value: 'preview',
+                    child: Row(
+                      children: [
+                        Icon(Icons.manage_search_outlined, size: 18),
+                        SizedBox(width: 8),
+                        Text('Preview next LLM request'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem<String>(
+                    value: 'debug',
+                    child: Row(
+                      children: [
+                        Icon(Icons.bug_report_outlined, size: 18),
+                        SizedBox(width: 8),
+                        Text('LLM debug logs'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem<String>(
+                    value: 'copy',
+                    child: Row(
+                      children: [
+                        Icon(Icons.content_copy_outlined, size: 18),
+                        SizedBox(width: 8),
+                        Text('Copy chat log'),
+                      ],
+                    ),
+                  ),
+                ],
+          ),
         ],
       ),
     );
@@ -1856,14 +1906,10 @@ $messagesJson
     final hintColor =
         context.appColors.textMuted.withAlpha(153);
     return Container(
-      margin: const EdgeInsets.fromLTRB(1.5, 0, 1.5, 1.5),
+      margin: EdgeInsets.zero,
       padding: const EdgeInsets.fromLTRB(10, 8, 10, 12),
       decoration: BoxDecoration(
         color: colors.surface,
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(14),
-          bottomRight: Radius.circular(14),
-        ),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
@@ -1908,83 +1954,7 @@ $messagesJson
               ),
             ),
           ),
-          const SizedBox(width: 8),
-          GestureDetector(
-            onTap: () => unawaited(_showChatSessionDialog()),
-            child: Tooltip(
-              message: 'Preview next LLM request',
-              child: Container(
-                width: 28,
-                height: 28,
-                margin: const EdgeInsets.only(bottom: 2),
-                decoration: BoxDecoration(
-                  color: colors.surfaceElevated,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(
-                  Icons.manage_search_outlined,
-                  size: 15,
-                  color: colors.primary,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          // Debug logs button
-          GestureDetector(
-            onTap: () => unawaited(_showDebugLogsDialog()),
-            child: Tooltip(
-              message: 'LLM debug logs (${_debugSessions.length} sessions)',
-              child: Container(
-                width: 28,
-                height: 28,
-                margin: const EdgeInsets.only(bottom: 2),
-                decoration: BoxDecoration(
-                  color: colors.surfaceElevated,
-                  borderRadius: BorderRadius.circular(14),
-                  border:
-                      _isGeneratingReply
-                          ? Border.all(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.error.withAlpha(120),
-                          )
-                          : null,
-                ),
-                child: Icon(
-                  Icons.bug_report_outlined,
-                  size: 15,
-                  color:
-                      _isGeneratingReply
-                          ? Theme.of(context).colorScheme.error
-                          : colors.primary,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 4),
-          // Copy full chat log to clipboard
-          GestureDetector(
-            onTap: () => unawaited(_copyFullLogsToClipboard()),
-            child: Tooltip(
-              message: 'Copy chat log to clipboard',
-              child: Container(
-                width: 28,
-                height: 28,
-                margin: const EdgeInsets.only(bottom: 2),
-                decoration: BoxDecoration(
-                  color: colors.surfaceElevated,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(
-                  Icons.content_copy_outlined,
-                  size: 15,
-                  color: colors.primary,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
+
           Expanded(
             child: Focus(
               onKeyEvent: (node, event) {

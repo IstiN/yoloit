@@ -1718,14 +1718,10 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         context.appColors.textMuted.withAlpha(153);
     final changedFiles = _collectChangedFilesForStrip();
     return Container(
-      margin: const EdgeInsets.fromLTRB(1.5, 0, 1.5, 1.5),
+      margin: EdgeInsets.zero,
       padding: const EdgeInsets.fromLTRB(10, 8, 22, 12),
       decoration: BoxDecoration(
         color: colors.surface,
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(14),
-          bottomRight: Radius.circular(14),
-        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

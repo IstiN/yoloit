@@ -122,6 +122,12 @@ abstract class BoardPanelPlugin {
   /// Whether the board should draw the standard title/header row.
   bool get showHeader => true;
 
+  /// Padding applied around the plugin content inside the panel body.
+  ///
+  /// Return [EdgeInsets.zero] when the plugin draws its own chrome (e.g. a chat
+  /// input bar that should sit flush against the panel edges).
+  EdgeInsets get contentPadding => const EdgeInsets.all(12);
+
   /// Whether this plugin can be safely rendered in a headless offscreen context
   /// (no GPU, no platform views, no native video decoders).
   ///

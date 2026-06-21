@@ -47,6 +47,9 @@ class YoloAssistantPlugin extends BoardPanelPlugin {
   bool get hasEditor => false;
 
   @override
+  EdgeInsets get contentPadding => EdgeInsets.zero;
+
+  @override
   Widget buildContent(
     BuildContext context,
     BoardPanelInstance panel,

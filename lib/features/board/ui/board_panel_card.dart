@@ -442,7 +442,8 @@ class BoardPanelCardState extends State<BoardPanelCard>
                                   padding:
                                       !showHeader || contentToolbar != null
                                           ? EdgeInsets.zero
-                                          : const EdgeInsets.all(12),
+                                          : plugin?.contentPadding ??
+                                              const EdgeInsets.all(12),
                                   child: _buildPanelContent(context, panel),
                                 ),
                               ),
