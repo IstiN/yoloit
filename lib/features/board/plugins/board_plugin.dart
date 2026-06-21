@@ -172,12 +172,25 @@ abstract class BoardPanelPlugin {
   /// Whether this plugin provides a custom editor accessible from the panel header.
   bool get hasEditor => false;
 
-  /// Optional widgets to inject into the panel header row (before the close button).
-  /// Use for plugin-specific header actions (e.g. env variable gear icon).
+  /// Optional widgets to inject into the panel header row (before the overflow
+  /// menu and close button). Use for plugin-specific header actions (e.g. env
+  /// variable gear icon).
   List<Widget> buildHeaderActions(
     BuildContext context,
     BoardPanelInstance panel,
     ValueChanged<Map<String, dynamic>> onUpdateState, {
     void Function(double w, double h)? onResize,
+    VoidCallback? onEditColor,
   }) => const [];
+
+  /// Optional content-level toolbar rendered below the header.
+  ///
+  /// Lets plugins expose their primary actions (add row, chart type, terminal
+  /// env groups, etc.) in the unified chrome instead of embedding them inside
+  /// [buildContent]. Return `null` or an empty list to hide the toolbar.
+  List<Widget>? buildContentToolbar(
+    BuildContext context,
+    BoardPanelInstance panel,
+    BoardPanelRenderContext renderContext,
+  ) => null;
 }

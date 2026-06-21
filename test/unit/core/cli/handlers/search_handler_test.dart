@@ -269,6 +269,95 @@ void main() {
       final results = searchBoards(cubit, 'xyz');
       expect(results, isEmpty);
     });
+
+    test('matches panel type and display name', () {
+      final cubit = _MockBoardCubit();
+      when(() => cubit.state).thenReturn(
+        BoardState(
+          boards: [
+            _board(
+              panels: [_panel(id: 't1', type: 'board.table', title: '')],
+            ),
+          ],
+          isLoaded: true,
+        ),
+      );
+
+      expect(
+        searchBoards(cubit, 'table').any((r) => r['panelId'] == 't1'),
+        true,
+      );
+      expect(
+        searchBoards(cubit, 'Table').any((r) => r['panelId'] == 't1'),
+        true,
+      );
+    });
+
+    test('matches table cell content', () {
+      final cubit = _MockBoardCubit();
+      when(() => cubit.state).thenReturn(
+        BoardState(
+          boards: [
+            _board(
+              panels: [
+                _panel(
+                  id: 't1',
+                  type: 'board.table',
+                  title: 'Sales',
+                  state: {
+                    'columns': [
+                      {'id': 'month', 'title': 'Month', 'type': 'text'},
+                    ],
+                    'rows': [
+                      {'id': 'r1', 'month': 'November'},
+                    ],
+                  },
+                ),
+              ],
+            ),
+          ],
+          isLoaded: true,
+        ),
+      );
+
+      final results = searchBoards(cubit, 'November');
+      expect(results.any((r) => r['panelId'] == 't1'), true);
+    });
+
+    test('matches chart data content', () {
+      final cubit = _MockBoardCubit();
+      when(() => cubit.state).thenReturn(
+        BoardState(
+          boards: [
+            _board(
+              panels: [
+                _panel(
+                  id: 'c1',
+                  type: 'board.chart',
+                  title: 'Revenue',
+                  state: {
+                    'type': 'line',
+                    'data': [
+                      {'month': 'December', 'sales': 420},
+                    ],
+                  },
+                ),
+              ],
+            ),
+          ],
+          isLoaded: true,
+        ),
+      );
+
+      expect(
+        searchBoards(cubit, 'December').any((r) => r['panelId'] == 'c1'),
+        true,
+      );
+      expect(
+        searchBoards(cubit, '420').any((r) => r['panelId'] == 'c1'),
+        true,
+      );
+    });
   });
 
   group('matchSnippet', () {

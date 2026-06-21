@@ -4,6 +4,7 @@ import 'package:yoloit/features/board/chat/chat_panel_widget.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
+import 'package:yoloit/features/board/ui/chat_header_menu.dart';
 
 final _chatPanelDefaultColors = AppColorScheme.fromAccent(Colors.green);
 
@@ -39,6 +40,23 @@ class ChatPanelPlugin extends BoardPanelPlugin {
 
   @override
   bool get hasEditor => false;
+
+  @override
+  List<Widget> buildHeaderActions(
+    BuildContext context,
+    BoardPanelInstance panel,
+    ValueChanged<Map<String, dynamic>> onUpdateState, {
+    void Function(double w, double h)? onResize,
+    VoidCallback? onEditColor,
+  }) {
+    return [
+      ChatHeaderMenu(
+        panel: panel,
+        onEditColor: onEditColor ?? () {},
+        onUpdateState: onUpdateState,
+      ),
+    ];
+  }
 
   @override
   Widget buildContent(

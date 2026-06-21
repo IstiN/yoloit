@@ -4,6 +4,7 @@ import 'package:shelf/shelf.dart' as shelf;
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/chat/chat_session_history.dart';
 import 'package:yoloit/features/board/chat/chat_session_manager.dart';
+import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
 
 Future<shelf.Response> handleSearch(
   String method,
@@ -60,9 +61,13 @@ List<Map<String, Object?>> searchBoards(BoardCubit cubit, String query) {
     for (final panel in board.panels) {
       // Include panel ID as a searchable field so queries like
       // "demo_copilot" or "demo copilot" match a panel named demo_copilot.
+      final plugin = BoardPluginRegistry.instance.pluginFor(panel.type);
+      final displayName = plugin?.displayName ?? panel.type;
       final texts = <String>[
         if ((panel.title ?? '').trim().isNotEmpty) panel.title.trim(),
         panel.id,
+        panel.type,
+        displayName,
         ...collectSearchStrings(panel.state),
       ];
       for (final text in texts) {

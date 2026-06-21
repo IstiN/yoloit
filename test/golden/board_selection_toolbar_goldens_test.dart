@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golden_toolkit/golden_toolkit.dart';
 import 'package:yoloit/core/theme/app_theme.dart';
-import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/ui/widgets/board_selection_toolbar.dart';
 
 Widget _toolbarShell({required int selectedCount}) {
@@ -13,7 +12,6 @@ Widget _toolbarShell({required int selectedCount}) {
         child: BoardSelectionToolbar(
           selectedCount: selectedCount,
           onAddToGroup: () {},
-          onDuplicate: () {},
           onDelete: () {},
           onClear: () {},
         ),

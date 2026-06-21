@@ -60,6 +60,7 @@ class CustomWidgetPlugin extends BoardPanelPlugin {
     BoardPanelInstance panel,
     ValueChanged<Map<String, dynamic>> onUpdateState, {
     void Function(double w, double h)? onResize,
+    VoidCallback? onEditColor,
   }) {
     return [
       // Quick size presets: Mobile / Tablet / Desktop

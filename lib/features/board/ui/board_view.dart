@@ -724,6 +724,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                   onDragEnd: _handlePanelDragEnd,
                                                   onConnectTap:
                                                       _handleConnectTap,
+                                                  onFullscreenPanel:
+                                                      _handleFullscreenPanel,
                                                 ),
                                                 // ── Drawing layer (above panels visually;
                                                 //    only intercepts gestures on actual stroke
@@ -1095,10 +1097,6 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                 context,
                                                 activeBoard,
                                               ),
-                                          onDuplicate:
-                                              () => context
-                                                  .read<BoardCubit>()
-                                                  .duplicatePanels(),
                                           onDelete:
                                               () {
                                                 final cubit = context.read<BoardCubit>();
@@ -2139,6 +2137,20 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
       );
       cubit.clearSelection();
     }
+  }
+
+  void _handleFullscreenPanel(BuildContext context, String panelId) {
+    final board = context.read<BoardCubit>().state.activeBoard;
+    if (board == null) return;
+    BoardPanelInstance? panel;
+    for (final p in board.panels) {
+      if (p.id == panelId) {
+        panel = p;
+        break;
+      }
+    }
+    if (panel == null || panel.hidden) return;
+    _zoomToPanel(board, panel.bounds.rect);
   }
 
   Offset? _boardPointFromGlobal(Offset globalPosition) {

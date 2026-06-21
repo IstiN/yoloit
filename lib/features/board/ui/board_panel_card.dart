@@ -11,11 +11,11 @@ import 'package:yoloit/features/board/chat/provider_icon.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
-import 'package:yoloit/features/board/terminal/board_terminal_panel_plugin.dart';
 import 'package:yoloit/features/board/ui/chat_glow_wrapper.dart';
-import 'package:yoloit/features/board/ui/chat_header_menu.dart';
-import 'package:yoloit/features/board/ui/miro_panel_toolbar.dart';
-import 'package:yoloit/ui/components/buttons/panel_header_icon_button.dart';
+import 'package:yoloit/features/board/ui/panel_settings_dialog.dart';
+import 'package:yoloit/features/board/ui/sticky_note_chrome.dart';
+import 'package:yoloit/features/board/ui/unified_panel_header.dart';
+import 'package:yoloit/ui/components/layout/panel_content_toolbar.dart';
 
 enum BoardPanelResizeHandle {
   topLeft,
@@ -79,6 +79,7 @@ class BoardPanelCard extends StatefulWidget {
     required this.onEditColor,
     required this.onBringToFront,
     required this.onSendToBack,
+    this.onFullscreen,
     this.onEditNote,
     this.onUpdateState,
     this.onCreateLinkedPanel,
@@ -100,6 +101,7 @@ class BoardPanelCard extends StatefulWidget {
   final VoidCallback onEditColor;
   final VoidCallback onBringToFront;
   final VoidCallback onSendToBack;
+  final VoidCallback? onFullscreen;
   final VoidCallback? onEditNote;
   final ValueChanged<Map<String, dynamic>>? onUpdateState;
   final Future<String?> Function(
@@ -137,6 +139,7 @@ class BoardPanelCardState extends State<BoardPanelCard>
   VoidCallback get onEditColor => widget.onEditColor;
   VoidCallback get onBringToFront => widget.onBringToFront;
   VoidCallback get onSendToBack => widget.onSendToBack;
+  VoidCallback? get onFullscreen => widget.onFullscreen;
   VoidCallback? get onEditNote => widget.onEditNote;
   ValueChanged<Map<String, dynamic>>? get onUpdateState => widget.onUpdateState;
   Future<String?> Function(String, Map<String, dynamic>, String)?
@@ -251,13 +254,6 @@ class BoardPanelCardState extends State<BoardPanelCard>
             : accent == null
             ? colors.surface
             : Color.lerp(colors.surface, accent, 0.12) ?? colors.surface;
-    final panelHeaderFill =
-        isCapturing
-            ? colors.background
-            : accent == null
-            ? colors.surfaceElevated
-            : Color.lerp(colors.surfaceElevated, accent, 0.18) ??
-                colors.surfaceElevated;
     final borderColor =
         !usePanelChrome
             ? Colors.transparent
@@ -273,19 +269,8 @@ class BoardPanelCardState extends State<BoardPanelCard>
     const selectionTopGutter = 62.0;
     const selectionBottomGutter = 18.0;
     const selectionHandleInset = 12.0;
-    final selectionToolbarMinWidth =
-        panel.type == 'board.sticky' || panel.type == 'board.shape'
-            ? 680.0
-            : 360.0;
-    final selectionToolbarWidth =
-        panel.bounds.width > selectionToolbarMinWidth
-            ? panel.bounds.width
-            : selectionToolbarMinWidth;
-    final selectionWrapperWidth =
-        panel.bounds.width + selectionSideGutter * 2 >
-                selectionToolbarWidth + selectionSideGutter * 2
-            ? panel.bounds.width + selectionSideGutter * 2
-            : selectionToolbarWidth + selectionSideGutter * 2;
+    final selectionWrapperWidth = panel.bounds.width + selectionSideGutter * 2;
+    final contentToolbar = _buildContentToolbar(context, panel);
     return AnimatedPositioned(
       duration:
           _isTransformingPanel
@@ -401,204 +386,61 @@ class BoardPanelCardState extends State<BoardPanelCard>
                                           : (details) => onMove(details),
                                   onPanEnd: (_) => _endPanelTransform(),
                                   onPanCancel: _endPanelTransform,
-                                  child: Container(
-                                    height: 44,
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
+                                  child: UnifiedPanelHeader(
+                                    panel: panel,
+                                    isSelected: selected,
+                                    isFocused: isFocused,
+                                    leadingIcon:
+                                        panel.type == ChatPanelPlugin.kTypeId
+                                            ? ChatProviderIcon(
+                                                provider:
+                                                    (panel.state['config']
+                                                                as Map?)?['provider']
+                                                        as String? ??
+                                                    'copilot',
+                                                size: 18,
+                                              )
+                                            : null,
+                                    pluginActions: _buildPluginHeaderActions(
+                                      context,
+                                      panel,
                                     ),
-                                    decoration: BoxDecoration(
-                                      color: panelHeaderFill,
-                                      borderRadius: const BorderRadius.vertical(
-                                        top: Radius.circular(16),
-                                      ),
-                                      border: Border(
-                                        bottom: BorderSide(
-                                          color: colors.divider,
+                                    onDuplicate:
+                                        () => _duplicatePanel(panel),
+                                    onToggleLocked:
+                                        () => _toggleLocked(panel),
+                                    onEditColor: onEditColor,
+                                    onBringToFront: onBringToFront,
+                                    onSendToBack: onSendToBack,
+                                    onFullscreen: onFullscreen,
+                                    onSettings:
+                                        () => _showPanelSettingsDialog(
+                                          context,
+                                          panel: panel,
+                                          plugin: plugin,
+                                          onEditPanel: onEditNote,
+                                          onEditColor: onEditColor,
+                                          onBringToFront: onBringToFront,
+                                          onSendToBack: onSendToBack,
                                         ),
-                                      ),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        if (panel.type ==
-                                            ChatPanelPlugin.kTypeId)
-                                          ChatProviderIcon(
-                                            provider:
-                                                (panel.state['config']
-                                                        as Map?)?['provider']
-                                                    as String? ??
-                                                'copilot',
-                                            size: 18,
-                                          )
-                                        else
-                                          Builder(
-                                            builder: (ctx) {
-                                              final plugin = BoardPluginRegistry
-                                                  .instance
-                                                  .pluginFor(panel.type);
-                                              final svgIcon = plugin
-                                                  ?.buildIconWidget(
-                                                    ctx,
-                                                    size: 16,
-                                                  );
-                                              if (svgIcon != null) {
-                                                return svgIcon;
-                                              }
-                                              return Icon(
-                                                plugin?.icon ??
-                                                    Icons
-                                                        .dashboard_customize_outlined,
-                                                size: 16,
-                                                color:
-                                                    Theme.of(context)
-                                                        .textTheme
-                                                        .bodySmall
-                                                        ?.color ??
-                                                    Theme.of(
-                                                      context,
-                                                    ).colorScheme.onSurface,
-                                              );
-                                            },
-                                          ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            panel.title,
-                                            overflow: TextOverflow.ellipsis,
-                                            maxLines: 1,
-                                            style: TextStyle(
-                                              color:
-                                                  Theme.of(
-                                                    context,
-                                                  ).colorScheme.onSurface,
-                                              fontWeight: FontWeight.w600,
-                                              fontSize: 13,
-                                            ),
-                                          ),
-                                        ),
-                                        if (panel.type !=
-                                            ChatPanelPlugin.kTypeId) ...[
-                                          GestureDetector(
-                                            onTap: onEditColor,
-                                            child: Container(
-                                              width: 16,
-                                              height: 16,
-                                              decoration: BoxDecoration(
-                                                color:
-                                                    accent ??
-                                                    (Theme.of(context)
-                                                            .textTheme
-                                                            .bodySmall
-                                                            ?.color ??
-                                                        Theme.of(context)
-                                                            .colorScheme
-                                                            .onSurface),
-                                                shape: BoxShape.circle,
-                                                border: Border.all(
-                                                  color: colors.textPrimary
-                                                      .withAlpha(100),
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          if (onEditNote != null)
-                                            SizedBox(
-                                              width: 28,
-                                              height: 28,
-                                              child: IconButton(
-                                                tooltip: 'Edit note',
-                                                onPressed: onEditNote,
-                                                icon: const Icon(
-                                                  Icons.edit_outlined,
-                                                  size: 16,
-                                                ),
-                                                splashRadius: 14,
-                                                padding: EdgeInsets.zero,
-                                              ),
-                                            ),
-                                        ],
-                                        if (panel.type ==
-                                            ChatPanelPlugin.kTypeId)
-                                          ChatHeaderMenu(
-                                            panel: panel,
-                                            onEditColor: onEditColor,
-                                            onUpdateState: onUpdateState,
-                                          ),
-                                        // Plugin-specific header actions (e.g. env gear for widget panels)
-                                        ...() {
-                                          final plugin = BoardPluginRegistry
-                                              .instance
-                                              .pluginFor(panel.type);
-                                          if (plugin == null ||
-                                              onUpdateState == null) {
-                                            return <Widget>[];
-                                          }
-                                          return plugin.buildHeaderActions(
-                                            context,
-                                            panel,
-                                            onUpdateState!,
-                                            onResize:
-                                                (w, h) => context
-                                                    .read<BoardCubit>()
-                                                    .resizePanel(
-                                                      panel.id,
-                                                      width: w,
-                                                      height: h,
-                                                    ),
-                                          );
-                                        }(),
-                                        PanelHeaderIconButton(
-                                          tooltip: 'Panel settings',
-                                          icon: Icons.tune_rounded,
-                                          onPressed:
-                                              () => _showPanelSettingsDialog(
-                                                context,
-                                                panel: panel,
-                                                plugin: plugin,
-                                                onEditPanel: onEditNote,
-                                                onEditColor: onEditColor,
-                                                onBringToFront: onBringToFront,
-                                                onSendToBack: onSendToBack,
-                                              ),
-                                        ),
-                                        PanelHeaderIconButton(
-                                          tooltip: 'Bring to front',
-                                          icon: Icons.flip_to_front_outlined,
-                                          onPressed: onBringToFront,
-                                        ),
-                                        PanelHeaderIconButton(
-                                          tooltip: 'Send to back',
-                                          icon: Icons.flip_to_back_outlined,
-                                          onPressed: onSendToBack,
-                                        ),
-                                        SizedBox(
-                                          width: 28,
-                                          height: 28,
-                                          child: IconButton(
-                                            tooltip: 'Remove panel',
-                                            onPressed: onDelete,
-                                            icon: const Icon(
-                                              Icons.close,
-                                              size: 16,
-                                            ),
-                                            splashRadius: 14,
-                                            padding: EdgeInsets.zero,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
+                                    onDelete: onDelete,
+                                  ),
+                                ),
+                              if (contentToolbar != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(
+                                    left: 12,
+                                    right: 12,
+                                    top: 8,
+                                  ),
+                                  child: PanelContentToolbar(
+                                    children: contentToolbar,
                                   ),
                                 ),
                               Expanded(
                                 child: Padding(
                                   padding:
-                                      !showHeader ||
-                                              panel.type ==
-                                                  ChatPanelPlugin.kTypeId ||
-                                              panel.type ==
-                                                  BoardTerminalPanelPlugin
-                                                      .kTypeId ||
-                                              panel.type == 'board.webpage'
+                                      !showHeader || contentToolbar != null
                                           ? EdgeInsets.zero
                                           : const EdgeInsets.all(12),
                                   child: _buildPanelContent(context, panel),
@@ -686,30 +528,22 @@ class BoardPanelCardState extends State<BoardPanelCard>
                   ),
                 ),
               ),
-              if (showSelectionChrome)
+              if (showSelectionChrome && !showHeader)
                 Positioned(
-                  top: 8,
+                  top: -46,
                   left: selectionSideGutter,
-                  child: MiroPanelToolbar(
-                    maxWidth: selectionToolbarWidth,
+                  child: StickyNoteChrome(
                     panel: panel,
-                    plugin: plugin,
-                    canEdit: onEditNote != null,
-                    onEdit: onEditNote,
-                    onEditColor: onEditColor,
+                    locked: panel.locked,
+                    onUpdateState: onUpdateState ?? (_) {},
+                    onDragStart: _startPanelTransform,
+                    onDragUpdate:
+                        panel.locked ? null : (details) => onMove(details),
+                    onDragEnd: _endPanelTransform,
+                    onDuplicate: () => _duplicatePanel(panel),
+                    onToggleLocked: () => _toggleLocked(panel),
                     onBringToFront: onBringToFront,
                     onSendToBack: onSendToBack,
-                    onDelete: onDelete,
-                    onToggleLocked: () {
-                      context.read<BoardCubit>().updatePanel(
-                        panel.id,
-                        (p) => p.copyWith(locked: !p.locked),
-                      );
-                    },
-                    onMoveStart: _startPanelTransform,
-                    onMoveUpdate:
-                        panel.locked ? null : (details) => onMove(details),
-                    onMoveEnd: _endPanelTransform,
                     onSettings:
                         () => _showPanelSettingsDialog(
                           context,
@@ -720,7 +554,7 @@ class BoardPanelCardState extends State<BoardPanelCard>
                           onBringToFront: onBringToFront,
                           onSendToBack: onSendToBack,
                         ),
-                    onUpdateState: onUpdateState,
+                    onDelete: onDelete,
                   ),
                 ),
               if (showSelectionChrome)
@@ -747,78 +581,122 @@ class BoardPanelCardState extends State<BoardPanelCard>
     );
   }
 
+  void _duplicatePanel(BoardPanelInstance panel) =>
+      context.read<BoardCubit>().duplicatePanels({panel.id});
+
+  void _toggleLocked(BoardPanelInstance panel) =>
+      context.read<BoardCubit>().updatePanel(
+        panel.id,
+        (p) => p.copyWith(locked: !p.locked),
+      );
+
+  List<Widget> _buildPluginHeaderActions(
+    BuildContext context,
+    BoardPanelInstance panel,
+  ) {
+    final plugin = BoardPluginRegistry.instance.pluginFor(panel.type);
+    final updateState = onUpdateState;
+    if (plugin == null || updateState == null) return const [];
+    return plugin.buildHeaderActions(
+      context,
+      panel,
+      updateState,
+      onResize: (w, h) => context.read<BoardCubit>().resizePanel(
+        panel.id,
+        width: w,
+        height: h,
+      ),
+      onEditColor: onEditColor,
+    );
+  }
+
+  List<Widget>? _buildContentToolbar(
+    BuildContext context,
+    BoardPanelInstance panel,
+  ) {
+    final plugin = BoardPluginRegistry.instance.pluginFor(panel.type);
+    if (plugin == null) return null;
+    return plugin.buildContentToolbar(
+      context,
+      panel,
+      _buildRenderContext(context, panel),
+    );
+  }
+
+  BoardPanelRenderContext _buildRenderContext(
+    BuildContext context,
+    BoardPanelInstance panel,
+  ) {
+    final activeBoard = context.read<BoardCubit>().state.activeBoard;
+    return BoardPanelRenderContext(
+      isSelected: panel.id ==
+          context.select<BoardCubit, String?>(
+            (cubit) => cubit.state.activeBoard?.viewport.focusedPanelId,
+          ),
+      onFocus: onTap,
+      onDelete: onDelete,
+      onUpdateState: onUpdateState ?? (_) {},
+      onShowEditor: onEditNote ?? () {},
+      remoteInfo: activeBoard == null ? null : remoteInfoForBoard(activeBoard),
+      onCreateLinkedPanel: onCreateLinkedPanel,
+      onFindPanelByGroup: (typeId, group) {
+        final board = context.read<BoardCubit>().state.activeBoard;
+        if (board == null) return null;
+        for (final p in board.panels) {
+          if (p.type != typeId) continue;
+          final panelGroup = p.state['group'];
+          if (panelGroup is String && panelGroup.trim() == group.trim()) {
+            return p.id;
+          }
+        }
+        return null;
+      },
+      onRevealSessionInPanel: (panelId, sessionId) async {
+        final cubit = context.read<BoardCubit>();
+        await cubit.updatePanel(panelId, (p) {
+          final hiddenRaw = p.state['hiddenSessionIds'];
+          final hidden = hiddenRaw is List
+              ? hiddenRaw.whereType<String>().toSet()
+              : <String>{};
+          hidden.remove(sessionId);
+          return p.copyWith(
+            state: {
+              ...p.state,
+              'activeSessionId': sessionId,
+              'hiddenSessionIds': hidden.toList(),
+            },
+          );
+        });
+      },
+      onFocusPanelById:
+          (panelId) => context.read<BoardCubit>().focusPanel(panelId),
+      onFindPanelById: (panelId) {
+        final board = context.read<BoardCubit>().state.activeBoard;
+        if (board == null) return null;
+        for (final panel in board.panels) {
+          if (panel.id == panelId) return panel;
+          if (panel.type == 'board.table') {
+            final customId = (panel.state['tableId'] as String?)?.trim() ?? '';
+            if (customId.isNotEmpty && customId == panelId) return panel;
+          }
+        }
+        return null;
+      },
+      onResize: (w, h) => context.read<BoardCubit>().resizePanel(
+        panel.id,
+        width: w,
+        height: h,
+      ),
+    );
+  }
+
   Widget _buildPanelContent(BuildContext context, BoardPanelInstance panel) {
     final plugin = BoardPluginRegistry.instance.pluginFor(panel.type);
     if (plugin != null) {
-      final activeBoard = context.read<BoardCubit>().state.activeBoard;
       return plugin.buildContent(
         context,
         panel,
-        BoardPanelRenderContext(
-          isSelected:
-              panel.id ==
-              context.select<BoardCubit, String?>(
-                (cubit) => cubit.state.activeBoard?.viewport.focusedPanelId,
-              ),
-          onFocus: onTap,
-          onDelete: onDelete,
-          onUpdateState: onUpdateState ?? (_) {},
-          onShowEditor: onEditNote ?? () {},
-          remoteInfo:
-              activeBoard == null ? null : remoteInfoForBoard(activeBoard),
-          onCreateLinkedPanel: onCreateLinkedPanel,
-          onFindPanelByGroup: (typeId, group) {
-            final board = context.read<BoardCubit>().state.activeBoard;
-            if (board == null) return null;
-            for (final p in board.panels) {
-              if (p.type != typeId) continue;
-              final panelGroup = p.state['group'];
-              if (panelGroup is String && panelGroup.trim() == group.trim()) {
-                return p.id;
-              }
-            }
-            return null;
-          },
-          onRevealSessionInPanel: (panelId, sessionId) async {
-            final cubit = context.read<BoardCubit>();
-            await cubit.updatePanel(panelId, (p) {
-              final hiddenRaw = p.state['hiddenSessionIds'];
-              final hidden =
-                  hiddenRaw is List
-                      ? hiddenRaw.whereType<String>().toSet()
-                      : <String>{};
-              hidden.remove(sessionId);
-              return p.copyWith(
-                state: {
-                  ...p.state,
-                  'activeSessionId': sessionId,
-                  'hiddenSessionIds': hidden.toList(),
-                },
-              );
-            });
-          },
-          onFocusPanelById:
-              (panelId) => context.read<BoardCubit>().focusPanel(panelId),
-          onFindPanelById: (panelId) {
-            final board = context.read<BoardCubit>().state.activeBoard;
-            if (board == null) return null;
-            for (final panel in board.panels) {
-              if (panel.id == panelId) return panel;
-              if (panel.type == 'board.table') {
-                final customId =
-                    (panel.state['tableId'] as String?)?.trim() ?? '';
-                if (customId.isNotEmpty && customId == panelId) return panel;
-              }
-            }
-            return null;
-          },
-          onResize:
-              (w, h) => context.read<BoardCubit>().resizePanel(
-                panel.id,
-                width: w,
-                height: h,
-              ),
-        ),
+        _buildRenderContext(context, panel),
       );
     }
     // Fallback for unknown types

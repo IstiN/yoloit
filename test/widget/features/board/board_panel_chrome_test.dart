@@ -61,11 +61,18 @@ void main() {
     );
     await tester.pump(const Duration(milliseconds: 450));
 
-    expect(find.byTooltip('Panel settings'), findsNWidgets(2));
-    expect(find.byTooltip('Bring to front'), findsNWidgets(2));
-    expect(find.byTooltip('Send to back'), findsNWidgets(2));
+    expect(find.text('Weather — Spitalfields'), findsOneWidget);
+    expect(find.text('Sibling'), findsOneWidget);
+    expect(find.byTooltip('More actions'), findsNWidgets(2));
 
-    await tester.tap(find.byTooltip('Bring to front').first);
+    await tester.tap(find.byTooltip('More actions').first);
+    await tester.pump();
+
+    expect(find.byTooltip('Bring to front'), findsOneWidget);
+    expect(find.byTooltip('Send to back'), findsOneWidget);
+    expect(find.byTooltip('Settings'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Bring to front'));
     await tester.pump();
 
     final updated = cubit.state.activeBoard!.panels.singleWhere(

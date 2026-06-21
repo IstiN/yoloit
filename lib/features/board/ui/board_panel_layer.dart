@@ -26,6 +26,7 @@ class BoardPanelLayer extends StatelessWidget {
     required this.onDragStart,
     required this.onDragEnd,
     required this.onConnectTap,
+    this.onFullscreenPanel,
   });
 
   final BoardDocument board;
@@ -46,6 +47,7 @@ class BoardPanelLayer extends StatelessWidget {
   final VoidCallback onDragEnd;
   final void Function(BuildContext context, BoardDocument board, String panelId)
   onConnectTap;
+  final void Function(BuildContext context, String panelId)? onFullscreenPanel;
 
   @override
   Widget build(BuildContext context) {
@@ -113,6 +115,8 @@ class BoardPanelLayer extends StatelessWidget {
                   (p) => p.copyWith(zIndex: minZ - 1),
                 );
               },
+              onFullscreen:
+                  () => onFullscreenPanel?.call(context, panel.id),
               onUpdateState: (newState) {
                 boardCubit.updatePanel(
                   panel.id,

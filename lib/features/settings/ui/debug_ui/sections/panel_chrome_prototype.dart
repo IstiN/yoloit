@@ -1,10 +1,11 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/ui/components/buttons/header_icon_button.dart';
 import 'package:yoloit/ui/components/buttons/toolbar_button.dart';
 import 'package:yoloit/ui/components/chips/panel_id_chip.dart';
+import 'package:yoloit/ui/components/layout/panel_content_toolbar.dart';
 import 'package:yoloit/ui/components/layout/showcase_scaffold.dart';
+import 'package:yoloit/ui/components/menus/hover_overflow_menu.dart';
 import 'package:yoloit/ui/components/typography/section_title.dart';
 
 /// Debug UI prototype for the redesigned panel chrome.
@@ -53,7 +54,7 @@ class PanelChromePrototype extends StatelessWidget {
         const SizedBox(height: 24),
         const SectionTitle('Content toolbar — primary + hover overflow'),
         const SizedBox(height: 8),
-        _ContentToolbar(
+        PanelContentToolbar(
           children: [
             ToolbarButton(
               icon: Icons.add,
@@ -70,11 +71,11 @@ class PanelChromePrototype extends StatelessWidget {
               label: 'Col',
               onPressed: () {},
             ),
-            const _HoverOverflowMenu(
+            const HoverOverflowMenu(
               items: [
-                _OverflowItem(icon: Icons.delete_outline, label: 'Remove col'),
-                _OverflowItem(icon: Icons.clear_all, label: 'Clear rows'),
-                _OverflowItem(icon: Icons.file_download, label: 'Export'),
+                HoverOverflowItem(icon: Icons.delete_outline, label: 'Remove col'),
+                HoverOverflowItem(icon: Icons.clear_all, label: 'Clear rows'),
+                HoverOverflowItem(icon: Icons.file_download, label: 'Export'),
               ],
             ),
           ],
@@ -164,89 +165,76 @@ class _MockPanelState extends State<_MockPanel> {
               ),
               child: Row(
                 children: [
-                    _HeaderIconButton(
-                      icon: Icons.drag_indicator,
-                      tooltip: 'Drag',
-                      onPressed: () {},
-                      colors: colors,
+                  HeaderIconButton(
+                    icon: Icons.drag_indicator,
+                    tooltip: 'Drag',
+                    onPressed: () {},
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(widget.icon, size: 16, color: widget.accentColor),
+                  const SizedBox(width: 8),
+                  Text(
+                    widget.title,
+                    style: TextStyle(
+                      color: colors.textPrimary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
                     ),
-                    const SizedBox(width: 8),
-                    Icon(widget.icon, size: 16, color: widget.accentColor),
-                    const SizedBox(width: 8),
-                    Text(
-                      widget.title,
-                      style: TextStyle(
-                        color: colors.textPrimary,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
+                  ),
+                  const Spacer(),
+                  HeaderIconButton(
+                    icon: Icons.copy,
+                    tooltip: 'Duplicate',
+                    onPressed: () {},
+                  ),
+                  HeaderIconButton(
+                    icon: Icons.format_color_fill,
+                    tooltip: 'Color',
+                    onPressed: () {},
+                    swatch: widget.accentColor,
+                  ),
+                  HoverOverflowMenu(
+                    items: [
+                      HoverOverflowItem(
+                        icon: _locked ? Icons.lock : Icons.lock_open,
+                        label: _locked ? 'Unlock' : 'Lock',
+                        onTap: () => setState(() => _locked = !_locked),
                       ),
-                    ),
-                    const Spacer(),
-                    _HeaderIconButton(
-                      icon: Icons.copy,
-                      tooltip: 'Duplicate',
-                      onPressed: () {},
-                      colors: colors,
-                    ),
-                    _HeaderIconButton(
-                      icon: _locked ? Icons.lock : Icons.lock_open,
-                      tooltip: _locked ? 'Unlock' : 'Lock',
-                      onPressed: () => setState(() => _locked = !_locked),
-                      colors: colors,
-                      active: _locked,
-                      
-                    ),
-                    _HeaderIconButton(
-                      icon: Icons.format_color_fill,
-                      tooltip: 'Color',
-                      onPressed: () {},
-                      colors: colors,
-                      swatch: widget.accentColor,
-                      
-                    ),
-                    _HoverOverflowMenu(
-                      items: [
-                        _OverflowItem(
-                          icon: Icons.content_copy,
-                          label: 'Duplicate',
-                          onTap: () {},
-                        ),
-                        _OverflowItem(
-                          icon: Icons.flip_to_front,
-                          label: 'Bring to front',
-                          onTap: () {},
-                        ),
-                        _OverflowItem(
-                          icon: Icons.flip_to_back,
-                          label: 'Send to back',
-                          onTap: () {},
-                        ),
-                        _OverflowItem(
-                          icon: Icons.open_in_full,
-                          label: 'Fullscreen',
-                          onTap: () {},
-                        ),
-                        _OverflowItem(
-                          icon: Icons.settings,
-                          label: 'Settings',
-                          onTap: () {},
-                        ),
-                        _OverflowItem(
-                          icon: Icons.delete_outline,
-                          label: 'Delete',
-                          onTap: () {},
-                        ),
-                      ],
-                    ),
-                    _HeaderIconButton(
-                      icon: Icons.close,
-                      tooltip: 'Close',
-                      onPressed: widget.onClose,
-                      colors: colors,
-                    ),
-                  ],
-                ),
+                      HoverOverflowItem(
+                        icon: Icons.flip_to_front,
+                        label: 'Bring to front',
+                        onTap: () {},
+                      ),
+                      HoverOverflowItem(
+                        icon: Icons.flip_to_back,
+                        label: 'Send to back',
+                        onTap: () {},
+                      ),
+                      HoverOverflowItem(
+                        icon: Icons.open_in_full,
+                        label: 'Fullscreen',
+                        onTap: () {},
+                      ),
+                      HoverOverflowItem(
+                        icon: Icons.settings,
+                        label: 'Settings',
+                        onTap: () {},
+                      ),
+                      HoverOverflowItem(
+                        icon: Icons.delete_outline,
+                        label: 'Delete',
+                        onTap: () {},
+                      ),
+                    ],
+                  ),
+                  HeaderIconButton(
+                    icon: Icons.close,
+                    tooltip: 'Close',
+                    onPressed: widget.onClose,
+                  ),
+                ],
               ),
+            ),
             Container(
               height: 120,
               color: colors.surface,
@@ -264,201 +252,4 @@ class _MockPanelState extends State<_MockPanel> {
   }
 }
 
-class _HeaderIconButton extends StatelessWidget {
-  const _HeaderIconButton({
-    required this.icon,
-    required this.tooltip,
-    required this.onPressed,
-    required this.colors,
-    this.active = false,
-    this.swatch,
-  });
 
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onPressed;
-  final AppColorScheme colors;
-  final bool active;
-  final Color? swatch;
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: Material(
-        type: MaterialType.transparency,
-        child: InkWell(
-          onTap: onPressed,
-          borderRadius: BorderRadius.circular(6),
-          child: Container(
-            width: 28,
-            height: 28,
-            alignment: Alignment.center,
-            decoration: active
-                ? BoxDecoration(
-                    color: colors.primary.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(6),
-                  )
-                : null,
-            child: Icon(
-              icon,
-              size: 16,
-              color: swatch ??
-                  (active ? colors.primary : colors.textSecondary),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _HoverOverflowMenu extends StatefulWidget {
-  const _HoverOverflowMenu({
-    required this.items,
-  });
-
-  final List<_OverflowItem> items;
-
-  @override
-  State<_HoverOverflowMenu> createState() => _HoverOverflowMenuState();
-}
-
-class _HoverOverflowMenuState extends State<_HoverOverflowMenu> {
-  final _controller = MenuController();
-  Timer? _hideTimer;
-
-  void _show() {
-    _hideTimer?.cancel();
-    if (!_controller.isOpen) {
-      _controller.open();
-    }
-  }
-
-  void _delayedHide() {
-    _hideTimer = Timer(const Duration(milliseconds: 80), () {
-      if (_controller.isOpen) {
-        _controller.close();
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _hideTimer?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.appColors;
-    return MenuAnchor(
-      controller: _controller,
-      alignmentOffset: const Offset(0, -56),
-      style: MenuStyle(
-        backgroundColor: WidgetStatePropertyAll(colors.surfaceElevated),
-        side: WidgetStatePropertyAll(BorderSide(color: colors.border)),
-        shape: WidgetStatePropertyAll(
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-        ),
-        padding: const WidgetStatePropertyAll(EdgeInsets.zero),
-        minimumSize: const WidgetStatePropertyAll(Size.zero),
-      ),
-      menuChildren: [
-        MouseRegion(
-          onEnter: (_) => _show(),
-          onExit: (_) => _delayedHide(),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              for (final item in widget.items)
-                _OverflowActionButton(
-                  icon: item.icon,
-                  tooltip: item.label,
-                  onPressed: item.onTap ?? () {},
-                  colors: colors,
-                ),
-            ],
-          ),
-        ),
-      ],
-      child: MouseRegion(
-        onEnter: (_) => _show(),
-        onExit: (_) => _delayedHide(),
-        child: _HeaderIconButton(
-          icon: Icons.more_vert,
-          tooltip: 'More',
-          onPressed: () {},
-          colors: colors,
-        ),
-      ),
-    );
-  }
-}
-
-class _OverflowActionButton extends StatelessWidget {
-  const _OverflowActionButton({
-    required this.icon,
-    required this.tooltip,
-    required this.onPressed,
-    required this.colors,
-  });
-
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onPressed;
-  final AppColorScheme colors;
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: InkWell(
-        onTap: onPressed,
-        borderRadius: BorderRadius.circular(6),
-        child: SizedBox(
-          width: 28,
-          height: 28,
-          child: Icon(icon, size: 16, color: colors.textSecondary),
-        ),
-      ),
-    );
-  }
-}
-
-class _OverflowItem {
-  const _OverflowItem({
-    required this.icon,
-    required this.label,
-    this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback? onTap;
-}
-
-class _ContentToolbar extends StatelessWidget {
-  const _ContentToolbar({required this.children});
-
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.appColors;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: colors.border),
-      ),
-      child: Wrap(
-        spacing: 4,
-        runSpacing: 4,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: children,
-      ),
-    );
-  }
-}
