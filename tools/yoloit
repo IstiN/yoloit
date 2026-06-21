@@ -1956,6 +1956,8 @@ elif fmt == "registry":
         out.append({
             "name": c["name"],
             "group": c["group"],
+            "description": c.get("description", ""),
+            "params": c.get("params", []),
             "aliases": c.get("aliases", []),
         })
     print(json.dumps(out, ensure_ascii=False, indent=2))

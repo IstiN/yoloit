@@ -154,7 +154,27 @@ else
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 5. TESTS
+# 5. GENERATED DART FILES ARE UP-TO-DATE
+# ═══════════════════════════════════════════════════════════════════════════
+echo "🔍 Checking generated LLM tool definitions..."
+if dart run tool/generate_auto_tools.dart --check; then
+  echo "✅ LLM tool definitions are up-to-date"
+else
+  echo ""
+  echo "╔═══════════════════════════════════════════════════════════════════════════╗"
+  echo "║  ❌ QUALITY GATE FAILED — GENERATED FILES OUT OF DATE                     ║"
+  echo "╚═══════════════════════════════════════════════════════════════════════════╝"
+  echo "   lib/features/board/chat/cli_tools/auto_tools.dart is out of sync with"
+  echo "   the CLI registry."
+  echo ""
+  echo "   Run: dart run tool/generate_auto_tools.dart"
+  echo "   Then stage the updated file and retry."
+  echo "   Use --no-verify to skip (NOT recommended — consult the team first)."
+  exit 1
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 6. TESTS
 # ═══════════════════════════════════════════════════════════════════════════
 echo "🧪 Running tests before commit..."
 if flutter test --concurrency=4 --exclude-tags=flaky 2>&1; then

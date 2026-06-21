@@ -26,6 +26,7 @@ class YoloitCliTool {
     required this.command,
     required this.description,
     this.alias,
+    this.aliases = const <String>[],
     this.group = 'app',
     this.params = const <YoloitCliToolParam>[],
     this.destructive = false,
@@ -35,6 +36,7 @@ class YoloitCliTool {
   final String command;
   final String description;
   final String? alias;
+  final List<String> aliases;
   final String group;
   final List<YoloitCliToolParam> params;
   final bool destructive;
@@ -45,9 +47,28 @@ class YoloitCliTool {
   /// Example: `{'ru': ['создай заметку {title}'], 'en': ['create note {title}']}`
   final Map<String, List<String>> humanVariants;
 
-  String get functionName =>
-      alias ?? YoloitCliToolCatalog.functionNameFor(command);
+  static final _validFunctionName = RegExp(r'^[a-zA-Z0-9_]+$');
+
+  List<String> get _allAliases =>
+      alias != null ? <String>[alias!, ...aliases] : aliases;
+
+  String get functionName {
+    if (_allAliases.isNotEmpty) {
+      final validAlias = _allAliases.firstWhere(
+        (a) => _validFunctionName.hasMatch(a),
+        orElse: () => '',
+      );
+      if (validAlias.isNotEmpty) return validAlias;
+    }
+    return fullFunctionName;
+  }
+
   String get fullFunctionName => YoloitCliToolCatalog.functionNameFor(command);
+  List<String> get allFunctionNames => <String>{
+      functionName,
+      fullFunctionName,
+      ..._allAliases,
+    }.toList();
 
   /// Export for training catalog (help --format catalog).
   Map<String, Object?> toCatalogJson() {
@@ -55,6 +76,7 @@ class YoloitCliTool {
       'command': command,
       'group': group,
       'description': description,
+      'aliases': _allAliases,
       'destructive': destructive,
       'params':
           params
@@ -70,8 +92,8 @@ class YoloitCliTool {
     };
   }
 
-  flm.LocalTool toLocalTool() {
-    final isCompact = alias != null;
+  List<flm.LocalTool> toLocalTools() {
+    final isCompact = _allAliases.isNotEmpty;
     final properties = <String, Object?>{};
     final requiredKeys = <String>[];
     for (final param in params) {
@@ -101,16 +123,29 @@ class YoloitCliTool {
         isCompact
             ? description
             : 'yoloit $command — $description.${destructive ? ' Ask for confirmation before using it.' : ''}';
-    return flm.LocalTool.function(
-      name: functionName,
-      description: desc,
-      parametersJsonSchema: schema,
-      metadata: <String, Object?>{
-        'command': command,
-        'group': group,
-        'destructive': destructive,
-      },
-    );
+    final metadata = <String, Object?>{
+      'command': command,
+      'group': group,
+      'destructive': destructive,
+    };
+    var names =
+        _allAliases.isEmpty
+            ? <String>[functionName]
+            : _allAliases
+                .where((a) => _validFunctionName.hasMatch(a))
+                .toList();
+    if (names.isEmpty) {
+      names = <String>[functionName];
+    }
+    return <flm.LocalTool>[
+      for (final name in names)
+        flm.LocalTool.function(
+          name: name,
+          description: desc,
+          parametersJsonSchema: schema,
+          metadata: metadata,
+        ),
+    ];
   }
 }
 
@@ -132,7 +167,7 @@ class YoloitCliToolCatalog {
             'additionalProperties': false,
           },
         ),
-        ..._tools.map((tool) => tool.toLocalTool()),
+        for (final tool in _tools) ...tool.toLocalTools(),
       ]);
 
   static List<flm.LocalTool> localToolsFor({
@@ -150,9 +185,8 @@ class YoloitCliToolCatalog {
         },
       ),
       for (final tool in _tools)
-        if (!disabled.contains(tool.functionName) &&
-            !disabled.contains(tool.fullFunctionName))
-          tool.toLocalTool(),
+        if (tool.allFunctionNames.every((n) => !disabled.contains(n)))
+          ...tool.toLocalTools(),
     ]);
   }
 
@@ -170,10 +204,13 @@ class YoloitCliToolCatalog {
             : resolvedName;
     final resolvedCommandWithColons = resolvedCommand.replaceAll('_', ':');
     for (final tool in _tools) {
-      if (tool.functionName == resolvedName ||
-          tool.functionName == name ||
-          tool.fullFunctionName == resolvedName ||
-          tool.alias == name ||
+      final names = <String>{
+        tool.functionName,
+        tool.fullFunctionName,
+        ...tool._allAliases,
+      };
+      if (names.contains(resolvedName) ||
+          names.contains(name) ||
           tool.command == rawCommand ||
           tool.command == rawCommandWithColons ||
           tool.command == resolvedCommand ||
