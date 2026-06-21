@@ -325,21 +325,20 @@ class _HoverOverflowMenu extends StatefulWidget {
 }
 
 class _HoverOverflowMenuState extends State<_HoverOverflowMenu> {
-  final _controller = OverlayPortalController();
-  final _link = LayerLink();
+  final _controller = MenuController();
   Timer? _hideTimer;
 
   void _show() {
     _hideTimer?.cancel();
-    if (!_controller.isShowing) {
-      setState(() => _controller.show());
+    if (!_controller.isOpen) {
+      _controller.open();
     }
   }
 
   void _delayedHide() {
     _hideTimer = Timer(const Duration(milliseconds: 80), () {
-      if (_controller.isShowing) {
-        setState(() => _controller.hide());
+      if (_controller.isOpen) {
+        _controller.close();
       }
     });
   }
@@ -353,51 +352,73 @@ class _HoverOverflowMenuState extends State<_HoverOverflowMenu> {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    return CompositedTransformTarget(
-      link: _link,
-      child: OverlayPortal(
-        controller: _controller,
-        overlayChildBuilder: (context) {
-          return CompositedTransformFollower(
-            link: _link,
-            targetAnchor: Alignment.centerLeft,
-            followerAnchor: Alignment.centerRight,
-            showWhenUnlinked: false,
-            child: MouseRegion(
-              onEnter: (_) => _show(),
-              onExit: (_) => _delayedHide(),
-              child: Container(
-                height: 28,
-                decoration: BoxDecoration(
-                  color: colors.surfaceElevated,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: colors.border),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    for (final item in widget.items)
-                      _HeaderIconButton(
-                        icon: item.icon,
-                        tooltip: item.label,
-                        onPressed: item.onTap ?? () {},
-                        colors: colors,
-                      ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
-        child: MouseRegion(
+    return MenuAnchor(
+      controller: _controller,
+      style: MenuStyle(
+        backgroundColor: WidgetStatePropertyAll(colors.surfaceElevated),
+        side: WidgetStatePropertyAll(BorderSide(color: colors.border)),
+        shape: WidgetStatePropertyAll(
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+        ),
+        padding: const WidgetStatePropertyAll(EdgeInsets.zero),
+        minimumSize: const WidgetStatePropertyAll(Size.zero),
+      ),
+      menuChildren: [
+        MouseRegion(
           onEnter: (_) => _show(),
           onExit: (_) => _delayedHide(),
-          child: _HeaderIconButton(
-            icon: Icons.more_vert,
-            tooltip: 'More',
-            onPressed: () {},
-            colors: colors,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final item in widget.items)
+                _OverflowActionButton(
+                  icon: item.icon,
+                  tooltip: item.label,
+                  onPressed: item.onTap ?? () {},
+                  colors: colors,
+                ),
+            ],
           ),
+        ),
+      ],
+      child: MouseRegion(
+        onEnter: (_) => _show(),
+        onExit: (_) => _delayedHide(),
+        child: _HeaderIconButton(
+          icon: Icons.more_vert,
+          tooltip: 'More',
+          onPressed: () {},
+          colors: colors,
+        ),
+      ),
+    );
+  }
+}
+
+class _OverflowActionButton extends StatelessWidget {
+  const _OverflowActionButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+    required this.colors,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onPressed;
+  final AppColorScheme colors;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(6),
+        child: SizedBox(
+          width: 28,
+          height: 28,
+          child: Icon(icon, size: 16, color: colors.textSecondary),
         ),
       ),
     );

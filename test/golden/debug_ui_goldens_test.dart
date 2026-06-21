@@ -41,35 +41,40 @@ void main() {
     testWidgets('DebugUIShell — Voice Overlay section', (tester) async {
       await _pump(tester, const DebugUIShell());
       await tester.tap(find.text('Voice Overlay'));
-      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
       await _golden(tester, 'debug_ui_voice_overlay');
     });
 
     testWidgets('DebugUIShell — Typography section', (tester) async {
       await _pump(tester, const DebugUIShell());
       await tester.tap(find.text('Typography'));
-      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
       await _golden(tester, 'debug_ui_typography');
     });
 
     testWidgets('DebugUIShell — Colors section', (tester) async {
       await _pump(tester, const DebugUIShell());
       await tester.tap(find.text('Colors'));
-      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
       await _golden(tester, 'debug_ui_colors');
     });
 
     testWidgets('DebugUIShell — Components section', (tester) async {
       await _pump(tester, const DebugUIShell());
       await tester.tap(find.text('Components'));
-      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
       await _golden(tester, 'debug_ui_components');
     });
 
     testWidgets('DebugUIShell — Panel Chrome Prototype section', (tester) async {
       await _pump(tester, const DebugUIShell());
       await tester.tap(find.text('Panel Chrome Prototype'));
-      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
       await _golden(tester, 'debug_ui_panel_chrome_prototype');
     });
   });
