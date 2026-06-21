@@ -354,6 +354,7 @@ class _HoverOverflowMenuState extends State<_HoverOverflowMenu> {
     final colors = context.appColors;
     return MenuAnchor(
       controller: _controller,
+      alignmentOffset: const Offset(0, -56),
       style: MenuStyle(
         backgroundColor: WidgetStatePropertyAll(colors.surfaceElevated),
         side: WidgetStatePropertyAll(BorderSide(color: colors.border)),
