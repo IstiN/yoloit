@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/ui/components/buttons/toolbar_button.dart';
@@ -323,46 +325,78 @@ class _HoverOverflowMenu extends StatefulWidget {
 }
 
 class _HoverOverflowMenuState extends State<_HoverOverflowMenu> {
-  bool _open = false;
+  final _controller = OverlayPortalController();
+  final _link = LayerLink();
+  Timer? _hideTimer;
 
-  double get _openWidth => (widget.items.length + 1) * 28.0;
+  void _show() {
+    _hideTimer?.cancel();
+    if (!_controller.isShowing) {
+      setState(() => _controller.show());
+    }
+  }
+
+  void _delayedHide() {
+    _hideTimer = Timer(const Duration(milliseconds: 80), () {
+      if (_controller.isShowing) {
+        setState(() => _controller.hide());
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _hideTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    return MouseRegion(
-      onEnter: (_) => setState(() => _open = true),
-      onExit: (_) => setState(() => _open = false),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOut,
-        width: _open ? _openWidth : 28,
-        height: 28,
-        clipBehavior: Clip.hardEdge,
-        decoration: BoxDecoration(
-          color: _open ? colors.surfaceElevated : null,
-          borderRadius: BorderRadius.circular(6),
-          border: _open ? Border.all(color: colors.border) : null,
-        ),
-        child: SizedBox(
-          width: _openWidth,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              for (final item in widget.items)
-                _HeaderIconButton(
-                  icon: item.icon,
-                  tooltip: item.label,
-                  onPressed: item.onTap ?? () {},
-                  colors: colors,
+    return CompositedTransformTarget(
+      link: _link,
+      child: OverlayPortal(
+        controller: _controller,
+        overlayChildBuilder: (context) {
+          return CompositedTransformFollower(
+            link: _link,
+            targetAnchor: Alignment.centerLeft,
+            followerAnchor: Alignment.centerRight,
+            showWhenUnlinked: false,
+            child: MouseRegion(
+              onEnter: (_) => _show(),
+              onExit: (_) => _delayedHide(),
+              child: Container(
+                height: 28,
+                decoration: BoxDecoration(
+                  color: colors.surfaceElevated,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: colors.border),
                 ),
-                _HeaderIconButton(
-                  icon: Icons.more_vert,
-                  tooltip: 'More',
-                  onPressed: () {},
-                  colors: colors,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (final item in widget.items)
+                      _HeaderIconButton(
+                        icon: item.icon,
+                        tooltip: item.label,
+                        onPressed: item.onTap ?? () {},
+                        colors: colors,
+                      ),
+                  ],
                 ),
-            ],
+              ),
+            ),
+          );
+        },
+        child: MouseRegion(
+          onEnter: (_) => _show(),
+          onExit: (_) => _delayedHide(),
+          child: _HeaderIconButton(
+            icon: Icons.more_vert,
+            tooltip: 'More',
+            onPressed: () {},
+            colors: colors,
           ),
         ),
       ),
