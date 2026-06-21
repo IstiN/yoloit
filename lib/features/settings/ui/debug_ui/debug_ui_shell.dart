@@ -3,6 +3,7 @@ import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/settings/ui/debug_ui/sections/chat_message_showcase.dart';
 import 'package:yoloit/features/settings/ui/debug_ui/sections/color_showcase.dart';
 import 'package:yoloit/features/settings/ui/debug_ui/sections/component_showcase.dart';
+import 'package:yoloit/features/settings/ui/debug_ui/sections/panel_chrome_prototype.dart';
 import 'package:yoloit/features/settings/ui/debug_ui/sections/plectrum_debug.dart';
 import 'package:yoloit/features/settings/ui/debug_ui/sections/typography_showcase.dart';
 import 'package:yoloit/features/settings/ui/debug_ui/sections/voice_overlay_debug.dart';
@@ -26,6 +27,7 @@ class _DebugUIShellState extends State<DebugUIShell> {
     ('Typography', TypographyShowcase()),
     ('Colors', ColorShowcase()),
     ('Components', ComponentShowcase()),
+    ('Panel Chrome Prototype', PanelChromePrototype()),
     ('Chat Messages', ChatMessageShowcase()),
   ];
 
