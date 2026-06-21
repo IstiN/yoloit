@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/ui/components/buttons/toolbar_button.dart';
+import 'package:yoloit/ui/components/chips/panel_id_chip.dart';
 import 'package:yoloit/ui/components/layout/showcase_scaffold.dart';
 import 'package:yoloit/ui/components/typography/section_title.dart';
 
@@ -51,20 +53,20 @@ class PanelChromePrototype extends StatelessWidget {
         const SizedBox(height: 8),
         _ContentToolbar(
           children: [
-            _ToolbarAction(
+            ToolbarButton(
               icon: Icons.add,
               label: 'Row',
-              onTap: () {},
+              onPressed: () {},
             ),
-            _ToolbarAction(
+            ToolbarButton(
               icon: Icons.remove,
               label: 'Row',
-              onTap: () {},
+              onPressed: () {},
             ),
-            _ToolbarAction(
+            ToolbarButton(
               icon: Icons.view_column,
               label: 'Col',
-              onTap: () {},
+              onPressed: () {},
             ),
             const _HoverOverflowMenu(
               items: [
@@ -82,8 +84,8 @@ class PanelChromePrototype extends StatelessWidget {
           spacing: 8,
           runSpacing: 8,
           children: [
-            _PanelIdChip(id: 'sales-data', onEdit: () {}, onCopy: () {}),
-            _PanelIdChip(id: 'panel-abc123', onEdit: () {}, onCopy: () {}),
+            PanelIdChip(id: 'sales-data', onEdit: () {}, onCopy: () {}),
+            PanelIdChip(id: 'panel-abc123', onEdit: () {}, onCopy: () {}),
           ],
         ),
       ],
@@ -114,7 +116,6 @@ class _MockPanel extends StatefulWidget {
 
 class _MockPanelState extends State<_MockPanel> {
   late bool _locked;
-  bool _hovered = false;
 
   @override
   void initState() {
@@ -148,22 +149,19 @@ class _MockPanelState extends State<_MockPanel> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            MouseRegion(
-              onEnter: (_) => setState(() => _hovered = true),
-              onExit: (_) => setState(() => _hovered = false),
-              child: Container(
-                height: 38,
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                decoration: BoxDecoration(
-                  color: widget.isSelected
-                      ? colors.surfaceElevated
-                      : colors.surface,
-                  border: Border(
-                    bottom: BorderSide(color: colors.border),
-                  ),
+            Container(
+              height: 38,
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              decoration: BoxDecoration(
+                color: widget.isSelected
+                    ? colors.surfaceElevated
+                    : colors.surface,
+                border: Border(
+                  bottom: BorderSide(color: colors.border),
                 ),
-                child: Row(
-                  children: [
+              ),
+              child: Row(
+                children: [
                     _HeaderIconButton(
                       icon: Icons.drag_indicator,
                       tooltip: 'Drag',
@@ -187,7 +185,6 @@ class _MockPanelState extends State<_MockPanel> {
                       tooltip: 'Duplicate',
                       onPressed: () {},
                       colors: colors,
-                      visible: true,
                     ),
                     _HeaderIconButton(
                       icon: _locked ? Icons.lock : Icons.lock_open,
@@ -195,7 +192,7 @@ class _MockPanelState extends State<_MockPanel> {
                       onPressed: () => setState(() => _locked = !_locked),
                       colors: colors,
                       active: _locked,
-                      visible: true,
+                      
                     ),
                     _HeaderIconButton(
                       icon: Icons.format_color_fill,
@@ -203,10 +200,9 @@ class _MockPanelState extends State<_MockPanel> {
                       onPressed: () {},
                       colors: colors,
                       swatch: widget.accentColor,
-                      visible: true,
+                      
                     ),
                     _HoverOverflowMenu(
-                      visible: _hovered || _locked,
                       items: [
                         _OverflowItem(
                           icon: Icons.content_copy,
@@ -245,12 +241,10 @@ class _MockPanelState extends State<_MockPanel> {
                       tooltip: 'Close',
                       onPressed: widget.onClose,
                       colors: colors,
-                      visible: true,
                     ),
                   ],
                 ),
               ),
-            ),
             Container(
               height: 120,
               color: colors.surface,
@@ -274,7 +268,6 @@ class _HeaderIconButton extends StatelessWidget {
     required this.tooltip,
     required this.onPressed,
     required this.colors,
-    this.visible = false,
     this.active = false,
     this.swatch,
   });
@@ -283,13 +276,11 @@ class _HeaderIconButton extends StatelessWidget {
   final String tooltip;
   final VoidCallback onPressed;
   final AppColorScheme colors;
-  final bool visible;
   final bool active;
   final Color? swatch;
 
   @override
   Widget build(BuildContext context) {
-    if (!visible) return const SizedBox.shrink();
     return Tooltip(
       message: tooltip,
       child: Material(
@@ -322,11 +313,9 @@ class _HeaderIconButton extends StatelessWidget {
 
 class _HoverOverflowMenu extends StatefulWidget {
   const _HoverOverflowMenu({
-    this.visible = true,
     required this.items,
   });
 
-  final bool visible;
   final List<_OverflowItem> items;
 
   @override
@@ -336,39 +325,46 @@ class _HoverOverflowMenu extends StatefulWidget {
 class _HoverOverflowMenuState extends State<_HoverOverflowMenu> {
   bool _open = false;
 
+  double get _openWidth => (widget.items.length + 1) * 28.0;
+
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    if (!widget.visible) return const SizedBox.shrink();
     return MouseRegion(
       onEnter: (_) => setState(() => _open = true),
       onExit: (_) => setState(() => _open = false),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        width: _open ? null : 28,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+        width: _open ? _openWidth : 28,
         height: 28,
+        clipBehavior: Clip.hardEdge,
         decoration: BoxDecoration(
           color: _open ? colors.surfaceElevated : null,
           borderRadius: BorderRadius.circular(6),
           border: _open ? Border.all(color: colors.border) : null,
         ),
-        child: _open
-            ? Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  for (final item in widget.items)
-                    _HeaderIconButton(
-                      icon: item.icon,
-                      tooltip: item.label,
-                      onPressed: item.onTap ?? () {},
-                      colors: colors,
-                      visible: true,
-                    ),
-                ],
-              )
-            : const Center(
-                child: Icon(Icons.more_vert, size: 16),
-              ),
+        child: SizedBox(
+          width: _openWidth,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              for (final item in widget.items)
+                _HeaderIconButton(
+                  icon: item.icon,
+                  tooltip: item.label,
+                  onPressed: item.onTap ?? () {},
+                  colors: colors,
+                ),
+                _HeaderIconButton(
+                  icon: Icons.more_vert,
+                  tooltip: 'More',
+                  onPressed: () {},
+                  colors: colors,
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -406,81 +402,6 @@ class _ContentToolbar extends StatelessWidget {
         runSpacing: 4,
         crossAxisAlignment: WrapCrossAlignment.center,
         children: children,
-      ),
-    );
-  }
-}
-
-class _ToolbarAction extends StatelessWidget {
-  const _ToolbarAction({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.appColors;
-    return TextButton.icon(
-      onPressed: onTap,
-      icon: Icon(icon, size: 14, color: colors.textSecondary),
-      label: Text(
-        label,
-        style: TextStyle(fontSize: 11, color: colors.textSecondary),
-      ),
-      style: TextButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-        minimumSize: Size.zero,
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      ),
-    );
-  }
-}
-
-class _PanelIdChip extends StatelessWidget {
-  const _PanelIdChip({
-    required this.id,
-    required this.onEdit,
-    required this.onCopy,
-  });
-
-  final String id;
-  final VoidCallback onEdit;
-  final VoidCallback onCopy;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.appColors;
-    return Tooltip(
-      message: 'Table ID: $id\nTap to copy, ✎ to edit',
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextButton.icon(
-            onPressed: onCopy,
-            icon: Icon(Icons.fingerprint, size: 12, color: colors.textMuted),
-            label: Text(
-              id.length > 14 ? '${id.substring(0, 14)}...' : id,
-              style: TextStyle(fontSize: 10, color: colors.textMuted),
-            ),
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-          ),
-          InkWell(
-            onTap: onEdit,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Icon(Icons.edit, size: 12, color: colors.textMuted),
-            ),
-          ),
-        ],
       ),
     );
   }

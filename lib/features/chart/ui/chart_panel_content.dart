@@ -10,6 +10,7 @@ import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/chart/model/chart_models.dart';
 import 'package:yoloit/features/table/model/table_models.dart' as table_models;
+import 'package:yoloit/ui/components/buttons/toolbar_button.dart';
 
 class ChartPanelContent extends StatelessWidget {
   const ChartPanelContent({
@@ -311,18 +312,10 @@ class _ChartHeader extends StatelessWidget {
               dropdownColor: colors.surfaceElevated,
             ),
           ),
-          TextButton.icon(
+          ToolbarButton(
+            icon: Icons.edit,
+            label: 'Data',
             onPressed: onEditData,
-            icon: Icon(Icons.edit, size: 14, color: colors.textSecondary),
-            label: Text(
-              'Data',
-              style: TextStyle(fontSize: 11, color: colors.textSecondary),
-            ),
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
           ),
         ],
       ),

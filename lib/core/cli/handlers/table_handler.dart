@@ -23,6 +23,26 @@ class TableCliHandler extends PanelCliHandler {
     'clear',
   ];
 
+  static const CliActionResult _missingIdResult = CliActionResult(
+    ok: false,
+    message: 'Missing required field: id',
+  );
+
+  static CliActionResult _notFoundResult(String kind, String id) =>
+      CliActionResult(ok: false, message: '$kind not found: $id');
+
+  static const CliActionResult _missingIdOrTitleResult = CliActionResult(
+    ok: false,
+    message: 'Missing required fields: id and title',
+  );
+
+  (String?, String?) _parseColumnIdAndTitle(Map<String, dynamic> args) {
+    return (
+      _string(args['id']) ?? _string(args['columnId']),
+      _string(args['title']) ?? _string(args['name']),
+    );
+  }
+
   @override
   Map<String, dynamic> getContent(BoardPanelInstance panel) {
     return <String, dynamic>{
@@ -121,16 +141,10 @@ class TableCliHandler extends PanelCliHandler {
     Map<String, dynamic> args,
     BoardPanelInstance panel,
   ) {
-    final id = _string(args['id']) ?? _string(args['columnId']);
-    final title = _string(args['title']) ?? _string(args['name']);
+    final (id, title) = _parseColumnIdAndTitle(args);
     final type = TableColumnTypeExtension.fromJson(args['type']);
     final options = _stringList(args['options']);
-    if (id == null || id.isEmpty) {
-      return const CliActionResult(
-        ok: false,
-        message: 'Missing required field: id',
-      );
-    }
+    if (id == null || id.isEmpty) return _missingIdResult;
     final columns = TableDataHelper.parseColumns(panel.state['columns']).toList();
     if (columns.any((column) => column.id == id)) {
       return CliActionResult(
@@ -166,19 +180,13 @@ class TableCliHandler extends PanelCliHandler {
     Map<String, dynamic> args,
     BoardPanelInstance panel,
   ) {
-    final id = _string(args['id']) ?? _string(args['columnId']);
-    final title = _string(args['title']) ?? _string(args['name']);
+    final (id, title) = _parseColumnIdAndTitle(args);
     if (id == null || title == null || title.isEmpty) {
-      return const CliActionResult(
-        ok: false,
-        message: 'Missing required fields: id and title',
-      );
+      return _missingIdOrTitleResult;
     }
     final columns = TableDataHelper.parseColumns(panel.state['columns']).toList();
     final index = columns.indexWhere((column) => column.id == id);
-    if (index < 0) {
-      return CliActionResult(ok: false, message: 'Column not found: $id');
-    }
+    if (index < 0) return _notFoundResult('Column', id);
     columns[index] = columns[index].copyWith(title: title);
     return CliActionResult(
       message: 'Column renamed to "$title"',
@@ -193,17 +201,10 @@ class TableCliHandler extends PanelCliHandler {
     BoardPanelInstance panel,
   ) {
     final id = _string(args['id']) ?? _string(args['columnId']);
-    if (id == null || id.isEmpty) {
-      return const CliActionResult(
-        ok: false,
-        message: 'Missing required field: id',
-      );
-    }
+    if (id == null || id.isEmpty) return _missingIdResult;
     final columns = TableDataHelper.parseColumns(panel.state['columns']).toList();
     final index = columns.indexWhere((column) => column.id == id);
-    if (index < 0) {
-      return CliActionResult(ok: false, message: 'Column not found: $id');
-    }
+    if (index < 0) return _notFoundResult('Column', id);
     columns.removeAt(index);
     final rows =
         TableDataHelper
@@ -250,18 +251,11 @@ class TableCliHandler extends PanelCliHandler {
     BoardPanelInstance panel,
   ) {
     final rowId = _string(args['id']) ?? _string(args['rowId']);
-    if (rowId == null || rowId.isEmpty) {
-      return const CliActionResult(
-        ok: false,
-        message: 'Missing required field: id',
-      );
-    }
+    if (rowId == null || rowId.isEmpty) return _missingIdResult;
     final columns = TableDataHelper.parseColumns(panel.state['columns']).toList();
     final rows = TableDataHelper.parseRows(panel.state['rows']).toList();
     final index = rows.indexWhere((row) => row.id == rowId);
-    if (index < 0) {
-      return CliActionResult(ok: false, message: 'Row not found: $rowId');
-    }
+    if (index < 0) return _notFoundResult('Row', rowId);
     final updatedCells = Map<String, dynamic>.from(rows[index].cells);
     for (final column in columns) {
       if (args.containsKey(column.id)) {
@@ -282,17 +276,10 @@ class TableCliHandler extends PanelCliHandler {
     BoardPanelInstance panel,
   ) {
     final rowId = _string(args['id']) ?? _string(args['rowId']);
-    if (rowId == null || rowId.isEmpty) {
-      return const CliActionResult(
-        ok: false,
-        message: 'Missing required field: id',
-      );
-    }
+    if (rowId == null || rowId.isEmpty) return _missingIdResult;
     final rows = TableDataHelper.parseRows(panel.state['rows']).toList();
     final index = rows.indexWhere((row) => row.id == rowId);
-    if (index < 0) {
-      return CliActionResult(ok: false, message: 'Row not found: $rowId');
-    }
+    if (index < 0) return _notFoundResult('Row', rowId);
     rows.removeAt(index);
     return CliActionResult(
       message: 'Row removed',

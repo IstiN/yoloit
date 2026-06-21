@@ -63,26 +63,27 @@ class RuntimeTerminalClient {
     }
   }
 
+  Future<void> _killPidFile(File pidFile, {int sigtermDelayMs = 300}) async {
+    if (!await pidFile.exists()) return;
+    final pidStr = (await pidFile.readAsString()).trim();
+    final pid = int.tryParse(pidStr);
+    if (pid == null) return;
+    try {
+      Process.killPid(pid, ProcessSignal.sigterm);
+      await Future<void>.delayed(Duration(milliseconds: sigtermDelayMs));
+      final check = await Process.run('kill', ['-0', '$pid']);
+      if (check.exitCode == 0) {
+        Process.killPid(pid, ProcessSignal.sigkill);
+      }
+    } catch (_) {
+      // ignore
+    }
+  }
+
   /// Kills the current runtime, re-extracts the binary, and starts a fresh one.
   Future<void> restartRuntime() async {
-    final pidFile = File(_pidPath);
-    if (await pidFile.exists()) {
-      final pidStr = (await pidFile.readAsString()).trim();
-      final pid = int.tryParse(pidStr);
-      if (pid != null) {
-        try {
-          Process.killPid(pid, ProcessSignal.sigterm);
-          await Future<void>.delayed(const Duration(milliseconds: 500));
-          final check = await Process.run('kill', ['-0', '$pid']);
-          if (check.exitCode == 0) {
-            Process.killPid(pid, ProcessSignal.sigkill);
-            await Future<void>.delayed(const Duration(milliseconds: 200));
-          }
-        } catch (_) {
-          // ignore
-        }
-      }
-    }
+    await _killPidFile(File(_pidPath), sigtermDelayMs: 500);
+    await Future<void>.delayed(const Duration(milliseconds: 200));
     await _deleteIfExists(_portPath);
     await _deleteIfExists(_pidPath);
 
@@ -119,26 +120,7 @@ class RuntimeTerminalClient {
     }
 
     // Script changed — kill stale runtime.
-    final pidFile = File(_pidPath);
-    if (await pidFile.exists()) {
-      final pidStr = (await pidFile.readAsString()).trim();
-      final pid = int.tryParse(pidStr);
-      if (pid != null) {
-        try {
-          final result = await Process.run('kill', ['-0', '$pid']);
-          if (result.exitCode == 0) {
-            Process.killPid(pid, ProcessSignal.sigterm);
-            await Future<void>.delayed(const Duration(milliseconds: 300));
-            final check = await Process.run('kill', ['-0', '$pid']);
-            if (check.exitCode == 0) {
-              Process.killPid(pid, ProcessSignal.sigkill);
-            }
-          }
-        } catch (_) {
-          // ignore
-        }
-      }
-    }
+    await _killPidFile(File(_pidPath));
 
     await _deleteIfExists(_portPath);
     await _deleteIfExists(_pidPath);

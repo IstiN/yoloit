@@ -146,14 +146,21 @@ List<BoardPanelInstance> pushPanelToRect(
   }
 
   final resolved = resolve(rects, movedPanelId, targetRect, <String>{});
-  return panels.map((panel) {
-    final newRect = resolved[panel.id];
-    if (newRect == null || newRect == boundsToGridRect(mode, panel.bounds)) {
-      return panel;
-    }
-    return panel.copyWith(bounds: gridRectToBounds(mode, newRect));
-  }).toList();
+  return _applyGridRects(mode, panels, resolved);
 }
+
+List<BoardPanelInstance> _applyGridRects(
+  BoardGridMode mode,
+  List<BoardPanelInstance> panels,
+  Map<String, GridRect> rects,
+) =>
+    panels.map((panel) {
+      final newRect = rects[panel.id];
+      if (newRect == null || newRect == boundsToGridRect(mode, panel.bounds)) {
+        return panel;
+      }
+      return panel.copyWith(bounds: gridRectToBounds(mode, newRect));
+    }).toList();
 
 Map<String, GridRect> _pushRecursive(
   Map<String, GridRect> rects,
@@ -225,13 +232,7 @@ List<BoardPanelInstance> pushPanelInGrid(
     <String>{},
   );
 
-  return panels.map((panel) {
-    final newRect = pushedRects[panel.id];
-    if (newRect == null || newRect == boundsToGridRect(mode, panel.bounds)) {
-      return panel;
-    }
-    return panel.copyWith(bounds: gridRectToBounds(mode, newRect));
-  }).toList();
+  return _applyGridRects(mode, panels, pushedRects);
 }
 
 class _PackedRect {
