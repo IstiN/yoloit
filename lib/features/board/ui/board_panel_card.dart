@@ -584,11 +584,36 @@ class BoardPanelCardState extends State<BoardPanelCard>
                   !isCapturing &&
                   !connectMode &&
                   panel.type != YoloAssistantPlugin.kTypeId)
-                Positioned(
-                  left: selectionSideGutter,
-                  top: selectionTopGutter,
-                  width: panel.bounds.width,
-                  height: panel.bounds.height,
+                AnimatedPositioned(
+                  duration: const Duration(milliseconds: 350),
+                  curve: Curves.easeInOutCubic,
+                  left:
+                      _yoloExpanded
+                          ? selectionSideGutter +
+                              panel.bounds.width +
+                              12
+                          : selectionSideGutter +
+                              panel.bounds.width -
+                              PanelYoloAssistantBadge.badgeSize -
+                              12,
+                  top:
+                      _yoloExpanded
+                          ? selectionTopGutter +
+                              panel.bounds.height -
+                              12 -
+                              PanelYoloAssistantBadge.expandedHeight
+                          : selectionTopGutter +
+                              panel.bounds.height -
+                              PanelYoloAssistantBadge.badgeSize -
+                              12,
+                  width:
+                      _yoloExpanded
+                          ? PanelYoloAssistantBadge.expandedWidth
+                          : PanelYoloAssistantBadge.badgeSize,
+                  height:
+                      _yoloExpanded
+                          ? PanelYoloAssistantBadge.expandedHeight
+                          : PanelYoloAssistantBadge.badgeSize,
                   child: PanelYoloAssistantBadge(
                     targetPanel: panel,
                     expanded: _yoloExpanded,
