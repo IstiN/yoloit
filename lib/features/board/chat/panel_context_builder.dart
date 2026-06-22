@@ -179,7 +179,7 @@ String _formatTableContent(Map<String, dynamic> content) {
           final id = c['id'] as String?;
           final title = c['title'] as String?;
           final key = id ?? title ?? '';
-          return row[key] as String? ?? '';
+          return (row[key]?.toString()) ?? '';
         })
         .toList();
     buffer.writeln('| ${cells.join(' | ')} |');

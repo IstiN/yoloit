@@ -75,7 +75,7 @@ class _TableTestHandler extends PanelCliHandler {
       {'id': 'age', 'title': 'Age'},
     ],
     'rows': [
-      {'name': 'Alice', 'age': '30'},
+      {'name': 'Alice', 'age': 30},
       {'name': 'Bob', 'age': '25'},
     ],
   };
@@ -145,6 +145,21 @@ void main() {
       expect(summary, contains('| Name | Age |'));
       expect(summary, contains('| Alice | 30 |'));
       expect(summary, contains('| Bob | 25 |'));
+    });
+
+    test('stringifies non-string table cells without casting', () async {
+      const panel = BoardPanelInstance(
+        id: 'p4',
+        type: 'board.table',
+        title: 'Mixed',
+        bounds: BoardPanelBounds(x: 0, y: 0, width: 100, height: 100),
+      );
+
+      final summary = await buildFocusPanelSummary(panel);
+
+      expect(summary, contains('| Alice | 30 |'));
+      expect(summary, isNot(contains('Error:')));
+      expect(summary, isNot(contains('is not a subtype')));
     });
   });
 }

@@ -10,6 +10,7 @@ import 'package:yoloit/features/board/history/board_history_store.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/builtin/markdown_note_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/yolo_assistant_plugin.dart';
+import 'package:yoloit/features/board/ui/board_panel_card.dart';
 import 'package:yoloit/features/board/ui/board_view.dart';
 
 void main() {
@@ -247,56 +248,74 @@ void main() {
     expect(find.text('Webpage'), findsOneWidget);
   });
 
-  testWidgets('focused panel shows YoLo badge and opens assistant panel', (
-    tester,
-  ) async {
-    SharedPreferences.setMockInitialValues({});
-    tester.view.physicalSize = const Size(1200, 760);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
+  testWidgets(
+    'focused panel shows YoLo badge and expands inline assistant overlay',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      tester.view.physicalSize = const Size(1200, 760);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
 
-    final cubit = BoardCubit();
-    addTearDown(cubit.close);
-    const target = BoardPanelInstance(
-      id: 'target',
-      type: MarkdownNotePlugin.kTypeId,
-      title: 'Article draft',
-      bounds: BoardPanelBounds(x: 56, y: 74, width: 520, height: 300),
-      zIndex: 1,
-      state: {'markdown': 'Long text'},
-    );
-    const board = BoardDocument(
-      id: 'board',
-      name: 'Board',
-      viewport: BoardViewport(scale: 1, focusedPanelId: 'target'),
-      panels: [target],
-    );
-    cubit.emit(
-      const BoardState(boards: [board], activeBoardId: 'board', isLoaded: true),
-    );
-
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: AppThemePreset.neonPurple.theme,
-        home: Scaffold(
-          body: BlocProvider.value(value: cubit, child: const BoardView()),
+      final cubit = BoardCubit();
+      addTearDown(cubit.close);
+      const target = BoardPanelInstance(
+        id: 'target',
+        type: MarkdownNotePlugin.kTypeId,
+        title: 'Article draft',
+        bounds: BoardPanelBounds(x: 56, y: 74, width: 520, height: 300),
+        zIndex: 1,
+        state: {'markdown': 'Long text'},
+      );
+      const board = BoardDocument(
+        id: 'board',
+        name: 'Board',
+        viewport: BoardViewport(scale: 1, focusedPanelId: 'target'),
+        panels: [target],
+      );
+      cubit.emit(
+        const BoardState(
+          boards: [board],
+          activeBoardId: 'board',
+          isLoaded: true,
         ),
-      ),
-    );
-    await tester.pump(const Duration(milliseconds: 450));
+      );
 
-    expect(find.byTooltip('Ask YoLo about this panel'), findsOneWidget);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppThemePreset.neonPurple.theme,
+          home: Scaffold(
+            body: BlocProvider.value(value: cubit, child: const BoardView()),
+          ),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 450));
 
-    await tester.tap(find.byTooltip('Ask YoLo about this panel'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 250));
+      expect(find.byTooltip('Ask YoLo about this panel'), findsOneWidget);
 
-    final panels = cubit.state.activeBoard!.panels;
-    final assistantPanels = panels.where(
-      (p) => p.type == YoloAssistantPlugin.kTypeId,
-    );
-    expect(assistantPanels, hasLength(1));
-    expect(assistantPanels.first.state['targetPanelId'], 'target');
-  });
+      await tester.tap(find.byTooltip('Ask YoLo about this panel'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      final panels = cubit.state.activeBoard!.panels;
+      expect(
+        panels.where((p) => p.type == YoloAssistantPlugin.kTypeId),
+        isEmpty,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(BoardPanelCard),
+          matching: find.text('YOLO'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(BoardPanelCard),
+          matching: find.widgetWithText(TextField, 'Ask YoLo…'),
+        ),
+        findsOneWidget,
+      );
+    },
+  );
 }
