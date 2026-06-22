@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:yoloit/core/utils/clipboard_utils.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/chat/chat_panel_plugin.dart';
 import 'package:yoloit/features/board/chat/chat_panel_widget.dart';
@@ -179,6 +180,43 @@ class _PanelYoloAssistantBadgeState extends State<PanelYoloAssistantBadge> {
     _onAssistantStateChanged(newState);
   }
 
+  Future<void> _copyHistory() async {
+    final messagesRaw = _assistantPanel.state['messages'];
+    final buffer = StringBuffer();
+    if (messagesRaw is List) {
+      for (final raw in messagesRaw) {
+        if (raw is! Map) continue;
+        try {
+          final message = ChatMessage.fromJson(
+            Map<String, dynamic>.from(raw),
+          );
+          final ts = message.timestamp?.toIso8601String() ?? '-';
+          final role = message.role.name.toUpperCase();
+          final title =
+              message.toolName?.isNotEmpty == true
+                  ? '[$ts] $role (${message.toolName})'
+                  : '[$ts] $role';
+          buffer.writeln(title);
+          if (message.attachments.isNotEmpty) {
+            buffer.writeln(
+              'Attachments: ${message.attachments.join(', ')}',
+            );
+          }
+          buffer.writeln(message.content.trimRight());
+          buffer.writeln('');
+        } catch (_) {}
+      }
+    }
+    await copyToClipboard(buffer.toString().trimRight());
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('YoLo history copied to clipboard'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
   void _toggleExpanded() {
     final next = !_expanded;
     widget.onExpandedChanged(next);
@@ -187,51 +225,63 @@ class _PanelYoloAssistantBadgeState extends State<PanelYoloAssistantBadge> {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedPositioned(
-      duration: const Duration(milliseconds: 350),
-      curve: Curves.easeInOutCubic,
-      left: 12,
-      bottom: 12,
-      width:
-          _expanded
-              ? PanelYoloAssistantBadge.expandedWidth
-              : PanelYoloAssistantBadge.badgeSize,
-      height:
-          _expanded
-              ? PanelYoloAssistantBadge.expandedHeight
-              : PanelYoloAssistantBadge.badgeSize,
-      child: Tooltip(
-        message: 'Ask YoLo about this panel',
-        child: MouseRegion(
-          cursor: SystemMouseCursors.click,
-          child: GestureDetector(
-            onTap: _toggleExpanded,
-            child: YoloAssistantOverlayShell(
-              expanded: _expanded,
-              badgeSize: PanelYoloAssistantBadge.badgeSize,
-              expandedWidth: PanelYoloAssistantBadge.expandedWidth,
-              expandedHeight: PanelYoloAssistantBadge.expandedHeight,
-              badgeOpacity: 1.0,
-              badgeIcon: SvgPicture.asset(
-                'assets/images/yolo_voice_badge.svg',
-                width: 28,
-                height: 28,
+    return Align(
+      alignment: Alignment.bottomRight,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeInOutCubic,
+        width:
+            _expanded
+                ? PanelYoloAssistantBadge.expandedWidth
+                : PanelYoloAssistantBadge.badgeSize,
+        height:
+            _expanded
+                ? PanelYoloAssistantBadge.expandedHeight
+                : PanelYoloAssistantBadge.badgeSize,
+        child: Tooltip(
+          message: 'Ask YoLo about this panel',
+          child: MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              onTap: _toggleExpanded,
+              child: YoloAssistantOverlayShell(
+                expanded: _expanded,
+                badgeSize: PanelYoloAssistantBadge.badgeSize,
+                expandedWidth: PanelYoloAssistantBadge.expandedWidth,
+                expandedHeight: PanelYoloAssistantBadge.expandedHeight,
+                badgeOpacity: 1.0,
+                badgeIcon: SvgPicture.asset(
+                  'assets/images/yolo_voice_badge.svg',
+                  width: 28,
+                  height: 28,
+                ),
+                headerTrailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    HeaderIconButton(
+                      icon: Icons.copy,
+                      tooltip: 'Copy YoLo history',
+                      onPressed: _copyHistory,
+                    ),
+                    const SizedBox(width: 4),
+                    HeaderIconButton(
+                      icon: Icons.close,
+                      tooltip: 'Close YoLo assistant',
+                      onPressed: _toggleExpanded,
+                    ),
+                  ],
+                ),
+                content:
+                    widget.chatBuilder?.call(
+                      _assistantPanel,
+                      _onAssistantStateChanged,
+                    ) ??
+                    ChatPanelWidget(
+                      panel: _assistantPanel,
+                      onUpdateState: _onAssistantStateChanged,
+                      compact: true,
+                    ),
               ),
-              headerTrailing: HeaderIconButton(
-                icon: Icons.close,
-                tooltip: 'Close YoLo assistant',
-                onPressed: _toggleExpanded,
-              ),
-              content:
-                  widget.chatBuilder?.call(
-                    _assistantPanel,
-                    _onAssistantStateChanged,
-                  ) ??
-                  ChatPanelWidget(
-                    panel: _assistantPanel,
-                    onUpdateState: _onAssistantStateChanged,
-                    compact: true,
-                  ),
             ),
           ),
         ),

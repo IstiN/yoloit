@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -302,5 +303,59 @@ void main() {
         expect(_configOf(captured).provider, 'cloud:openrouter');
       },
     );
+
+    testWidgets('copy history button copies messages to clipboard', (tester) async {
+      SystemChannels.platform.setMockMethodCallHandler((call) async {
+        if (call.method == 'Clipboard.setData') return null;
+        return null;
+      });
+      addTearDown(
+        () => SystemChannels.platform.setMockMethodCallHandler(null),
+      );
+
+      final fixture = _createFixture(
+        targetState: {
+          'yoloAssistant': {
+            'configured': true,
+            'assistantProviderResolved': true,
+            'messages': [
+              {
+                'id': 'm1',
+                'role': 'user',
+                'content': 'Hello',
+                'timestamp': '2026-06-22T10:00:00.000Z',
+                'toolCalls': [],
+                'attachments': [],
+              },
+              {
+                'id': 'm2',
+                'role': 'assistant',
+                'content': 'Hi there',
+                'timestamp': '2026-06-22T10:00:01.000Z',
+                'toolCalls': [],
+                'attachments': [],
+              },
+            ],
+            'config': {
+              'sessionName': 'saved',
+              'workingDir': '/tmp',
+              'provider': 'cloud:openrouter',
+              'model': 'openrouter/google/gemma-4-31b-it',
+            },
+          },
+        },
+      );
+      await _captureAssistantPanel(
+        tester,
+        fixture.cubit,
+        fixture.targetPanel,
+      );
+
+      await tester.tap(find.byTooltip('Copy YoLo history'));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(find.text('YoLo history copied to clipboard'), findsOneWidget);
+    });
   });
 }

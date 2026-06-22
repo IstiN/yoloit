@@ -128,7 +128,6 @@ class BoardPanelCardState extends State<BoardPanelCard>
   late final Animation<double> _opacity;
   late final Animation<double> _scale;
   bool _isTransformingPanel = false;
-  bool _isPanelHovered = false;
   bool _yoloExpanded = false;
 
   // Convenience getters so build code can still use widget.panel etc.
@@ -301,11 +300,8 @@ class BoardPanelCardState extends State<BoardPanelCard>
                 child: ChatGlowWrapper(
                   panelId: panel.id,
                   borderRadius: BorderRadius.circular(16),
-                  child: MouseRegion(
-                    onEnter: (_) => setState(() => _isPanelHovered = true),
-                    onExit: (_) => setState(() => _isPanelHovered = false),
-                    child: Listener(
-                      behavior: HitTestBehavior.deferToChild,
+                  child: Listener(
+                    behavior: HitTestBehavior.deferToChild,
                       onPointerDown: (_) {
                         if (isWebpage) {
                           if (!isFocused) {
@@ -536,7 +532,6 @@ class BoardPanelCardState extends State<BoardPanelCard>
                         ),
                       ),
                     ),
-                  ),
                 ),
               ),
               if (showSelectionChrome && !showHeader)
@@ -585,15 +580,21 @@ class BoardPanelCardState extends State<BoardPanelCard>
                     ),
                   ),
                 ),
-              if ((_isPanelHovered || selected || isFocused || _yoloExpanded) &&
+              if ((selected || isFocused || _yoloExpanded) &&
                   !isCapturing &&
                   !connectMode &&
                   panel.type != YoloAssistantPlugin.kTypeId)
-                PanelYoloAssistantBadge(
-                  targetPanel: panel,
-                  expanded: _yoloExpanded,
-                  onExpandedChanged:
-                      (value) => setState(() => _yoloExpanded = value),
+                Positioned(
+                  left: selectionSideGutter,
+                  top: selectionTopGutter,
+                  width: panel.bounds.width,
+                  height: panel.bounds.height,
+                  child: PanelYoloAssistantBadge(
+                    targetPanel: panel,
+                    expanded: _yoloExpanded,
+                    onExpandedChanged:
+                        (value) => setState(() => _yoloExpanded = value),
+                  ),
                 ),
             ],
           ),
