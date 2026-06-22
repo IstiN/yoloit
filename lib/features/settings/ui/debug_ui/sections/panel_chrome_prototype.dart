@@ -430,13 +430,22 @@ class _VoicePanelMorphDemoState extends State<_VoicePanelMorphDemo> {
       width: 380,
       height: 460,
       decoration: BoxDecoration(
-        color: colors.surface,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [colors.accentBlue, colors.primary],
+        ),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: colors.primary),
       ),
-      clipBehavior: Clip.antiAlias,
-      child: Stack(
-        children: [
+      child: Container(
+        margin: const EdgeInsets.all(1.5),
+        decoration: BoxDecoration(
+          color: colors.surface,
+          borderRadius: BorderRadius.circular(8.5),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          children: [
           Positioned.fill(
             child: Center(
               child: Text(
@@ -498,6 +507,7 @@ class _VoicePanelMorphDemoState extends State<_VoicePanelMorphDemo> {
           ),
         ],
       ),
+      ),
     );
   }
 
@@ -514,13 +524,22 @@ class _VoicePanelMorphDemoState extends State<_VoicePanelMorphDemo> {
           ),
           child: Row(
             children: [
-              Text(
-                'YOLO',
-                style: TextStyle(
-                  color: colors.primary,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.6,
+              ShaderMask(
+                blendMode: BlendMode.srcIn,
+                shaderCallback:
+                    (bounds) => LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [colors.accentBlue, colors.primary],
+                    ).createShader(bounds),
+                child: Text(
+                  'YOLO',
+                  style: TextStyle(
+                    color: colors.textHighlight,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.6,
+                  ),
                 ),
               ),
               const Spacer(),
