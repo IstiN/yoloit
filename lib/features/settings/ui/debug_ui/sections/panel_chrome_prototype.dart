@@ -91,6 +91,10 @@ class PanelChromePrototype extends StatelessWidget {
             PanelIdChip(id: 'panel-abc123', onEdit: () {}, onCopy: () {}),
           ],
         ),
+        const SizedBox(height: 24),
+        const SectionTitle('Selected panel — voice input badge'),
+        const SizedBox(height: 8),
+        const _MockPanelWithVoiceBadge(),
       ],
     );
   }
@@ -253,3 +257,160 @@ class _MockPanelState extends State<_MockPanel> {
 }
 
 
+
+class _MockPanelWithVoiceBadge extends StatefulWidget {
+  const _MockPanelWithVoiceBadge();
+
+  @override
+  State<_MockPanelWithVoiceBadge> createState() =>
+      _MockPanelWithVoiceBadgeState();
+}
+
+class _MockPanelWithVoiceBadgeState extends State<_MockPanelWithVoiceBadge> {
+  bool _listening = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        _MockPanel(
+          title: 'Terminal agent',
+          icon: Icons.terminal,
+          accentColor: colors.accentBlue,
+          isSelected: true,
+          onClose: () {},
+        ),
+        Align(
+          alignment: Alignment.centerRight,
+          child: Transform.translate(
+            offset: const Offset(18, 0),
+            child: _VoiceInputBadge(
+              isListening: _listening,
+              onTap: () => setState(() => _listening = !_listening),
+            ),
+          ),
+        ),
+        if (_listening)
+          const Positioned(
+            right: 44,
+            top: -70,
+            child: _VoiceListeningBubble(),
+          ),
+      ],
+    );
+  }
+}
+
+class _VoiceInputBadge extends StatelessWidget {
+  const _VoiceInputBadge({required this.isListening, required this.onTap});
+
+  final bool isListening;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return GestureDetector(
+      onTap: onTap,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: Tooltip(
+          message:
+              isListening
+                  ? 'Tap to stop listening'
+                  : 'Voice input for this panel',
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [colors.accentBlue, colors.primary],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: colors.accentBlue.withValues(alpha: 0.35),
+                  blurRadius: 10,
+                  spreadRadius: -2,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Icon(
+              isListening ? Icons.stop : Icons.mic,
+              size: 18,
+              color: colors.textHighlight,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _VoiceListeningBubble extends StatelessWidget {
+  const _VoiceListeningBubble();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: colors.surfaceElevated,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colors.border),
+        boxShadow: [
+          BoxShadow(
+            color: colors.textMuted.withValues(alpha: 0.2),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _WaveformBars(color: colors.primary),
+          const SizedBox(height: 6),
+          Text(
+            'Listening...',
+            style: TextStyle(fontSize: 12, color: colors.textPrimary),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WaveformBars extends StatelessWidget {
+  const _WaveformBars({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    const heights = <double>[8, 16, 10, 18, 12];
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        for (final height in heights)
+          Container(
+            width: 4,
+            height: height,
+            margin: const EdgeInsets.symmetric(horizontal: 2),
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+      ],
+    );
+  }
+}
