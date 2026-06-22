@@ -37,6 +37,8 @@ class CliToolsPickerDialog extends StatefulWidget {
 
 class _CliToolsPickerDialogState extends State<CliToolsPickerDialog> {
   late Set<String> _disabled;
+  final _searchController = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -44,22 +46,40 @@ class _CliToolsPickerDialogState extends State<CliToolsPickerDialog> {
     _disabled = {...widget.initialDisabled};
   }
 
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   void _persist(Set<String> next) {
     setState(() => _disabled = {...next});
     widget.onPersist(next);
+  }
+
+  bool _matchesSearch(YoloitCliTool tool) {
+    if (_searchQuery.isEmpty) return true;
+    final query = _searchQuery.toLowerCase();
+    return tool.command.toLowerCase().contains(query) ||
+        tool.functionName.toLowerCase().contains(query) ||
+        tool.description.toLowerCase().contains(query) ||
+        tool.group.toLowerCase().contains(query);
   }
 
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final muted = colors.textMuted.withAlpha(153);
-    final tools = [...YoloitCliToolCatalog.tools]..sort((a, b) {
-      final byGroup = a.group.compareTo(b.group);
-      return byGroup == 0 ? a.command.compareTo(b.command) : byGroup;
-    });
+    final tools = [...YoloitCliToolCatalog.tools]
+      ..sort((a, b) {
+        final byGroup = a.group.compareTo(b.group);
+        return byGroup == 0 ? a.command.compareTo(b.command) : byGroup;
+      });
+
+    final filteredTools = tools.where(_matchesSearch).toList();
 
     final grouped = <String, List<YoloitCliTool>>{};
-    for (final tool in tools) {
+    for (final tool in filteredTools) {
       grouped.putIfAbsent(tool.group, () => []).add(tool);
     }
 
@@ -177,26 +197,62 @@ class _CliToolsPickerDialogState extends State<CliToolsPickerDialog> {
               style: TextStyle(fontSize: 12, color: muted),
             ),
             const SizedBox(height: 10),
-            Expanded(
-              child: ListView(
-                children: [
-                  for (final entry in grouped.entries) ...[
-                    Padding(
-                      padding: const EdgeInsets.only(top: 10, bottom: 4),
-                      child: Text(
-                        entry.key.toUpperCase(),
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          color: colors.primary,
-                          letterSpacing: 0.6,
+            TextField(
+              controller: _searchController,
+              onChanged: (value) => setState(() => _searchQuery = value.trim()),
+              style: TextStyle(fontSize: 13, color: colors.textPrimary),
+              decoration: InputDecoration(
+                hintText: 'Search tools…',
+                hintStyle: TextStyle(fontSize: 13, color: muted),
+                prefixIcon: Icon(Icons.search, size: 18, color: muted),
+                suffixIcon:
+                    _searchQuery.isEmpty
+                        ? null
+                        : IconButton(
+                          icon: Icon(Icons.clear, size: 18, color: muted),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() => _searchQuery = '');
+                          },
                         ),
-                      ),
-                    ),
-                    ...entry.value.map(buildTile),
-                  ],
-                ],
+                filled: true,
+                fillColor: colors.surfaceElevated,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(vertical: 10),
               ),
+            ),
+            const SizedBox(height: 10),
+            Expanded(
+              child:
+                  filteredTools.isEmpty
+                      ? Center(
+                        child: Text(
+                          'No tools match your search',
+                          style: TextStyle(fontSize: 13, color: muted),
+                        ),
+                      )
+                      : ListView(
+                        children: [
+                          for (final entry in grouped.entries) ...[
+                            Padding(
+                              padding: const EdgeInsets.only(top: 10, bottom: 4),
+                              child: Text(
+                                entry.key.toUpperCase(),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  color: colors.primary,
+                                  letterSpacing: 0.6,
+                                ),
+                              ),
+                            ),
+                            ...entry.value.map(buildTile),
+                          ],
+                        ],
+                      ),
             ),
           ],
         ),

@@ -104,5 +104,34 @@ void main() {
 
       expect(persisted, isNotNull);
     });
+
+    testWidgets('filters tools by search query', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppThemePreset.neonPurple.theme,
+          home: CliToolsPickerDialog(
+            initialDisabled: const {},
+            onPersist: (_) {},
+          ),
+        ),
+      );
+
+      final initialCheckboxes = tester.widgetList(find.byType(Checkbox)).length;
+      expect(initialCheckboxes, greaterThan(0));
+
+      await tester.enterText(find.byType(TextField), 'xyz_no_match');
+      await tester.pump();
+
+      expect(find.byType(Checkbox), findsNothing);
+      expect(find.text('No tools match your search'), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.clear));
+      await tester.pump();
+
+      expect(
+        tester.widgetList(find.byType(Checkbox)).length,
+        initialCheckboxes,
+      );
+    });
   });
 }

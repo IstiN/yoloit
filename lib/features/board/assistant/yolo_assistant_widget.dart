@@ -1907,7 +1907,7 @@ $messagesJson
         context.appColors.textMuted.withAlpha(153);
     return Container(
       margin: EdgeInsets.zero,
-      padding: const EdgeInsets.fromLTRB(10, 8, 10, 12),
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 0),
       decoration: BoxDecoration(
         color: colors.surface,
       ),
