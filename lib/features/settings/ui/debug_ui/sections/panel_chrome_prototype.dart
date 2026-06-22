@@ -96,6 +96,10 @@ class PanelChromePrototype extends StatelessWidget {
         const SectionTitle('Selected panel — voice input badge'),
         const SizedBox(height: 8),
         const _MockPanelWithVoiceBadge(),
+        const SizedBox(height: 24),
+        const SectionTitle('Voice badge morphing into chat panel'),
+        const SizedBox(height: 8),
+        const _VoicePanelMorphDemo(),
       ],
     );
   }
@@ -404,6 +408,183 @@ class _WaveformBars extends StatelessWidget {
               borderRadius: BorderRadius.circular(2),
             ),
           ),
+      ],
+    );
+  }
+}
+
+class _VoicePanelMorphDemo extends StatefulWidget {
+  const _VoicePanelMorphDemo();
+
+  @override
+  State<_VoicePanelMorphDemo> createState() => _VoicePanelMorphDemoState();
+}
+
+class _VoicePanelMorphDemoState extends State<_VoicePanelMorphDemo> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return Container(
+      width: 380,
+      height: 460,
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: colors.primary),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: Center(
+              child: Text(
+                'Panel body placeholder',
+                style: TextStyle(color: colors.textMuted, fontSize: 12),
+              ),
+            ),
+          ),
+          Positioned(
+            left: 12,
+            bottom: 12,
+            child: GestureDetector(
+              onTap: () => setState(() => _expanded = !_expanded),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 650),
+                curve: Curves.easeInOutCubic,
+                width: _expanded ? 356 : 36,
+                height: _expanded ? 436 : 36,
+                decoration: BoxDecoration(
+                  color: colors.surfaceElevated,
+                  borderRadius: BorderRadius.circular(_expanded ? 16 : 18),
+                  border: Border.all(color: colors.border),
+                  boxShadow: [
+                    BoxShadow(
+                      color: colors.textMuted.withValues(
+                        alpha: _expanded ? 0.2 : 0.15,
+                      ),
+                      blurRadius: _expanded ? 20 : 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(_expanded ? 16 : 18),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      AnimatedOpacity(
+                        duration: const Duration(milliseconds: 250),
+                        opacity: _expanded ? 0 : 1,
+                        child: Center(
+                          child: SvgPicture.asset(
+                            'assets/images/yolo_voice_badge.svg',
+                            width: 28,
+                            height: 28,
+                          ),
+                        ),
+                      ),
+                      AnimatedOpacity(
+                        duration: const Duration(milliseconds: 350),
+                        opacity: _expanded ? 1 : 0,
+                        child: _buildChatContent(colors),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChatContent(AppColorScheme colors) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          height: 38,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: colors.surface,
+            border: Border(bottom: BorderSide(color: colors.border)),
+          ),
+          child: Row(
+            children: [
+              Text(
+                'YOLO',
+                style: TextStyle(
+                  color: colors.primary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.6,
+                ),
+              ),
+              const Spacer(),
+              Icon(Icons.more_vert, size: 18, color: colors.textSecondary),
+            ],
+          ),
+        ),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: colors.primary.withValues(alpha: 0.12),
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(12),
+                      topRight: Radius.circular(12),
+                      bottomRight: Radius.circular(12),
+                    ),
+                  ),
+                  child: Text(
+                    'Hi! How can I help?',
+                    style: TextStyle(fontSize: 12, color: colors.textPrimary),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+          decoration: BoxDecoration(
+            color: colors.surface,
+            border: Border(top: BorderSide(color: colors.border)),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Container(
+                  height: 32,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  decoration: BoxDecoration(
+                    color: colors.surfaceElevated,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: colors.border),
+                  ),
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Message...',
+                    style: TextStyle(fontSize: 12, color: colors.textMuted),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(Icons.mic, size: 18, color: colors.primary),
+            ],
+          ),
+        ),
       ],
     );
   }
