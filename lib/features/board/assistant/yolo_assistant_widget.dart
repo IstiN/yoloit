@@ -451,7 +451,7 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
 
     try {
       _messageDraft = msgs;
-      final runtimeContext = _runtimeContext();
+      final runtimeContext = await _runtimeContext();
       final calledTools = <String>[];
       final overlayToolLogs = <String>[];
       // Maps toolCallId → startAt ISO string for accurate per-tool timing.
@@ -467,7 +467,7 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
           await _toolExecutor.invoke(
             'yoloit_panel_focus',
             focusArgs,
-            runtimeContext: _runtimeContext(),
+            runtimeContext: await _runtimeContext(),
           );
         },
       );
@@ -838,7 +838,7 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
         .join('\n');
   }
 
-  ChatRuntimeContext _runtimeContext() {
+  Future<ChatRuntimeContext> _runtimeContext() async {
     final board = _currentBoard();
     final target = _targetPanel;
     return ChatRuntimeContext(
@@ -851,7 +851,7 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
       currentBoardPanelsSummary: _currentBoardPanelsSummary(board),
       viewportScale: board?.viewport.scale,
       targetPanelSummary: target != null
-          ? buildFocusPanelSummary(
+          ? await buildFocusPanelSummary(
               target,
               typeName: BoardPluginRegistry.instance.pluginFor(target.type)?.displayName,
             )
@@ -1000,7 +1000,7 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
   ) async {
     final target = _targetPanel;
     final targetSummary = target != null
-        ? buildFocusPanelSummary(
+        ? await buildFocusPanelSummary(
             target,
             typeName: BoardPluginRegistry.instance.pluginFor(target.type)?.displayName,
           )
