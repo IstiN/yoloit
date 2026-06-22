@@ -44,18 +44,17 @@ class YoloAssistantOverlayShell extends StatelessWidget {
         color: colors.surfaceElevated,
         borderRadius: BorderRadius.circular(expanded ? 16 : 18),
         border: border,
-        gradient: border == null
-            ? LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [colors.accentBlue, colors.primary],
-              )
-            : null,
+        gradient:
+            border == null
+                ? LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [colors.accentBlue, colors.primary],
+                )
+                : null,
         boxShadow: [
           BoxShadow(
-            color: colors.textMuted.withValues(
-              alpha: expanded ? 0.2 : 0.15,
-            ),
+            color: colors.textMuted.withValues(alpha: expanded ? 0.2 : 0.15),
             blurRadius: expanded ? 20 : 8,
             offset: const Offset(0, 4),
           ),
@@ -80,10 +79,7 @@ class YoloAssistantOverlayShell extends StatelessWidget {
                     headerTrailing: headerTrailing,
                     content: content,
                   )
-                  : _BadgeIcon(
-                    icon: badgeIcon,
-                    opacity: badgeOpacity,
-                  ),
+                  : _BadgeIcon(icon: badgeIcon, opacity: badgeOpacity),
         ),
       ),
     );

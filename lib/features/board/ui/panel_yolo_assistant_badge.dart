@@ -7,6 +7,7 @@ import 'package:yoloit/features/board/chat/chat_panel_widget.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/board/ui/yolo_assistant_overlay_shell.dart';
+import 'package:yoloit/features/settings/data/cloud_llm_settings_service.dart';
 import 'package:yoloit/ui/components/buttons/header_icon_button.dart';
 
 /// Hover-triggered inline YoLo assistant badge anchored to a board panel.
@@ -31,7 +32,8 @@ class PanelYoloAssistantBadge extends StatefulWidget {
   final Widget Function(
     BoardPanelInstance assistantPanel,
     ValueChanged<Map<String, dynamic>> onUpdateState,
-  )? chatBuilder;
+  )?
+  chatBuilder;
 
   static const double badgeSize = 36;
   static const double expandedWidth = 360;
@@ -44,7 +46,6 @@ class PanelYoloAssistantBadge extends StatefulWidget {
 
 class _PanelYoloAssistantBadgeState extends State<PanelYoloAssistantBadge> {
   bool _expanded = false;
-  bool _badgeHovered = false;
   late BoardPanelInstance _assistantPanel;
   BoardCubit? _cubit;
 
@@ -53,6 +54,9 @@ class _PanelYoloAssistantBadgeState extends State<PanelYoloAssistantBadge> {
     super.initState();
     _expanded = widget.expanded;
     _assistantPanel = _buildAssistantPanel();
+    if (widget.targetPanel.state['yoloAssistant'] == null) {
+      _resolveDefaultProvider();
+    }
   }
 
   @override
@@ -69,6 +73,9 @@ class _PanelYoloAssistantBadgeState extends State<PanelYoloAssistantBadge> {
     }
     if (oldWidget.targetPanel.id != widget.targetPanel.id) {
       _assistantPanel = _buildAssistantPanel();
+      if (widget.targetPanel.state['yoloAssistant'] == null) {
+        _resolveDefaultProvider();
+      }
     }
   }
 
@@ -78,9 +85,9 @@ class _PanelYoloAssistantBadgeState extends State<PanelYoloAssistantBadge> {
         widget.targetPanel.state['yoloAssistant'] as Map<String, dynamic>?;
     final state =
         persisted == null
-            ? Map<String, dynamic>.from(chatPlugin.initialState)
-            : Map<String, dynamic>.from(chatPlugin.initialState)
-              ..addAll(persisted ?? const {});
+              ? Map<String, dynamic>.from(chatPlugin.initialState)
+              : Map<String, dynamic>.from(chatPlugin.initialState)
+          ..addAll(persisted ?? const {});
     state['targetPanelId'] = widget.targetPanel.id;
     state['configured'] = true;
     const defaultConfig = ChatSessionConfig(
@@ -93,9 +100,13 @@ class _PanelYoloAssistantBadgeState extends State<PanelYoloAssistantBadge> {
       final saved = ChatSessionConfig.fromJson(
         Map<String, dynamic>.from(savedConfig),
       );
-      state['config'] = defaultConfig
-          .copyWith(sessionName: saved.sessionName, workingDir: saved.workingDir)
-          .toJson();
+      state['config'] =
+          defaultConfig
+              .copyWith(
+                sessionName: saved.sessionName,
+                workingDir: saved.workingDir,
+              )
+              .toJson();
     } else {
       state['config'] = defaultConfig.toJson();
     }
@@ -120,10 +131,43 @@ class _PanelYoloAssistantBadgeState extends State<PanelYoloAssistantBadge> {
     });
     _cubit?.updatePanel(
       widget.targetPanel.id,
-      (panel) => panel.copyWith(
-        state: {...panel.state, 'yoloAssistant': state},
-      ),
+      (panel) =>
+          panel.copyWith(state: {...panel.state, 'yoloAssistant': state}),
     );
+  }
+
+  Future<void> _resolveDefaultProvider() async {
+    final providerPref =
+        await CloudLlmSettingsService.instance.loadAssistantProviderType();
+    String providerType;
+    if (providerPref == 'cloud') {
+      final cloudConfig =
+          await CloudLlmSettingsService.instance.loadActiveConfig();
+      if (cloudConfig != null && cloudConfig.isValid) {
+        providerType = 'cloud:${cloudConfig.id}';
+      } else {
+        providerType = 'local';
+      }
+    } else {
+      providerType = 'local';
+    }
+
+    final rawConfig = _assistantPanel.state['config'];
+    final config =
+        rawConfig is Map
+            ? ChatSessionConfig.fromJson(Map<String, dynamic>.from(rawConfig))
+            : const ChatSessionConfig(
+              sessionName: '',
+              workingDir: '',
+              provider: 'local',
+            );
+    if (config.provider == providerType) return;
+
+    final newState = {
+      ..._assistantPanel.state,
+      'config': config.copyWith(provider: providerType).toJson(),
+    };
+    _onAssistantStateChanged(newState);
   }
 
   void _toggleExpanded() {
@@ -139,22 +183,26 @@ class _PanelYoloAssistantBadgeState extends State<PanelYoloAssistantBadge> {
       curve: Curves.easeInOutCubic,
       left: 12,
       bottom: 12,
-      width: _expanded ? PanelYoloAssistantBadge.expandedWidth : PanelYoloAssistantBadge.badgeSize,
-      height: _expanded ? PanelYoloAssistantBadge.expandedHeight : PanelYoloAssistantBadge.badgeSize,
+      width:
+          _expanded
+              ? PanelYoloAssistantBadge.expandedWidth
+              : PanelYoloAssistantBadge.badgeSize,
+      height:
+          _expanded
+              ? PanelYoloAssistantBadge.expandedHeight
+              : PanelYoloAssistantBadge.badgeSize,
       child: Tooltip(
         message: 'Ask YoLo about this panel',
-        child: GestureDetector(
-          onTap: _toggleExpanded,
-          child: MouseRegion(
-            onEnter: (_) => setState(() => _badgeHovered = true),
-            onExit: (_) => setState(() => _badgeHovered = false),
-            cursor: SystemMouseCursors.click,
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: GestureDetector(
+            onTap: _toggleExpanded,
             child: YoloAssistantOverlayShell(
               expanded: _expanded,
               badgeSize: PanelYoloAssistantBadge.badgeSize,
               expandedWidth: PanelYoloAssistantBadge.expandedWidth,
               expandedHeight: PanelYoloAssistantBadge.expandedHeight,
-              badgeOpacity: _badgeHovered ? 1.0 : 0.55,
+              badgeOpacity: 1.0,
               badgeIcon: SvgPicture.asset(
                 'assets/images/yolo_voice_badge.svg',
                 width: 28,
