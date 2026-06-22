@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:yoloit/core/remote/yoloit_remote_client.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/ui/adaptive_dialog.dart';
@@ -11,6 +12,7 @@ import 'package:yoloit/features/board/chat/provider_icon.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
+import 'package:yoloit/features/board/plugins/builtin/yolo_assistant_plugin.dart';
 import 'package:yoloit/features/board/ui/chat_glow_wrapper.dart';
 import 'package:yoloit/features/board/ui/panel_settings_dialog.dart';
 import 'package:yoloit/features/board/ui/sticky_note_chrome.dart';
@@ -126,6 +128,7 @@ class BoardPanelCardState extends State<BoardPanelCard>
   late final Animation<double> _opacity;
   late final Animation<double> _scale;
   bool _isTransformingPanel = false;
+  bool _yoloBadgeHovered = false;
 
   // Convenience getters so build code can still use widget.panel etc.
   BoardPanelInstance get panel => widget.panel;
@@ -529,6 +532,34 @@ class BoardPanelCardState extends State<BoardPanelCard>
                   ),
                 ),
               ),
+              if ((selected || isFocused) &&
+                  !isCapturing &&
+                  !connectMode &&
+                  panel.type != YoloAssistantPlugin.kTypeId)
+                Positioned(
+                  left: selectionSideGutter + 12,
+                  bottom: selectionBottomGutter + 12,
+                  child: MouseRegion(
+                    onEnter: (_) => setState(() => _yoloBadgeHovered = true),
+                    onExit: (_) => setState(() => _yoloBadgeHovered = false),
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => _openYoloAssistantForPanel(context, panel),
+                      child: Tooltip(
+                        message: 'Ask YoLo about this panel',
+                        child: AnimatedOpacity(
+                          duration: const Duration(milliseconds: 150),
+                          opacity: _yoloBadgeHovered ? 1.0 : 0.5,
+                          child: SvgPicture.asset(
+                            'assets/images/yolo_voice_badge.svg',
+                            width: 28,
+                            height: 28,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               if (showSelectionChrome && !showHeader)
                 Positioned(
                   top: -46,
@@ -590,6 +621,58 @@ class BoardPanelCardState extends State<BoardPanelCard>
         panel.id,
         (p) => p.copyWith(locked: !p.locked),
       );
+
+  Future<void> _openYoloAssistantForPanel(
+    BuildContext context,
+    BoardPanelInstance targetPanel,
+  ) async {
+    final cubit = context.read<BoardCubit>();
+    final board = cubit.state.activeBoard;
+    if (board == null) return;
+
+    BoardPanelInstance? existing;
+    for (final p in board.panels) {
+      if (p.type == YoloAssistantPlugin.kTypeId &&
+          p.state['targetPanelId'] == targetPanel.id &&
+          !p.hidden) {
+        existing = p;
+        break;
+      }
+    }
+    if (existing != null) {
+      await cubit.focusPanel(existing.id);
+      return;
+    }
+
+    const Size assistantSize = Size(420, 560);
+    const double gap = 20.0;
+    const double maxVisibleX = 3000.0;
+    var x = targetPanel.bounds.x + targetPanel.bounds.width + gap;
+    var y = targetPanel.bounds.y;
+    if (x + assistantSize.width > maxVisibleX) {
+      x = targetPanel.bounds.x;
+      y = targetPanel.bounds.y + targetPanel.bounds.height + gap;
+    }
+
+    final ts = DateTime.now().millisecondsSinceEpoch;
+    final assistantPanel = BoardPanelInstance(
+      id: 'panel-$ts',
+      type: YoloAssistantPlugin.kTypeId,
+      title: 'YoLo: ${targetPanel.title}',
+      bounds: BoardPanelBounds(
+        x: x,
+        y: y,
+        width: assistantSize.width,
+        height: assistantSize.height,
+      ),
+      state: {
+        ...const YoloAssistantPlugin().initialState,
+        'targetPanelId': targetPanel.id,
+      },
+    );
+    await cubit.addPanel(assistantPanel);
+    await cubit.focusPanel(assistantPanel.id);
+  }
 
   List<Widget> _buildPluginHeaderActions(
     BuildContext context,

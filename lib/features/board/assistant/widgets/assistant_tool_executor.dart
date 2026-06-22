@@ -10,12 +10,14 @@ class AssistantToolExecutor implements YoloitToolExecutor {
     required this.delegate,
     required this.assistantPanelId,
     required this.assistantPanelTitle,
+    this.targetPanelId,
     required this.onFocusPanel,
   });
 
   final YoloitToolExecutor delegate;
   final String assistantPanelId;
   final String assistantPanelTitle;
+  final String? targetPanelId;
   final Future<void> Function(Map<String, Object?> focusArgs) onFocusPanel;
 
   // Mutable per-message state — set before each sendMessage call.
@@ -38,6 +40,10 @@ class AssistantToolExecutor implements YoloitToolExecutor {
     final tool = YoloitCliToolCatalog.byFunctionName(functionName);
     final toolCommand = tool?.command ?? functionName;
     final mutableArgs = Map<String, Object?>.from(arguments);
+
+    // Default panel-argument tools to the focus panel when the user did not
+    // name one explicitly.
+    _retargetToFocusPanelIfNeeded(toolCommand, mutableArgs);
 
     await _retargetPanelLookupToRealNoteIfNeeded(
       toolCommand,
@@ -74,6 +80,19 @@ class AssistantToolExecutor implements YoloitToolExecutor {
     }
 
     return result;
+  }
+
+  void _retargetToFocusPanelIfNeeded(
+    String toolCommand,
+    Map<String, Object?> arguments,
+  ) {
+    final focusId = targetPanelId?.trim();
+    if (focusId == null || focusId.isEmpty) return;
+    // Board-level and create commands should not be defaulted to a focus panel.
+    if (toolCommand.startsWith('board') || toolCommand == 'panel:create') return;
+    final panel = '${arguments['panel'] ?? ''}'.trim();
+    if (panel.isNotEmpty) return;
+    arguments['panel'] = focusId;
   }
 
   void _retargetNoteToolIfNeeded(

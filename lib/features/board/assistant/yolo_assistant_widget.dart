@@ -30,10 +30,12 @@ import 'package:yoloit/features/board/chat/chat_session_history.dart';
 import 'package:yoloit/features/board/chat/cloud_asr_service.dart';
 import 'package:yoloit/features/board/chat/cloud_llm_provider.dart';
 import 'package:yoloit/features/board/chat/local_llm_provider.dart';
+import 'package:yoloit/features/board/chat/panel_context_builder.dart';
 import 'package:yoloit/features/board/chat/yolo_chat_prompt.dart';
 import 'package:yoloit/features/board/chat/yoloit_cli_tools.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
+import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
 import 'package:yoloit/features/preview/widgets/markdown_document_preview.dart';
 import 'package:yoloit/features/settings/data/cloud_llm_settings_service.dart';
 import 'package:yoloit/features/settings/data/local_ai_models_service.dart';
@@ -224,6 +226,21 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
 
   String? get _lastTargetNotePanelId =>
       widget.panel.state['lastTargetNotePanelId'] as String?;
+
+  String? get _targetPanelId =>
+      widget.panel.state['targetPanelId'] as String?;
+
+  BoardPanelInstance? get _targetPanel {
+    final id = _targetPanelId;
+    if (id == null || id == widget.panel.id) return null;
+    final board = _currentBoard();
+    if (board == null) return null;
+    try {
+      return board.panels.firstWhere((p) => p.id == id);
+    } catch (_) {
+      return null;
+    }
+  }
 
   int get _maxOutputTokens {
     final value = widget.panel.state['localModelMaxOutputTokens'];
@@ -445,6 +462,7 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
         delegate: _toolExecutor,
         assistantPanelId: widget.panel.id,
         assistantPanelTitle: widget.panel.title,
+        targetPanelId: _targetPanelId,
         onFocusPanel: (focusArgs) async {
           await _toolExecutor.invoke(
             'yoloit_panel_focus',
@@ -822,6 +840,7 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
 
   ChatRuntimeContext _runtimeContext() {
     final board = _currentBoard();
+    final target = _targetPanel;
     return ChatRuntimeContext(
       boardId: board?.id,
       boardName: board?.name,
@@ -831,6 +850,12 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
       availableBoardsSummary: _availableBoardsSummary(),
       currentBoardPanelsSummary: _currentBoardPanelsSummary(board),
       viewportScale: board?.viewport.scale,
+      targetPanelSummary: target != null
+          ? buildFocusPanelSummary(
+              target,
+              typeName: BoardPluginRegistry.instance.pluginFor(target.type)?.displayName,
+            )
+          : null,
     );
   }
 
@@ -973,11 +998,28 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
   Future<List<Map<String, String>>> _buildMessagesForRequest(
     List<Map<String, dynamic>> chatMessages,
   ) async {
-    final systemContent =
-        '${await loadYoloChatSystemPrompt()}\n\n'
-        '${_buildContextSnapshotMarkdown()}\n'
-        'Active skills: ${_activeSkills.join(', ')}.\n'
-        'Last target note panel id: ${_lastTargetNotePanelId ?? 'unknown'}.';
+    final target = _targetPanel;
+    final targetSummary = target != null
+        ? buildFocusPanelSummary(
+            target,
+            typeName: BoardPluginRegistry.instance.pluginFor(target.type)?.displayName,
+          )
+        : null;
+    final buffer = StringBuffer()
+      ..writeln(await loadYoloChatSystemPrompt())
+      ..writeln()
+      ..writeln(_buildContextSnapshotMarkdown());
+    if (targetSummary != null) {
+      buffer
+        ..writeln()
+        ..writeln(targetSummary);
+    }
+    buffer
+      ..writeln()
+      ..writeln('Active skills: ${_activeSkills.join(', ')}.')
+      ..writeln('Last target note panel id: ${_lastTargetNotePanelId ?? 'unknown'}.')
+      ..writeln('Focus panel id: ${target?.id ?? 'none'}.');
+    final systemContent = buffer.toString().trim();
 
     final result = <Map<String, String>>[
       {'role': 'system', 'content': systemContent},

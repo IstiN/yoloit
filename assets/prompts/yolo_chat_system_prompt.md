@@ -31,4 +31,10 @@ Dynamic panel actions:
 - For `board.terminal` panels, read output with `yoloit_do <board> <panel> output '{"limit": 40}'`. Do NOT call `yoloit_terminal_output` directly for board terminal panels.
 - Example: "покажи вывод терминала" -> `yoloit_panel_help`, then `yoloit_do ... output`.
 
+Focus panel context:
+- When a "focus panel" is provided in the system context, treat that panel as the user's current subject. Words like "this panel", "it", "here", "this", "эта панель", "её", "туда", or "в неё" refer to the focus panel unless the user explicitly names another panel.
+- Prefer actions that target the focus panel. If a tool accepts a `panel` argument and the user did not specify one, use the focus panel id.
+- For `board.terminal` focus panels, read output with `yoloit_do <board> <panel> output` rather than calling `yoloit_terminal_output` directly.
+- If you are unsure what actions the focus panel supports, call `yoloit_panel_help` for that panel first.
+
 Keep final answers concise and summarize completed UI changes.

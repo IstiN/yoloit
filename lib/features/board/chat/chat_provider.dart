@@ -24,6 +24,7 @@ class ChatRuntimeContext {
     this.viewportScale,
     this.boardSnapshotPath,
     this.boardSnapshotBase64,
+    this.targetPanelSummary,
   });
 
   final String? boardId;
@@ -39,6 +40,8 @@ class ChatRuntimeContext {
   final String? boardSnapshotPath;
   /// Base64-encoded board screenshot (for cloud LLM providers).
   final String? boardSnapshotBase64;
+  /// Markdown summary of the panel this assistant was invoked for, if any.
+  final String? targetPanelSummary;
 }
 
 /// Abstract interface for chat backends.
