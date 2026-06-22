@@ -75,11 +75,21 @@ class YoloAssistantOverlayShell extends StatelessWidget {
           switchOutCurve: Curves.easeInOutCubic,
           child:
               expanded
-                  ? _ExpandedContent(
-                    headerTrailing: headerTrailing,
-                    content: content,
+                  ? OverflowBox(
+                    key: const ValueKey('yolo-expanded'),
+                    maxWidth: expandedWidth,
+                    maxHeight: expandedHeight,
+                    alignment: Alignment.topCenter,
+                    child: _ExpandedContent(
+                      headerTrailing: headerTrailing,
+                      content: content,
+                    ),
                   )
-                  : _BadgeIcon(icon: badgeIcon, opacity: badgeOpacity),
+                  : _BadgeIcon(
+                    key: const ValueKey('yolo-badge'),
+                    icon: badgeIcon,
+                    opacity: badgeOpacity,
+                  ),
         ),
       ),
     );
@@ -87,7 +97,7 @@ class YoloAssistantOverlayShell extends StatelessWidget {
 }
 
 class _BadgeIcon extends StatelessWidget {
-  const _BadgeIcon({required this.icon, required this.opacity});
+  const _BadgeIcon({super.key, required this.icon, required this.opacity});
 
   final Widget icon;
   final double opacity;
@@ -95,11 +105,7 @@ class _BadgeIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: AnimatedOpacity(
-        duration: const Duration(milliseconds: 150),
-        opacity: opacity,
-        child: icon,
-      ),
+      child: Opacity(opacity: opacity, child: icon),
     );
   }
 }
@@ -138,29 +144,39 @@ class YoloAssistantHeader extends StatelessWidget {
         color: colors.surface,
         border: Border(bottom: BorderSide(color: colors.border)),
       ),
-      child: Row(
-        children: [
-          ShaderMask(
-            blendMode: BlendMode.srcIn,
-            shaderCallback:
-                (bounds) => LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [colors.accentBlue, colors.primary],
-                ).createShader(bounds),
-            child: Text(
-              'YOLO',
-              style: TextStyle(
-                color: colors.textHighlight,
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.6,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final showTrailing = trailing != null && constraints.maxWidth >= 60;
+          return Row(
+            children: [
+              Expanded(
+                child: ShaderMask(
+                  blendMode: BlendMode.srcIn,
+                  shaderCallback:
+                      (bounds) => LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [colors.accentBlue, colors.primary],
+                      ).createShader(bounds),
+                  child: Text(
+                    'YOLO',
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: colors.textHighlight,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.6,
+                    ),
+                  ),
+                ),
               ),
-            ),
-          ),
-          const Spacer(),
-          if (trailing != null) trailing!,
-        ],
+              if (showTrailing) ...[
+                const SizedBox(width: 8),
+                trailing!,
+              ],
+            ],
+          );
+        },
       ),
     );
   }

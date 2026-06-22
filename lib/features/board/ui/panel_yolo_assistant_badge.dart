@@ -54,7 +54,8 @@ class _PanelYoloAssistantBadgeState extends State<PanelYoloAssistantBadge> {
     super.initState();
     _expanded = widget.expanded;
     _assistantPanel = _buildAssistantPanel();
-    if (widget.targetPanel.state['yoloAssistant'] == null) {
+    if (widget.targetPanel.state['yoloAssistant'] == null ||
+        _assistantPanel.state['assistantProviderResolved'] != true) {
       _resolveDefaultProvider();
     }
   }
@@ -73,7 +74,8 @@ class _PanelYoloAssistantBadgeState extends State<PanelYoloAssistantBadge> {
     }
     if (oldWidget.targetPanel.id != widget.targetPanel.id) {
       _assistantPanel = _buildAssistantPanel();
-      if (widget.targetPanel.state['yoloAssistant'] == null) {
+      if (widget.targetPanel.state['yoloAssistant'] == null ||
+          _assistantPanel.state['assistantProviderResolved'] != true) {
         _resolveDefaultProvider();
       }
     }
@@ -90,6 +92,8 @@ class _PanelYoloAssistantBadgeState extends State<PanelYoloAssistantBadge> {
           ..addAll(persisted ?? const {});
     state['targetPanelId'] = widget.targetPanel.id;
     state['configured'] = true;
+    state['assistantProviderResolved'] =
+        (persisted?['assistantProviderResolved'] as bool?) ?? false;
     const defaultConfig = ChatSessionConfig(
       sessionName: '',
       workingDir: '',
@@ -97,16 +101,10 @@ class _PanelYoloAssistantBadgeState extends State<PanelYoloAssistantBadge> {
     );
     final savedConfig = state['config'];
     if (savedConfig is Map) {
-      final saved = ChatSessionConfig.fromJson(
-        Map<String, dynamic>.from(savedConfig),
-      );
       state['config'] =
-          defaultConfig
-              .copyWith(
-                sessionName: saved.sessionName,
-                workingDir: saved.workingDir,
-              )
-              .toJson();
+          ChatSessionConfig.fromJson(
+            Map<String, dynamic>.from(savedConfig),
+          ).toJson();
     } else {
       state['config'] = defaultConfig.toJson();
     }
@@ -137,19 +135,21 @@ class _PanelYoloAssistantBadgeState extends State<PanelYoloAssistantBadge> {
   }
 
   Future<void> _resolveDefaultProvider() async {
+    if (!mounted) return;
     final providerPref =
         await CloudLlmSettingsService.instance.loadAssistantProviderType();
-    String providerType;
-    if (providerPref == 'cloud') {
-      final cloudConfig =
-          await CloudLlmSettingsService.instance.loadActiveConfig();
-      if (cloudConfig != null && cloudConfig.isValid) {
-        providerType = 'cloud:${cloudConfig.id}';
-      } else {
-        providerType = 'local';
-      }
+    final cloudConfig =
+        providerPref == 'cloud'
+            ? await CloudLlmSettingsService.instance.loadActiveConfig()
+            : null;
+    final String providerType;
+    final String? model;
+    if (providerPref == 'cloud' && cloudConfig != null && cloudConfig.isValid) {
+      providerType = 'cloud:${cloudConfig.id}';
+      model = cloudConfig.model;
     } else {
       providerType = 'local';
+      model = null;
     }
 
     final rawConfig = _assistantPanel.state['config'];
@@ -161,11 +161,20 @@ class _PanelYoloAssistantBadgeState extends State<PanelYoloAssistantBadge> {
               workingDir: '',
               provider: 'local',
             );
-    if (config.provider == providerType) return;
+    final alreadyResolved = _assistantPanel.state['assistantProviderResolved'] == true;
+    if (alreadyResolved &&
+        config.provider == providerType &&
+        (model == null || config.model == model)) {
+      return;
+    }
 
     final newState = {
       ..._assistantPanel.state,
-      'config': config.copyWith(provider: providerType).toJson(),
+      'config': config.copyWith(
+        provider: providerType,
+        model: model,
+      ).toJson(),
+      'assistantProviderResolved': true,
     };
     _onAssistantStateChanged(newState);
   }
