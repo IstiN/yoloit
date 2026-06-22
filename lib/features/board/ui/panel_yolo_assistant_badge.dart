@@ -8,6 +8,7 @@ import 'package:yoloit/features/board/chat/chat_panel_widget.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/board/ui/yolo_assistant_overlay_shell.dart';
+import 'package:yoloit/features/mindmap/widgets/canvas_interaction_lock.dart';
 import 'package:yoloit/features/settings/data/cloud_llm_settings_service.dart';
 import 'package:yoloit/ui/components/buttons/header_icon_button.dart';
 
@@ -271,16 +272,18 @@ class _PanelYoloAssistantBadgeState extends State<PanelYoloAssistantBadge> {
                     ),
                   ],
                 ),
-                content:
-                    widget.chatBuilder?.call(
-                      _assistantPanel,
-                      _onAssistantStateChanged,
-                    ) ??
-                    ChatPanelWidget(
-                      panel: _assistantPanel,
-                      onUpdateState: _onAssistantStateChanged,
-                      compact: true,
-                    ),
+                content: ScrollableCardMarker(
+                  child:
+                      widget.chatBuilder?.call(
+                        _assistantPanel,
+                        _onAssistantStateChanged,
+                      ) ??
+                      ChatPanelWidget(
+                        panel: _assistantPanel,
+                        onUpdateState: _onAssistantStateChanged,
+                        compact: true,
+                      ),
+                ),
               ),
             ),
           ),

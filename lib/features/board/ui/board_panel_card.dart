@@ -590,8 +590,8 @@ class BoardPanelCardState extends State<BoardPanelCard>
                   left:
                       _yoloExpanded
                           ? selectionSideGutter +
-                              panel.bounds.width +
-                              12
+                              panel.bounds.width -
+                              24
                           : selectionSideGutter +
                               panel.bounds.width -
                               PanelYoloAssistantBadge.badgeSize -
