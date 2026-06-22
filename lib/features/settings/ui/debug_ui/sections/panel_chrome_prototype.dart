@@ -283,20 +283,18 @@ class _MockPanelWithVoiceBadgeState extends State<_MockPanelWithVoiceBadge> {
           isSelected: true,
           onClose: () {},
         ),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: Transform.translate(
-            offset: const Offset(-18, 0),
-            child: _VoiceInputBadge(
-              isListening: _listening,
-              onTap: () => setState(() => _listening = !_listening),
-            ),
+        Positioned(
+          left: -18,
+          bottom: -18,
+          child: _VoiceInputBadge(
+            isListening: _listening,
+            onTap: () => setState(() => _listening = !_listening),
           ),
         ),
         if (_listening)
           const Positioned(
             left: 44,
-            top: -70,
+            bottom: 44,
             child: _VoiceListeningBubble(),
           ),
       ],
