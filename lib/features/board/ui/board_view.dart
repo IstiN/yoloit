@@ -1238,7 +1238,12 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                 left: 0,
                                 right: 0,
                                 bottom: 0,
-                                child: YoloBadgeWithChat(),
+                                child: SafeArea(
+                                  top: false,
+                                  left: false,
+                                  right: false,
+                                  child: YoloBadgeWithChat(),
+                                ),
                               ),
                           ], // outer Stack children
                         ); // outer Stack

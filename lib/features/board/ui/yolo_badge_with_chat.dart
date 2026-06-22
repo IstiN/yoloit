@@ -233,7 +233,7 @@ class YoloBadgeWithChatState extends State<YoloBadgeWithChat>
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Padding(
-                    padding: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.only(bottom: 24),
                     child: _buildChatTab(context),
                   ),
                   AnimatedBuilder(
