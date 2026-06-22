@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/features/board/ui/yolo_assistant_overlay_shell.dart';
 import 'package:yoloit/ui/components/buttons/header_icon_button.dart';
 import 'package:yoloit/ui/components/buttons/toolbar_button.dart';
 import 'package:yoloit/ui/components/chips/panel_id_chip.dart';
@@ -459,49 +460,24 @@ class _VoicePanelMorphDemoState extends State<_VoicePanelMorphDemo> {
             bottom: 12,
             child: GestureDetector(
               onTap: () => setState(() => _expanded = !_expanded),
-              child: AnimatedContainer(
+              child: YoloAssistantOverlayShell(
+                expanded: _expanded,
+                badgeSize: 36,
+                expandedWidth: 356,
+                expandedHeight: 436,
                 duration: const Duration(milliseconds: 650),
-                curve: Curves.easeInOutCubic,
-                width: _expanded ? 356 : 36,
-                height: _expanded ? 436 : 36,
-                decoration: BoxDecoration(
-                  color: colors.surfaceElevated,
-                  borderRadius: BorderRadius.circular(_expanded ? 16 : 18),
-                  border: Border.all(color: colors.border),
-                  boxShadow: [
-                    BoxShadow(
-                      color: colors.textMuted.withValues(
-                        alpha: _expanded ? 0.2 : 0.15,
-                      ),
-                      blurRadius: _expanded ? 20 : 8,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
+                border: Border.all(color: colors.border),
+                badgeIcon: SvgPicture.asset(
+                  'assets/images/yolo_voice_badge.svg',
+                  width: 28,
+                  height: 28,
                 ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(_expanded ? 16 : 18),
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      AnimatedOpacity(
-                        duration: const Duration(milliseconds: 250),
-                        opacity: _expanded ? 0 : 1,
-                        child: Center(
-                          child: SvgPicture.asset(
-                            'assets/images/yolo_voice_badge.svg',
-                            width: 28,
-                            height: 28,
-                          ),
-                        ),
-                      ),
-                      AnimatedOpacity(
-                        duration: const Duration(milliseconds: 350),
-                        opacity: _expanded ? 1 : 0,
-                        child: _buildChatContent(colors),
-                      ),
-                    ],
-                  ),
+                headerTrailing: Icon(
+                  Icons.more_vert,
+                  size: 18,
+                  color: colors.textSecondary,
                 ),
+                content: _buildChatBody(colors),
               ),
             ),
           ),
@@ -511,42 +487,10 @@ class _VoicePanelMorphDemoState extends State<_VoicePanelMorphDemo> {
     );
   }
 
-  Widget _buildChatContent(AppColorScheme colors) {
+  Widget _buildChatBody(AppColorScheme colors) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Container(
-          height: 38,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            color: colors.surface,
-            border: Border(bottom: BorderSide(color: colors.border)),
-          ),
-          child: Row(
-            children: [
-              ShaderMask(
-                blendMode: BlendMode.srcIn,
-                shaderCallback:
-                    (bounds) => LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [colors.accentBlue, colors.primary],
-                    ).createShader(bounds),
-                child: Text(
-                  'YOLO',
-                  style: TextStyle(
-                    color: colors.textHighlight,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.6,
-                  ),
-                ),
-              ),
-              const Spacer(),
-              Icon(Icons.more_vert, size: 18, color: colors.textSecondary),
-            ],
-          ),
-        ),
         Expanded(
           child: Padding(
             padding: const EdgeInsets.all(12),

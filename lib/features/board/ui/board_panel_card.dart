@@ -2,11 +2,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:yoloit/core/remote/yoloit_remote_client.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/ui/adaptive_dialog.dart';
-import 'package:yoloit/features/board/assistant/yolo_assistant_widget.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/chat/chat_panel_plugin.dart';
 import 'package:yoloit/features/board/chat/provider_icon.dart';
@@ -16,9 +14,9 @@ import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
 import 'package:yoloit/features/board/plugins/builtin/yolo_assistant_plugin.dart';
 import 'package:yoloit/features/board/ui/chat_glow_wrapper.dart';
 import 'package:yoloit/features/board/ui/panel_settings_dialog.dart';
+import 'package:yoloit/features/board/ui/panel_yolo_assistant_badge.dart';
 import 'package:yoloit/features/board/ui/sticky_note_chrome.dart';
 import 'package:yoloit/features/board/ui/unified_panel_header.dart';
-import 'package:yoloit/ui/components/buttons/header_icon_button.dart';
 import 'package:yoloit/ui/components/layout/panel_content_toolbar.dart';
 
 enum BoardPanelResizeHandle {
@@ -591,7 +589,7 @@ class BoardPanelCardState extends State<BoardPanelCard>
                   !isCapturing &&
                   !connectMode &&
                   panel.type != YoloAssistantPlugin.kTypeId)
-                _PanelYoloAssistantBadge(
+                PanelYoloAssistantBadge(
                   targetPanel: panel,
                   expanded: _yoloExpanded,
                   onExpandedChanged:
@@ -863,226 +861,4 @@ class PanelResizeHandleWidget extends StatelessWidget {
   }
 }
 
-class _PanelYoloAssistantBadge extends StatefulWidget {
-  const _PanelYoloAssistantBadge({
-    required this.targetPanel,
-    required this.expanded,
-    required this.onExpandedChanged,
-  });
 
-  final BoardPanelInstance targetPanel;
-  final bool expanded;
-  final ValueChanged<bool> onExpandedChanged;
-
-  @override
-  State<_PanelYoloAssistantBadge> createState() =>
-      _PanelYoloAssistantBadgeState();
-}
-
-class _PanelYoloAssistantBadgeState extends State<_PanelYoloAssistantBadge> {
-  bool _expanded = false;
-  bool _badgeHovered = false;
-  late BoardPanelInstance _assistantPanel;
-
-  static const double _badgeSize = 36;
-  static const double _expandedWidth = 360;
-  static const double _expandedHeight = 420;
-
-  @override
-  void initState() {
-    super.initState();
-    _expanded = widget.expanded;
-    _assistantPanel = _buildAssistantPanel();
-  }
-
-  @override
-  void didUpdateWidget(covariant _PanelYoloAssistantBadge oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.expanded != _expanded) {
-      setState(() => _expanded = widget.expanded);
-    }
-    if (oldWidget.targetPanel.id != widget.targetPanel.id) {
-      _assistantPanel = _buildAssistantPanel();
-    }
-  }
-
-  BoardPanelInstance _buildAssistantPanel() {
-    final persisted =
-        widget.targetPanel.state['yoloAssistant'] as Map<String, dynamic>?;
-    final state =
-        persisted == null
-            ? <String, dynamic>{
-              ...const YoloAssistantPlugin().initialState,
-              'targetPanelId': widget.targetPanel.id,
-            }
-            : Map<String, dynamic>.from(persisted);
-    if (!state.containsKey('targetPanelId')) {
-      state['targetPanelId'] = widget.targetPanel.id;
-    }
-    return BoardPanelInstance(
-      id: 'yolo-badge-${widget.targetPanel.id}',
-      type: YoloAssistantPlugin.kTypeId,
-      title: 'YoLo: ${widget.targetPanel.title}',
-      bounds: const BoardPanelBounds(
-        x: 0,
-        y: 0,
-        width: _expandedWidth,
-        height: _expandedHeight,
-      ),
-      state: state,
-    );
-  }
-
-  void _onAssistantStateChanged(Map<String, dynamic> state) {
-    if (!mounted) return;
-    setState(() {
-      _assistantPanel = _assistantPanel.copyWith(state: state);
-    });
-    final cubit = context.read<BoardCubit>();
-    cubit.updatePanel(
-      widget.targetPanel.id,
-      (panel) =>
-          panel.copyWith(state: {...panel.state, 'yoloAssistant': state}),
-    );
-  }
-
-  void _toggleExpanded() {
-    final next = !_expanded;
-    widget.onExpandedChanged(next);
-    setState(() => _expanded = next);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.appColors;
-    return AnimatedPositioned(
-      duration: const Duration(milliseconds: 350),
-      curve: Curves.easeInOutCubic,
-      left: 12,
-      bottom: 12,
-      width: _expanded ? _expandedWidth : _badgeSize,
-      height: _expanded ? _expandedHeight : _badgeSize,
-      child: Tooltip(
-        message: 'Ask YoLo about this panel',
-        child: GestureDetector(
-          onTap: _toggleExpanded,
-          child: MouseRegion(
-            onEnter: (_) => setState(() => _badgeHovered = true),
-            onExit: (_) => setState(() => _badgeHovered = false),
-            cursor: SystemMouseCursors.click,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 350),
-              curve: Curves.easeInOutCubic,
-              width: _expanded ? _expandedWidth : _badgeSize,
-              height: _expanded ? _expandedHeight : _badgeSize,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [colors.accentBlue, colors.primary],
-                ),
-                borderRadius: BorderRadius.circular(_expanded ? 16 : 18),
-                boxShadow: [
-                  BoxShadow(
-                    color: colors.textMuted.withValues(
-                      alpha: _expanded ? 0.2 : 0.15,
-                    ),
-                    blurRadius: _expanded ? 20 : 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Container(
-                margin: const EdgeInsets.all(1.5),
-                decoration: BoxDecoration(
-                  color: colors.surfaceElevated,
-                  borderRadius: BorderRadius.circular(_expanded ? 14.5 : 16.5),
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    AnimatedOpacity(
-                      duration: const Duration(milliseconds: 200),
-                      opacity: _expanded ? 0 : 1,
-                      child: Center(
-                        child: AnimatedOpacity(
-                          duration: const Duration(milliseconds: 150),
-                          opacity: _badgeHovered ? 1.0 : 0.55,
-                          child: SvgPicture.asset(
-                            'assets/images/yolo_voice_badge.svg',
-                            width: 28,
-                            height: 28,
-                          ),
-                        ),
-                      ),
-                    ),
-                    AnimatedOpacity(
-                      duration: const Duration(milliseconds: 300),
-                      opacity: _expanded ? 1 : 0,
-                      child: _buildChatContent(colors),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildChatContent(AppColorScheme colors) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _buildHeader(colors),
-        Expanded(
-          child: YoloAssistantWidget(
-            panel: _assistantPanel,
-            onUpdateState: _onAssistantStateChanged,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildHeader(AppColorScheme colors) {
-    return Container(
-      height: 38,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      decoration: BoxDecoration(
-        color: colors.surface,
-        border: Border(bottom: BorderSide(color: colors.border)),
-      ),
-      child: Row(
-        children: [
-          ShaderMask(
-            blendMode: BlendMode.srcIn,
-            shaderCallback:
-                (bounds) => LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [colors.accentBlue, colors.primary],
-                ).createShader(bounds),
-            child: Text(
-              'YOLO',
-              style: TextStyle(
-                color: colors.textHighlight,
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.6,
-              ),
-            ),
-          ),
-          const Spacer(),
-          HeaderIconButton(
-            icon: Icons.close,
-            tooltip: 'Close YoLo assistant',
-            onPressed: _toggleExpanded,
-          ),
-        ],
-      ),
-    );
-  }
-}

@@ -459,6 +459,11 @@ flowchart TD
       systemBuf.writeln('\nCurrent board panels:');
       systemBuf.writeln(panelsSummary);
     }
+    final targetPanelSummary = runtimeContext?.targetPanelSummary?.trim();
+    if (targetPanelSummary != null && targetPanelSummary.isNotEmpty) {
+      systemBuf.writeln('\nFocus panel (the panel the assistant is attached to):');
+      systemBuf.writeln(targetPanelSummary);
+    }
 
     final messages = <Map<String, Object?>>[
       {'role': 'system', 'content': systemBuf.toString().trim()},

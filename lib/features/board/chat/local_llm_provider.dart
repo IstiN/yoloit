@@ -1006,6 +1006,11 @@ class LocalLlmProvider extends ChatProvider {
           'When asked to show/focus/play an existing panel, use the listed panel instead of asking for a new URL/file.',
         );
       }
+      final targetPanelSummary = runtimeContext?.targetPanelSummary?.trim();
+      if (targetPanelSummary != null && targetPanelSummary.isNotEmpty) {
+        systemBuf.writeln('\nFocus panel (the panel the assistant is attached to):');
+        systemBuf.writeln(targetPanelSummary);
+      }
     }
 
     final result = <Map<String, String>>[];

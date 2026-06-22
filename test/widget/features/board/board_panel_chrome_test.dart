@@ -312,7 +312,7 @@ void main() {
       expect(
         find.descendant(
           of: find.byType(BoardPanelCard),
-          matching: find.widgetWithText(TextField, 'Ask YoLo…'),
+          matching: find.widgetWithText(TextField, 'Message…'),
         ),
         findsOneWidget,
       );

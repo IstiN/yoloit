@@ -21,6 +21,7 @@ import 'package:yoloit/features/board/chat/chat_session_manager.dart';
 import 'package:yoloit/features/board/chat/cli_guidance_service.dart';
 import 'package:yoloit/features/board/chat/cloud_asr_service.dart';
 import 'package:yoloit/features/board/chat/opencode_provider.dart';
+import 'package:yoloit/features/board/chat/panel_context_builder.dart';
 import 'package:yoloit/features/board/chat/widgets/chat_action_button.dart';
 import 'package:yoloit/features/board/chat/widgets/chat_changed_files_strip.dart';
 import 'package:yoloit/features/board/chat/widgets/chat_context_toggles.dart';
@@ -55,11 +56,13 @@ class ChatPanelWidget extends StatefulWidget {
     required this.onUpdateState,
     this.onCreateLinkedPanel,
     this.remoteInfo,
+    this.compact = false,
   });
 
   final BoardPanelInstance panel;
   final ValueChanged<Map<String, dynamic>> onUpdateState;
   final RemoteBoardInfo? remoteInfo;
+  final bool compact;
   final Future<String?> Function(
     String typeId,
     Map<String, dynamic> state,
@@ -1027,6 +1030,22 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         .join('\n');
   }
 
+  Future<String?> _focusPanelSummary() async {
+    final targetPanelId = widget.panel.state['targetPanelId'] as String?;
+    if (targetPanelId == null || targetPanelId.isEmpty) return null;
+    final board = _currentBoardForPanel();
+    if (board == null) return null;
+    BoardPanelInstance? targetPanel;
+    for (final panel in board.panels) {
+      if (panel.id == targetPanelId) {
+        targetPanel = panel;
+        break;
+      }
+    }
+    if (targetPanel == null) return null;
+    return buildFocusPanelSummary(targetPanel);
+  }
+
   Future<void> _sendMessage({
     String? overrideText,
     List<String> overrideAttachments = const [],
@@ -1097,6 +1116,9 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     final board = _currentBoardForPanel();
     final enrichedText = _injectYoloPanelContext(text);
 
+    // Build focus-panel context when the assistant was invoked for a panel.
+    final focusPanelSummary = await _focusPanelSummary();
+
     // Capture board snapshot if enabled
     String? snapshotPath;
     String? snapshotBase64;
@@ -1131,6 +1153,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         viewportScale: board?.viewport.scale,
         boardSnapshotPath: snapshotPath,
         boardSnapshotBase64: snapshotBase64,
+        targetPanelSummary: focusPanelSummary,
       ),
       onEvent: _handleEvent,
       onError: (Object error) {
@@ -1641,32 +1664,35 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
 
   Widget _buildChatView() {
     return ClipRRect(
-      borderRadius: const BorderRadius.only(
-        bottomLeft: Radius.circular(16),
-        bottomRight: Radius.circular(16),
-      ),
+      borderRadius: widget.compact
+          ? BorderRadius.zero
+          : const BorderRadius.only(
+              bottomLeft: Radius.circular(16),
+              bottomRight: Radius.circular(16),
+            ),
       child: Column(
         children: [
-          // Session info bar
-          ChatInfoBar(
-            workingDir: _config.workingDir,
-            provider: _config.provider,
-            model: _config.model,
-            autopilot: _config.autopilot,
-            reasoningEffort: _config.reasoningEffort,
-            totalOutputTokens: _totalOutputTokens,
-            isProcessing: _isProcessing,
-            onAutopilotToggle: () {
-              setState(() {
-                _config = _config.copyWith(autopilot: !_config.autopilot);
-              });
-              _persistMessages();
-            },
-            onCycleReasoningEffort: _cycleReasoningEffort,
-            onCopySession: _copySessionToClipboard,
-            onShowHistory: () => _showSessionHistoryDialog(context),
-            shortPath: _shortPath,
-          ),
+          // Session info bar (hidden in compact inline overlays)
+          if (!widget.compact)
+            ChatInfoBar(
+              workingDir: _config.workingDir,
+              provider: _config.provider,
+              model: _config.model,
+              autopilot: _config.autopilot,
+              reasoningEffort: _config.reasoningEffort,
+              totalOutputTokens: _totalOutputTokens,
+              isProcessing: _isProcessing,
+              onAutopilotToggle: () {
+                setState(() {
+                  _config = _config.copyWith(autopilot: !_config.autopilot);
+                });
+                _persistMessages();
+              },
+              onCycleReasoningEffort: _cycleReasoningEffort,
+              onCopySession: _copySessionToClipboard,
+              onShowHistory: () => _showSessionHistoryDialog(context),
+              shortPath: _shortPath,
+            ),
           // Messages
           Expanded(
             child:
