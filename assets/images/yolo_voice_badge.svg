@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <defs>
+    <linearGradient id="yoloGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4FA3FF"/>
+      <stop offset="100%" stop-color="#7C5CFC"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Outer circle -->
+  <circle cx="100" cy="100" r="90" fill="none" stroke="url(#yoloGrad)" stroke-width="12"/>
+
+  <!-- Letter Y (top-left) -->
+  <line x1="68" y1="42" x2="100" y2="92" stroke="url(#yoloGrad)" stroke-width="13" stroke-linecap="round"/>
+  <line x1="132" y1="42" x2="100" y2="92" stroke="url(#yoloGrad)" stroke-width="13" stroke-linecap="round"/>
+  <line x1="100" y1="92" x2="100" y2="136" stroke="url(#yoloGrad)" stroke-width="13" stroke-linecap="round"/>
+
+  <!-- Top-right o -->
+  <circle cx="142" cy="72" r="23" fill="none" stroke="url(#yoloGrad)" stroke-width="12"/>
+
+  <!-- Letter l (bottom-left) -->
+  <line x1="60" y1="108" x2="60" y2="150" stroke="url(#yoloGrad)" stroke-width="13" stroke-linecap="round"/>
+  <path d="M60 150 Q60 166 84 166 L108 166" fill="none" stroke="url(#yoloGrad)" stroke-width="13" stroke-linecap="round"/>
+
+  <!-- Bottom-right o -->
+  <circle cx="142" cy="134" r="23" fill="none" stroke="url(#yoloGrad)" stroke-width="12"/>
+</svg>

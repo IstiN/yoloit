@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/ui/components/buttons/header_icon_button.dart';
 import 'package:yoloit/ui/components/buttons/toolbar_button.dart';
@@ -283,9 +284,9 @@ class _MockPanelWithVoiceBadgeState extends State<_MockPanelWithVoiceBadge> {
           onClose: () {},
         ),
         Align(
-          alignment: Alignment.centerRight,
+          alignment: Alignment.centerLeft,
           child: Transform.translate(
-            offset: const Offset(18, 0),
+            offset: const Offset(-18, 0),
             child: _VoiceInputBadge(
               isListening: _listening,
               onTap: () => setState(() => _listening = !_listening),
@@ -294,7 +295,7 @@ class _MockPanelWithVoiceBadgeState extends State<_MockPanelWithVoiceBadge> {
         ),
         if (_listening)
           const Positioned(
-            right: 44,
+            left: 44,
             top: -70,
             child: _VoiceListeningBubble(),
           ),
@@ -327,24 +328,19 @@ class _VoiceInputBadge extends StatelessWidget {
             height: 36,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [colors.accentBlue, colors.primary],
-              ),
               boxShadow: [
                 BoxShadow(
-                  color: colors.accentBlue.withValues(alpha: 0.35),
+                  color: colors.textMuted.withValues(alpha: 0.25),
                   blurRadius: 10,
                   spreadRadius: -2,
                   offset: const Offset(0, 3),
                 ),
               ],
             ),
-            child: Icon(
-              isListening ? Icons.stop : Icons.mic,
-              size: 18,
-              color: colors.textHighlight,
+            child: SvgPicture.asset(
+              'assets/images/yolo_voice_badge.svg',
+              width: 36,
+              height: 36,
             ),
           ),
         ),
