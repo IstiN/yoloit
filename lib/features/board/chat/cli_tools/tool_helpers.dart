@@ -26,7 +26,27 @@ class YoloitCliToolParam {
   final String? shortKey;
 
   bool get isFlag => flag != null;
-  String get compactKey => shortKey ?? key;
+
+  /// Compact key exposed in the LLM tool schema. When a shortKey is defined
+  /// it is used; otherwise the param key is exposed in lowercase.
+  String get compactKey => shortKey ?? key.toLowerCase();
+
+  /// The lowercase form of [key], used by some model providers as the property
+  /// name even when a shortKey is present.
+  String get lowerKey => key.toLowerCase();
+
+  /// The canonical key used to look up values after normalization. Accepts
+  /// the original key, the short key, the compact schema key, and the raw
+  /// lowercase key for providers that normalize property names.
+  Iterable<String> get lookupKeys sync* {
+    yield key;
+    if (shortKey != null) yield shortKey!;
+    final compact = compactKey;
+    if (compact != key && compact != shortKey) yield compact;
+    final lower = lowerKey;
+    if (lower != key && lower != shortKey && lower != compact) yield lower;
+    yield* aliases;
+  }
 
   Map<String, Object?> toJsonSchema() {
     final type = switch (kind) {

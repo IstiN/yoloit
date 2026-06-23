@@ -1,3 +1,4 @@
+// covers-write: board.chart
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yoloit/core/cli/handlers/chart_handler.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
@@ -16,7 +17,12 @@ void main() {
 
   BoardPanelInstance tablePanel({
     String id = 'panel-table',
+    String title = 'Table',
     String? tableId,
+    List<Map<String, dynamic>> columns = const [
+      {'id': 'month', 'title': 'Month', 'type': 'text'},
+      {'id': 'sales', 'title': 'Sales', 'type': 'number'},
+    ],
     List<Map<String, dynamic>> rows = const [
       {'id': 'r1', 'month': 'Jan', 'sales': 120},
       {'id': 'r2', 'month': 'Feb', 'sales': 190},
@@ -25,13 +31,10 @@ void main() {
       BoardPanelInstance(
         id: id,
         type: 'board.table',
-        title: 'Table',
+        title: title,
         bounds: const BoardPanelBounds(x: 0, y: 0, width: 400, height: 300),
         state: {
-          'columns': [
-            {'id': 'month', 'title': 'Month', 'type': 'text'},
-            {'id': 'sales', 'title': 'Sales', 'type': 'number'},
-          ],
+          'columns': columns,
           'rows': rows,
           if (tableId != null) 'tableId': tableId,
         },
@@ -145,6 +148,22 @@ void main() {
       expect(result.ok, isTrue);
       expect(result.stateUpdate!['tablePanelId'], 'panel-table');
     });
+
+    test('link-table resolves table panel by title', () async {
+      final panel = newPanel();
+      final result = await handler.handleAction(
+        'link-table',
+        {
+          'tablePanelId': 'Sales Data',
+          '_currentBoardPanels': [
+            tablePanel(id: 'panel-table', title: 'Sales Data').toJson(),
+          ],
+        },
+        panel,
+      );
+      expect(result.ok, isTrue);
+      expect(result.stateUpdate!['tablePanelId'], 'panel-table');
+    });
   });
 
   group('ChartCliHandler — refresh', () {
@@ -179,6 +198,59 @@ void main() {
       expect(result.ok, isTrue);
       final data = result.stateUpdate!['data'] as List<dynamic>;
       expect(data.length, 2);
+    });
+
+    test('refresh finds table by panel title', () async {
+      final panel = newPanel(state: {'tablePanelId': 'Sales Data'});
+      final result = await handler.handleAction(
+        'refresh',
+        {
+          '_currentBoardPanels': [
+            tablePanel(id: 'panel-table', title: 'Sales Data').toJson(),
+          ],
+        },
+        panel,
+      );
+      expect(result.ok, isTrue);
+      final data = result.stateUpdate!['data'] as List<dynamic>;
+      expect(data.length, 2);
+    });
+
+    test('refresh casts text numbers to numeric values for chart', () async {
+      final panel = newPanel(state: {'tablePanelId': 'expenses-table'});
+      final result = await handler.handleAction(
+        'refresh',
+        {
+          '_currentBoardPanels': [
+            tablePanel(
+              id: 'expenses-table',
+              title: 'Expenses',
+              columns: const [
+                {'id': 'category', 'title': 'Категория', 'type': 'text'},
+                {'id': 'amount', 'title': 'Сумма', 'type': 'number'},
+              ],
+              rows: const [
+                {'id': 'r1', 'category': 'Продукты', 'amount': '3500'},
+                {'id': 'r2', 'category': 'Транспорт', 'amount': '1200'},
+              ],
+            ).toJson(),
+          ],
+        },
+        panel,
+      );
+      expect(result.ok, isTrue);
+      final data = result.stateUpdate!['data'] as List<dynamic>;
+      expect((data.first as Map<String, dynamic>)['amount'], 3500.0);
+      expect(
+        result.stateUpdate!['xKey'],
+        'category',
+        reason: 'should infer text column as xKey',
+      );
+      expect(
+        result.stateUpdate!['yKey'],
+        'amount',
+        reason: 'should infer number column as yKey',
+      );
     });
 
     test('refresh fails when table panel missing', () async {

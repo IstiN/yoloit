@@ -49,6 +49,41 @@ final List<YoloitCliTool> runTools = <YoloitCliTool>[
   ),
 
   YoloitCliTool(
+    command: 'terminal:output',
+    alias: 'tout',
+    description:
+        'Read the latest output from an interactive terminal panel. '
+        'Pass the panel title or id; the session is resolved automatically.',
+    group: 'run',
+    params: <YoloitCliToolParam>[
+      boardParam(),
+      panelParam(),
+      toolParam(
+        'session',
+        'Optional terminal session id override',
+        shortKey: 's',
+      ),
+    ],
+  ),
+
+  YoloitCliTool(
+    command: 'terminal:set-dir',
+    alias: 'tsd',
+    description: 'Set the working directory of an interactive terminal panel',
+    group: 'run',
+    params: <YoloitCliToolParam>[
+      boardParam(),
+      panelParam(),
+      toolParam(
+        'dir',
+        'Working directory path',
+        required: true,
+        shortKey: 'd',
+      ),
+    ],
+  ),
+
+  YoloitCliTool(
     command: 'run:detach',
     alias: 'rdt',
     description: 'Detach run session from panel',

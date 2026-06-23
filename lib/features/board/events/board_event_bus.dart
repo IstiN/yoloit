@@ -22,6 +22,15 @@ class KanbanCardToChatEvent extends BoardEvent {
   final String text;
 }
 
+/// Emitted after a YoLoIT CLI tool call mutates board/panel state.
+/// Listeners (e.g. [BoardCubit]) can refresh remote boards so the UI
+/// reflects changes made through a remote yoloitd instance.
+class BoardToolMutationEvent extends BoardEvent {
+  const BoardToolMutationEvent(this.command);
+
+  final String command;
+}
+
 /// Central event bus for board-wide notifications.
 ///
 /// **Emitting events** (from chat/agent code):

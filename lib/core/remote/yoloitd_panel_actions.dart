@@ -49,6 +49,9 @@ RemotePanelActionResult handleRemotePanelAction(
     'board.chat' => _chat(panel, action, args),
     'board.setup_guide' => _setupGuide(panel, action, args),
     'board.run' || 'board.run_configs' => _run(panel, action, args),
+    'board.table' => _table(panel, action, args),
+    'board.calendar' => _calendar(panel, action, args),
+    'board.chart' => _chart(panel, action, args),
     'board.diff.preview' => _diffPreview(panel, action, args),
     'board.yolo_assistant' => _yoloAssistant(panel, action, args),
     'board.widget.custom' => _customWidget(panel, action, args),
@@ -351,7 +354,7 @@ RemotePanelActionResult _checklist(
       return RemotePanelActionResult(stateUpdate: {'items': items});
     case 'rename':
       final index = _itemIndex(items, args);
-      final text = args['text']?.toString();
+      final text = (args['newText'] ?? args['text'])?.toString();
       if (index < 0 || text == null) return _missing('index/id/text');
       items[index] = {...items[index], 'text': text};
       return RemotePanelActionResult(stateUpdate: {'items': items});
@@ -726,6 +729,420 @@ RemotePanelActionResult _run(
   return _unknown(action);
 }
 
+RemotePanelActionResult _table(
+  RemotePanel panel,
+  String action,
+  Map<String, dynamic> args,
+) {
+  final columns = _tableColumns(panel);
+  final rows = _tableRows(panel);
+  switch (action) {
+    case 'get':
+      return RemotePanelActionResult(
+        data: {
+          'tableId': _tableEffectiveId(panel),
+          'columns': columns,
+          'rows': rows,
+        },
+      );
+    case 'set':
+      final newColumns = _maps(args['columns']);
+      final newRows =
+          _maps(args['rows']).map((row) => _normalizeTableRowInput(row)).toList();
+      if (newColumns.isEmpty) {
+        return _missing('columns');
+      }
+      return RemotePanelActionResult(
+        stateUpdate: {
+          'columns': newColumns,
+          'rows': newRows,
+        },
+      );
+    case 'set-id':
+      final tableId = _string(args['tableId'] ?? args['id']);
+      if (tableId == null || tableId.isEmpty) {
+        return _missing('tableId');
+      }
+      return RemotePanelActionResult(
+        stateUpdate: {
+          ...panel.state,
+          'tableId': tableId,
+        },
+      );
+    case 'add-column':
+      final id = _string(args['id'] ?? args['columnId']);
+      if (id == null || id.isEmpty) {
+        return _missing('id');
+      }
+      if (columns.any((column) => column['id'] == id)) {
+        return RemotePanelActionResult(
+          ok: false,
+          message: 'Column already exists: $id',
+        );
+      }
+      final title = _string(args['title'] ?? args['name']) ?? id;
+      final type = _string(args['type']) ?? 'text';
+      final newColumn = <String, dynamic>{
+        'id': id,
+        'title': title,
+        'type': type,
+        if (args['options'] is List) 'options': _strings(args['options']),
+      };
+      final defaultValue = _tableDefaultCellValue(type);
+      final updatedRows =
+          rows
+              .map(
+                (row) => <String, dynamic>{
+                  ...row,
+                  id: defaultValue,
+                },
+              )
+              .toList();
+      return RemotePanelActionResult(
+        stateUpdate: {
+          'columns': [...columns, newColumn],
+          'rows': updatedRows,
+        },
+      );
+    case 'rename-column':
+      final id = _string(args['id'] ?? args['columnId']);
+      final title = _string(args['title'] ?? args['name']);
+      if (id == null || id.isEmpty || title == null || title.isEmpty) {
+        return _missing('id/title');
+      }
+      final index = columns.indexWhere((column) => column['id'] == id);
+      if (index < 0) return _notFound('Column');
+      columns[index] = {...columns[index], 'title': title};
+      return RemotePanelActionResult(stateUpdate: {'columns': columns});
+    case 'remove-column':
+      final id = _string(args['id'] ?? args['columnId']);
+      if (id == null || id.isEmpty) return _missing('id');
+      final index = columns.indexWhere((column) => column['id'] == id);
+      if (index < 0) return _notFound('Column');
+      columns.removeAt(index);
+      final updatedRows =
+          rows
+              .map((row) => <String, dynamic>{...row}..remove(id))
+              .toList();
+      return RemotePanelActionResult(
+        stateUpdate: {'columns': columns, 'rows': updatedRows},
+      );
+    case 'add-row':
+      final cellInput = _normalizeTableCellInput(args, columns);
+      final cells = <String, dynamic>{
+        for (final column in columns)
+          column['id'] as String:
+              _tableCastCellValue(cellInput[column['id']], column['type']),
+      };
+      final newRow = <String, dynamic>{
+        'id': 'r-${DateTime.now().millisecondsSinceEpoch}',
+        ...cells,
+      };
+      return RemotePanelActionResult(
+        stateUpdate: {'rows': [...rows, newRow]},
+        data: {'rowId': newRow['id']},
+      );
+    case 'update-row':
+      final rowId = _string(args['id'] ?? args['rowId']);
+      if (rowId == null || rowId.isEmpty) return _missing('id');
+      final index = rows.indexWhere((row) => row['id'] == rowId);
+      if (index < 0) return _notFound('Row');
+      final cellInput = _normalizeTableCellInput(args, columns);
+      final updatedCells = Map<String, dynamic>.from(rows[index]);
+      for (final column in columns) {
+        final columnId = column['id'] as String;
+        if (cellInput.containsKey(columnId)) {
+          updatedCells[columnId] = _tableCastCellValue(
+            cellInput[columnId],
+            column['type'],
+          );
+        }
+      }
+      rows[index] = updatedCells;
+      return RemotePanelActionResult(stateUpdate: {'rows': rows});
+    case 'remove-row':
+      final rowId = _string(args['id'] ?? args['rowId']);
+      if (rowId == null || rowId.isEmpty) return _missing('id');
+      rows.removeWhere((row) => row['id'] == rowId);
+      return RemotePanelActionResult(stateUpdate: {'rows': rows});
+    case 'clear':
+      return const RemotePanelActionResult(
+        stateUpdate: {'rows': <Map<String, dynamic>>[]},
+      );
+  }
+  return _unknown(action);
+}
+
+List<Map<String, dynamic>> _tableColumns(RemotePanel panel) => _maps(
+  panel.state['columns'],
+).toList();
+
+List<Map<String, dynamic>> _tableRows(RemotePanel panel) => _maps(
+  panel.state['rows'],
+).toList();
+
+String _tableEffectiveId(RemotePanel panel) {
+  final custom = (panel.state['tableId'] as String?)?.trim() ?? '';
+  return custom.isEmpty ? panel.id : custom;
+}
+
+Map<String, dynamic> _tableCellInput(Map<String, dynamic> args) {
+  final cells = args['cells'] ?? args['row'];
+  if (cells is Map) return Map<String, dynamic>.from(cells);
+  return args;
+}
+
+/// Normalizes cell input for `add-row` / `update-row` so values keyed by
+/// column title are mapped to the matching column id. If both id and title
+/// reference the same column, the id key wins.
+Map<String, dynamic> _normalizeTableCellInput(
+  Map<String, dynamic> args,
+  List<Map<String, dynamic>> columns,
+) {
+  final input = _tableCellInput(args);
+  final columnIds =
+      columns.map((column) => (column['id'] as String?)?.trim() ?? '').toSet();
+  final titleToId = <String, String>{
+    for (final column in columns)
+      if (column['title'] != null)
+        column['title'].toString().toLowerCase().trim():
+            (column['id'] as String?)?.trim() ?? '',
+  };
+  final normalized = <String, dynamic>{};
+  for (final entry in input.entries) {
+    final key = entry.key.toString();
+    if (columnIds.contains(key)) {
+      normalized[key] = entry.value;
+      continue;
+    }
+    final idFromTitle = titleToId[key.toLowerCase().trim()];
+    if (idFromTitle != null && idFromTitle.isNotEmpty) {
+      normalized[idFromTitle] = entry.value;
+    } else {
+      normalized[key] = entry.value;
+    }
+  }
+  return normalized;
+}
+
+Map<String, dynamic> _normalizeTableRowInput(Map<String, dynamic> row) {
+  // `table:set` rows may be either `{id, cells: {col: value}}` (tool shape)
+  // or `{id, col: value}` (legacy shape). Normalize to the top-level shape.
+  final cells = row['cells'];
+  if (cells is Map) {
+    return <String, dynamic>{
+      'id': row['id'],
+      ...Map<String, dynamic>.from(
+        cells.map((k, v) => MapEntry(k.toString(), v)),
+      ),
+    };
+  }
+  return row;
+}
+
+dynamic _tableDefaultCellValue(String? type) {
+  switch (type) {
+    case 'number':
+      return 0;
+    case 'date':
+      return DateTime.now().toUtc().toIso8601String().split('T').first;
+    case 'select':
+    case 'text':
+    default:
+      return '';
+  }
+}
+
+dynamic _tableCastCellValue(dynamic value, dynamic type) {
+  if (value == null) return _tableDefaultCellValue(type?.toString());
+  switch (type?.toString()) {
+    case 'number':
+      if (value is num) return value;
+      return double.tryParse(value.toString()) ?? 0;
+    case 'date':
+    case 'select':
+    case 'text':
+    default:
+      return value.toString();
+  }
+}
+
+RemotePanelActionResult _calendar(
+  RemotePanel panel,
+  String action,
+  Map<String, dynamic> args,
+) {
+  final events = _maps(panel.state['events']);
+  switch (action) {
+    case 'events':
+      return RemotePanelActionResult(
+        data: {'events': events, 'count': events.length},
+      );
+    case 'create-event':
+    case 'add-event':
+      final title = _string(args['title']);
+      if (title == null || title.isEmpty) return _missing('title');
+      final start = DateTime.tryParse(args['start']?.toString() ?? '');
+      if (start == null) return _missing('start');
+      final event = <String, dynamic>{
+        'id': _timestampId('ev'),
+        'title': title,
+        'start': start.toUtc().toIso8601String(),
+        'end': _parseOptionalDate(args['end'])?.toUtc().toIso8601String(),
+        'allDay': args['allDay'] == true ||
+            args['allDay']?.toString().toLowerCase() == 'true',
+        'description': _string(args['description']) ?? '',
+        'color': _string(args['color']) ?? '',
+        'meetingUrl': _string(args['meetingUrl'] ?? args['url']) ?? '',
+      };
+      events.add(event);
+      return RemotePanelActionResult(
+        stateUpdate: {'events': events, 'eventCount': events.length},
+        data: {'event': event},
+      );
+    case 'update-event':
+      final eventId = _string(args['eventId'] ?? args['id']);
+      if (eventId == null || eventId.isEmpty) return _missing('eventId');
+      final index = events.indexWhere((event) => event['id'] == eventId);
+      if (index < 0) return _notFound('Event');
+      final existing = events[index];
+      events[index] = <String, dynamic>{
+        ...existing,
+        if (args.containsKey('title')) 'title': _string(args['title']) ?? '',
+        if (args.containsKey('start'))
+          'start':
+              _parseOptionalDate(args['start'])?.toUtc().toIso8601String() ??
+              existing['start'],
+        if (args.containsKey('end'))
+          'end': _parseOptionalDate(args['end'])?.toUtc().toIso8601String(),
+        if (args.containsKey('allDay'))
+          'allDay': args['allDay'] == true ||
+              args['allDay']?.toString().toLowerCase() == 'true',
+        if (args.containsKey('description'))
+          'description': _string(args['description']) ?? '',
+        if (args.containsKey('color')) 'color': _string(args['color']) ?? '',
+        if (args.containsKey('meetingUrl') || args.containsKey('url'))
+          'meetingUrl': _string(args['meetingUrl'] ?? args['url']) ?? '',
+      };
+      return RemotePanelActionResult(
+        stateUpdate: {'events': events, 'eventCount': events.length},
+        data: {'event': events[index]},
+      );
+    case 'delete-event':
+      final eventId = _string(args['eventId'] ?? args['id']);
+      if (eventId == null || eventId.isEmpty) return _missing('eventId');
+      events.removeWhere((event) => event['id'] == eventId);
+      return RemotePanelActionResult(
+        stateUpdate: {'events': events, 'eventCount': events.length},
+      );
+    case 'set-view':
+      final view = _string(args['view']);
+      const allowed = {'month', 'week', 'workWeek', 'day', 'threeDay', 'list'};
+      if (view == null || !allowed.contains(view)) {
+        return RemotePanelActionResult(
+          ok: false,
+          message: 'Invalid view. Allowed: ${allowed.join(', ')}',
+        );
+      }
+      return RemotePanelActionResult(
+        stateUpdate: {...panel.state, 'view': view},
+      );
+    case 'focus-date':
+      final date = _parseOptionalDate(args['date'] ?? args['focusedDate']);
+      if (date == null) return _missing('date');
+      return RemotePanelActionResult(
+        stateUpdate: {
+          ...panel.state,
+          'focusedDate': _dateOnly(date).toUtc().toIso8601String(),
+        },
+      );
+    case 'scroll-to-time':
+      final hour = int.tryParse(args['hour']?.toString() ?? '');
+      if (hour == null || hour < 0 || hour > 23) {
+        return _missing('hour (0-23)');
+      }
+      return RemotePanelActionResult(
+        stateUpdate: {...panel.state, 'scrollHour': hour},
+      );
+  }
+  return _unknown(action);
+}
+
+DateTime? _parseOptionalDate(dynamic value) {
+  if (value == null) return null;
+  return DateTime.tryParse(value.toString());
+}
+
+DateTime _dateOnly(DateTime date) => DateTime(date.year, date.month, date.day);
+
+RemotePanelActionResult _chart(
+  RemotePanel panel,
+  String action,
+  Map<String, dynamic> args,
+) {
+  switch (action) {
+    case 'get':
+      return RemotePanelActionResult(
+        data: {
+          'type': panel.state['type'] ?? 'line',
+          'data': panel.state['data'] ?? const <Map<String, dynamic>>[],
+          'xKey': panel.state['xKey'] ?? 'month',
+          'yKey': panel.state['yKey'] ?? 'sales',
+          'groupKey': panel.state['groupKey'],
+          'tablePanelId': panel.state['tablePanelId'],
+          'animated': panel.state['animated'] ?? true,
+        },
+      );
+    case 'set-data':
+      final data = _maps(args['data'] ?? args['json']);
+      return RemotePanelActionResult(
+        stateUpdate: {...panel.state, 'data': data},
+      );
+    case 'set-type':
+      final type = _string(args['type']);
+      const allowed = {'line', 'bar', 'pie', 'scatter', 'radar', 'area'};
+      if (type == null || !allowed.contains(type)) {
+        return RemotePanelActionResult(
+          ok: false,
+          message: 'Invalid type. Allowed: ${allowed.join(', ')}',
+        );
+      }
+      return RemotePanelActionResult(
+        stateUpdate: {...panel.state, 'type': type},
+      );
+    case 'set-options':
+      final next = Map<String, dynamic>.from(panel.state);
+      final xKey = _string(args['xKey'] ?? args['x']);
+      final yKey = _string(args['yKey'] ?? args['y']);
+      final groupKey = _string(args['groupKey'] ?? args['group']);
+      if (xKey != null) next['xKey'] = xKey;
+      if (yKey != null) next['yKey'] = yKey;
+      if (groupKey != null) {
+        next['groupKey'] = groupKey.isEmpty ? null : groupKey;
+      }
+      if (args['animated'] is bool) next['animated'] = args['animated'];
+      return RemotePanelActionResult(stateUpdate: next);
+    case 'link-table':
+      final tablePanelId = _string(args['tablePanelId'] ?? args['table']);
+      if (tablePanelId == null || tablePanelId.isEmpty) {
+        return _missing('tablePanelId');
+      }
+      return RemotePanelActionResult(
+        stateUpdate: {...panel.state, 'tablePanelId': tablePanelId},
+      );
+    case 'unlink-table':
+      return RemotePanelActionResult(
+        stateUpdate: {...panel.state, 'tablePanelId': null},
+      );
+    case 'refresh':
+      return RemotePanelActionResult(
+        message: 'Refresh requires board context; state unchanged',
+        data: {'tablePanelId': panel.state['tablePanelId']},
+      );
+  }
+  return _unknown(action);
+}
+
 RemotePanelActionResult _diffPreview(
   RemotePanel panel,
   String action,
@@ -870,7 +1287,10 @@ int _columnIndex(List<String> columns, Object? value) {
 int _itemIndex(List<Map<String, dynamic>> items, Map<String, dynamic> args) {
   if (args['index'] is num) return (args['index'] as num).toInt();
   final id = args['id']?.toString();
-  if (id != null) return items.indexWhere((item) => item['id'] == id);
+  if (id != null) {
+    final index = items.indexWhere((item) => item['id'] == id);
+    if (index >= 0) return index;
+  }
   final text = args['text']?.toString();
   if (text != null) return items.indexWhere((item) => item['text'] == text);
   return -1;
@@ -886,3 +1306,9 @@ int _duration(Object? value) => _int(value, fallback: 300).clamp(1, 86400);
 
 String _timestampId(String prefix) =>
     '$prefix-${DateTime.now().microsecondsSinceEpoch}';
+
+String? _string(dynamic value) {
+  if (value == null) return null;
+  final text = value.toString().trim();
+  return text.isEmpty ? null : text;
+}

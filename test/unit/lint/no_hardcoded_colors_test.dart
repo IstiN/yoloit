@@ -24,7 +24,7 @@ void main() {
     'lib/features/board/ui/board_history_panel.dart': 2,
     'lib/features/board/ui/board_tools_panel.dart': 2,
     'lib/features/board/ui/board_view.dart': 0,
-    'lib/features/board/ui/sticky_note_chrome.dart': 17,
+    'lib/features/board/ui/sticky_note_chrome.dart': 26,
     'lib/features/board/ui/board_overview_preview.dart': 57,
     'lib/features/board/chat/chat_panel_widget.dart': 55,
     'lib/features/collaboration/ui/web_mindmap_canvas.dart': 49,

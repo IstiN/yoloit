@@ -1,3 +1,4 @@
+// covers-write: board.checklist
 import 'dart:convert';
 import 'dart:io';
 
@@ -183,6 +184,24 @@ void main() {
       final r = await handler.handleAction('remove', {}, panel);
       expect(r.ok, isFalse);
     });
+
+    test('remove by text removes matching item', () async {
+      final panel = _panelFromFixture('checklist_shopping');
+      final r = await handler.handleAction('remove', {'text': 'milk'}, panel);
+      expect(r.ok, isTrue);
+      final items = r.stateUpdate!['items'] as List;
+      expect(items.any((i) => i['text'] == 'Milk'), isFalse);
+      expect(items.length, 3);
+    });
+
+    test('remove by id removes matching item', () async {
+      final panel = _panelFromFixture('checklist_shopping');
+      final r = await handler.handleAction('remove', {'id': 'item-4'}, panel);
+      expect(r.ok, isTrue);
+      final items = r.stateUpdate!['items'] as List;
+      expect(items.any((i) => i['id'] == 'item-4'), isFalse);
+      expect(items.length, 3);
+    });
   });
 
   group('ChecklistCliHandler — rename action', () {
@@ -204,6 +223,32 @@ void main() {
       final panel = _panelFromFixture('checklist_shopping');
       final r = await handler.handleAction('rename', {'index': 0}, panel);
       expect(r.ok, isFalse);
+    });
+
+    test('rename by text updates matching item', () async {
+      final panel = _panelFromFixture('checklist_shopping');
+      final r = await handler.handleAction(
+        'rename',
+        {'text': 'milk', 'newText': 'Oat Milk'},
+        panel,
+      );
+      expect(r.ok, isTrue);
+      final items = r.stateUpdate!['items'] as List;
+      final renamed = items.firstWhere((i) => i['text'] == 'Oat Milk');
+      expect(renamed, isNotNull);
+    });
+
+    test('rename by id updates matching item', () async {
+      final panel = _panelFromFixture('checklist_shopping');
+      final r = await handler.handleAction(
+        'rename',
+        {'id': 'item-4', 'newText': 'Tea'},
+        panel,
+      );
+      expect(r.ok, isTrue);
+      final items = r.stateUpdate!['items'] as List;
+      final renamed = items.firstWhere((i) => i['id'] == 'item-4');
+      expect(renamed['text'], 'Tea');
     });
   });
 

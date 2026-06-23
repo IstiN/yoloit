@@ -37,11 +37,13 @@ class CalendarPanelContent extends StatefulWidget {
     required this.panel,
     required this.renderContext,
     this.storage,
+    this.todayOverride,
   });
 
   final BoardPanelInstance panel;
   final BoardPanelRenderContext renderContext;
   final CalendarEventStorage? storage;
+  final DateTime? todayOverride;
 
   @override
   State<CalendarPanelContent> createState() => _CalendarPanelContentState();
@@ -248,6 +250,7 @@ class _CalendarPanelContentState extends State<CalendarPanelContent> {
 
     final focused = _focusedDate;
     final view = _view;
+    final today = _dateOnly(widget.todayOverride ?? DateTime.now());
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -257,7 +260,7 @@ class _CalendarPanelContentState extends State<CalendarPanelContent> {
           view: view,
           onPrevious: () => _movePeriod(-1),
           onNext: () => _movePeriod(1),
-          onToday: () => _setFocusedDate(DateTime.now()),
+          onToday: () => _setFocusedDate(today),
           onViewChanged: _setView,
           onAddEvent: () => _showEventDialog(initialDate: focused),
         ),
@@ -268,6 +271,7 @@ class _CalendarPanelContentState extends State<CalendarPanelContent> {
               child: _CalendarBody(
                 view: view,
                 focusedDate: focused,
+                today: today,
                 events: _events,
                 scrollController: _scrollController,
                 onDayTap: (date) {
@@ -410,6 +414,7 @@ class _CalendarBody extends StatelessWidget {
   const _CalendarBody({
     required this.view,
     required this.focusedDate,
+    required this.today,
     required this.events,
     required this.scrollController,
     required this.onDayTap,
@@ -420,6 +425,7 @@ class _CalendarBody extends StatelessWidget {
 
   final _CalendarView view;
   final DateTime focusedDate;
+  final DateTime today;
   final List<CalendarEvent> events;
   final ScrollController scrollController;
   final ValueChanged<DateTime> onDayTap;
@@ -432,6 +438,7 @@ class _CalendarBody extends StatelessWidget {
     return switch (view) {
       _CalendarView.month => _MonthView(
           focusedDate: focusedDate,
+          today: today,
           events: events,
           onDayTap: onDayTap,
           onEventTap: onEventTap,
@@ -439,6 +446,7 @@ class _CalendarBody extends StatelessWidget {
         ),
       _CalendarView.week => _TimelineView(
           startDate: _weekStart(focusedDate),
+          today: today,
           dayCount: 7,
           events: events,
           scrollController: scrollController,
@@ -448,6 +456,7 @@ class _CalendarBody extends StatelessWidget {
         ),
       _CalendarView.workWeek => _TimelineView(
           startDate: _weekStart(focusedDate),
+          today: today,
           dayCount: 5,
           events: events,
           scrollController: scrollController,
@@ -457,6 +466,7 @@ class _CalendarBody extends StatelessWidget {
         ),
       _CalendarView.day => _TimelineView(
           startDate: focusedDate,
+          today: today,
           dayCount: 1,
           events: events,
           scrollController: scrollController,
@@ -466,6 +476,7 @@ class _CalendarBody extends StatelessWidget {
         ),
       _CalendarView.threeDay => _TimelineView(
           startDate: focusedDate,
+          today: today,
           dayCount: 3,
           events: events,
           scrollController: scrollController,
@@ -486,6 +497,7 @@ class _CalendarBody extends StatelessWidget {
 class _MonthView extends StatelessWidget {
   const _MonthView({
     required this.focusedDate,
+    required this.today,
     required this.events,
     required this.onDayTap,
     required this.onEventTap,
@@ -493,6 +505,7 @@ class _MonthView extends StatelessWidget {
   });
 
   final DateTime focusedDate;
+  final DateTime today;
   final List<CalendarEvent> events;
   final ValueChanged<DateTime> onDayTap;
   final ValueChanged<CalendarEvent> onEventTap;
@@ -505,7 +518,6 @@ class _MonthView extends StatelessWidget {
     final gridStart = monthStart.subtract(
       Duration(days: (monthStart.weekday - DateTime.monday) % 7),
     );
-    final today = _dateOnly(DateTime.now());
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -660,6 +672,7 @@ class _MonthDayCell extends StatelessWidget {
 class _TimelineView extends StatelessWidget {
   const _TimelineView({
     required this.startDate,
+    required this.today,
     required this.dayCount,
     required this.events,
     required this.scrollController,
@@ -669,6 +682,7 @@ class _TimelineView extends StatelessWidget {
   });
 
   final DateTime startDate;
+  final DateTime today;
   final int dayCount;
   final List<CalendarEvent> events;
   final ScrollController scrollController;
@@ -692,6 +706,7 @@ class _TimelineView extends StatelessWidget {
             return Expanded(
               child: _DayColumn(
                 day: day,
+                today: today,
                 events: dayEvents,
                 onEventTap: onEventTap,
                 onEventLongPress: onEventLongPress,
@@ -709,6 +724,7 @@ class _TimelineView extends StatelessWidget {
 class _DayColumn extends StatelessWidget {
   const _DayColumn({
     required this.day,
+    required this.today,
     required this.events,
     required this.onEventTap,
     required this.onEventLongPress,
@@ -717,6 +733,7 @@ class _DayColumn extends StatelessWidget {
   });
 
   final DateTime day;
+  final DateTime today;
   final List<CalendarEvent> events;
   final ValueChanged<CalendarEvent> onEventTap;
   final ValueChanged<CalendarEvent> onEventLongPress;
@@ -726,7 +743,7 @@ class _DayColumn extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    final isToday = _dateOnly(day) == _dateOnly(DateTime.now());
+    final isToday = _dateOnly(day) == today;
     return Container(
       decoration: BoxDecoration(
         border: Border(

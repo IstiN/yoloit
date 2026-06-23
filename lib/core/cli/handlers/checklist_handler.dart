@@ -52,11 +52,17 @@ class ChecklistCliHandler extends PanelCliHandler {
       case 'uncheck':
         return _setChecked(panel, args, false);
       case 'remove':
-        final index = _indexArg(args);
-        if (index == null) {
-          return const CliActionResult(ok: false, message: 'Missing "index"');
-        }
         final items = _items(panel);
+        final index =
+            _indexArg(args) ??
+            _indexById(items, args['id']?.toString()) ??
+            _indexByText(items, _textArg(args));
+        if (index == null) {
+          return const CliActionResult(
+            ok: false,
+            message: 'Missing "index", "id", or "text"',
+          );
+        }
         if (index < 0 || index >= items.length) {
           return const CliActionResult(
             ok: false,
@@ -69,22 +75,25 @@ class ChecklistCliHandler extends PanelCliHandler {
           stateUpdate: {'items': items},
         );
       case 'rename':
-        final index = _indexArg(args);
-        final text = args['text'] as String?;
-        if (index == null || text == null) {
+        final items = _items(panel);
+        final index =
+            _indexArg(args) ??
+            _indexById(items, args['id']?.toString()) ??
+            _indexByText(items, _textArg(args));
+        final newText = (args['newText'] ?? args['text']) as String?;
+        if (index == null || newText == null) {
           return const CliActionResult(
             ok: false,
-            message: 'Missing "index" and "text"',
+            message: 'Missing "index"/"id"/"text" and "newText"',
           );
         }
-        final items = _items(panel);
         if (index < 0 || index >= items.length) {
           return const CliActionResult(
             ok: false,
             message: 'Index out of range',
           );
         }
-        items[index] = {...items[index], 'text': text};
+        items[index] = {...items[index], 'text': newText};
         return CliActionResult(
           message: 'Item renamed',
           stateUpdate: {'items': items},
@@ -194,12 +203,21 @@ class ChecklistCliHandler extends PanelCliHandler {
       },
     ),
     'remove': const CliActionHelp(
-      description: 'Remove an item by zero-based index',
-      params: {'index': 'Zero-based item index'},
+      description: 'Remove an item by index, id, or text',
+      params: {
+        'index': 'Zero-based item index',
+        'id': 'Item id',
+        'text': 'Item text',
+      },
     ),
     'rename': const CliActionHelp(
-      description: 'Rename an item by zero-based index',
-      params: {'index': 'Zero-based item index', 'text': 'New item text'},
+      description: 'Rename an item by index, id, or text',
+      params: {
+        'index': 'Zero-based item index',
+        'id': 'Item id',
+        'text': 'Current item text (also accepts newText for the value)',
+        'newText': 'New item text',
+      },
     ),
   };
 }

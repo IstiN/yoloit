@@ -8,6 +8,7 @@ import 'package:path/path.dart' as p;
 import 'package:yaml/yaml.dart';
 import 'package:yoloit/core/cli/cli_server.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
+import 'package:yoloit/features/board/events/board_event_bus.dart';
 
 import 'package:yoloit/features/board/chat/cli_tools/app_tools.dart';
 import 'package:yoloit/features/board/chat/cli_tools/auto_tools.dart';
@@ -525,9 +526,11 @@ class YoloitCliToolArgumentNormalizer {
     if (tool == null) return;
     for (final param in tool.params) {
       if (_isMissing(normalized[param.key])) {
-        final shortKey = param.shortKey;
-        if (shortKey != null && !_isMissing(normalized[shortKey])) {
-          normalized[param.key] = normalized[shortKey];
+        for (final key in param.lookupKeys) {
+          if (key != param.key && !_isMissing(normalized[key])) {
+            normalized[param.key] = normalized[key];
+            break;
+          }
         }
       }
     }
@@ -1085,7 +1088,22 @@ class YoloitCliToolExecutor implements YoloitToolExecutor {
       });
     }
 
-    final cliArgs = _buildCliArgs(tool, arguments, runtimeContext);
+    final normalized = YoloitCliToolArgumentNormalizer.normalize(
+      functionName: functionName,
+      arguments: arguments,
+      userMessage: '',
+      runtimeContext: runtimeContext,
+    );
+    final cliArgs = _buildCliArgs(tool, normalized, runtimeContext);
+    final validation = _validateCliArgs(tool, cliArgs);
+    if (validation != null) {
+      return jsonEncode(<String, Object?>{
+        'ok': false,
+        'executed': false,
+        'command': _renderCommand(cliArgs),
+        'error': validation,
+      });
+    }
     final rendered = _renderCommand(cliArgs);
     if (tool.destructive && !_confirmedDestructive(arguments)) {
       return jsonEncode(<String, Object?>{
@@ -1108,7 +1126,7 @@ class YoloitCliToolExecutor implements YoloitToolExecutor {
     final cliPort = CliServer.instance.port;
     final result = await Process.run(
       executable,
-      cliArgs,
+      cliArgs.map(_argvQuote).toList(),
       runInShell: false,
       environment:
           cliPort == null
@@ -1118,13 +1136,111 @@ class YoloitCliToolExecutor implements YoloitToolExecutor {
 
     final stdoutText = result.stdout.toString().trim();
     final stderrText = result.stderr.toString().trim();
+    final ok = result.exitCode == 0;
+
+    // Notify the UI so remote boards can be refreshed after mutations.
+    if (ok && !_isReadOnlyCommand(tool.command)) {
+      try {
+        final decoded = jsonDecode(stdoutText) as Map<String, dynamic>?;
+        if (decoded?['ok'] == true) {
+          BoardEventBus.instance.emit(BoardToolMutationEvent(tool.command));
+        }
+      } catch (_) {
+        // Non-JSON output is fine for some legacy commands; ignore.
+      }
+    }
+
     return jsonEncode(<String, Object?>{
-      'ok': result.exitCode == 0,
+      'ok': ok,
       'command': rendered,
       'exitCode': result.exitCode,
       if (stdoutText.isNotEmpty) 'stdout': stdoutText,
       if (stderrText.isNotEmpty) 'stderr': stderrText,
     });
+  }
+
+  static const _readOnlySuffixes = <String>{
+    ':get',
+    ':list',
+    ':events',
+    ':cards',
+    ':columns',
+    ':items',
+    ':status',
+    ':info',
+    ':help',
+    ':preview',
+    ':read',
+    ':search',
+    ':snapshot',
+    ':diagram',
+    ':svg',
+    ':screenshot',
+    ':export',
+    ':history',
+    ':messages',
+    ':logs',
+    ':output',
+    ':config',
+  };
+
+  bool _isReadOnlyCommand(String command) {
+    if (command == 'help' ||
+        command == 'get_tools' ||
+        command == 'list_tools' ||
+        command == 'panels' ||
+        command == 'panel' ||
+        command == 'panel:types' ||
+        command == 'search') {
+      return true;
+    }
+    if (command == 'board') return true;
+    if (command.startsWith('board:') &&
+        _readOnlySuffixes.any(command.endsWith)) {
+      return true;
+    }
+    if (command.startsWith('template:') &&
+        _readOnlySuffixes.any(command.endsWith)) {
+      return true;
+    }
+    if (command.startsWith('files:') &&
+        _readOnlySuffixes.any(command.endsWith)) {
+      return true;
+    }
+    if (command.startsWith('filetree:') &&
+        _readOnlySuffixes.any(command.endsWith)) {
+      return true;
+    }
+    if (command.startsWith('code:') && command.endsWith(':get')) return true;
+    if (command.startsWith('note:') && command.endsWith(':get')) return true;
+    if (command.startsWith('shape:') && command.endsWith(':get')) return true;
+    if (command.startsWith('sticky:') && command.endsWith(':get')) return true;
+    if (command.startsWith('table:') && command.endsWith(':get')) return true;
+    if (command.startsWith('kanban:') &&
+        (command.endsWith(':columns') || command.endsWith(':cards'))) {
+      return true;
+    }
+    if (command.startsWith('checklist:') && command.endsWith(':items')) {
+      return true;
+    }
+    if (command.startsWith('calendar:') &&
+        (command.endsWith(':events') || command.endsWith(':show-event'))) {
+      return true;
+    }
+    if (command.startsWith('playlist:') && command.endsWith(':list')) {
+      return true;
+    }
+    if (command.startsWith('timer:') && command.endsWith(':status')) {
+      return true;
+    }
+    if (command.startsWith('webpage:') &&
+        (command.endsWith(':get') ||
+            command.endsWith(':title') ||
+            command.endsWith(':url') ||
+            command.endsWith(':content'))) {
+      return true;
+    }
+    return false;
   }
 
   List<String> _buildCliArgs(
@@ -1168,15 +1284,9 @@ class YoloitCliToolExecutor implements YoloitToolExecutor {
     ChatRuntimeContext? runtimeContext,
     YoloitCliTool tool,
   ) {
-    if (param.shortKey != null && arguments.containsKey(param.shortKey!)) {
-      return arguments[param.shortKey!];
-    }
-    if (arguments.containsKey(param.key)) {
-      return arguments[param.key];
-    }
-    for (final alias in param.aliases) {
-      if (arguments.containsKey(alias)) {
-        return arguments[alias];
+    for (final key in param.lookupKeys) {
+      if (arguments.containsKey(key)) {
+        return arguments[key];
       }
     }
     return switch (param.runtimeDefault) {
@@ -1254,6 +1364,73 @@ class YoloitCliToolExecutor implements YoloitToolExecutor {
     );
   }
 
+  /// Validates the built CLI arguments against obvious schema violations.
+  /// Returns an error message or null when valid.
+  String? _validateCliArgs(YoloitCliTool tool, List<String> cliArgs) {
+    final paramByFlag = <String, YoloitCliToolParam>{
+      for (final param in tool.params)
+        if (param.flag != null) param.flag!: param,
+    };
+    final paramsByPosition = tool.params.where((p) => p.flag == null).toList();
+    var positionalIndex = 0;
+    for (var i = 0; i < cliArgs.length; i++) {
+      final arg = cliArgs[i];
+      if (arg == tool.command) continue;
+      if (paramByFlag.containsKey(arg)) {
+        final param = paramByFlag[arg]!;
+        if (param.kind == YoloitCliToolParamKind.boolean) {
+          // boolean flag has no following value
+          continue;
+        }
+        if (i + 1 >= cliArgs.length) {
+          return 'Flag "$arg" for ${tool.command} is missing a value';
+        }
+        final value = cliArgs[i + 1];
+        final error = _validateValue(param, value);
+        if (error != null) return error;
+        i++;
+        continue;
+      }
+      if (positionalIndex < paramsByPosition.length) {
+        final param = paramsByPosition[positionalIndex];
+        final error = _validateValue(param, arg);
+        if (error != null) return error;
+        positionalIndex++;
+      }
+    }
+    return null;
+  }
+
+  String? _validateValue(YoloitCliToolParam param, String value) {
+    if (_isPlaceholderId(value)) {
+      return 'Parameter "${param.key}" looks like a placeholder id: "$value". '
+          'Use the actual ${param.key} value.';
+    }
+    if (param.enumValues.isNotEmpty) {
+      final text = value.trim();
+      if (!param.enumValues.contains(text)) {
+        return 'Invalid value for "${param.key}": "$text". '
+            'Allowed: ${param.enumValues.join(', ')}';
+      }
+    }
+    if (param.kind == YoloitCliToolParamKind.number) {
+      if (num.tryParse(value.trim()) == null) {
+        return 'Parameter "${param.key}" must be a number, got "$value"';
+      }
+    }
+    return null;
+  }
+
+  /// Detects values that look like LLM-invented identifiers such as
+  /// "yoloit_board_grid" or "board_terminal_12345" being passed as a board,
+  /// panel, or session id.
+  bool _isPlaceholderId(String value) {
+    final lower = value.trim().toLowerCase();
+    if (lower.startsWith('yoloit_')) return true;
+    if (RegExp(r'^board_[a-z_]+_\d+$').hasMatch(lower)) return true;
+    return false;
+  }
+
   String? _firstNotEmpty(String? first, String? second) {
     final a = first?.trim();
     if (a != null && a.isNotEmpty && a != 'unknown') return a;
@@ -1271,6 +1448,17 @@ class YoloitCliToolExecutor implements YoloitToolExecutor {
       return value;
     }
     return "'${value.replaceAll("'", "'\\''")}'";
+  }
+
+  /// Quotes an argument so it survives being passed to the bash script via
+  /// [Process.run] with [runInShell] false. The script parses positional
+  /// arguments with `"$1"`, so JSON payloads and titles with spaces must be
+  /// enclosed in double quotes and have their inner double quotes escaped.
+  String _argvQuote(String value) {
+    if (RegExp(r'^[a-zA-Z0-9_./:=@-]+$').hasMatch(value)) {
+      return value;
+    }
+    return '"${value.replaceAll('"', '\\"')}"';
   }
 
   String _resolveYoloitExecutable() {

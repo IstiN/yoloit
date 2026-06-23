@@ -27,6 +27,7 @@ class _FakeStorage extends CalendarEventStorage {
 Widget _calendarShell(
   BoardPanelInstance panel, {
   List<CalendarEvent> events = const [],
+  DateTime? today,
   double width = 900,
   double height = 600,
 }) {
@@ -46,6 +47,7 @@ Widget _calendarShell(
             onShowEditor: () {},
           ),
           storage: _FakeStorage(events),
+          todayOverride: today,
         ),
       ),
     ),
@@ -67,7 +69,7 @@ void main() {
   group('Golden tests — CalendarPanelContent', () {
     testGoldens('month view empty', (tester) async {
       await tester.pumpWidgetBuilder(
-        _calendarShell(_panel()),
+        _calendarShell(_panel(), today: DateTime(2026, 6, 19)),
         surfaceSize: const Size(900, 600),
       );
       await tester.pump();
@@ -78,6 +80,7 @@ void main() {
       await tester.pumpWidgetBuilder(
         _calendarShell(
           _panel(state: {'focusedDate': '2026-06-19T00:00:00.000'}),
+          today: DateTime(2026, 6, 19),
           events: [
             CalendarEvent(
               id: 'ev-1',
@@ -97,6 +100,7 @@ void main() {
       await tester.pumpWidgetBuilder(
         _calendarShell(
           _panel(state: {'view': 'week', 'focusedDate': '2026-06-19T00:00:00.000'}),
+          today: DateTime(2026, 6, 19),
         ),
         surfaceSize: const Size(900, 600),
       );
@@ -108,6 +112,7 @@ void main() {
       await tester.pumpWidgetBuilder(
         _calendarShell(
           _panel(state: {'view': 'day', 'focusedDate': '2026-06-19T00:00:00.000'}),
+          today: DateTime(2026, 6, 19),
           events: [
             CalendarEvent(
               id: 'ev-2',
@@ -127,6 +132,7 @@ void main() {
       await tester.pumpWidgetBuilder(
         _calendarShell(
           _panel(state: {'focusedDate': '2026-06-19T00:00:00.000'}),
+          today: DateTime(2026, 6, 19),
         ),
         surfaceSize: const Size(900, 600),
       );
@@ -140,6 +146,7 @@ void main() {
       await tester.pumpWidgetBuilder(
         _calendarShell(
           _panel(state: {'focusedDate': '2026-06-19T00:00:00.000'}),
+          today: DateTime(2026, 6, 19),
           events: [
             CalendarEvent(
               id: 'ev-3',

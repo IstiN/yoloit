@@ -142,6 +142,34 @@ A pre-configured `repomix.config.json` lives at the repo root. It excludes `thir
 
 ---
 
+## 🧪 Pre-commit Hooks & Coverage Ratchets
+
+- The pre-commit hook is located at `scripts/pre-commit` and is installed to `.git/hooks/pre-commit`.
+- It includes a **CLI integration-test coverage ratchet**:
+  - `python3 scripts/check_cli_integration_coverage.py` enumerates every command registered in `tools/yoloit`.
+  - Each command must be either:
+    - covered by an integration test in `test/integration/` (annotate the file with `// covers: cmd1, cmd2, ...`), or
+    - explicitly listed in `scripts/cli_integration_exempt.json` with a mandatory reason.
+  - If a command is neither covered nor exempt, the hook fails and blocks the commit.
+- It also includes a **panel write-coverage ratchet**:
+  - `python3 scripts/check_panel_write_coverage.py` enumerates every built-in panel type (`board.*`).
+  - Each panel type must be either:
+    - covered by a test that exercises a write/update path (annotate the file with `// covers-write: board.type1, board.type2, ...`), or
+    - explicitly listed in `scripts/panel_write_exempt.json` with a mandatory reason.
+  - If a panel type is neither covered nor exempt, the hook fails and blocks the commit.
+- Install or refresh the hook with:
+  ```bash
+  cp scripts/pre-commit .git/hooks/pre-commit
+  chmod +x .git/hooks/pre-commit
+  # Optional: track hooks in the repo
+  git config core.hooksPath scripts
+  ```
+- Run the coverage checks locally at any time:
+  ```bash
+  python3 scripts/check_cli_integration_coverage.py
+  python3 scripts/check_panel_write_coverage.py
+  ```
+
 ## 🚨 Critical Agent Gotchas
 
 - **No Heredocs (`cat << 'EOF'`)**:

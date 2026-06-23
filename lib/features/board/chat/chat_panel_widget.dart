@@ -1745,7 +1745,10 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     final changedFiles = _collectChangedFilesForStrip();
     return Container(
       margin: EdgeInsets.zero,
-      padding: const EdgeInsets.fromLTRB(10, 8, 22, 0),
+      padding:
+          widget.compact
+              ? const EdgeInsets.fromLTRB(10, 8, 22, 12)
+              : const EdgeInsets.fromLTRB(10, 8, 22, 0),
       decoration: BoxDecoration(
         color: colors.surface,
       ),

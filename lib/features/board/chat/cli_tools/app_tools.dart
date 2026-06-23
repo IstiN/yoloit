@@ -111,14 +111,21 @@ final List<YoloitCliTool> appTools = <YoloitCliTool>[
     command: 'agent:run',
     alias: 'agr',
     description:
-        'Launch an agent session and send it an initial task. The task is automatically typed into the agent terminal — do NOT call any other command to send the task; it is already sent.',
+        'Launch a terminal agent session in a folder. '
+        'The agent opens its own terminal and the initial task is typed automatically. '
+        'This is NOT a chat command — to send text to an existing terminal panel use yolochat:terminal.',
     group: 'agents',
     params: <YoloitCliToolParam>[
-      toolParam('agent', 'Agent id', shortKey: 'a'),
-      toolParam('path', 'Workspace or folder path', required: true, shortKey: 'pth'),
+      toolParam('agent', 'Agent id (e.g. copilot)', shortKey: 'a'),
+      toolParam(
+        'path',
+        'Workspace or folder path',
+        required: true,
+        shortKey: 'pth',
+      ),
       toolParam(
         'task',
-        'Initial task/prompt — typed into the agent automatically',
+        'Initial task/prompt — typed into the agent terminal automatically',
         shortKey: 'tsk',
       ),
       toolParam('name', 'Optional session name', flag: '--name', shortKey: 'n'),
@@ -218,11 +225,17 @@ final List<YoloitCliTool> appTools = <YoloitCliTool>[
     command: 'yolochat:terminal',
     alias: 'ctm',
     description:
-        'Send text to a board terminal session and press Enter by default. '
-        'Use this when chat needs to control an interactive terminal.',
+        'Send literal text to an existing terminal panel and press Enter. '
+        'The `text` parameter is the command/characters to type (e.g. "npm test", not an agent name). '
+        'Use --no-enter to type without pressing Enter.',
     group: 'yolochat',
     params: <YoloitCliToolParam>[
-      toolParam('text', 'Terminal input text', required: true, shortKey: 'tx'),
+      toolParam(
+        'text',
+        'Literal text to type into the terminal',
+        required: true,
+        shortKey: 'tx',
+      ),
       boardFlagParam(),
       panelFlagParam(),
       toolParam(

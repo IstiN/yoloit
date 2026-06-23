@@ -1,3 +1,4 @@
+// covers-write: board.table
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yoloit/core/cli/handlers/table_handler.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
@@ -77,6 +78,29 @@ void main() {
       final result = await handler.handleAction('set', {}, panel);
       expect(result.ok, isFalse);
     });
+
+    test('set unwraps nested cells map from tool schema', () async {
+      final panel = newPanel();
+      final result = await handler.handleAction(
+        'set',
+        {
+          'columns': [
+            {'id': 'name', 'title': 'Name', 'type': 'text'},
+          ],
+          'rows': [
+            {'id': 'r1', 'cells': {'name': 'Bob'}},
+          ],
+        },
+        panel,
+      );
+      expect(result.ok, isTrue);
+      final rows = result.stateUpdate!['rows'] as List<dynamic>;
+      expect((rows.first as Map<String, dynamic>)['name'], 'Bob');
+      expect(
+        (rows.first as Map<String, dynamic>).containsKey('cells'),
+        isFalse,
+      );
+    });
   });
 
   group('TableCliHandler — set-id', () {
@@ -136,6 +160,32 @@ void main() {
       final columns = result.stateUpdate!['columns'] as List<dynamic>;
       expect((columns.first as Map<String, dynamic>)['title'], 'Period');
     });
+
+    test('rename-column accepts column title instead of id', () async {
+      final panel = newPanel(
+        state: <String, dynamic>{
+          'columns': [
+            {'id': 'category', 'title': 'Категория', 'type': 'text'},
+            {'id': 'amount', 'title': 'Сумма', 'type': 'number'},
+          ],
+          'rows': [
+            {'id': 'r-0', 'category': 'Продукты', 'amount': 3000},
+          ],
+          'tableId': '',
+        },
+      );
+      final result = await handler.handleAction(
+        'rename-column',
+        {'id': 'Сумма', 'title': 'Цена'},
+        panel,
+      );
+      expect(result.ok, isTrue);
+      final columns = result.stateUpdate!['columns'] as List<dynamic>;
+      final renamed = columns.firstWhere(
+        (column) => (column as Map<String, dynamic>)['id'] == 'amount',
+      ) as Map<String, dynamic>;
+      expect(renamed['title'], 'Цена');
+    });
   });
 
   group('TableCliHandler — remove-column', () {
@@ -151,6 +201,31 @@ void main() {
       final rows = result.stateUpdate!['rows'] as List<dynamic>;
       expect(columns.length, 1);
       expect((rows.first as Map<String, dynamic>).containsKey('sales'), isFalse);
+    });
+
+    test('remove-column accepts column title instead of id', () async {
+      final panel = newPanel(
+        state: <String, dynamic>{
+          'columns': [
+            {'id': 'category', 'title': 'Категория', 'type': 'text'},
+            {'id': 'amount', 'title': 'Сумма', 'type': 'number'},
+          ],
+          'rows': [
+            {'id': 'r-0', 'category': 'Продукты', 'amount': 3000},
+          ],
+          'tableId': '',
+        },
+      );
+      final result = await handler.handleAction(
+        'remove-column',
+        {'id': 'Сумма'},
+        panel,
+      );
+      expect(result.ok, isTrue);
+      final columns = result.stateUpdate!['columns'] as List<dynamic>;
+      final rows = result.stateUpdate!['rows'] as List<dynamic>;
+      expect(columns.length, 1);
+      expect((rows.first as Map<String, dynamic>).containsKey('amount'), isFalse);
     });
   });
 
@@ -168,6 +243,48 @@ void main() {
       expect((rows.last as Map<String, dynamic>)['month'], 'Apr');
       expect((rows.last as Map<String, dynamic>)['sales'], 220);
     });
+
+    test('add-row unwraps cells map from tool schema', () async {
+      final panel = newPanel();
+      final result = await handler.handleAction(
+        'add-row',
+        {'cells': {'month': 'Apr', 'sales': 210}},
+        panel,
+      );
+      expect(result.ok, isTrue);
+      final rows = result.stateUpdate!['rows'] as List<dynamic>;
+      expect(rows.length, 4);
+      expect((rows.last as Map<String, dynamic>)['month'], 'Apr');
+      expect((rows.last as Map<String, dynamic>)['sales'], 210);
+    });
+
+    test('add-row maps column titles to ids', () async {
+      final panel = newPanel(
+        state: <String, dynamic>{
+          'columns': [
+            {'id': 'category', 'title': 'Категория', 'type': 'text'},
+            {'id': 'amount', 'title': 'Сумма', 'type': 'number'},
+          ],
+          'rows': [
+            {'id': 'r-0', 'category': 'Продукты', 'amount': 3000},
+          ],
+          'tableId': '',
+        },
+      );
+      final result = await handler.handleAction(
+        'add-row',
+        {
+          'cells': <String, dynamic>{'Категория': 'Аренда', 'Сумма': 25000},
+        },
+        panel,
+      );
+      expect(result.ok, isTrue);
+      final rows = result.stateUpdate!['rows'] as List<dynamic>;
+      expect(rows, hasLength(2));
+      final added = rows.last as Map<String, dynamic>;
+      expect(added['category'], 'Аренда');
+      expect(added['amount'], 25000);
+    });
   });
 
   group('TableCliHandler — update-row', () {
@@ -183,6 +300,49 @@ void main() {
       expect(result.ok, isTrue);
       final updatedRows = result.stateUpdate!['rows'] as List<dynamic>;
       expect((updatedRows.first as Map<String, dynamic>)['sales'], 999);
+    });
+
+    test('update-row unwraps cells map from tool schema', () async {
+      final panel = newPanel();
+      final rows = panel.state['rows'] as List<dynamic>;
+      final rowId = (rows.first as Map<String, dynamic>)['id'] as String;
+      final result = await handler.handleAction(
+        'update-row',
+        {'rowId': rowId, 'cells': {'month': 'Apr', 'sales': 210}},
+        panel,
+      );
+      expect(result.ok, isTrue);
+      final updatedRows = result.stateUpdate!['rows'] as List<dynamic>;
+      expect((updatedRows.first as Map<String, dynamic>)['month'], 'Apr');
+      expect((updatedRows.first as Map<String, dynamic>)['sales'], 210);
+    });
+
+    test('update-row maps column titles to ids', () async {
+      final panel = newPanel(
+        state: <String, dynamic>{
+          'columns': [
+            {'id': 'category', 'title': 'Категория', 'type': 'text'},
+            {'id': 'amount', 'title': 'Сумма', 'type': 'number'},
+          ],
+          'rows': [
+            {'id': 'r-1', 'category': 'Продукты', 'amount': 3000},
+          ],
+          'tableId': '',
+        },
+      );
+      final result = await handler.handleAction(
+        'update-row',
+        {
+          'rowId': 'r-1',
+          'cells': <String, dynamic>{'Категория': 'Аренда', 'Сумма': 25000},
+        },
+        panel,
+      );
+      expect(result.ok, isTrue);
+      final updatedRows = result.stateUpdate!['rows'] as List<dynamic>;
+      final updated = updatedRows.first as Map<String, dynamic>;
+      expect(updated['category'], 'Аренда');
+      expect(updated['amount'], 25000);
     });
   });
 

@@ -1,0 +1,570 @@
+[
+  {
+    "command": "reload",
+    "reason": "Requires running Flutter app / widget runtime (hot reload, install, dev mode); not available in headless yoloitd"
+  },
+  {
+    "command": "restart",
+    "reason": "Requires running Flutter app / widget runtime (hot reload, install, dev mode); not available in headless yoloitd"
+  },
+  {
+    "command": "help",
+    "reason": "Meta command that returns static help text"
+  },
+  {
+    "command": "remote:connect",
+    "reason": "remote:connect/disconnect manage CLI local state; remote:status is covered"
+  },
+  {
+    "command": "remote:disconnect",
+    "reason": "remote:connect/disconnect manage CLI local state; remote:status is covered"
+  },
+  {
+    "command": "template:info",
+    "reason": "Action/endpoint not implemented by headless yoloitd"
+  },
+  {
+    "command": "board:screenshot",
+    "reason": "Board UI operations (zoom/focus/fit/arrange/screenshot/svg/diagram/translate/grid/folder/select) require Flutter desktop app"
+  },
+  {
+    "command": "board:svg",
+    "reason": "Board UI operations (zoom/focus/fit/arrange/screenshot/svg/diagram/translate/grid/folder/select) require Flutter desktop app"
+  },
+  {
+    "command": "board:apply",
+    "reason": "Action/endpoint not implemented by headless yoloitd"
+  },
+  {
+    "command": "group:cycle-focus",
+    "reason": "Action/endpoint not implemented by headless yoloitd"
+  },
+  {
+    "command": "run:list",
+    "reason": "Run panel requires native host and desktop app run session logic; yoloitd run endpoints are not used by CLI run:* commands"
+  },
+  {
+    "command": "run:input",
+    "reason": "Run panel requires native host and desktop app run session logic; yoloitd run endpoints are not used by CLI run:* commands"
+  },
+  {
+    "command": "run:attach",
+    "reason": "Run panel requires native host and desktop app run session logic; yoloitd run endpoints are not used by CLI run:* commands"
+  },
+  {
+    "command": "run:popout",
+    "reason": "Run panel requires native host and desktop app run session logic; yoloitd run endpoints are not used by CLI run:* commands"
+  },
+  {
+    "command": "agent:list",
+    "reason": "Requires ASR / agent runtime and local app context; not available in headless yoloitd"
+  },
+  {
+    "command": "agent:default",
+    "reason": "Requires ASR / agent runtime and local app context; not available in headless yoloitd"
+  },
+  {
+    "command": "agent:run",
+    "reason": "Requires ASR / agent runtime and local app context; not available in headless yoloitd"
+  },
+  {
+    "command": "agent:model",
+    "reason": "Requires ASR / agent runtime and local app context; not available in headless yoloitd"
+  },
+  {
+    "command": "agent:asr",
+    "reason": "Requires ASR / agent runtime and local app context; not available in headless yoloitd"
+  },
+  {
+    "command": "search",
+    "reason": "Global search UI is local-app only"
+  },
+  {
+    "command": "yolochat:panels",
+    "reason": "AI chat UI and session management require local app context; not available headless"
+  },
+  {
+    "command": "yolochat:send",
+    "reason": "AI chat UI and session management require local app context; not available headless"
+  },
+  {
+    "command": "yolochat:terminal",
+    "reason": "AI chat UI and session management require local app context; not available headless"
+  },
+  {
+    "command": "yolochat:messages",
+    "reason": "AI chat UI and session management require local app context; not available headless"
+  },
+  {
+    "command": "yolochat:clear",
+    "reason": "AI chat UI and session management require local app context; not available headless"
+  },
+  {
+    "command": "yolochat:sessions",
+    "reason": "AI chat UI and session management require local app context; not available headless"
+  },
+  {
+    "command": "yolochat:history",
+    "reason": "AI chat UI and session management require local app context; not available headless"
+  },
+  {
+    "command": "yolochat:restore",
+    "reason": "AI chat UI and session management require local app context; not available headless"
+  },
+  {
+    "command": "yolochat:status",
+    "reason": "AI chat UI and session management require local app context; not available headless"
+  },
+  {
+    "command": "yolochat:stop",
+    "reason": "AI chat UI and session management require local app context; not available headless"
+  },
+  {
+    "command": "yolochat:logs",
+    "reason": "AI chat UI and session management require local app context; not available headless"
+  },
+  {
+    "command": "yolochat:config",
+    "reason": "AI chat UI and session management require local app context; not available headless"
+  },
+  {
+    "command": "yolochat:follow-up",
+    "reason": "AI chat UI and session management require local app context; not available headless"
+  },
+  {
+    "command": "cloud:list",
+    "reason": "Cloud provider configuration is local-app only; no yoloitd endpoints"
+  },
+  {
+    "command": "cloud:add",
+    "reason": "Cloud provider configuration is local-app only; no yoloitd endpoints"
+  },
+  {
+    "command": "cloud:remove",
+    "reason": "Cloud provider configuration is local-app only; no yoloitd endpoints"
+  },
+  {
+    "command": "cloud:select",
+    "reason": "Cloud provider configuration is local-app only; no yoloitd endpoints"
+  },
+  {
+    "command": "cloud:update",
+    "reason": "Cloud provider configuration is local-app only; no yoloitd endpoints"
+  },
+  {
+    "command": "files:search",
+    "reason": "Local file preview/read/search commands operate on client filesystem and are not remote server features"
+  },
+  {
+    "command": "files:read",
+    "reason": "Local file preview/read/search commands operate on client filesystem and are not remote server features"
+  },
+  {
+    "command": "files:preview",
+    "reason": "Local file preview/read/search commands operate on client filesystem and are not remote server features"
+  },
+  {
+    "command": "cloud:provider",
+    "reason": "Cloud provider configuration is local-app only; no yoloitd endpoints"
+  },
+  {
+    "command": "theme",
+    "reason": "UI-only theming commands that mutate desktop app appearance; no yoloitd endpoints"
+  },
+  {
+    "command": "theme:presets",
+    "reason": "UI-only theming commands that mutate desktop app appearance; no yoloitd endpoints"
+  },
+  {
+    "command": "theme:set",
+    "reason": "UI-only theming commands that mutate desktop app appearance; no yoloitd endpoints"
+  },
+  {
+    "command": "theme:brightness",
+    "reason": "UI-only theming commands that mutate desktop app appearance; no yoloitd endpoints"
+  },
+  {
+    "command": "theme:color",
+    "reason": "UI-only theming commands that mutate desktop app appearance; no yoloitd endpoints"
+  },
+  {
+    "command": "theme:reset-color",
+    "reason": "UI-only theming commands that mutate desktop app appearance; no yoloitd endpoints"
+  },
+  {
+    "command": "theme:reset-all",
+    "reason": "UI-only theming commands that mutate desktop app appearance; no yoloitd endpoints"
+  },
+  {
+    "command": "theme:save",
+    "reason": "UI-only theming commands that mutate desktop app appearance; no yoloitd endpoints"
+  },
+  {
+    "command": "theme:export",
+    "reason": "UI-only theming commands that mutate desktop app appearance; no yoloitd endpoints"
+  },
+  {
+    "command": "theme:import",
+    "reason": "UI-only theming commands that mutate desktop app appearance; no yoloitd endpoints"
+  },
+  {
+    "command": "theme:delete",
+    "reason": "UI-only theming commands that mutate desktop app appearance; no yoloitd endpoints"
+  },
+  {
+    "command": "theme:colors",
+    "reason": "UI-only theming commands that mutate desktop app appearance; no yoloitd endpoints"
+  },
+  {
+    "command": "theme:slots",
+    "reason": "UI-only theming commands that mutate desktop app appearance; no yoloitd endpoints"
+  },
+  {
+    "command": "board:folder",
+    "reason": "Board UI operations (zoom/focus/fit/arrange/screenshot/svg/diagram/translate/grid/folder/select) require Flutter desktop app"
+  },
+  {
+    "command": "board:focus",
+    "reason": "Board UI operations (zoom/focus/fit/arrange/screenshot/svg/diagram/translate/grid/folder/select) require Flutter desktop app"
+  },
+  {
+    "command": "board:zoom",
+    "reason": "Board UI operations (zoom/focus/fit/arrange/screenshot/svg/diagram/translate/grid/folder/select) require Flutter desktop app"
+  },
+  {
+    "command": "board:fit",
+    "reason": "Board UI operations (zoom/focus/fit/arrange/screenshot/svg/diagram/translate/grid/folder/select) require Flutter desktop app"
+  },
+  {
+    "command": "board:arrange",
+    "reason": "Board UI operations (zoom/focus/fit/arrange/screenshot/svg/diagram/translate/grid/folder/select) require Flutter desktop app"
+  },
+  {
+    "command": "board:grid",
+    "reason": "Board UI operations (zoom/focus/fit/arrange/screenshot/svg/diagram/translate/grid/folder/select) require Flutter desktop app"
+  },
+  {
+    "command": "select",
+    "reason": "Board UI operations (zoom/focus/fit/arrange/screenshot/svg/diagram/translate/grid/folder/select) require Flutter desktop app"
+  },
+  {
+    "command": "board:translate",
+    "reason": "Board UI operations (zoom/focus/fit/arrange/screenshot/svg/diagram/translate/grid/folder/select) require Flutter desktop app"
+  },
+  {
+    "command": "panel:z",
+    "reason": "Panel UI operations (focus/hide/show/copy/paste/duplicate/screenshot/z) require Flutter desktop app"
+  },
+  {
+    "command": "panel:focus",
+    "reason": "Panel UI operations (focus/hide/show/copy/paste/duplicate/screenshot/z) require Flutter desktop app"
+  },
+  {
+    "command": "panel:hide",
+    "reason": "Panel UI operations (focus/hide/show/copy/paste/duplicate/screenshot/z) require Flutter desktop app"
+  },
+  {
+    "command": "panel:show",
+    "reason": "Panel UI operations (focus/hide/show/copy/paste/duplicate/screenshot/z) require Flutter desktop app"
+  },
+  {
+    "command": "panel:screenshot",
+    "reason": "Panel UI operations (focus/hide/show/copy/paste/duplicate/screenshot/z) require Flutter desktop app"
+  },
+  {
+    "command": "panel:copy",
+    "reason": "Panel UI operations (focus/hide/show/copy/paste/duplicate/screenshot/z) require Flutter desktop app"
+  },
+  {
+    "command": "panel:paste",
+    "reason": "Panel UI operations (focus/hide/show/copy/paste/duplicate/screenshot/z) require Flutter desktop app"
+  },
+  {
+    "command": "panel:duplicate",
+    "reason": "Panel UI operations (focus/hide/show/copy/paste/duplicate/screenshot/z) require Flutter desktop app"
+  },
+  {
+    "command": "calendar:set-view",
+    "reason": "Panel UI operations (focus/hide/show/copy/paste/duplicate/screenshot/z) require Flutter desktop app"
+  },
+  {
+    "command": "calendar:focus-date",
+    "reason": "Panel UI operations (focus/hide/show/copy/paste/duplicate/screenshot/z) require Flutter desktop app"
+  },
+  {
+    "command": "calendar:scroll-to-time",
+    "reason": "Panel UI operations (focus/hide/show/copy/paste/duplicate/screenshot/z) require Flutter desktop app"
+  },
+  {
+    "command": "calendar:scroll-to-event",
+    "reason": "Panel UI operations (focus/hide/show/copy/paste/duplicate/screenshot/z) require Flutter desktop app"
+  },
+  {
+    "command": "calendar:show-event",
+    "reason": "Panel UI operations (focus/hide/show/copy/paste/duplicate/screenshot/z) require Flutter desktop app"
+  },
+  {
+    "command": "chart:link-table",
+    "reason": "Panel UI operations (focus/hide/show/copy/paste/duplicate/screenshot/z) require Flutter desktop app"
+  },
+  {
+    "command": "chart:refresh",
+    "reason": "Panel UI operations (focus/hide/show/copy/paste/duplicate/screenshot/z) require Flutter desktop app"
+  },
+  {
+    "command": "filetree:set-root",
+    "reason": "Local file preview/read/search commands operate on client filesystem and are not remote server features"
+  },
+  {
+    "command": "terminal:output",
+    "reason": "Not yet exercised by an integration test; add one or keep this exemption with justification"
+  },
+  {
+    "command": "terminal:config",
+    "reason": "Not yet exercised by an integration test; add one or keep this exemption with justification"
+  },
+  {
+    "command": "terminal:set-dir",
+    "reason": "Not yet exercised by an integration test; add one or keep this exemption with justification"
+  },
+  {
+    "command": "filetree:open",
+    "reason": "Local file preview/read/search commands operate on client filesystem and are not remote server features"
+  },
+  {
+    "command": "filetree:expand",
+    "reason": "Local file preview/read/search commands operate on client filesystem and are not remote server features"
+  },
+  {
+    "command": "filetree:collapse",
+    "reason": "Local file preview/read/search commands operate on client filesystem and are not remote server features"
+  },
+  {
+    "command": "filetree:refresh",
+    "reason": "Local file preview/read/search commands operate on client filesystem and are not remote server features"
+  },
+  {
+    "command": "filetree:read",
+    "reason": "Local file preview/read/search commands operate on client filesystem and are not remote server features"
+  },
+  {
+    "command": "run:output",
+    "reason": "Run panel requires native host and desktop app run session logic; yoloitd run endpoints are not used by CLI run:* commands"
+  },
+  {
+    "command": "run:detach",
+    "reason": "Run panel requires native host and desktop app run session logic; yoloitd run endpoints are not used by CLI run:* commands"
+  },
+  {
+    "command": "run:add",
+    "reason": "Run panel requires native host and desktop app run session logic; yoloitd run endpoints are not used by CLI run:* commands"
+  },
+  {
+    "command": "run:update",
+    "reason": "Run panel requires native host and desktop app run session logic; yoloitd run endpoints are not used by CLI run:* commands"
+  },
+  {
+    "command": "run:remove",
+    "reason": "Run panel requires native host and desktop app run session logic; yoloitd run endpoints are not used by CLI run:* commands"
+  },
+  {
+    "command": "run:run",
+    "reason": "Run panel requires native host and desktop app run session logic; yoloitd run endpoints are not used by CLI run:* commands"
+  },
+  {
+    "command": "run:stop",
+    "reason": "Run panel requires native host and desktop app run session logic; yoloitd run endpoints are not used by CLI run:* commands"
+  },
+  {
+    "command": "run:config",
+    "reason": "Run panel requires native host and desktop app run session logic; yoloitd run endpoints are not used by CLI run:* commands"
+  },
+  {
+    "command": "run:close",
+    "reason": "Run panel requires native host and desktop app run session logic; yoloitd run endpoints are not used by CLI run:* commands"
+  },
+  {
+    "command": "run:logs",
+    "reason": "Run panel requires native host and desktop app run session logic; yoloitd run endpoints are not used by CLI run:* commands"
+  },
+  {
+    "command": "kanban:paste",
+    "reason": "Action/endpoint not implemented by headless yoloitd"
+  },
+  {
+    "command": "kanban:send-card-to-chat",
+    "reason": "Action/endpoint not implemented by headless yoloitd"
+  },
+  {
+    "command": "play",
+    "reason": "Media playback commands require native host and Flutter desktop app"
+  },
+  {
+    "command": "pause",
+    "reason": "Media playback commands require native host and Flutter desktop app"
+  },
+  {
+    "command": "stop",
+    "reason": "Media playback commands require native host and Flutter desktop app"
+  },
+  {
+    "command": "next",
+    "reason": "Media playback commands require native host and Flutter desktop app"
+  },
+  {
+    "command": "prev",
+    "reason": "Media playback commands require native host and Flutter desktop app"
+  },
+  {
+    "command": "playlist:list",
+    "reason": "Media playback commands require native host and Flutter desktop app"
+  },
+  {
+    "command": "playlist:add",
+    "reason": "Media playback commands require native host and Flutter desktop app"
+  },
+  {
+    "command": "playlist:remove",
+    "reason": "Media playback commands require native host and Flutter desktop app"
+  },
+  {
+    "command": "web:open",
+    "reason": "WebView-based commands require native host and Flutter desktop app"
+  },
+  {
+    "command": "web:get",
+    "reason": "WebView-based commands require native host and Flutter desktop app"
+  },
+  {
+    "command": "web:exec",
+    "reason": "WebView-based commands require native host and Flutter desktop app"
+  },
+  {
+    "command": "web:content",
+    "reason": "WebView-based commands require native host and Flutter desktop app"
+  },
+  {
+    "command": "web:title",
+    "reason": "WebView-based commands require native host and Flutter desktop app"
+  },
+  {
+    "command": "web:url",
+    "reason": "WebView-based commands require native host and Flutter desktop app"
+  },
+  {
+    "command": "web:scroll",
+    "reason": "WebView-based commands require native host and Flutter desktop app"
+  },
+  {
+    "command": "web:click",
+    "reason": "WebView-based commands require native host and Flutter desktop app"
+  },
+  {
+    "command": "timer:create",
+    "reason": "Timer UI state is local-app only (panel type supported, but timer:* CLI assumes desktop app)"
+  },
+  {
+    "command": "timer:status",
+    "reason": "Timer UI state is local-app only (panel type supported, but timer:* CLI assumes desktop app)"
+  },
+  {
+    "command": "timer:set",
+    "reason": "Timer UI state is local-app only (panel type supported, but timer:* CLI assumes desktop app)"
+  },
+  {
+    "command": "timer:start",
+    "reason": "Timer UI state is local-app only (panel type supported, but timer:* CLI assumes desktop app)"
+  },
+  {
+    "command": "timer:pause",
+    "reason": "Timer UI state is local-app only (panel type supported, but timer:* CLI assumes desktop app)"
+  },
+  {
+    "command": "timer:resume",
+    "reason": "Timer UI state is local-app only (panel type supported, but timer:* CLI assumes desktop app)"
+  },
+  {
+    "command": "timer:reset",
+    "reason": "Timer UI state is local-app only (panel type supported, but timer:* CLI assumes desktop app)"
+  },
+  {
+    "command": "app:list",
+    "reason": "Requires running Flutter app / widget runtime (hot reload, install, dev mode); not available in headless yoloitd"
+  },
+  {
+    "command": "app:install",
+    "reason": "Requires running Flutter app / widget runtime (hot reload, install, dev mode); not available in headless yoloitd"
+  },
+  {
+    "command": "app:remove",
+    "reason": "Requires running Flutter app / widget runtime (hot reload, install, dev mode); not available in headless yoloitd"
+  },
+  {
+    "command": "app:run",
+    "reason": "Requires running Flutter app / widget runtime (hot reload, install, dev mode); not available in headless yoloitd"
+  },
+  {
+    "command": "app:create",
+    "reason": "Requires running Flutter app / widget runtime (hot reload, install, dev mode); not available in headless yoloitd"
+  },
+  {
+    "command": "app:execute",
+    "reason": "Requires running Flutter app / widget runtime (hot reload, install, dev mode); not available in headless yoloitd"
+  },
+  {
+    "command": "app:reload",
+    "reason": "Requires running Flutter app / widget runtime (hot reload, install, dev mode); not available in headless yoloitd"
+  },
+  {
+    "command": "app:logs",
+    "reason": "Requires running Flutter app / widget runtime (hot reload, install, dev mode); not available in headless yoloitd"
+  },
+  {
+    "command": "app:snapshot",
+    "reason": "Requires running Flutter app / widget runtime (hot reload, install, dev mode); not available in headless yoloitd"
+  },
+  {
+    "command": "app:screenshot",
+    "reason": "Requires running Flutter app / widget runtime (hot reload, install, dev mode); not available in headless yoloitd"
+  },
+  {
+    "command": "app:dev-skill",
+    "reason": "Requires running Flutter app / widget runtime (hot reload, install, dev mode); not available in headless yoloitd"
+  },
+  {
+    "command": "app:demo",
+    "reason": "Requires running Flutter app / widget runtime (hot reload, install, dev mode); not available in headless yoloitd"
+  },
+  {
+    "command": "app:demo-view",
+    "reason": "Requires running Flutter app / widget runtime (hot reload, install, dev mode); not available in headless yoloitd"
+  },
+  {
+    "command": "draw:list",
+    "reason": "Drawing UI operations are local-app only"
+  },
+  {
+    "command": "draw:add",
+    "reason": "Drawing UI operations are local-app only"
+  },
+  {
+    "command": "draw:remove",
+    "reason": "Drawing UI operations are local-app only"
+  },
+  {
+    "command": "draw:clear",
+    "reason": "Drawing UI operations are local-app only"
+  },
+  {
+    "command": "draw:svg",
+    "reason": "Drawing UI operations are local-app only"
+  },
+  {
+    "command": "draw:export",
+    "reason": "Drawing UI operations are local-app only"
+  },
+  {
+    "command": "draw:file",
+    "reason": "Drawing UI operations are local-app only"
+  }
+]

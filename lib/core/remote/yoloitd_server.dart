@@ -94,6 +94,9 @@ class YoloitdServer {
       if (path.length >= 2 && path[0] == 'api' && path[1] == 'terminals') {
         return _handleTerminals(request, method, path.skip(2).toList());
       }
+      if (path.length >= 2 && path[0] == 'api' && path[1] == 'templates') {
+        return _handleTemplates(request, method, path.skip(2).toList());
+      }
       return _json(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
     } catch (error, stackTrace) {
       stderr.writeln('[yoloitd] $error\n$stackTrace');
@@ -112,9 +115,17 @@ class YoloitdServer {
     if (sub.isEmpty && method == 'GET') {
       final boards = await store.loadBoards();
       final activeId = await store.activeBoardId();
+      final includeArchived =
+          request.url.queryParameters['includeArchived']?.toLowerCase() ==
+          'true';
       return _json(<String, Object?>{
         'boards':
             boards
+                .where(
+                  (board) =>
+                      includeArchived ||
+                      (board.metadata['archived'] as bool? ?? false) == false,
+                )
                 .map((board) => board.summary(active: board.id == activeId))
                 .toList(),
       });
@@ -151,6 +162,30 @@ class YoloitdServer {
       return _json(<String, Object?>{
         'ok': true,
         'message': 'Deleted board ${board.name}',
+      });
+    }
+    if (sub.length == 2 && sub[1] == 'archive' && method == 'POST') {
+      final result = await store.updateBoard(
+        board.id,
+        (current) => current.copyWith(
+          metadata: <String, dynamic>{...current.metadata, 'archived': true},
+        ),
+      );
+      return _json(<String, Object?>{
+        'ok': result != null,
+        'message': 'Archived board ${board.name}',
+      });
+    }
+    if (sub.length == 2 && sub[1] == 'unarchive' && method == 'POST') {
+      final result = await store.updateBoard(
+        board.id,
+        (current) => current.copyWith(
+          metadata: <String, dynamic>{...current.metadata, 'archived': false},
+        ),
+      );
+      return _json(<String, Object?>{
+        'ok': result != null,
+        'message': 'Unarchived board ${board.name}',
       });
     }
     if (sub.length == 1 && method == 'PUT') {
@@ -224,6 +259,102 @@ class YoloitdServer {
     }
     if (sub.length == 2 && sub[1] == 'links' && method == 'GET') {
       return _json(<String, Object?>{'links': board.links});
+    }
+    if (sub.length == 2 && sub[1] == 'links' && method == 'POST') {
+      final body = await _body(request);
+      final fromId = (body['from'] as String? ?? '').trim();
+      final toId = (body['to'] as String? ?? '').trim();
+      if (fromId.isEmpty || toId.isEmpty) {
+        return _json(<String, Object?>{
+          'ok': false,
+          'error': 'from and to required',
+        }, 400);
+      }
+      final fromPanel = _findPanel(board, fromId);
+      final toPanel = _findPanel(board, toId);
+      if (fromPanel == null || toPanel == null) {
+        return _json(<String, Object?>{
+          'ok': false,
+          'error': 'panel not found',
+        }, 404);
+      }
+      final link = <String, Object?>{
+        'id': _nextId('link'),
+        'fromPanelId': fromPanel.id,
+        'toPanelId': toPanel.id,
+        'from': fromPanel.id,
+        'to': toPanel.id,
+        if (body['color'] != null) 'color': body['color'],
+        if (body['style'] != null) 'style': body['style'],
+      };
+      final result = await store.updateBoard(
+        board.id,
+        (current) => current.copyWith(links: <Map<String, dynamic>>[...current.links, link]),
+      );
+      return _json(<String, Object?>{
+        'ok': result != null,
+        'link': link,
+      });
+    }
+    if (sub.length == 3 && sub[1] == 'links' && method == 'DELETE') {
+      final linkId = Uri.decodeComponent(sub[2]);
+      final result = await store.updateBoard(
+        board.id,
+        (current) => current.copyWith(
+          links: current.links.where((link) => link['id'] != linkId).toList(),
+        ),
+      );
+      return _json(<String, Object?>{
+        'ok': result != null,
+        'message': 'Link deleted',
+      });
+    }
+    if (sub.length == 3 && sub[1] == 'links' && method == 'PUT') {
+      final linkId = Uri.decodeComponent(sub[2]);
+      final body = await _body(request);
+      final result = await store.updateBoard(
+        board.id,
+        (current) => current.copyWith(
+          links: current.links.map((link) {
+            if (link['id'] != linkId) return link;
+            final next = Map<String, dynamic>.from(link);
+            if (body['color'] != null) next['color'] = body['color'];
+            if (body['style'] != null) next['style'] = body['style'];
+            return next;
+          }).toList(),
+        ),
+      );
+      return _json(<String, Object?>{'ok': result != null});
+    }
+    if (sub.length >= 2 && sub[1] == 'groups') {
+      return _handleGroups(request, method, board, sub.skip(2).toList());
+    }
+    return _json(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
+  }
+
+  Future<shelf.Response> _handleTemplates(
+    shelf.Request request,
+    String method,
+    List<String> sub,
+  ) async {
+    if (sub.isEmpty && method == 'GET') {
+      return _json(<String, Object?>{
+        'ok': true,
+        'templates': const <Map<String, Object?>>[],
+      });
+    }
+    if (sub.isEmpty && method == 'POST') {
+      return _json(<String, Object?>{
+        'ok': true,
+        'message': 'Templates synced',
+        'templates': const <Map<String, Object?>>[],
+      });
+    }
+    if (sub.length == 1 && method == 'GET') {
+      return _json(<String, Object?>{
+        'ok': false,
+        'error': 'Template not found',
+      }, 404);
     }
     return _json(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
   }
@@ -570,6 +701,8 @@ class YoloitdServer {
           hidden: body['hidden'] as bool?,
           locked: body['locked'] as bool?,
           pinned: body['pinned'] as bool?,
+          zIndex: (body['zIndex'] as num?)?.toInt(),
+          color: _parseColorValue(body['color']),
           state:
               body['state'] is Map
                   ? Map<String, dynamic>.from(body['state'] as Map)
@@ -606,6 +739,212 @@ class YoloitdServer {
       return _json(result.toJson(panel: updated));
     }
     return _json(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
+  }
+
+  Future<shelf.Response> _handleGroups(
+    shelf.Request request,
+    String method,
+    RemoteBoard board,
+    List<String> sub,
+  ) async {
+    final groups = _boardGroups(board);
+
+    if (sub.isEmpty && method == 'GET') {
+      return _json(<String, Object?>{'ok': true, 'groups': groups});
+    }
+    if (sub.isEmpty && method == 'POST') {
+      final body = await _body(request);
+      final name = (body['name'] as String? ?? '').trim();
+      if (name.isEmpty) {
+        return _json(<String, Object?>{
+          'ok': false,
+          'error': 'name required',
+        }, 400);
+      }
+      final group = <String, dynamic>{
+        'id': _nextId('g'),
+        'name': name,
+        'panelIds': _parsePanelIds(board, body['panels']),
+        if (body['color'] != null && body['color'] != 'clear')
+          'color': body['color'],
+      };
+      groups.add(group);
+      final result = await store.updateBoard(
+        board.id,
+        (current) => current.copyWith(
+          metadata: <String, dynamic>{...current.metadata, 'groups': groups},
+        ),
+      );
+      return _json(<String, Object?>{
+        'ok': result != null,
+        'group': group,
+      });
+    }
+
+    if (sub.isEmpty) {
+      return _json(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
+    }
+
+    final groupId = Uri.decodeComponent(sub[0]);
+    final index = groups.indexWhere((group) => group['id'] == groupId);
+    if (index < 0) {
+      return _json(<String, Object?>{
+        'ok': false,
+        'error': 'group not found',
+      }, 404);
+    }
+
+    if (sub.length == 1 && method == 'DELETE') {
+      groups.removeAt(index);
+      await store.updateBoard(
+        board.id,
+        (current) => current.copyWith(
+          metadata: <String, dynamic>{...current.metadata, 'groups': groups},
+        ),
+      );
+      return _json(<String, Object?>{'ok': true, 'message': 'Group deleted'});
+    }
+
+    if (sub.length == 1 && method == 'PUT') {
+      final body = await _body(request);
+      final group = Map<String, dynamic>.from(groups[index]);
+      if (body['name'] is String) group['name'] = body['name'];
+      if (body.containsKey('color')) {
+        if (body['color'] == null || body['color'] == 'clear') {
+          group.remove('color');
+        } else {
+          group['color'] = body['color'];
+        }
+      }
+      if (body['collapsed'] is bool) group['collapsed'] = body['collapsed'];
+      groups[index] = group;
+      await store.updateBoard(
+        board.id,
+        (current) => current.copyWith(
+          metadata: <String, dynamic>{...current.metadata, 'groups': groups},
+        ),
+      );
+      return _json(<String, Object?>{'ok': true, 'group': group});
+    }
+
+    if (sub.length == 2 && sub[1] == 'panels' && method == 'POST') {
+      final body = await _body(request);
+      final ids = _parsePanelIds(board, body['panels']);
+      final group = Map<String, dynamic>.from(groups[index]);
+      final panelIds = _stringList(group['panelIds']).toSet()..addAll(ids);
+      group['panelIds'] = panelIds.toList();
+      groups[index] = group;
+      await store.updateBoard(
+        board.id,
+        (current) => current.copyWith(
+          metadata: <String, dynamic>{...current.metadata, 'groups': groups},
+        ),
+      );
+      return _json(<String, Object?>{
+        'ok': true,
+        'message': 'Panels added to group',
+      });
+    }
+
+    if (sub.length == 2 && sub[1] == 'panels' && method == 'DELETE') {
+      final body = await _body(request);
+      final ids = _parsePanelIds(board, body['panels']);
+      final group = Map<String, dynamic>.from(groups[index]);
+      group['panelIds'] = _stringList(group['panelIds'])
+          .where((String id) => !ids.contains(id))
+          .toList();
+      groups[index] = group;
+      await store.updateBoard(
+        board.id,
+        (current) => current.copyWith(
+          metadata: <String, dynamic>{...current.metadata, 'groups': groups},
+        ),
+      );
+      return _json(<String, Object?>{
+        'ok': true,
+        'message': 'Panels removed from group',
+      });
+    }
+
+    if (sub.length == 2 && sub[1] == 'move' && method == 'POST') {
+      final body = await _body(request);
+      final dx = (body['dx'] as num?)?.toDouble() ?? 0.0;
+      final dy = (body['dy'] as num?)?.toDouble() ?? 0.0;
+      final group = groups[index];
+      final panelIds = _stringList(group['panelIds']).toSet();
+      await store.updateBoard(
+        board.id,
+        (current) => current.copyWith(
+          panels: current.panels.map((panel) {
+            if (!panelIds.contains(panel.id)) return panel;
+            return panel.copyWith(
+              bounds: panel.bounds.copyWith(
+                x: panel.bounds.x + dx,
+                y: panel.bounds.y + dy,
+              ),
+            );
+          }).toList(),
+        ),
+      );
+      return _json(<String, Object?>{'ok': true, 'message': 'Group moved'});
+    }
+
+    return _json(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
+  }
+
+  List<Map<String, dynamic>> _boardGroups(RemoteBoard board) {
+    final raw = board.metadata['groups'];
+    if (raw is List) {
+      return raw.whereType<Map<Object?, Object?>>().map(
+        (entry) => Map<String, dynamic>.from(entry),
+      ).toList();
+    }
+    return <Map<String, dynamic>>[];
+  }
+
+  List<String> _parsePanelIds(RemoteBoard board, dynamic value) {
+    List<String> rawIds() {
+      if (value is String) {
+        return value.split(',').map((part) => part.trim()).where(
+          (part) => part.isNotEmpty,
+        ).toList();
+      }
+      if (value is List) {
+        return value.map((entry) => entry.toString().trim()).where(
+          (part) => part.isNotEmpty,
+        ).toList();
+      }
+      return const <String>[];
+    }
+
+    return rawIds().map((id) => _findPanel(board, id)?.id ?? id).toList();
+  }
+
+  int? _parseColorValue(dynamic value) {
+    if (value == null || value == 'clear') return null;
+    if (value is int) return value;
+    final text = value.toString().trim();
+    if (text.isEmpty || text == 'clear') return null;
+    if (text.startsWith('#')) {
+      final hex = text.substring(1);
+      final parsed = int.tryParse(hex, radix: 16);
+      if (parsed != null) return parsed;
+    }
+    return null;
+  }
+
+  List<String> _stringList(dynamic value) {
+    if (value is List) {
+      return value.map((entry) => entry.toString().trim()).where(
+        (part) => part.isNotEmpty,
+      ).toList();
+    }
+    if (value is String) {
+      return value.split(',').map((part) => part.trim()).where(
+        (part) => part.isNotEmpty,
+      ).toList();
+    }
+    return const <String>[];
   }
 
   Future<shelf.Response> _handleRuns(

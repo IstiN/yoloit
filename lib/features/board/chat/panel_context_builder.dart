@@ -276,8 +276,8 @@ String _typeGuidance(String typeId) {
 - Change working directory with `yoloit_do <board> <panel> set-dir '{"dir":"/path"}'`.'''.trim();
     case 'board.table':
       return '''
-- Add rows with `yoloit_do <board> <panel> add-row '{"row":{...}}'`.
-- Update rows with `yoloit_do <board> <panel> update-row '{"rowId":"...","row":{...}}'`.
+- Add rows with `yoloit_do <board> <panel> add-row '{"cells":{...}}'`.
+- Update rows with `yoloit_do <board> <panel> update-row '{"rowId":"...","cells":{...}}'`.
 - Column ids are shown in the content above.'''.trim();
     case 'board.kanban':
       return '''

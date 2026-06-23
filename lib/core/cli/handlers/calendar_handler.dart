@@ -139,7 +139,7 @@ class CalendarCliHandler extends PanelCliHandler {
     final eventId = _requireEventId(args);
     if (eventId.result != null) return eventId.result!;
     final events = await _storage.loadEvents(panel.id);
-    final existing = events.firstWhereOrNull((e) => e.id == eventId.value);
+    final existing = _findEventByIdOrTitle(events, eventId.value!);
     if (existing == null) {
       return CliActionResult(
         ok: false,
@@ -170,16 +170,18 @@ class CalendarCliHandler extends PanelCliHandler {
   ) async {
     final eventId = _requireEventId(args);
     if (eventId.result != null) return eventId.result!;
-    final ok = await _storage.deleteEvent(panel.id, eventId.value!);
-    if (!ok) {
+    final events = await _storage.loadEvents(panel.id);
+    final existing = _findEventByIdOrTitle(events, eventId.value!);
+    if (existing == null) {
       return CliActionResult(
         ok: false,
         message: 'Event not found: ${eventId.value}',
       );
     }
+    final ok = await _storage.deleteEvent(panel.id, existing.id);
     final count = await _storage.countEvents(panel.id);
     return CliActionResult(
-      message: 'Deleted event: ${eventId.value}',
+      message: 'Deleted event: ${existing.title}',
       stateUpdate: {'eventCount': count},
     );
   }
@@ -198,6 +200,23 @@ class CalendarCliHandler extends PanelCliHandler {
       );
     }
     return (value: eventId, result: null);
+  }
+
+  CalendarEvent? _findEventByIdOrTitle(
+    List<CalendarEvent> events,
+    String idOrTitle,
+  ) {
+    final needle = idOrTitle.toLowerCase();
+    CalendarEvent? partialMatch;
+    for (final event in events) {
+      if (event.id == idOrTitle) return event;
+      final title = event.title.toLowerCase();
+      if (title == needle) return event;
+      if (partialMatch == null && title.contains(needle)) {
+        partialMatch = event;
+      }
+    }
+    return partialMatch;
   }
 
   CliActionResult _handleSetView(
@@ -306,7 +325,7 @@ class CalendarCliHandler extends PanelCliHandler {
       );
     }
     final events = await _storage.loadEvents(panel.id);
-    final event = events.firstWhereOrNull((e) => e.id == eventId);
+    final event = _findEventByIdOrTitle(events, eventId);
     if (event == null) {
       return CliActionResult(
         ok: false,
@@ -446,9 +465,9 @@ class CalendarCliHandler extends PanelCliHandler {
       },
     ),
     'update-event': const CliActionHelp(
-      description: 'Update an existing event',
+      description: 'Update an existing event by id or title',
       params: {
-        'eventId': 'Event id',
+        'eventId': 'Event id or title',
         'title': 'New title',
         'start': 'New start',
         'end': 'New end',
@@ -458,8 +477,8 @@ class CalendarCliHandler extends PanelCliHandler {
       },
     ),
     'delete-event': const CliActionHelp(
-      description: 'Delete an event by id',
-      params: {'eventId': 'Event id'},
+      description: 'Delete an event by id or title',
+      params: {'eventId': 'Event id or title'},
     ),
     'set-view': const CliActionHelp(
       description: 'Switch calendar view',
@@ -481,8 +500,8 @@ class CalendarCliHandler extends PanelCliHandler {
       },
     ),
     'show-event': const CliActionHelp(
-      description: 'Show details of a single event',
-      params: {'eventId': 'Event id'},
+      description: 'Show details of a single event by id or title',
+      params: {'eventId': 'Event id or title'},
     ),
   };
 }

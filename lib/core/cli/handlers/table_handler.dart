@@ -101,7 +101,9 @@ class TableCliHandler extends PanelCliHandler {
       );
     }
     final parsedColumns = TableDataHelper.parseColumns(columns);
-    final parsedRows = TableDataHelper.parseRows(rows);
+    final parsedRows = TableDataHelper.parseRows(
+      rows.map((row) => _normalizeRowInput(_map(row))).toList(),
+    );
     if (parsedColumns.isEmpty) {
       return const CliActionResult(
         ok: false,
@@ -185,7 +187,7 @@ class TableCliHandler extends PanelCliHandler {
       return _missingIdOrTitleResult;
     }
     final columns = TableDataHelper.parseColumns(panel.state['columns']).toList();
-    final index = columns.indexWhere((column) => column.id == id);
+    final index = _columnIndexByIdOrTitle(columns, id);
     if (index < 0) return _notFoundResult('Column', id);
     columns[index] = columns[index].copyWith(title: title);
     return CliActionResult(
@@ -203,20 +205,21 @@ class TableCliHandler extends PanelCliHandler {
     final id = _string(args['id']) ?? _string(args['columnId']);
     if (id == null || id.isEmpty) return _missingIdResult;
     final columns = TableDataHelper.parseColumns(panel.state['columns']).toList();
-    final index = columns.indexWhere((column) => column.id == id);
+    final index = _columnIndexByIdOrTitle(columns, id);
     if (index < 0) return _notFoundResult('Column', id);
+    final removedId = columns[index].id;
     columns.removeAt(index);
     final rows =
         TableDataHelper
             .parseRows(panel.state['rows'])
             .map(
               (row) => row.copyWith(
-                cells: Map<String, dynamic>.from(row.cells)..remove(id),
+                cells: Map<String, dynamic>.from(row.cells)..remove(removedId),
               ),
             )
             .toList();
     return CliActionResult(
-      message: 'Column "$id" removed',
+      message: 'Column "$removedId" removed',
       stateUpdate: <String, dynamic>{
         'columns': TableDataHelper.columnsToJson(columns),
         'rows': TableDataHelper.rowsToJson(rows),
@@ -230,9 +233,10 @@ class TableCliHandler extends PanelCliHandler {
   ) {
     final columns = TableDataHelper.parseColumns(panel.state['columns']).toList();
     final rows = TableDataHelper.parseRows(panel.state['rows']).toList();
+    final cellInput = _normalizeCellInput(args, columns);
     final cells = <String, dynamic>{
       for (final column in columns)
-        column.id: _castCellValue(args[column.id], column.type),
+        column.id: _castCellValue(cellInput[column.id], column.type),
     };
     final newRow = TableRow(
       id: 'r-${DateTime.now().millisecondsSinceEpoch}',
@@ -256,10 +260,14 @@ class TableCliHandler extends PanelCliHandler {
     final rows = TableDataHelper.parseRows(panel.state['rows']).toList();
     final index = rows.indexWhere((row) => row.id == rowId);
     if (index < 0) return _notFoundResult('Row', rowId);
+    final cellInput = _normalizeCellInput(args, columns);
     final updatedCells = Map<String, dynamic>.from(rows[index].cells);
     for (final column in columns) {
-      if (args.containsKey(column.id)) {
-        updatedCells[column.id] = _castCellValue(args[column.id], column.type);
+      if (cellInput.containsKey(column.id)) {
+        updatedCells[column.id] = _castCellValue(
+          cellInput[column.id],
+          column.type,
+        );
       }
     }
     rows[index] = rows[index].copyWith(cells: updatedCells);
@@ -297,6 +305,82 @@ class TableCliHandler extends PanelCliHandler {
         'rows': const <Map<String, dynamic>>[],
       },
     );
+  }
+
+  Map<String, dynamic> _cellInput(Map<String, dynamic> args) {
+    // The `table:add-row` / `table:update-row` tool schemas expose cell values
+    // under the `cells` key. Older docs/clients may pass them at the top level,
+    // so we support both shapes.
+    final cells = args['cells'] ?? args['row'];
+    if (cells is Map<String, dynamic>) return cells;
+    if (cells is Map) {
+      return Map<String, dynamic>.from(cells);
+    }
+    return args;
+  }
+
+  /// Normalizes cell input so values keyed by column title are mapped to the
+  /// matching column id. If the same column is referenced by both id and title,
+  /// the id key wins.
+  Map<String, dynamic> _normalizeCellInput(
+    Map<String, dynamic> args,
+    List<TableColumn> columns,
+  ) {
+    final input = _cellInput(args);
+    final normalized = <String, dynamic>{};
+    for (final entry in input.entries) {
+      final key = entry.key.toString();
+      final columnId = _columnIdFromIdOrTitle(columns, key);
+      if (columnId != null) {
+        normalized[columnId] = entry.value;
+      } else {
+        normalized[key] = entry.value;
+      }
+    }
+    return normalized;
+  }
+
+  String? _columnIdFromIdOrTitle(List<TableColumn> columns, String idOrTitle) {
+    for (final column in columns) {
+      if (column.id == idOrTitle) return column.id;
+    }
+    final needle = idOrTitle.toLowerCase().trim();
+    for (final column in columns) {
+      if (column.title.toLowerCase().trim() == needle) return column.id;
+    }
+    return null;
+  }
+
+  int _columnIndexByIdOrTitle(List<TableColumn> columns, String idOrTitle) {
+    for (var i = 0; i < columns.length; i++) {
+      if (columns[i].id == idOrTitle) return i;
+    }
+    final needle = idOrTitle.toLowerCase().trim();
+    for (var i = 0; i < columns.length; i++) {
+      if (columns[i].title.toLowerCase().trim() == needle) return i;
+    }
+    return -1;
+  }
+
+  Map<String, dynamic> _normalizeRowInput(Map<String, dynamic> row) {
+    // `table:set` rows may be either `{id, cells: {col: value}}` (tool shape)
+    // or `{id, col: value}` (legacy shape). Normalize to the top-level shape.
+    final cells = row['cells'];
+    if (cells is Map) {
+      return <String, dynamic>{
+        'id': row['id'],
+        ...Map<String, dynamic>.from(
+          cells.map((k, v) => MapEntry(k.toString(), v)),
+        ),
+      };
+    }
+    return row;
+  }
+
+  Map<String, dynamic> _map(dynamic value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) return Map<String, dynamic>.from(value);
+    return const <String, dynamic>{};
   }
 
   dynamic _defaultCellValue(TableColumnType type) {

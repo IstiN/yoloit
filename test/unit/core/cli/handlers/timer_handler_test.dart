@@ -1,3 +1,4 @@
+// covers-write: board.timer
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yoloit/core/cli/handlers/timer_handler.dart';
 import 'package:yoloit/features/board/model/board_models.dart';

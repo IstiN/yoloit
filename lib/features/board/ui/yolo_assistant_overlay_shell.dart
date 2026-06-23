@@ -35,63 +35,67 @@ class YoloAssistantOverlayShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    return AnimatedContainer(
-      duration: duration,
-      curve: Curves.easeInOutCubic,
-      width: expanded ? expandedWidth : badgeSize,
-      height: expanded ? expandedHeight : badgeSize,
-      decoration: BoxDecoration(
-        color: colors.surfaceElevated,
-        borderRadius: BorderRadius.circular(expanded ? 16 : 18),
-        border: border,
-        gradient:
-            border == null
-                ? LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [colors.accentBlue, colors.primary],
-                )
-                : null,
-        boxShadow: [
-          BoxShadow(
-            color: colors.textMuted.withValues(alpha: expanded ? 0.2 : 0.15),
-            blurRadius: expanded ? 20 : 8,
-            offset: const Offset(0, 4),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return AnimatedContainer(
+          duration: duration,
+          curve: Curves.easeInOutCubic,
+          width: constraints.maxWidth,
+          height: constraints.maxHeight,
+          decoration: BoxDecoration(
+            color: colors.surfaceElevated,
+            borderRadius: BorderRadius.circular(expanded ? 16 : 18),
+            border: border,
+            gradient:
+                border == null
+                    ? LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [colors.accentBlue, colors.primary],
+                    )
+                    : null,
+            boxShadow: [
+              BoxShadow(
+                color: colors.textMuted.withValues(alpha: expanded ? 0.2 : 0.15),
+                blurRadius: expanded ? 20 : 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Container(
-        margin: border == null ? const EdgeInsets.all(1.5) : EdgeInsets.zero,
-        decoration: BoxDecoration(
-          color: colors.surfaceElevated,
-          borderRadius: BorderRadius.circular(
-            border == null ? (expanded ? 14.5 : 16.5) : (expanded ? 16 : 18),
+          child: Container(
+            margin: border == null ? const EdgeInsets.all(1.5) : EdgeInsets.zero,
+            decoration: BoxDecoration(
+              color: colors.surfaceElevated,
+              borderRadius: BorderRadius.circular(
+                border == null ? (expanded ? 14.5 : 16.5) : (expanded ? 16 : 18),
+              ),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 250),
+              switchInCurve: Curves.easeInOutCubic,
+              switchOutCurve: Curves.easeInOutCubic,
+              child:
+                  expanded
+                      ? OverflowBox(
+                        key: const ValueKey('yolo-expanded'),
+                        maxWidth: expandedWidth,
+                        maxHeight: expandedHeight,
+                        alignment: Alignment.topCenter,
+                        child: _ExpandedContent(
+                          headerTrailing: headerTrailing,
+                          content: content,
+                        ),
+                      )
+                      : _BadgeIcon(
+                        key: const ValueKey('yolo-badge'),
+                        icon: badgeIcon,
+                        opacity: badgeOpacity,
+                      ),
+            ),
           ),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 250),
-          switchInCurve: Curves.easeInOutCubic,
-          switchOutCurve: Curves.easeInOutCubic,
-          child:
-              expanded
-                  ? OverflowBox(
-                    key: const ValueKey('yolo-expanded'),
-                    maxWidth: expandedWidth,
-                    maxHeight: expandedHeight,
-                    alignment: Alignment.topCenter,
-                    child: _ExpandedContent(
-                      headerTrailing: headerTrailing,
-                      content: content,
-                    ),
-                  )
-                  : _BadgeIcon(
-                    key: const ValueKey('yolo-badge'),
-                    icon: badgeIcon,
-                    opacity: badgeOpacity,
-                  ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

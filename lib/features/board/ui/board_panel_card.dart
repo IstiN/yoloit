@@ -580,32 +580,26 @@ class BoardPanelCardState extends State<BoardPanelCard>
                     ),
                   ),
                 ),
-              if ((selected || isFocused || _yoloExpanded) &&
-                  !isCapturing &&
+              if (!isCapturing &&
                   !connectMode &&
                   panel.type != YoloAssistantPlugin.kTypeId)
                 AnimatedPositioned(
                   duration: const Duration(milliseconds: 350),
                   curve: Curves.easeInOutCubic,
                   left:
-                      _yoloExpanded
-                          ? selectionSideGutter +
-                              panel.bounds.width -
-                              24
-                          : selectionSideGutter +
-                              panel.bounds.width -
-                              PanelYoloAssistantBadge.badgeSize -
-                              12,
+                      selectionSideGutter +
+                      panel.bounds.width -
+                      (_yoloExpanded
+                          ? PanelYoloAssistantBadge.expandedWidth
+                          : PanelYoloAssistantBadge.badgeSize) -
+                      12,
                   top:
-                      _yoloExpanded
-                          ? selectionTopGutter +
-                              panel.bounds.height -
-                              12 -
-                              PanelYoloAssistantBadge.expandedHeight
-                          : selectionTopGutter +
-                              panel.bounds.height -
-                              PanelYoloAssistantBadge.badgeSize -
-                              12,
+                      selectionTopGutter +
+                      panel.bounds.height -
+                      (_yoloExpanded
+                          ? PanelYoloAssistantBadge.expandedHeight
+                          : PanelYoloAssistantBadge.badgeSize) -
+                      12,
                   width:
                       _yoloExpanded
                           ? PanelYoloAssistantBadge.expandedWidth
@@ -614,15 +608,24 @@ class BoardPanelCardState extends State<BoardPanelCard>
                       _yoloExpanded
                           ? PanelYoloAssistantBadge.expandedHeight
                           : PanelYoloAssistantBadge.badgeSize,
-                  child: PanelYoloAssistantBadge(
-                    targetPanel: panel,
-                    expanded: _yoloExpanded,
-                    onExpandedChanged:
-                        (value) => setState(() => _yoloExpanded = value),
+                  child: IgnorePointer(
+                    ignoring: !(selected || isFocused || _yoloExpanded),
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 200),
+                      curve: Curves.easeInOut,
+                      opacity:
+                          (selected || isFocused || _yoloExpanded) ? 1.0 : 0.0,
+                      child: PanelYoloAssistantBadge(
+                        targetPanel: panel,
+                        expanded: _yoloExpanded,
+                        onExpandedChanged:
+                            (value) => setState(() => _yoloExpanded = value),
+                      ),
+                    ),
                   ),
                 ),
             ],
-          ),
+          ), // Stack
         ), // ScaleTransition
       ), // FadeTransition
     );

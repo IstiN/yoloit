@@ -1,3 +1,4 @@
+// covers-write: board.webpage, board.playlist, board.checklist, board.code.snippet, board.files, board.file.preview, board.sticky, board.shape, board.terminal
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yoloit/core/cli/handlers/webpage_handler.dart';
 import 'package:yoloit/core/cli/handlers/playlist_handler.dart';

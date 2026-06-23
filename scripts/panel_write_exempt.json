@@ -1,0 +1,6 @@
+[
+  {
+    "type": "board.diff.preview",
+    "reason": "Display-only panel generated from file selection/git diff; has no user-facing write actions or CLI handler. State is set externally by the opener, and UI updates are validated through the DiffPreviewPlugin rendering path in integration smoke tests."
+  }
+]

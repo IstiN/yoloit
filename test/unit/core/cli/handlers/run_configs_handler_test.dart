@@ -1,3 +1,4 @@
+// covers-write: board.run_configs, board.run
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yoloit/core/cli/handlers/run_configs_handler.dart';
@@ -246,6 +247,24 @@ void main() {
       final r = await handler.handleAction('unknown', {}, _panel());
       expect(r.ok, isFalse);
       expect(r.message, contains('Unknown'));
+    });
+  });
+
+  group('RunConfigsCliHandler — board.run panel type', () {
+    const runHandler = RunConfigsCliHandler(panelTypeId: 'board.run');
+
+    test('typeId reports board.run', () {
+      expect(runHandler.typeId, 'board.run');
+    });
+
+    test('add config from a run panel uses default group', () async {
+      final r = await runHandler.handleAction('add', {
+        'name': 'Run Panel Config',
+        'command': 'echo run',
+      }, _panel(state: {'group': 'default'}));
+      expect(r.ok, isTrue);
+      expect(r.data!['name'], 'Run Panel Config');
+      expect(r.data!['group'], 'default');
     });
   });
 }

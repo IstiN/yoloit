@@ -9,6 +9,7 @@ import 'package:yoloit/core/remote/yoloit_remote_client.dart';
 import 'package:yoloit/core/utils/clipboard_utils.dart';
 import 'package:yoloit/features/board/bloc/board_state.dart';
 import 'package:yoloit/features/board/chat/chat_panel_plugin.dart';
+import 'package:yoloit/features/board/events/board_event_bus.dart';
 import 'package:yoloit/features/board/history/board_history_event.dart';
 import 'package:yoloit/features/board/history/board_history_store.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
@@ -32,7 +33,20 @@ class BoardCubit extends Cubit<BoardState> {
   }) : _historyStore = historyStore ?? const NoopBoardHistoryStore(),
        _actorId = actorId,
        _clipboard = clipboard ?? const SystemClipboard(),
-       super(const BoardState());
+       super(const BoardState()) {
+    _boardEventSub = BoardEventBus.instance.stream.listen((event) {
+      if (event is BoardToolMutationEvent) {
+        _scheduleRemoteRefresh();
+      }
+    });
+  }
+
+  void _scheduleRemoteRefresh() {
+    _remoteRefreshDebounce?.cancel();
+    _remoteRefreshDebounce = Timer(const Duration(milliseconds: 250), () {
+      unawaited(refreshRemoteBoards());
+    });
+  }
 
   static const _boardsStorageKey = 'board.documents.v1';
   static const _activeBoardStorageKey = 'board.active.id.v1';
@@ -46,6 +60,8 @@ class BoardCubit extends Cubit<BoardState> {
   List<BoardDocument>? _pendingRemoteSyncCurrentBoards;
   String? _pendingRemoteSyncActiveBoardId;
   bool _remoteSyncInFlight = false;
+  Timer? _remoteRefreshDebounce;
+  StreamSubscription<BoardEvent>? _boardEventSub;
 
   Future<void> load() async {
     if (state.isLoaded) return;
@@ -2508,6 +2524,8 @@ class BoardCubit extends Cubit<BoardState> {
   Future<void> close() async {
     await flushRemoteSync();
     _remoteSyncDebounce?.cancel();
+    _remoteRefreshDebounce?.cancel();
+    await _boardEventSub?.cancel();
     return super.close();
   }
 

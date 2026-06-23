@@ -1,3 +1,4 @@
+// covers-write: board.code.snippet
 import 'dart:convert';
 import 'dart:io';
 

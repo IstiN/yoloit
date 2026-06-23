@@ -3,7 +3,11 @@ import 'dart:convert';
 import 'package:yoloit/core/cli/panel_cli_handler.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/chart/model/chart_models.dart';
-import 'package:yoloit/features/table/model/table_models.dart';
+import 'package:yoloit/features/table/model/table_models.dart' as table_models;
+
+enum _ChartColumnRole { x, y }
+
+typedef TableDataHelper = table_models.TableDataHelper;
 
 /// CLI handler for Chart panels (`board.chart`).
 class ChartCliHandler extends PanelCliHandler {
@@ -130,11 +134,13 @@ class ChartCliHandler extends PanelCliHandler {
         message: 'Missing required field: tablePanelId',
       );
     }
+    final rawPanels = args['_currentBoardPanels'];
+    final resolvedId = _resolveTablePanelId(rawPanels, tablePanelId);
     return CliActionResult(
-      message: 'Linked to table panel $tablePanelId',
+      message: 'Linked to table panel ${resolvedId ?? tablePanelId}',
       stateUpdate: <String, dynamic>{
         ...panel.state,
-        'tablePanelId': tablePanelId,
+        'tablePanelId': resolvedId ?? tablePanelId,
       },
     );
   }
@@ -153,16 +159,17 @@ class ChartCliHandler extends PanelCliHandler {
     Map<String, dynamic> args,
     BoardPanelInstance panel,
   ) {
-    final tablePanelId =
+    final rawPanels = args['_currentBoardPanels'];
+    final requestedId =
         _string(args['tablePanelId'] ?? args['table']) ??
         ChartDataHelper.tablePanelIdFromState(panel.state);
-    if (tablePanelId == null || tablePanelId.isEmpty) {
+    if (requestedId == null || requestedId.isEmpty) {
       return const CliActionResult(
         ok: false,
         message: 'No table panel linked. Use link-table first.',
       );
     }
-    final rawPanels = args['_currentBoardPanels'];
+    final tablePanelId = _resolveTablePanelId(rawPanels, requestedId);
     BoardPanelInstance? targetPanel;
     if (rawPanels is List) {
       targetPanel =
@@ -185,7 +192,7 @@ class ChartCliHandler extends PanelCliHandler {
     if (targetPanel == null) {
       return CliActionResult(
         ok: false,
-        message: 'Table panel not found: $tablePanelId',
+        message: 'Table panel not found: $requestedId',
       );
     }
     if (targetPanel.type != 'board.table') {
@@ -195,15 +202,71 @@ class ChartCliHandler extends PanelCliHandler {
       );
     }
     final rows = TableDataHelper.parseRows(targetPanel.state['rows']);
-    final data = rows.map((row) => row.cells).toList();
+    final columns = TableDataHelper.parseColumns(targetPanel.state['columns']);
+    final columnById = <String, table_models.TableColumn>{
+      for (final column in columns) column.id: column,
+    };
+    final data =
+        rows.map((row) {
+          final cells = <String, dynamic>{};
+          for (final entry in row.cells.entries) {
+            final column = columnById[entry.key];
+            cells[entry.key] =
+                column == null
+                    ? entry.value
+                    : _castToColumnType(entry.value, column.type);
+          }
+          return cells;
+        }).toList();
+    final xKey = panel.state['xKey'] as String?;
+    final yKey = panel.state['yKey'] as String?;
     return CliActionResult(
       message: 'Chart refreshed from table $tablePanelId',
       stateUpdate: <String, dynamic>{
         ...panel.state,
         'data': data,
         'tablePanelId': tablePanelId,
+        if (xKey == null || xKey.isEmpty)
+          'xKey': _inferKey(columns, _ChartColumnRole.x),
+        if (yKey == null || yKey.isEmpty)
+          'yKey': _inferKey(columns, _ChartColumnRole.y),
       },
     );
+  }
+
+  String _inferKey(
+    List<table_models.TableColumn> columns,
+    _ChartColumnRole role,
+  ) {
+    if (columns.isEmpty) {
+      return role == _ChartColumnRole.x ? 'category' : 'value';
+    }
+    final text = columns
+        .where((c) => c.type == table_models.TableColumnType.text)
+        .firstOrNull;
+    final number = columns
+        .where((c) => c.type == table_models.TableColumnType.number)
+        .firstOrNull;
+    if (role == _ChartColumnRole.x) {
+      return text?.id ?? columns.first.id;
+    }
+    return number?.id ?? columns.first.id;
+  }
+
+  dynamic _castToColumnType(
+    dynamic value,
+    table_models.TableColumnType type,
+  ) {
+    if (value == null) return null;
+    switch (type) {
+      case table_models.TableColumnType.number:
+        if (value is num) return value;
+        return double.tryParse(value.toString()) ?? 0;
+      case table_models.TableColumnType.date:
+      case table_models.TableColumnType.select:
+      case table_models.TableColumnType.text:
+        return value.toString();
+    }
   }
 
   List<Map<String, dynamic>>? _parseData(dynamic value) {
@@ -231,6 +294,34 @@ class ChartCliHandler extends PanelCliHandler {
               ),
             )
             .toList();
+  }
+
+  String? _resolveTablePanelId(dynamic rawPanels, String idOrTitle) {
+    if (rawPanels is! List) return null;
+    final panels =
+        rawPanels
+            .whereType<Map<Object?, Object?>>()
+            .map(
+              (entry) => BoardPanelInstance.fromJson(
+                Map<String, dynamic>.from(
+                  entry.map((k, v) => MapEntry(k.toString(), v)),
+                ),
+              ),
+            )
+            .toList();
+    final byId = panels.firstWhereOrNull(
+      (panel) =>
+          panel.id == idOrTitle ||
+          TableDataHelper.effectiveId(panel.state, panel.id) == idOrTitle,
+    );
+    if (byId != null) return byId.id;
+    final needle = idOrTitle.toLowerCase();
+    final byTitle = panels.firstWhereOrNull(
+      (panel) =>
+          panel.type == 'board.table' &&
+          panel.title.toLowerCase().trim() == needle,
+    );
+    return byTitle?.id;
   }
 
   String? _string(dynamic value) {
@@ -262,9 +353,9 @@ class ChartCliHandler extends PanelCliHandler {
       },
     ),
     'link-table': const CliActionHelp(
-      description: 'Link chart data to a Table panel',
+      description: 'Link chart data to a Table panel by id or title',
       params: {
-        'tablePanelId': 'Table panel id or custom tableId',
+        'tablePanelId': 'Table panel id, custom tableId, or panel title',
       },
     ),
     'unlink-table': const CliActionHelp(

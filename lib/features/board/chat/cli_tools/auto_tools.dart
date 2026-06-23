@@ -29,34 +29,16 @@ final List<YoloitCliTool> autoTools = <YoloitCliTool>[
     params: <YoloitCliToolParam>[boardParam(), panelParam(), toolParam('questions', 'Space-separated questions', required: true)],
   ),
   YoloitCliTool(
-    command: 'board:grid',
-    description: 'Toggle or reset grid view for a board',
-    group: 'board',
-    params: <YoloitCliToolParam>[toolParam('id_or_name', 'Board identifier or board name', required: true), toolParam('on_or_off_or_reset', 'Enable, disable or reset grid view', required: true), toolParam('cell', 'Grid cell size in pixels', required: false, flag: 'cell'), toolParam('spacing', 'Gap between cells in pixels', required: false, flag: 'spacing'), toolParam('arrange', 'Re-arrange panels into the default cloud', required: false, flag: 'arrange'), toolParam('group', 'Arrange panels into type blocks', required: false, flag: 'group')],
-  ),
-  YoloitCliTool(
     command: 'select',
     description: 'Select panels by ids or rectangle, or show current selection',
     group: 'board',
     params: <YoloitCliToolParam>[boardParam(), toolParam('panels', 'Comma-separated panel ids or titles', required: false, flag: 'panels'), toolParam('rect', 'Rectangle in board coordinates', required: false, flag: 'rect')],
   ),
   YoloitCliTool(
-    command: 'terminal:output',
-    description: 'Read terminal output',
-    group: 'panel',
-    params: <YoloitCliToolParam>[boardParam(), panelParam(), toolParam('session', 'Session id or name', required: false)],
-  ),
-  YoloitCliTool(
     command: 'terminal:config',
     description: 'Get terminal configuration',
     group: 'panel',
     params: <YoloitCliToolParam>[boardParam(), panelParam()],
-  ),
-  YoloitCliTool(
-    command: 'terminal:set-dir',
-    description: 'Set terminal working directory',
-    group: 'panel',
-    params: <YoloitCliToolParam>[boardParam(), panelParam(), toolParam('dir', 'Working directory', required: true)],
   ),
   YoloitCliTool(
     command: 'filetree:list',
@@ -142,42 +124,6 @@ final List<YoloitCliTool> autoTools = <YoloitCliTool>[
     aliases: const ['n:g'],
     group: 'note',
     params: <YoloitCliToolParam>[boardParam(), panelParam()],
-  ),
-  YoloitCliTool(
-    command: 'sticky:get',
-    description: 'Read sticky note content',
-    group: 'note',
-    params: <YoloitCliToolParam>[boardParam(), panelParam()],
-  ),
-  YoloitCliTool(
-    command: 'sticky:set',
-    description: 'Set sticky note text',
-    group: 'note',
-    params: <YoloitCliToolParam>[boardParam(), panelParam(), toolParam('text', 'Note text', required: true)],
-  ),
-  YoloitCliTool(
-    command: 'sticky:append',
-    description: 'Append text to a sticky note',
-    group: 'note',
-    params: <YoloitCliToolParam>[boardParam(), panelParam(), toolParam('text', 'Text to append', required: true)],
-  ),
-  YoloitCliTool(
-    command: 'sticky:color',
-    description: 'Set sticky note color',
-    group: 'note',
-    params: <YoloitCliToolParam>[boardParam(), panelParam(), toolParam('color', 'Hex color', required: true)],
-  ),
-  YoloitCliTool(
-    command: 'shape:get',
-    description: 'Get shape panel state',
-    group: 'note',
-    params: <YoloitCliToolParam>[boardParam(), panelParam()],
-  ),
-  YoloitCliTool(
-    command: 'shape:set',
-    description: 'Set shape panel properties',
-    group: 'note',
-    params: <YoloitCliToolParam>[boardParam(), panelParam(), toolParam('text', 'Label text', required: false, flag: 'text'), toolParam('fill', 'Fill color', required: false, flag: 'fill'), toolParam('stroke', 'Stroke color', required: false, flag: 'stroke'), toolParam('stroke_width', 'Stroke width', required: false, flag: 'stroke_width')],
   ),
   YoloitCliTool(
     command: 'code:get',

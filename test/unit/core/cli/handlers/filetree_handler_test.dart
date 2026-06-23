@@ -1,3 +1,4 @@
+// covers-write: board.filetree
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yoloit/core/cli/handlers/filetree_handler.dart';
 import 'package:yoloit/features/board/model/board_models.dart';

@@ -174,6 +174,255 @@ void main() {
   );
 
   test(
+    'executor quotes arguments with spaces and json payloads for shell argv',
+    () async {
+      final executor = YoloitCliToolExecutor(execute: false);
+      final result =
+          jsonDecode(
+                await executor.invoke(
+                  'yoloit_chart_create',
+                  <String, Object?>{
+                    'b': 'Personal Expenses',
+                    't': 'Expenses Bar Chart',
+                    'type': 'bar',
+                  },
+                ),
+              )
+              as Map<String, Object?>;
+
+      expect(result['ok'], isTrue);
+      expect(
+        result['command'],
+        "yoloit chart:create 'Personal Expenses' 'Expenses Bar Chart' bar",
+      );
+    },
+  );
+
+  test(
+    'executor recognizes compact lowercase keys from tool schema',
+    () async {
+      final executor = YoloitCliToolExecutor(execute: false);
+      final result =
+          jsonDecode(
+                await executor.invoke(
+                  'chlt',
+                  <String, Object?>{
+                    'b': 'board-1',
+                    'p': 'chart-1',
+                    'tablepanelid': 'table-1',
+                  },
+                ),
+              )
+              as Map<String, Object?>;
+
+      expect(result['ok'], isTrue);
+      expect(result['executed'], isFalse);
+      expect(
+        result['command'],
+        "yoloit chart:link-table board-1 chart-1 table-1",
+      );
+    },
+  );
+
+  test(
+    'executor quotes json body argument for do action',
+    () async {
+      final executor = YoloitCliToolExecutor(execute: false);
+      final result =
+          jsonDecode(
+                await executor.invoke(
+                  'yoloit_do',
+                  <String, Object?>{
+                    'b': 'Personal Expenses',
+                    'p': 'expenses-table',
+                    'a': 'add-row',
+                    'j': '{"cells":{"Категория":"Аренда","Сумма":25000}}',
+                  },
+                ),
+              )
+              as Map<String, Object?>;
+
+      expect(result['ok'], isTrue);
+      expect(
+        result['command'],
+        "yoloit do 'Personal Expenses' expenses-table add-row "
+        "'{\"cells\":{\"Категория\":\"Аренда\",\"Сумма\":25000}}'",
+      );
+    },
+  );
+
+  test('executor renders board:grid with dashed flags', () async {
+    final executor = YoloitCliToolExecutor(execute: false);
+    final result =
+        jsonDecode(
+              await executor.invoke(
+                'bgr',
+                <String, Object?>{
+                  'b': 'My Board',
+                  'on_or_off_or_reset': 'on',
+                  'cell': 220,
+                  'spacing': 24,
+                  'arrange': true,
+                },
+              ),
+            )
+            as Map<String, Object?>;
+
+    expect(result['ok'], isTrue);
+    expect(
+      result['command'],
+      "yoloit board:grid 'My Board' on --cell 220 --spacing 24 --arrange",
+    );
+  });
+
+  test('executor validates board:grid enum value', () async {
+    final executor = YoloitCliToolExecutor(execute: false);
+    final result =
+        jsonDecode(
+              await executor.invoke(
+                'bgr',
+                <String, Object?>{
+                  'b': 'My Board',
+                  'on_or_off_or_reset': 'maybe',
+                },
+              ),
+            )
+            as Map<String, Object?>;
+
+    expect(result['ok'], isFalse);
+    expect(result['executed'], isFalse);
+    expect(result['error'], contains('Invalid value'));
+  });
+
+  test('executor rejects placeholder ids for panel/session args', () async {
+    final executor = YoloitCliToolExecutor(execute: false);
+    final result =
+        jsonDecode(
+              await executor.invoke(
+                'tout',
+                <String, Object?>{
+                  'b': 'board-1',
+                  'p': 'yoloit_board_grid',
+                },
+              ),
+            )
+            as Map<String, Object?>;
+
+    expect(result['ok'], isFalse);
+    expect(result['error'], contains('placeholder'));
+  });
+
+  test('executor renders terminal:set-dir with alias', () async {
+    final executor = YoloitCliToolExecutor(execute: false);
+    final result =
+        jsonDecode(
+              await executor.invoke(
+                'tsd',
+                <String, Object?>{
+                  'b': 'board-1',
+                  'p': 'Terminal',
+                  'd': '/Users/me/project',
+                },
+              ),
+            )
+            as Map<String, Object?>;
+
+    expect(result['ok'], isTrue);
+    expect(
+      result['command'],
+      "yoloit terminal:set-dir board-1 Terminal /Users/me/project",
+    );
+  });
+
+  test('executor validates yolochat:terminal text is not an agent name', () async {
+    final executor = YoloitCliToolExecutor(execute: false);
+    final result =
+        jsonDecode(
+              await executor.invoke(
+                'ctm',
+                <String, Object?>{
+                  'tx': 'copilot',
+                  'b': 'board-1',
+                  'p': 'Terminal',
+                },
+              ),
+            )
+            as Map<String, Object?>;
+
+    expect(result['ok'], isTrue);
+    expect(
+      result['command'],
+      "yoloit yolochat:terminal copilot --board board-1 --panel Terminal",
+    );
+  });
+
+  test('executor renders shape:set with dashed flags', () async {
+    final executor = YoloitCliToolExecutor(execute: false);
+    final result =
+        jsonDecode(
+              await executor.invoke(
+                'shs',
+                <String, Object?>{
+                  'b': 'board-1',
+                  'p': 'Diamond',
+                  'f': '#22C55E',
+                },
+              ),
+            )
+            as Map<String, Object?>;
+
+    expect(result['ok'], isTrue);
+    expect(
+      result['command'],
+      "yoloit shape:set board-1 Diamond --fill '#22C55E'",
+    );
+  });
+
+  test('executor renders shape:set fill only without text placeholder', () async {
+    final executor = YoloitCliToolExecutor(execute: false);
+    final result =
+        jsonDecode(
+              await executor.invoke(
+                'yoloit_shape_set',
+                <String, Object?>{
+                  'b': 'board-1',
+                  'p': 'p-1782029161949503',
+                  'fill': '#22C55E',
+                },
+              ),
+            )
+            as Map<String, Object?>;
+
+    expect(result['ok'], isTrue);
+    expect(
+      result['command'],
+      "yoloit shape:set board-1 p-1782029161949503 --fill '#22C55E'",
+    );
+  });
+
+  test('executor renders sticky:color with dashed flag', () async {
+    final executor = YoloitCliToolExecutor(execute: false);
+    final result =
+        jsonDecode(
+              await executor.invoke(
+                'stc',
+                <String, Object?>{
+                  'b': 'board-1',
+                  'p': 'Idea',
+                  'c': '#FEF08A',
+                },
+              ),
+            )
+            as Map<String, Object?>;
+
+    expect(result['ok'], isTrue);
+    expect(
+      result['command'],
+      "yoloit sticky:color board-1 Idea --color '#FEF08A'",
+    );
+  });
+
+  test(
     'executor can preview play command without file when playlist panel auto-resolves',
     () async {
       final executor = YoloitCliToolExecutor(execute: false);

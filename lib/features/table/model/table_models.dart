@@ -69,7 +69,15 @@ class TableRow {
 
   factory TableRow.fromJson(Map<String, dynamic> json) {
     final id = (json['id'] as String? ?? '').trim();
-    final cells = Map<String, dynamic>.from(json)..remove('id');
+    final nestedCells = json['cells'];
+    final Map<String, dynamic> cells;
+    if (nestedCells is Map) {
+      cells = Map<String, dynamic>.from(
+        nestedCells.map((k, v) => MapEntry(k.toString(), v)),
+      );
+    } else {
+      cells = Map<String, dynamic>.from(json)..remove('id');
+    }
     return TableRow(
       id: id.isEmpty ? TableDataHelper._nextId('r') : id,
       cells: cells,

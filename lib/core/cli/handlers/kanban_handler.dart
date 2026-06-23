@@ -154,7 +154,7 @@ class KanbanCliHandler extends PanelCliHandler {
           data: {'cardId': cardId},
         );
       case 'move-card':
-        final cardId = args['cardId'] as String?;
+        final cardId = args['cardId'] as String? ?? args['card'] as String?;
         final toCol = args['to'] as String? ?? args['columnId'] as String?;
         if (cardId == null || toCol == null) {
           return const CliActionResult(
@@ -171,7 +171,7 @@ class KanbanCliHandler extends PanelCliHandler {
           );
         }
         final cards = _cards(panel);
-        final idx = _cardIndex(cards, cardId);
+        final idx = _cardIndexByIdOrTitle(cards, cardId);
         if (idx == null) {
           return CliActionResult(ok: false, message: 'Card not found: $cardId');
         }
@@ -182,23 +182,23 @@ class KanbanCliHandler extends PanelCliHandler {
           stateUpdate: {'cards': cards},
         );
       case 'remove-card':
-        final cardId = args['cardId'] as String?;
+        final cardId = args['cardId'] as String? ?? args['card'] as String?;
         if (cardId == null) {
           return const CliActionResult(ok: false, message: 'Missing "cardId"');
         }
         final cards = _cards(panel)
-          ..removeWhere((card) => card['id'] == cardId);
+          ..removeWhere((card) => _cardMatchesIdOrTitle(card, cardId));
         return CliActionResult(
           message: 'Card removed',
           stateUpdate: {'cards': cards},
         );
       case 'update-card':
-        final cardId = args['cardId'] as String?;
+        final cardId = args['cardId'] as String? ?? args['card'] as String?;
         if (cardId == null) {
           return const CliActionResult(ok: false, message: 'Missing "cardId"');
         }
         final cards = _cards(panel);
-        final idx = _cardIndex(cards, cardId);
+        final idx = _cardIndexByIdOrTitle(cards, cardId);
         if (idx == null) {
           return CliActionResult(ok: false, message: 'Card not found: $cardId');
         }
@@ -214,7 +214,7 @@ class KanbanCliHandler extends PanelCliHandler {
           stateUpdate: {'cards': cards},
         );
       case 'send-card-to-chat':
-        final cardId = args['cardId'] as String?;
+        final cardId = args['cardId'] as String? ?? args['card'] as String?;
         final targetPanelId = args['targetPanelId'] as String?;
         if (cardId == null || targetPanelId == null) {
           return const CliActionResult(
@@ -223,7 +223,7 @@ class KanbanCliHandler extends PanelCliHandler {
           );
         }
         final cards = _cards(panel);
-        final idx = _cardIndex(cards, cardId);
+        final idx = _cardIndexByIdOrTitle(cards, cardId);
         if (idx == null) {
           return CliActionResult(ok: false, message: 'Card not found: $cardId');
         }
@@ -299,9 +299,26 @@ class KanbanCliHandler extends PanelCliHandler {
     _ => <Map<String, dynamic>>[],
   };
 
-  int? _cardIndex(List<Map<String, dynamic>> cards, String cardId) {
-    final idx = cards.indexWhere((card) => card['id'] == cardId);
-    return idx < 0 ? null : idx;
+  int? _cardIndexByIdOrTitle(
+    List<Map<String, dynamic>> cards,
+    String idOrTitle,
+  ) {
+    for (var i = 0; i < cards.length; i++) {
+      if (cards[i]['id']?.toString() == idOrTitle) return i;
+    }
+    final needle = idOrTitle.toLowerCase().trim();
+    for (var i = 0; i < cards.length; i++) {
+      final title = cards[i]['title']?.toString().toLowerCase().trim() ?? '';
+      if (title == needle || title.contains(needle)) return i;
+    }
+    return null;
+  }
+
+  bool _cardMatchesIdOrTitle(Map<String, dynamic> card, String idOrTitle) {
+    if (card['id']?.toString() == idOrTitle) return true;
+    final needle = idOrTitle.toLowerCase().trim();
+    final title = card['title']?.toString().toLowerCase().trim() ?? '';
+    return title == needle || title.contains(needle);
   }
 
   int _findColumnIndex(List<String> columns, String idOrName) {
@@ -356,17 +373,17 @@ class KanbanCliHandler extends PanelCliHandler {
       },
     ),
     'move-card': const CliActionHelp(
-      description: 'Move a card to another column',
-      params: {'cardId': 'Card id', 'to': 'Target column index or name'},
+      description: 'Move a card to another column by id or title',
+      params: {'cardId': 'Card id or title', 'to': 'Target column index or name'},
     ),
     'remove-card': const CliActionHelp(
-      description: 'Remove a card by id',
-      params: {'cardId': 'Card id'},
+      description: 'Remove a card by id or title',
+      params: {'cardId': 'Card id or title'},
     ),
     'update-card': const CliActionHelp(
-      description: 'Update card title, description, or color',
+      description: 'Update card title, description, or color by id or title',
       params: {
-        'cardId': 'Card id',
+        'cardId': 'Card id or title',
         'title': 'New title',
         'description': 'New description',
         'color': 'Color',
@@ -374,9 +391,9 @@ class KanbanCliHandler extends PanelCliHandler {
     ),
     'send-card-to-chat': const CliActionHelp(
       description:
-          'Copy a kanban card into a chat panel as a pending message',
+          'Copy a kanban card into a chat panel as a pending message by id or title',
       params: {
-        'cardId': 'Card id',
+        'cardId': 'Card id or title',
         'targetPanelId': 'Target chat panel id',
       },
     ),

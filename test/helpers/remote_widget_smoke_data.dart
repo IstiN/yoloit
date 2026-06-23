@@ -136,6 +136,31 @@ Map<String, Object?> remoteWidgetSmokeState(String type) {
       'label': 'Remote timer',
       'lastTick': 0,
     },
+    'board.table' => {
+      'columns': [
+        {'id': 'month', 'title': 'Month', 'type': 'text'},
+        {'id': 'sales', 'title': 'Sales', 'type': 'number'},
+      ],
+      'rows': [
+        {'id': 'r-1', 'month': 'Jan', 'sales': 120},
+        {'id': 'r-2', 'month': 'Feb', 'sales': 190},
+      ],
+    },
+    'board.calendar' => {
+      'view': 'month',
+      'events': <Map<String, Object?>>[],
+      'eventCount': 0,
+    },
+    'board.chart' => {
+      'type': 'line',
+      'data': [
+        {'month': 'Jan', 'sales': 120},
+        {'month': 'Feb', 'sales': 190},
+      ],
+      'xKey': 'month',
+      'yKey': 'sales',
+      'animated': true,
+    },
     _ => <String, Object?>{},
   };
 }
@@ -252,6 +277,40 @@ List<Map<String, Object?>> remoteWidgetSmokeActions(String type) {
       {'action': 'set', 'duration': 900, 'label': 'Remote timer'},
       {'action': 'start'},
       {'action': 'pause'},
+    ],
+    'board.table' => [
+      {
+        'action': 'add-column',
+        'id': 'region',
+        'title': 'Region',
+        'type': 'text',
+      },
+      {'action': 'add-row', 'cells': {'month': 'Mar', 'sales': 210}},
+      {
+        'action': 'update-row',
+        'rowId': 'r-1',
+        'cells': {'month': 'January', 'sales': 121},
+      },
+      {'action': 'remove-row', 'rowId': 'r-2'},
+    ],
+    'board.calendar' => [
+      {
+        'action': 'create-event',
+        'title': 'Remote standup',
+        'start': '2026-06-19T10:00:00.000Z',
+        'allDay': false,
+      },
+      {'action': 'set-view', 'view': 'week'},
+    ],
+    'board.chart' => [
+      {
+        'action': 'set-data',
+        'data': [
+          {'month': 'Mar', 'sales': 210},
+          {'month': 'Apr', 'sales': 240},
+        ],
+      },
+      {'action': 'set-type', 'type': 'bar'},
     ],
     _ => [
       {'action': 'set', 'remoteSmoke': true},

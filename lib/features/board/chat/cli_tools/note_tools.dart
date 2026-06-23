@@ -73,6 +73,112 @@ final List<YoloitCliTool> noteTools = <YoloitCliTool>[
   ),
 
   YoloitCliTool(
+    command: 'sticky:get',
+    alias: 'stg',
+    description: 'Read sticky note content',
+    group: 'note',
+    params: <YoloitCliToolParam>[boardParam(), panelParam()],
+  ),
+
+  YoloitCliTool(
+    command: 'sticky:set',
+    alias: 'sts',
+    description: 'Set sticky note text',
+    group: 'note',
+    params: <YoloitCliToolParam>[
+      boardParam(),
+      panelParam(),
+      toolParam(
+        'text',
+        'Note text',
+        required: true,
+        flag: '--text',
+        shortKey: 'tx',
+      ),
+    ],
+  ),
+
+  YoloitCliTool(
+    command: 'sticky:append',
+    alias: 'sta',
+    description: 'Append text to a sticky note',
+    group: 'note',
+    params: <YoloitCliToolParam>[
+      boardParam(),
+      panelParam(),
+      toolParam(
+        'text',
+        'Text to append',
+        required: true,
+        flag: '--text',
+        shortKey: 'tx',
+      ),
+    ],
+  ),
+
+  YoloitCliTool(
+    command: 'sticky:color',
+    alias: 'stc',
+    description: 'Set sticky note color',
+    group: 'note',
+    params: <YoloitCliToolParam>[
+      boardParam(),
+      panelParam(),
+      toolParam(
+        'color',
+        'Hex color',
+        required: true,
+        flag: '--color',
+        shortKey: 'c',
+      ),
+    ],
+  ),
+
+  YoloitCliTool(
+    command: 'shape:get',
+    alias: 'shg',
+    description: 'Get shape panel state',
+    group: 'note',
+    params: <YoloitCliToolParam>[boardParam(), panelParam()],
+  ),
+
+  YoloitCliTool(
+    command: 'shape:set',
+    alias: 'shs',
+    description: 'Set shape panel properties',
+    group: 'note',
+    params: <YoloitCliToolParam>[
+      boardParam(),
+      panelParam(),
+      toolParam(
+        'text',
+        'Label text',
+        flag: '--text',
+        shortKey: 'tx',
+      ),
+      toolParam(
+        'fill',
+        'Fill color as #RRGGBB',
+        flag: '--fill',
+        shortKey: 'f',
+      ),
+      toolParam(
+        'stroke',
+        'Stroke color as #RRGGBB',
+        flag: '--stroke',
+        shortKey: 'st',
+      ),
+      toolParam(
+        'stroke_width',
+        'Stroke width in pixels',
+        flag: '--stroke-width',
+        kind: YoloitCliToolParamKind.number,
+        shortKey: 'sw',
+      ),
+    ],
+  ),
+
+  YoloitCliTool(
     command: 'note:create',
     alias: 'ncrt',
     description: 'Create a new note panel',

@@ -7,6 +7,7 @@ import 'package:yoloit/core/remote/yoloitd_models.dart';
 import 'package:yoloit/core/remote/yoloitd_server.dart';
 import 'package:yoloit/core/remote/yoloitd_store.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
+import 'package:yoloit/features/board/events/board_event_bus.dart';
 
 void main() {
   setUp(() {
@@ -145,6 +146,51 @@ void main() {
       expect(cubit.state.boards.where(isRemoteBoard), isEmpty);
       expect(cubit.state.boards, isNotEmpty);
       expect(await store.findBoard(remoteBoard.id), isNotNull);
+    },
+  );
+
+  test(
+    'BoardToolMutationEvent triggers remote board refresh',
+    () async {
+      final dir = await Directory.systemTemp.createTemp('yoloitd_event_');
+      addTearDown(() => dir.delete(recursive: true));
+      final store = YoloitdStore(rootDir: dir, actorId: 'remote-test');
+      final remoteBoard = await store.createBoard('Remote Event');
+      await store.addPanel(
+        remoteBoard.id,
+        const RemotePanel(
+          id: 'note-1',
+          type: 'board.note.markdown',
+          title: 'Note',
+          bounds: RemotePanelBounds(x: 10, y: 20, width: 300, height: 220),
+          state: {'markdown': 'before'},
+        ),
+      );
+      final server = YoloitdServer(store: store, port: 0, token: 'secret');
+      await server.start();
+      addTearDown(server.stop);
+
+      final cubit = BoardCubit();
+      addTearDown(cubit.close);
+      await cubit.load();
+      await cubit.connectRemoteBoards(
+        url: 'http://127.0.0.1:${server.boundPort}',
+        token: 'secret',
+      );
+
+      await store.updatePanel(
+        remoteBoard.id,
+        'note-1',
+        (panel) => panel.copyWith(state: {'markdown': 'after'}),
+      );
+
+      BoardEventBus.instance.emit(const BoardToolMutationEvent('table:set'));
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+
+      expect(
+        cubit.state.activeBoard!.panels.single.state['markdown'],
+        'after',
+      );
     },
   );
 }

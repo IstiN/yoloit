@@ -336,6 +336,62 @@ final List<YoloitCliTool> boardTools = <YoloitCliTool>[
   ),
 
   YoloitCliTool(
+    command: 'board:grid',
+    alias: 'bgr',
+    description:
+        'Toggle, reset or configure grid view for a board. '
+        'Use "on" to enable, "off" to disable, or "reset" to restore defaults.',
+    group: 'board',
+    humanVariants: const {
+      'ru': [
+        'включи сетку на борде',
+        'выключи сетку',
+        'сбрось сетку',
+        'упорядочи панели по сетке',
+      ],
+      'en': [
+        'enable grid',
+        'disable grid',
+        'reset grid',
+        'snap panels to grid',
+      ],
+    },
+    params: <YoloitCliToolParam>[
+      boardParam('id_or_name'),
+      toolParam(
+        'on_or_off_or_reset',
+        'Enable, disable or reset grid view',
+        required: true,
+        enumValues: const <String>['on', 'off', 'reset'],
+      ),
+      toolParam(
+        'cell',
+        'Grid cell size in pixels',
+        flag: '--cell',
+        kind: YoloitCliToolParamKind.number,
+      ),
+      toolParam(
+        'spacing',
+        'Gap between cells in pixels',
+        flag: '--spacing',
+        kind: YoloitCliToolParamKind.number,
+      ),
+      toolParam(
+        'arrange',
+        'Re-arrange panels into the default cloud',
+        flag: '--arrange',
+        kind: YoloitCliToolParamKind.boolean,
+      ),
+      toolParam(
+        'group',
+        'Arrange panels into type blocks',
+        flag: '--group',
+        kind: YoloitCliToolParamKind.boolean,
+      ),
+    ],
+  ),
+
+  YoloitCliTool(
     command: 'board:translate',
     alias: 'btr',
     description: 'Move board viewport',

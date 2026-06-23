@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/utils/color_utils.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
+import 'package:yoloit/features/board/plugins/builtin/shape_plugin.dart';
 import 'package:yoloit/ui/components/buttons/header_icon_button.dart';
 import 'package:yoloit/ui/components/menus/miro_toolbar_primitives.dart';
 import 'package:yoloit/ui/components/menus/panel_overflow_menu.dart';
@@ -49,12 +50,39 @@ class StickyNoteChrome extends StatelessWidget {
     final colors = context.appColors;
     final textColor = Theme.of(context).colorScheme.onSurface;
     final fontSize = (panel.state['fontSize'] as num?)?.round() ?? 18;
-    final noteColor =
-        parseHexColor(panel.state['color'] as String?) ??
-        const Color(0xFFFEF08A);
+    final isShape = panel.type == ShapePlugin.kTypeId;
     final stickyTextColor =
         parseHexColor(panel.state['textColor'] as String?) ??
-        const Color(0xFF1F2937);
+        (isShape ? const Color(0xFFE2E8F0) : const Color(0xFF1F2937));
+    final surfaceColor =
+        isShape
+            ? (parseHexColor(panel.state['strokeColor'] as String?) ??
+                const Color(0xFF93C5FD))
+            : (parseHexColor(panel.state['color'] as String?) ??
+                const Color(0xFFFEF08A));
+    final surfaceTooltip = isShape ? 'Border color' : 'Sticky color';
+    final surfaceColors =
+        isShape
+            ? const [
+              Color(0xFF93C5FD),
+              Color(0xFFA78BFA),
+              Color(0xFFF472B6),
+              Color(0xFFFBBF24),
+              Color(0xFF34D399),
+              Color(0xFFF87171),
+              Color(0xFFE2E8F0),
+            ]
+            : const [
+              Color(0xFFFEF08A),
+              Color(0xFFFDE68A),
+              Color(0xFFFCA5A5),
+              Color(0xFFF9A8D4),
+              Color(0xFFC4B5FD),
+              Color(0xFF93C5FD),
+              Color(0xFF86EFAC),
+              Color(0xFFFFFFFF),
+            ];
+    final surfaceStateKey = isShape ? 'strokeColor' : 'color';
 
     return Material(
       color: Colors.transparent,
@@ -80,7 +108,10 @@ class StickyNoteChrome extends StatelessWidget {
               children: [
                 const SizedBox(width: 4),
                 MiroToolbarDragIcon(
-                  tooltip: locked ? 'Sticky note is locked' : 'Move sticky note',
+                  tooltip:
+                      locked
+                          ? (isShape ? 'Shape is locked' : 'Sticky note is locked')
+                          : (isShape ? 'Move shape' : 'Move sticky note'),
                   onStart: onDragStart,
                   onUpdate: onDragUpdate,
                   onEnd: onDragEnd,
@@ -110,20 +141,15 @@ class StickyNoteChrome extends StatelessWidget {
                   onCustomSelected: (initial) => showMiroToolbarCustomColor(context, initial),
                 ),
                 MiroToolbarColorMenu(
-                  tooltip: 'Sticky color',
-                  icon: Icons.format_color_fill_outlined,
-                  selected: noteColor,
-                  colors: const [
-                    Color(0xFFFEF08A),
-                    Color(0xFFFDE68A),
-                    Color(0xFFFCA5A5),
-                    Color(0xFFF9A8D4),
-                    Color(0xFFC4B5FD),
-                    Color(0xFF93C5FD),
-                    Color(0xFF86EFAC),
-                    Color(0xFFFFFFFF),
-                  ],
-                  onSelected: (value) => _updateState({'color': miroToolbarHex(value)}),
+                  tooltip: surfaceTooltip,
+                  icon:
+                      isShape
+                          ? Icons.border_color_outlined
+                          : Icons.format_color_fill_outlined,
+                  selected: surfaceColor,
+                  colors: surfaceColors,
+                  onSelected:
+                      (value) => _updateState({surfaceStateKey: miroToolbarHex(value)}),
                   onCustomSelected: (initial) => showMiroToolbarCustomColor(context, initial),
                 ),
                 MiroToolbarDivider(colors: colors),

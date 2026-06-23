@@ -1,3 +1,4 @@
+// covers-write: board.calendar
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -184,6 +185,26 @@ void main() {
       expect((r.data!['event'] as Map<String, dynamic>)['title'], 'New');
     });
 
+    test('update-event finds event by title', () async {
+      final panel = newPanel();
+      const storage = CalendarEventStorage();
+      await storage.upsertEvent(
+        panel.id,
+        CalendarEvent(
+          id: 'ev-1',
+          title: 'Standup',
+          start: DateTime(2026, 6, 19, 10),
+        ),
+      );
+      final r = await handler.handleAction(
+        'update-event',
+        {'eventId': 'Standup', 'description': 'Daily'},
+        panel,
+      );
+      expect(r.ok, isTrue);
+      expect((r.data!['event'] as Map<String, dynamic>)['description'], 'Daily');
+    });
+
     test('update-event returns ok=false when event missing', () async {
       final panel = newPanel();
       final r = await handler.handleAction(
@@ -217,6 +238,26 @@ void main() {
       final r = await handler.handleAction(
         'delete-event',
         {'eventId': 'ev-1'},
+        panel,
+      );
+      expect(r.ok, isTrue);
+      expect(r.stateUpdate!['eventCount'], 0);
+    });
+
+    test('delete-event finds event by title', () async {
+      final panel = newPanel();
+      const storage = CalendarEventStorage();
+      await storage.upsertEvent(
+        panel.id,
+        CalendarEvent(
+          id: 'ev-1',
+          title: 'Retrospective',
+          start: DateTime(2026, 6, 19, 10),
+        ),
+      );
+      final r = await handler.handleAction(
+        'delete-event',
+        {'eventId': 'Retrospective'},
         panel,
       );
       expect(r.ok, isTrue);
@@ -356,6 +397,28 @@ void main() {
       final data = r.data!['event'] as Map<String, dynamic>;
       expect(data['title'], 'Show me');
       expect(data['description'], 'Details');
+    });
+
+    test('show-event finds event by title', () async {
+      final panel = newPanel();
+      const storage = CalendarEventStorage();
+      await storage.upsertEvent(
+        panel.id,
+        CalendarEvent(
+          id: 'ev-show',
+          title: 'Find me',
+          start: DateTime(2026, 6, 21, 10),
+          description: 'Details',
+        ),
+      );
+      final r = await handler.handleAction(
+        'show-event',
+        {'eventId': 'Find me'},
+        panel,
+      );
+      expect(r.ok, isTrue);
+      final data = r.data!['event'] as Map<String, dynamic>;
+      expect(data['title'], 'Find me');
     });
 
     test('show-event returns ok=false when event missing', () async {

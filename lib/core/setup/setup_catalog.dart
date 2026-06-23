@@ -3,7 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:json_annotation/json_annotation.dart';
-import 'package:yoloit/core/skills/yoloit_global_skills_service.dart';
+import 'package:yoloit/core/setup/setup_skills_service_vm.dart'
+    if (dart.library.ui) 'package:yoloit/core/setup/setup_skills_service_flutter.dart' as skills_service;
 
 part 'setup_catalog.g.dart';
 
@@ -415,7 +416,7 @@ class SetupCatalog {
 
   static Stream<String> runSpecialInstallTask(String packageId) {
     if (packageId == yoloitSkillsPackageId) {
-      return YoloitGlobalSkillsService.instance.installOrUpdate();
+      return skills_service.installOrUpdateSkills();
     }
     final controller = StreamController<String>();
     controller.add('[error] Unknown special install task: $packageId');
@@ -472,7 +473,7 @@ class SetupCatalog {
     SetupTargetOs os,
   ) async {
     if (spec.id == yoloitSkillsPackageId) {
-      final status = await YoloitGlobalSkillsService.instance.check();
+      final status = await skills_service.checkSkills();
       return SetupPackageStatus(
         id: spec.id,
         name: spec.name,

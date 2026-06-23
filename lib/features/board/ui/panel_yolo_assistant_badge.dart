@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:yoloit/core/utils/clipboard_utils.dart';
@@ -126,20 +128,36 @@ class _PanelYoloAssistantBadgeState extends State<PanelYoloAssistantBadge> {
 
   void _onAssistantStateChanged(Map<String, dynamic> state) {
     if (!mounted) return;
-    setState(() {
-      _assistantPanel = _assistantPanel.copyWith(state: state);
-    });
+    _assistantPanel = _assistantPanel.copyWith(state: state);
     _cubit?.updatePanel(
       widget.targetPanel.id,
       (panel) =>
           panel.copyWith(state: {...panel.state, 'yoloAssistant': state}),
     );
+    final scheduler = SchedulerBinding.instance;
+    if (scheduler.schedulerPhase == SchedulerPhase.persistentCallbacks) {
+      // setState is illegal while the tree is locked (e.g. during dispose).
+      // Defer the rebuild until the next frame; the cubit update above still
+      // persists the new state immediately.
+      scheduler.addPostFrameCallback((_) {
+        if (mounted) setState(() {});
+      });
+    } else {
+      setState(() {});
+    }
   }
 
   Future<void> _resolveDefaultProvider() async {
     if (!mounted) return;
-    final providerPref =
-        await CloudLlmSettingsService.instance.loadAssistantProviderType();
+    String providerPref;
+    try {
+      providerPref =
+          await CloudLlmSettingsService.instance.loadAssistantProviderType();
+    } on MissingPluginException {
+      // SharedPreferences isn't available in headless/widget tests; fall back
+      // to the local provider so the badge can still render.
+      providerPref = 'local';
+    }
     final cloudConfig =
         providerPref == 'cloud'
             ? await CloudLlmSettingsService.instance.loadActiveConfig()
@@ -228,9 +246,7 @@ class _PanelYoloAssistantBadgeState extends State<PanelYoloAssistantBadge> {
   Widget build(BuildContext context) {
     return Align(
       alignment: Alignment.bottomRight,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 350),
-        curve: Curves.easeInOutCubic,
+      child: SizedBox(
         width:
             _expanded
                 ? PanelYoloAssistantBadge.expandedWidth
@@ -240,39 +256,40 @@ class _PanelYoloAssistantBadgeState extends State<PanelYoloAssistantBadge> {
                 ? PanelYoloAssistantBadge.expandedHeight
                 : PanelYoloAssistantBadge.badgeSize,
         child: Tooltip(
-          message: 'Ask YoLo about this panel',
-          child: MouseRegion(
-            cursor: SystemMouseCursors.click,
-            child: GestureDetector(
-              onTap: _toggleExpanded,
-              child: YoloAssistantOverlayShell(
-                expanded: _expanded,
-                badgeSize: PanelYoloAssistantBadge.badgeSize,
-                expandedWidth: PanelYoloAssistantBadge.expandedWidth,
-                expandedHeight: PanelYoloAssistantBadge.expandedHeight,
-                badgeOpacity: 1.0,
-                badgeIcon: SvgPicture.asset(
-                  'assets/images/yolo_voice_badge.svg',
-                  width: 28,
-                  height: 28,
-                ),
-                headerTrailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    HeaderIconButton(
-                      icon: Icons.copy,
-                      tooltip: 'Copy YoLo history',
-                      onPressed: _copyHistory,
-                    ),
-                    const SizedBox(width: 4),
-                    HeaderIconButton(
-                      icon: Icons.close,
-                      tooltip: 'Close YoLo assistant',
-                      onPressed: _toggleExpanded,
-                    ),
-                  ],
-                ),
-                content: ScrollableCardMarker(
+        message: 'Ask YoLo about this panel',
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: GestureDetector(
+            onTap: _toggleExpanded,
+            child: YoloAssistantOverlayShell(
+              expanded: _expanded,
+              badgeSize: PanelYoloAssistantBadge.badgeSize,
+              expandedWidth: PanelYoloAssistantBadge.expandedWidth,
+              expandedHeight: PanelYoloAssistantBadge.expandedHeight,
+              badgeOpacity: 1.0,
+              badgeIcon: SvgPicture.asset(
+                'assets/images/yolo_voice_badge.svg',
+                width: 28,
+                height: 28,
+              ),
+              headerTrailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  HeaderIconButton(
+                    icon: Icons.copy,
+                    tooltip: 'Copy YoLo history',
+                    onPressed: _copyHistory,
+                  ),
+                  const SizedBox(width: 4),
+                  HeaderIconButton(
+                    icon: Icons.close,
+                    tooltip: 'Close YoLo assistant',
+                    onPressed: _toggleExpanded,
+                  ),
+                ],
+              ),
+              content: ScrollableCardRegion(
+                child: ScrollableCardMarker(
                   child:
                       widget.chatBuilder?.call(
                         _assistantPanel,
@@ -289,6 +306,7 @@ class _PanelYoloAssistantBadgeState extends State<PanelYoloAssistantBadge> {
           ),
         ),
       ),
+    ),
     );
   }
 }

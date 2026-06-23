@@ -1,3 +1,4 @@
+// covers-write: board.widget.custom
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/widgets/js_widget_engine.dart';

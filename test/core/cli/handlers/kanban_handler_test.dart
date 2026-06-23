@@ -1,3 +1,4 @@
+// covers-write: board.kanban
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yoloit/core/cli/handlers/kanban_handler.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
@@ -79,12 +80,51 @@ void main() {
     expect(moved['columnIndex'], 1);
   });
 
+  test('move-card by card title', () async {
+    final r = await handler.handleAction(
+        'move-card', {'card': 'Task A', 'to': 'Done'}, _panel(state: _withColumns()));
+    expect(r.ok, isTrue);
+    final cards = r.stateUpdate!['cards'] as List;
+    final moved = cards.firstWhere((c) => c['id'] == 'card-1');
+    expect(moved['columnIndex'], 1);
+  });
+
   test('remove-card by cardId', () async {
     final r = await handler.handleAction(
         'remove-card', {'cardId': 'card-1'}, _panel(state: _withColumns()));
     expect(r.ok, isTrue);
     final cards = r.stateUpdate!['cards'] as List;
     expect(cards.length, 1);
+  });
+
+  test('remove-card by card title', () async {
+    final r = await handler.handleAction(
+        'remove-card', {'card': 'Task A'}, _panel(state: _withColumns()));
+    expect(r.ok, isTrue);
+    final cards = r.stateUpdate!['cards'] as List;
+    expect(cards.length, 1);
+    expect(cards.where((c) => c['id'] == 'card-1'), isEmpty);
+  });
+
+  test('update-card by card title', () async {
+    final r = await handler.handleAction(
+        'update-card', {'card': 'Task A', 'description': 'Details'}, _panel(state: _withColumns()));
+    expect(r.ok, isTrue);
+    final cards = r.stateUpdate!['cards'] as List;
+    final updated = cards.firstWhere((c) => c['id'] == 'card-1');
+    expect(updated['description'], 'Details');
+  });
+
+  test('send-card-to-chat by card title', () async {
+    final r = await handler.handleAction(
+      'send-card-to-chat',
+      {'card': 'Task A', 'targetPanelId': 'chat-1'},
+      _panel(state: _withColumns()),
+    );
+    expect(r.ok, isTrue);
+    expect(r.additionalStateUpdates, contains('chat-1'));
+    final targetState = r.additionalStateUpdates!['chat-1']!;
+    expect(targetState['_cliPendingMessage'], 'Task A');
   });
 
   test('send-card-to-chat queues pending message on target panel', () async {

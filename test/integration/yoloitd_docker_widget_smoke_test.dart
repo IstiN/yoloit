@@ -1,87 +1,35 @@
-import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:test/test.dart';
 import 'package:yoloit/core/remote/yoloitd_panel_catalog.dart';
 
 import '../helpers/remote_widget_smoke_data.dart';
+import '../helpers/yoloitd_docker_harness.dart';
 
 void main() {
   final runDocker = Platform.environment['YOLOIT_RUN_DOCKER_TESTS'] == '1';
 
+  setUp(() {
+    HttpOverrides.global = null;
+  });
+
   test(
     'yoloitd docker container round-trips every remote widget type',
     () async {
-      final image =
-          Platform.environment['YOLOITD_DOCKER_IMAGE']?.trim().isNotEmpty ==
-                  true
-              ? Platform.environment['YOLOITD_DOCKER_IMAGE']!.trim()
-              : 'yoloitd:dev';
-      final shouldBuild =
-          Platform.environment['YOLOIT_BUILD_DOCKER_IMAGE'] == '1';
-      final container =
-          'yoloitd-widget-smoke-${DateTime.now().microsecondsSinceEpoch}';
-      const token = 'docker-secret';
-      final port = await _freePort();
+      final harness = await YoloitdDockerHarness.start();
+      addTearDown(harness.dispose);
 
-      // ignore: avoid_print
-      print('Docker smoke using image=$image port=$port build=$shouldBuild');
-      if (shouldBuild) {
-        await _docker([
-          'build',
-          '--progress=plain',
-          '-f',
-          'docker/Dockerfile.yoloitd',
-          '-t',
-          image,
-          '.',
-        ]);
-      } else if (!await _imageExists(image)) {
-        fail(
-          'Docker image $image was not found. Build it first with:\n'
-          '  docker build -f docker/Dockerfile.yoloitd -t $image .\n'
-          'or run this test with YOLOIT_BUILD_DOCKER_IMAGE=1.',
-        );
-      }
-
-      // ignore: avoid_print
-      print('Starting container $container');
-      await _docker([
-        'run',
-        '-d',
-        '--name',
-        container,
-        '-e',
-        'YOLOITD_TOKEN=$token',
-        '-p',
-        '127.0.0.1:$port:43110',
-        image,
-      ]);
-      addTearDown(() async {
-        await _runProcess('docker', ['rm', '-f', container]);
-      });
-
-      final baseUrl = 'http://127.0.0.1:$port';
-      // ignore: avoid_print
-      print('Waiting for health $baseUrl');
-      await _waitForHealth(baseUrl, token);
-      // ignore: avoid_print
-      print('Container is healthy');
-
-      final created = await _json(
+      final created = await harness.json(
         'POST',
-        '$baseUrl/api/boards',
-        token,
+        '/api/boards',
         body: {'name': 'Docker Remote Widgets'},
       );
       final board = created['board'] as Map<String, dynamic>;
       final boardId = board['id'] as String;
 
-      final typesResponse = await _json(
+      final typesResponse = await harness.json(
         'GET',
-        '$baseUrl/api/boards/$boardId/panel-types',
-        token,
+        '/api/boards/$boardId/panel-types',
       );
       final remoteTypes =
           (typesResponse['types'] as List<dynamic>)
@@ -99,10 +47,9 @@ void main() {
         final panelId = 'docker-panel-$i';
         final size =
             yoloitdPanelTypes[i]['defaultSize'] as Map<String, dynamic>;
-        final createdPanel = await _json(
+        final createdPanel = await harness.json(
           'POST',
-          '$baseUrl/api/boards/$boardId/panels',
-          token,
+          '/api/boards/$boardId/panels',
           body: {
             'id': panelId,
             'type': type,
@@ -117,27 +64,24 @@ void main() {
         expect(createdPanel['ok'], isTrue, reason: type);
 
         for (final action in remoteWidgetSmokeActions(type)) {
-          final response = await _json(
+          final response = await harness.json(
             'POST',
-            '$baseUrl/api/boards/$boardId/panels/$panelId/action',
-            token,
+            '/api/boards/$boardId/panels/$panelId/action',
             body: action,
           );
           expect(response['ok'], isTrue, reason: '$type ${action['action']}');
         }
 
-        final update = await _json(
+        final update = await harness.json(
           'PUT',
-          '$baseUrl/api/boards/$boardId/panels/$panelId',
-          token,
+          '/api/boards/$boardId/panels/$panelId',
           body: {'width': 444, 'height': 333},
         );
         expect(update['ok'], isTrue, reason: type);
 
-        final fetched = await _json(
+        final fetched = await harness.json(
           'GET',
-          '$baseUrl/api/boards/$boardId/panels/$panelId',
-          token,
+          '/api/boards/$boardId/panels/$panelId',
         );
         expect(fetched['type'], type);
         _expectRemoteActionState(
@@ -149,11 +93,7 @@ void main() {
         expect(bounds['height'], 333, reason: type);
       }
 
-      final boardJson = await _json(
-        'GET',
-        '$baseUrl/api/boards/$boardId',
-        token,
-      );
+      final boardJson = await harness.json('GET', '/api/boards/$boardId');
       expect(boardJson['panels'], hasLength(yoloitdPanelTypes.length));
       final panelTypes =
           (boardJson['panels'] as List<dynamic>)
@@ -166,10 +106,9 @@ void main() {
         containsAll(yoloitdPanelTypes.map((entry) => entry['type'] as String)),
       );
 
-      final snapshot = await _text(
+      final snapshot = await harness.text(
         'GET',
-        '$baseUrl/api/boards/$boardId/snapshot',
-        token,
+        '/api/boards/$boardId/snapshot',
       );
       for (final entry in yoloitdPanelTypes) {
         expect(snapshot, contains(entry['type'] as String));
@@ -236,102 +175,41 @@ void _expectRemoteActionState(String type, Map<String, dynamic> content) {
       expect(content['widgetId'], 'remote-widget');
     case 'board.timer':
       expect(content['duration'], 900);
-  }
-}
-
-Future<bool> _imageExists(String image) async {
-  final result = await _runProcess('docker', ['image', 'inspect', image]);
-  return result.exitCode == 0;
-}
-
-Future<int> _freePort() async {
-  final socket = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
-  final port = socket.port;
-  await socket.close();
-  return port;
-}
-
-Future<void> _docker(List<String> args) async {
-  // ignore: avoid_print
-  print('docker ${args.join(' ')}');
-  final result = await _runProcess('docker', args);
-  if (result.exitCode != 0) {
-    fail(
-      'docker ${args.join(' ')} failed (${result.exitCode})\n'
-      '${result.stdout}\n${result.stderr}',
-    );
-  }
-}
-
-Future<ProcessResult> _runProcess(
-  String executable,
-  List<String> args, {
-  Duration timeout = const Duration(seconds: 30),
-}) async {
-  final process = await Process.start(executable, args);
-  final stdoutFuture = utf8.decoder.bind(process.stdout).join();
-  final stderrFuture = utf8.decoder.bind(process.stderr).join();
-  final exitCode = await process.exitCode.timeout(
-    timeout,
-    onTimeout: () {
-      process.kill();
-      throw TimeoutException(
-        '$executable ${args.join(' ')} timed out after $timeout',
+    case 'board.table':
+      final columns = (content['columns'] as List<dynamic>)
+          .whereType<Map<String, dynamic>>()
+          .toList();
+      final rows = content['rows'] as List<dynamic>;
+      expect(
+        columns.map((column) => column['id']).toSet(),
+        contains('region'),
       );
-    },
-  );
-  final stdoutText = await stdoutFuture;
-  final stderrText = await stderrFuture;
-  return ProcessResult(process.pid, exitCode, stdoutText, stderrText);
-}
-
-Future<void> _waitForHealth(String baseUrl, String token) async {
-  Object? lastError;
-  for (var i = 0; i < 80; i++) {
-    try {
-      final health = await _json('GET', '$baseUrl/api/health', token);
-      if (health['ok'] == true) return;
-    } catch (error) {
-      lastError = error;
-    }
-    await Future<void>.delayed(const Duration(milliseconds: 250));
-  }
-  fail('Timed out waiting for yoloitd health: $lastError');
-}
-
-Future<Map<String, dynamic>> _json(
-  String method,
-  String url,
-  String token, {
-  Map<String, Object?>? body,
-}) async {
-  final raw = await _text(method, url, token, body: body);
-  return jsonDecode(raw) as Map<String, dynamic>;
-}
-
-Future<String> _text(
-  String method,
-  String url,
-  String token, {
-  Map<String, Object?>? body,
-}) async {
-  final client = HttpClient();
-  try {
-    final request = await client.openUrl(method, Uri.parse(url));
-    request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
-    if (body != null) {
-      final encoded = utf8.encode(jsonEncode(body));
-      request.headers.contentType = ContentType.json;
-      request.contentLength = encoded.length;
-      request.add(encoded);
-    }
-    final response = await request.close();
-    final text = await utf8.decoder.bind(response).join();
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      fail('$method $url returned ${response.statusCode}: $text');
-    }
-    return text;
-  } finally {
-    client.close(force: true);
+      expect(rows, hasLength(2));
+      expect(
+        rows.whereType<Map<String, dynamic>>().any(
+          (row) => row['month'] == 'January',
+        ),
+        isTrue,
+      );
+    case 'board.calendar':
+      expect(content['view'], 'week');
+      final events = content['events'] as List<dynamic>;
+      expect(events, isNotEmpty);
+      expect(
+        events.whereType<Map<String, dynamic>>().any(
+          (event) => event['title'] == 'Remote standup',
+        ),
+        isTrue,
+      );
+    case 'board.chart':
+      expect(content['type'], 'bar');
+      final data = content['data'] as List<dynamic>;
+      expect(data, hasLength(2));
+      expect(
+        data.whereType<Map<String, dynamic>>().any(
+          (point) => point['month'] == 'Apr',
+        ),
+        isTrue,
+      );
   }
 }
