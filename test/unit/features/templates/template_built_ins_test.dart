@@ -5,6 +5,14 @@ import 'package:yoloit/features/templates/model/template_models.dart';
 
 void main() {
   group('Built-in templates', () {
+    test('default GitHub source points to IstiN/yoloit', () {
+      final source = TemplateSourcesService.instance.defaultSource;
+      expect(source.id, 'yoloit-github');
+      expect(source.githubOwner, 'IstiN');
+      expect(source.githubRepo, 'yoloit');
+      expect(source.githubPath, 'yoloit/templates');
+    });
+
     test('built-in source points to yoloit/templates and loads all templates',
         () async {
       final source = TemplateSourcesService.instance.builtInSource;

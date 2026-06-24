@@ -44,7 +44,10 @@ class TemplatesCubit extends Cubit<TemplatesState> {
   Future<void> load() async {
     emit(state.copyWith(isLoading: true, error: null));
     try {
-      final templates = await _service.loadAll();
+      var templates = await _service.loadAll();
+      if (templates.isEmpty) {
+        templates = await _service.sync();
+      }
       emit(state.copyWith(templates: templates, isLoading: false));
     } catch (e) {
       emit(state.copyWith(isLoading: false, error: e.toString()));

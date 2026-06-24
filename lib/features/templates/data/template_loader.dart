@@ -87,13 +87,16 @@ class GitHubTemplateLoader extends TemplateLoader {
   Future<List<BoardTemplate>> load(TemplateSource source) async {
     final cacheDir = _cacheDirFor(source);
     if (await cacheDir.exists()) {
-      return const LocalTemplateLoader().load(
+      final cached = await const LocalTemplateLoader().load(
         source.copyWith(type: TemplateSourceType.local, localPath: cacheDir.path),
       );
+      if (cached.isNotEmpty) return cached;
     }
-    // If no cache exists yet, sync first.
+    // If no cache exists yet (or a previous sync left an empty cache), sync.
     await sync(source);
-    return load(source);
+    return const LocalTemplateLoader().load(
+      source.copyWith(type: TemplateSourceType.local, localPath: cacheDir.path),
+    );
   }
 
   @override

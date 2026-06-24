@@ -52,7 +52,7 @@ class _TemplateSourcesSectionState extends State<TemplateSourcesSection> {
         const SizedBox(height: 8),
         Text(
           'Templates are loaded from local folders or GitHub repositories. '
-          'The default source points to the yoloit/yoloit repository at yoloit/templates.',
+          'The default source points to the IstiN/yoloit repository at yoloit/templates.',
           style: TextStyle(
             fontSize: 12,
             color: colors.onSurface.withAlpha(160),

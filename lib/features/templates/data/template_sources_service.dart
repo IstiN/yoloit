@@ -9,7 +9,7 @@ import 'package:yoloit/features/templates/model/template_models.dart';
 /// Persists the user's configured template sources.
 ///
 /// Sources are stored in `~/.config/yoloit/template_sources.json`. A built-in
-/// default GitHub source pointing to `yoloit/yoloit` is always returned unless
+/// default GitHub source pointing to `IstiN/yoloit` is always returned unless
 /// the user explicitly disables or removes it.
 class TemplateSourcesService {
   TemplateSourcesService._();
@@ -17,6 +17,8 @@ class TemplateSourcesService {
   static final instance = TemplateSourcesService._();
 
   static const _fileName = 'template_sources.json';
+  static const _defaultGithubOwner = 'IstiN';
+  static const _defaultGithubRepo = 'yoloit';
 
   File get _storageFile {
     final dir = PlatformDirs.instance.configDir;
@@ -26,8 +28,8 @@ class TemplateSourcesService {
   TemplateSource get defaultSource => const TemplateSource(
     id: 'yoloit-github',
     type: TemplateSourceType.github,
-    githubOwner: 'yoloit',
-    githubRepo: 'yoloit',
+    githubOwner: _defaultGithubOwner,
+    githubRepo: _defaultGithubRepo,
     githubBranch: 'main',
     githubPath: 'yoloit/templates',
   );
@@ -77,6 +79,14 @@ class TemplateSourcesService {
       }());
       sources = [];
     }
+    final normalized = _normalizeSources(sources);
+    if (!_sameSources(sources, normalized.sources)) {
+      await saveAll(normalized.sources);
+      if (normalized.clearGithubCache) {
+        await _clearGithubCache();
+      }
+    }
+    sources = normalized.sources;
     // Ensure the default source exists unless explicitly removed.
     if (!sources.any((s) => s.id == defaultSource.id)) {
       sources = [defaultSource, ...sources];
@@ -87,6 +97,60 @@ class TemplateSourcesService {
       sources = [builtIn, ...sources];
     }
     return sources;
+  }
+
+  ({List<TemplateSource> sources, bool clearGithubCache}) _normalizeSources(
+    List<TemplateSource> sources,
+  ) {
+    var clearGithubCache = false;
+    final normalized =
+        sources.map((source) {
+          if (source.id != defaultSource.id ||
+              source.type != TemplateSourceType.github) {
+            return source;
+          }
+          final owner = source.githubOwner ?? '';
+          final repo = source.githubRepo ?? '';
+          final isLegacyDefault =
+              owner == 'yoloit' && repo == 'yoloit' ||
+              owner.isEmpty ||
+              repo.isEmpty;
+          if (!isLegacyDefault &&
+              owner == _defaultGithubOwner &&
+              repo == _defaultGithubRepo) {
+            return source;
+          }
+          clearGithubCache = true;
+          return defaultSource.copyWith(
+            enabled: source.enabled,
+            githubToken: source.githubToken,
+          );
+        }).toList();
+    return (sources: normalized, clearGithubCache: clearGithubCache);
+  }
+
+  bool _sameSources(List<TemplateSource> a, List<TemplateSource> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i].toJson().toString() != b[i].toJson().toString()) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  Future<void> _clearGithubCache() async {
+    final cacheDir = Directory(
+      p.join(
+        PlatformDirs.instance.configDir,
+        'templates',
+        'cache',
+        defaultSource.id,
+      ),
+    );
+    if (await cacheDir.exists()) {
+      await cacheDir.delete(recursive: true);
+    }
   }
 
   Future<void> saveAll(List<TemplateSource> sources) async {
