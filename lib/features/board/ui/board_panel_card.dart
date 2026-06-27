@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yoloit/core/remote/yoloit_remote_client.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
@@ -11,61 +10,12 @@ import 'package:yoloit/features/board/chat/provider_icon.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
-import 'package:yoloit/features/board/plugins/builtin/yolo_assistant_plugin.dart';
 import 'package:yoloit/features/board/ui/chat_glow_wrapper.dart';
 import 'package:yoloit/features/board/ui/panel_settings_dialog.dart';
-import 'package:yoloit/features/board/ui/panel_yolo_assistant_badge.dart';
-import 'package:yoloit/features/board/ui/sticky_note_chrome.dart';
+import 'package:yoloit/features/board/ui/board_panel_resize_chrome.dart';
+import 'package:yoloit/features/board/ui/board_panel_selection_metrics.dart';
 import 'package:yoloit/features/board/ui/unified_panel_header.dart';
 import 'package:yoloit/ui/components/layout/panel_content_toolbar.dart';
-
-enum BoardPanelResizeHandle {
-  topLeft,
-  top,
-  topRight,
-  right,
-  bottomRight,
-  bottom,
-  bottomLeft,
-  left;
-
-  bool get affectsLeft => this == left || this == topLeft || this == bottomLeft;
-  bool get affectsRight =>
-      this == right || this == topRight || this == bottomRight;
-  bool get affectsTop => this == top || this == topLeft || this == topRight;
-  bool get affectsBottom =>
-      this == bottom || this == bottomLeft || this == bottomRight;
-
-  SystemMouseCursor get cursor => switch (this) {
-    topLeft || bottomRight => SystemMouseCursors.resizeUpLeftDownRight,
-    topRight || bottomLeft => SystemMouseCursors.resizeUpRightDownLeft,
-    left || right => SystemMouseCursors.resizeLeftRight,
-    top || bottom => SystemMouseCursors.resizeUpDown,
-  };
-
-  String get tooltip => switch (this) {
-    topLeft => 'Resize from top left',
-    top => 'Resize height',
-    topRight => 'Resize from top right',
-    right => 'Resize width',
-    bottomRight => 'Resize from bottom right',
-    bottom => 'Resize height',
-    bottomLeft => 'Resize from bottom left',
-    left => 'Resize width',
-  };
-}
-
-class BoardPanelResizeUpdate {
-  const BoardPanelResizeUpdate({
-    required this.handle,
-    required this.delta,
-    required this.globalPosition,
-  });
-
-  final BoardPanelResizeHandle handle;
-  final Offset delta;
-  final Offset globalPosition;
-}
 
 class BoardPanelCard extends StatefulWidget {
   const BoardPanelCard({
@@ -128,7 +78,6 @@ class BoardPanelCardState extends State<BoardPanelCard>
   late final Animation<double> _opacity;
   late final Animation<double> _scale;
   bool _isTransformingPanel = false;
-  bool _yoloExpanded = false;
 
   // Convenience getters so build code can still use widget.panel etc.
   BoardPanelInstance get panel => widget.panel;
@@ -223,19 +172,6 @@ class BoardPanelCardState extends State<BoardPanelCard>
     onDragEnd();
   }
 
-  void _resizeFromHandle(
-    BoardPanelResizeHandle handle,
-    DragUpdateDetails details,
-  ) {
-    onResize(
-      BoardPanelResizeUpdate(
-        handle: handle,
-        delta: details.delta,
-        globalPosition: details.globalPosition,
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
@@ -267,11 +203,9 @@ class BoardPanelCardState extends State<BoardPanelCard>
             : accent == null
             ? colors.divider
             : Color.lerp(colors.divider, accent, 0.65) ?? colors.divider;
-    final showSelectionChrome = isFocused && !isCapturing;
-    const selectionSideGutter = 18.0;
-    const selectionTopGutter = 62.0;
-    const selectionBottomGutter = 18.0;
-    const selectionHandleInset = 12.0;
+    const selectionSideGutter = BoardPanelSelectionMetrics.sideGutter;
+    const selectionTopGutter = BoardPanelSelectionMetrics.topGutter;
+    const selectionBottomGutter = BoardPanelSelectionMetrics.bottomGutter;
     final selectionWrapperWidth = panel.bounds.width + selectionSideGutter * 2;
     final contentToolbar = _buildContentToolbar(context, panel);
     return AnimatedPositioned(
@@ -301,8 +235,11 @@ class BoardPanelCardState extends State<BoardPanelCard>
                   panelId: panel.id,
                   borderRadius: BorderRadius.circular(16),
                   child: Listener(
-                    behavior: HitTestBehavior.deferToChild,
-                      onPointerDown: (_) {
+                    behavior: HitTestBehavior.opaque,
+                    onPointerDown: (_) {
+                      if (kDebugMode) {
+                        debugPrint('[BoardPanelCard] onPointerDown panelId=${panel.id} isWebpage=$isWebpage isFocused=$isFocused');
+                      }
                         if (isWebpage) {
                           if (!isFocused) {
                             if (kDebugMode) {
@@ -534,96 +471,6 @@ class BoardPanelCardState extends State<BoardPanelCard>
                     ),
                 ),
               ),
-              if (showSelectionChrome && !showHeader)
-                Positioned(
-                  top: -46,
-                  left: selectionSideGutter,
-                  child: StickyNoteChrome(
-                    panel: panel,
-                    locked: panel.locked,
-                    onUpdateState: onUpdateState ?? (_) {},
-                    onDragStart: _startPanelTransform,
-                    onDragUpdate:
-                        panel.locked ? null : (details) => onMove(details),
-                    onDragEnd: _endPanelTransform,
-                    onDuplicate: () => _duplicatePanel(panel),
-                    onToggleLocked: () => _toggleLocked(panel),
-                    onBringToFront: onBringToFront,
-                    onSendToBack: onSendToBack,
-                    onSettings:
-                        () => _showPanelSettingsDialog(
-                          context,
-                          panel: panel,
-                          plugin: plugin,
-                          onEditPanel: onEditNote,
-                          onEditColor: onEditColor,
-                          onBringToFront: onBringToFront,
-                          onSendToBack: onSendToBack,
-                        ),
-                    onDelete: onDelete,
-                  ),
-                ),
-              if (showSelectionChrome)
-                Positioned(
-                  left: selectionSideGutter - selectionHandleInset,
-                  top: selectionTopGutter - selectionHandleInset,
-                  width: panel.bounds.width + selectionHandleInset * 2,
-                  height: panel.bounds.height + selectionHandleInset * 2,
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: BoardPanelResizeOverlay.handles(
-                      locked: panel.locked,
-                      onStart: _startPanelTransform,
-                      onUpdate: _resizeFromHandle,
-                      onEnd: _endPanelTransform,
-                      colors: colors,
-                    ),
-                  ),
-                ),
-              if (!isCapturing &&
-                  !connectMode &&
-                  panel.type != YoloAssistantPlugin.kTypeId)
-                AnimatedPositioned(
-                  duration: const Duration(milliseconds: 350),
-                  curve: Curves.easeInOutCubic,
-                  left:
-                      selectionSideGutter +
-                      panel.bounds.width -
-                      (_yoloExpanded
-                          ? PanelYoloAssistantBadge.expandedWidth
-                          : PanelYoloAssistantBadge.badgeSize) -
-                      12,
-                  top:
-                      selectionTopGutter +
-                      panel.bounds.height -
-                      (_yoloExpanded
-                          ? PanelYoloAssistantBadge.expandedHeight
-                          : PanelYoloAssistantBadge.badgeSize) -
-                      12,
-                  width:
-                      _yoloExpanded
-                          ? PanelYoloAssistantBadge.expandedWidth
-                          : PanelYoloAssistantBadge.badgeSize,
-                  height:
-                      _yoloExpanded
-                          ? PanelYoloAssistantBadge.expandedHeight
-                          : PanelYoloAssistantBadge.badgeSize,
-                  child: IgnorePointer(
-                    ignoring: !(selected || isFocused || _yoloExpanded),
-                    child: AnimatedOpacity(
-                      duration: const Duration(milliseconds: 200),
-                      curve: Curves.easeInOut,
-                      opacity:
-                          (selected || isFocused || _yoloExpanded) ? 1.0 : 0.0,
-                      child: PanelYoloAssistantBadge(
-                        targetPanel: panel,
-                        expanded: _yoloExpanded,
-                        onExpandedChanged:
-                            (value) => setState(() => _yoloExpanded = value),
-                      ),
-                    ),
-                  ),
-                ),
             ],
           ), // Stack
         ), // ScaleTransition
@@ -755,139 +602,4 @@ class BoardPanelCardState extends State<BoardPanelCard>
     return Center(child: Text('Unknown: ${panel.type}'));
   }
 }
-
-class BoardPanelResizeOverlay {
-  const BoardPanelResizeOverlay._();
-
-  static List<Widget> handles({
-    required bool locked,
-    required ValueChanged<DragStartDetails> onStart,
-    required void Function(BoardPanelResizeHandle, DragUpdateDetails) onUpdate,
-    required VoidCallback onEnd,
-    required AppColorScheme colors,
-  }) {
-    if (locked) return const [];
-    return BoardPanelResizeHandle.values
-        .map(
-          (handle) => PanelResizeHandleWidget(
-            handle: handle,
-            onStart: onStart,
-            onUpdate: (details) => onUpdate(handle, details),
-            onEnd: onEnd,
-            colors: colors,
-          ),
-        )
-        .toList(growable: false);
-  }
-}
-
-class PanelResizeHandleWidget extends StatelessWidget {
-  const PanelResizeHandleWidget({
-    super.key,
-    required this.handle,
-    required this.onStart,
-    required this.onUpdate,
-    required this.onEnd,
-    required this.colors,
-  });
-
-  final BoardPanelResizeHandle handle;
-  final ValueChanged<DragStartDetails> onStart;
-  final ValueChanged<DragUpdateDetails> onUpdate;
-  final VoidCallback onEnd;
-  final AppColorScheme colors;
-
-  static const double _hitSize = 24;
-  static const double _dotSize = 10;
-
-  @override
-  Widget build(BuildContext context) {
-    final child = MouseRegion(
-      cursor: handle.cursor,
-      child: Tooltip(
-        message: handle.tooltip,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onPanStart: onStart,
-          onPanUpdate: onUpdate,
-          onPanEnd: (_) => onEnd(),
-          onPanCancel: onEnd,
-          child: SizedBox(
-            width: _hitSize,
-            height: _hitSize,
-            child: Center(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: colors.surface,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: colors.primary, width: 2),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.16),
-                      blurRadius: 5,
-                      offset: const Offset(0, 1),
-                    ),
-                  ],
-                ),
-                child: const SizedBox(width: _dotSize, height: _dotSize),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-
-    return switch (handle) {
-      BoardPanelResizeHandle.topLeft => Positioned(
-        left: 0,
-        top: 0,
-        child: child,
-      ),
-      BoardPanelResizeHandle.top => Positioned(
-        left: 0,
-        right: 0,
-        top: 0,
-        height: _hitSize,
-        child: Center(child: child),
-      ),
-      BoardPanelResizeHandle.topRight => Positioned(
-        right: 0,
-        top: 0,
-        child: child,
-      ),
-      BoardPanelResizeHandle.right => Positioned(
-        right: 0,
-        top: 0,
-        bottom: 0,
-        width: _hitSize,
-        child: Center(child: child),
-      ),
-      BoardPanelResizeHandle.bottomRight => Positioned(
-        right: 0,
-        bottom: 0,
-        child: child,
-      ),
-      BoardPanelResizeHandle.bottom => Positioned(
-        left: 0,
-        right: 0,
-        bottom: 0,
-        height: _hitSize,
-        child: Center(child: child),
-      ),
-      BoardPanelResizeHandle.bottomLeft => Positioned(
-        left: 0,
-        bottom: 0,
-        child: child,
-      ),
-      BoardPanelResizeHandle.left => Positioned(
-        left: 0,
-        top: 0,
-        bottom: 0,
-        width: _hitSize,
-        child: Center(child: child),
-      ),
-    };
-  }
-}
-
 

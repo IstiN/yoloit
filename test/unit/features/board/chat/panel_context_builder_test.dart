@@ -113,7 +113,7 @@ void main() {
       expect(summary, contains('- id: `p1`'));
       expect(summary, contains('# Hello'));
       expect(summary, contains('How to work with this panel'));
-      expect(summary, contains('yoloit_do'));
+      expect(summary, contains('yoloit_note_append'));
     });
 
     test('formats terminal content with recent output', () async {

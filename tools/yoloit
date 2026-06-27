@@ -105,6 +105,101 @@ _resolve_base() {
   return 0
 }
 
+# When chat paste stores long text in /tmp/.../yoloit_clip/clip_<ts>.txt, models
+# often pass that path to --text. Read the file contents instead of using the path.
+_resolve_text_value() {
+  local value="${1:-}"
+  [[ -z "$value" ]] && { printf '%s' ""; return; }
+  case "$value" in
+    @/*) value="${value#@}" ;;
+    file://*) value=$(python3 -c "import sys,urllib.parse; print(urllib.parse.urlparse(sys.argv[1]).path)" "$value") ;;
+  esac
+  if [[ -f "$value" && "$value" == *"/yoloit_clip/clip_"* && "$value" == *.txt ]]; then
+    python3 -c "
+import pathlib,sys,re
+raw=pathlib.Path(sys.argv[1]).read_text()
+s=raw.strip()
+if s.startswith('[20'):
+    blocks=list(re.finditer(r'\[[^\]]+\]\s+USER\s*\n(.*?)(?=\n\n\[|\Z)', raw, re.S))
+    if blocks:
+        print(blocks[-1].group(1).strip(), end='')
+        sys.exit(0)
+print(raw, end='')
+" "$value"
+    return
+  fi
+  printf '%s' "$value"
+}
+
+# Collect text after <board> <panel>. Supports positional text and --text/--tx flags
+# produced by YoLoIT chat tool executor.
+_collect_text_arg() {
+  shift 2
+  local text=""
+  [[ $# -eq 0 ]] && { printf '%s' ""; return; }
+  case "$1" in
+    --text|--tx|-text|-tx) text="${2:-}" ;;
+    --text=*|--tx=*) text="${1#*=}" ;;
+    *) text="$*" ;;
+  esac
+  _resolve_text_value "$text"
+}
+
+# Merge action into JSON body and expand yoloit_clip .txt paths in text fields.
+_merge_action_body() {
+  local body="$1"
+  local action="$2"
+  python3 -c "
+import json,sys,pathlib,re
+CLIP_RE = re.compile(r'/yoloit_clip/clip_\\d+\\.txt$')
+TEXT_KEYS = {'text','content','code','markdown','item','label','body','tx'}
+
+def extract_usable(raw):
+    s = raw.strip()
+    if not s.startswith('[20'):
+        return raw
+    blocks = list(re.finditer(r'\[[^\]]+\]\s+USER\s*\n(.*?)(?=\n\n\[|\Z)', raw, re.S))
+    if blocks:
+        return blocks[-1].group(1).strip()
+    return raw
+
+def resolve_value(v):
+    if not isinstance(v, str):
+        return v
+    p = v[1:] if v.startswith('@') else v
+    if p.startswith('file://'):
+        from urllib.parse import urlparse
+        p = urlparse(p).path
+    if CLIP_RE.search(p) and pathlib.Path(p).is_file():
+        return extract_usable(pathlib.Path(p).read_text())
+    return v
+
+raw = sys.argv[1]
+try:
+    b = json.loads(raw)
+except json.JSONDecodeError:
+    p = raw[1:] if raw.startswith('@') else raw
+    if p.startswith('file://'):
+        from urllib.parse import urlparse
+        p = urlparse(p).path
+    if CLIP_RE.search(p) and pathlib.Path(p).is_file():
+        b = {'text': extract_usable(pathlib.Path(p).read_text())}
+    elif raw.strip():
+        b = {'text': raw}
+    else:
+        b = {}
+if isinstance(b, str):
+    b = {'text': b}
+elif not isinstance(b, dict):
+    b = {'text': json.dumps(b, ensure_ascii=False)}
+b['action'] = sys.argv[2]
+for k in list(b.keys()):
+    if k in TEXT_KEYS and isinstance(b.get(k), str):
+        b[k] = resolve_value(b[k])
+print(json.dumps(b))
+" "$body" "$action"
+}
+
 _resolve_vm_service_ws_uri() {
   # Flutter runs a small `development-service` proxy next to the app. Its
   # command line contains the app VM service URI:
@@ -1231,7 +1326,7 @@ commands = [{'group': 'app',
   'params': [['[board]', 'Board id or name (optional)', False],
              ['shape', 'rectangle|circle|diamond|triangle|hexagon|frame', True],
              ['title', 'Panel title', True],
-             ['--text label', 'Centered label', False],
+             ['--text label', 'Centered label (yoloit_clip .txt paths are read automatically)', False],
              ['--fill #RRGGBB', 'Fill color', False],
              ['--stroke #RRGGBB', 'Stroke color', False]],
   'example': 'yoloit shape:create diamond "Decision" --text "Go / No-go"',
@@ -1302,7 +1397,7 @@ commands = [{'group': 'app',
   'description': 'Set shape panel properties',
   'params': [['board', 'Board id or name', True],
              ['panel', 'Shape panel id or title', True],
-             ['--text', 'Label text', False],
+             ['--text', 'Label text (yoloit_clip .txt paths are read automatically)', False],
              ['--fill', 'Fill color', False],
              ['--stroke', 'Stroke color', False],
              ['--stroke-width', 'Stroke width', False]],
@@ -3250,13 +3345,7 @@ PY
     [[ $# -lt 3 ]] && { echo "Usage: yoloit do <board> <panel> <action> [json-body]" >&2; exit 1; }
     bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2"); action=$3
     body="${4:-\{\}}"
-    # merge action into body JSON
-    merged=$(python3 -c "
-import json,sys
-b = json.loads(sys.argv[1])
-b['action'] = sys.argv[2]
-print(json.dumps(b))
-" "$body" "$action")
+    merged=$(_merge_action_body "$body" "$action")
     _post "/boards/${bid}/panels/${pid}/action" "$merged" | python3 -m json.tool 2>/dev/null
     ;;
   run:list)
@@ -4123,6 +4212,7 @@ PYEOF
         ;;
     esac
     bid_raw=$(_require_board "$bid_raw")
+    text=$(_resolve_text_value "$text")
     bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
     state=$(python3 -c "import json,sys; print(json.dumps({'shape':sys.argv[1], 'text':sys.argv[2], 'fillColor':sys.argv[3], 'strokeColor':sys.argv[4]}))" "$shape" "$text" "$fill" "$stroke")
     pid=$(_auto_panel "$bid" "board.shape" "$title" "$state")
@@ -4145,7 +4235,7 @@ PYEOF
     # Explicit board+panel required (legacy compat)
     [[ $# -lt 3 ]] && { echo "Usage: yoloit note:append <board> <panel> <text>" >&2; exit 1; }
     bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
-    shift 2; text="$*"
+    text=$(_collect_text_arg "$@")
     _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"append\",\"text\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$text")}" | python3 -m json.tool 2>/dev/null
     ;;
   note:wrap|n:w)
@@ -5303,14 +5393,16 @@ PY
     ;;
   sticky:set)
     [[ $# -lt 3 ]] && { echo "Usage: yoloit sticky:set <board> <panel> <text>" >&2; exit 1; }
-    board="$1"; panel="$2"; arg="$3"; _use_board "$board"
-    json=$(python3 -c "import json,sys; print(json.dumps({'text': sys.argv[1]}))" "$arg")
+    board="$1"; panel="$2"; _use_board "$board"
+    text=$(_collect_text_arg "$@")
+    json=$(python3 -c "import json,sys; print(json.dumps({'text': sys.argv[1]}))" "$text")
     "$0" do "$board" "$panel" set "$json"
     ;;
   sticky:append)
     [[ $# -lt 3 ]] && { echo "Usage: yoloit sticky:append <board> <panel> <text>" >&2; exit 1; }
-    board="$1"; panel="$2"; arg="$3"; _use_board "$board"
-    json=$(python3 -c "import json,sys; print(json.dumps({'text': sys.argv[1]}))" "$arg")
+    board="$1"; panel="$2"; _use_board "$board"
+    text=$(_collect_text_arg "$@")
+    json=$(python3 -c "import json,sys; print(json.dumps({'text': sys.argv[1]}))" "$text")
     "$0" do "$board" "$panel" append "$json"
     ;;
   sticky:color)
@@ -5339,6 +5431,7 @@ PY
         *) shift ;;
       esac
     done
+    text=$(_resolve_text_value "$text")
     json=$(python3 -c "import json,sys; d={k:v for k,v in zip(['text','fillColor','strokeColor','strokeWidth'], sys.argv[1:5]) if v}; print(json.dumps(d))" "$text" "$fill" "$stroke" "$stroke_width")
     "$0" do "$board" "$panel" set "$json"
     ;;

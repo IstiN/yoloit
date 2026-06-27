@@ -10,6 +10,8 @@ import 'package:flutter/services.dart';
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:yaml/yaml.dart';
+import 'package:yoloit/core/cli/cli_installed_paths.dart';
+import 'package:yoloit/core/cli/cli_text_argument_resolver.dart';
 import 'package:yoloit/core/cli/board_screenshot_service.dart';
 import 'package:yoloit/core/cli/board_svg_exporter.dart';
 import 'package:yoloit/core/cli/handlers/agents_handler.dart';
@@ -68,6 +70,13 @@ class CliServer {
     }
     return '${Platform.environment['HOME'] ?? '/tmp'}/.config/yoloit';
   }
+
+  /// Installed CLI wrapper path for the current build mode.
+  static String installedCliPathForHome(String home) =>
+      CliInstalledPaths.pathForHome(home);
+
+  /// Returns the installed CLI wrapper when present for the current mode.
+  static File? get installedCliExecutable => CliInstalledPaths.executable();
 
   /// Port file written so the CLI client knows which port to connect to.
   static String get _portFilePath => '$_configDir/cli.port';
@@ -973,7 +982,9 @@ class CliServer {
     final hasExplicitState = body['state'] is Map;
     final state =
         hasExplicitState
-            ? Map<String, dynamic>.from(body['state'] as Map)
+            ? CliTextArgumentResolver.resolvePanelState(
+              Map<String, dynamic>.from(body['state'] as Map),
+            )
             : _initialPanelStateForBoard(plugin.initialState, typeId, board);
     final hasCustomPosition = body['x'] is num || body['y'] is num;
     final bounds =
@@ -1216,7 +1227,7 @@ class CliServer {
       );
     }
 
-    final result = await handler.handleAction(action, {
+    final actionArgs = CliTextArgumentResolver.resolveActionArgs({
       ...body,
       '_boardId': board.id,
       '_boardName': board.name,
@@ -1231,11 +1242,15 @@ class CliServer {
           .map((p) => '- ${p.title} [${p.type}] (${p.id})')
           .join('\n'),
       '_currentBoardPanels': board.panels.map((p) => p.toJson()).toList(),
-    }, panel);
+    });
+    final result = await handler.handleAction(action, actionArgs, panel);
 
     // Apply state update if provided
     if (result.stateUpdate != null && result.ok) {
-      final mergedState = {...panel.state, ...result.stateUpdate!};
+      final mergedState = {
+        ...panel.state,
+        ...CliTextArgumentResolver.resolvePanelState(result.stateUpdate!),
+      };
       await cubit.updatePanel(
         panel.id,
         (p) => p.copyWith(state: mergedState),
@@ -1867,7 +1882,10 @@ class CliServer {
       bounds: BoardPanelBounds(x: x, y: y, width: width, height: height),
       color: color,
       params: {...?params, if (ref != null && ref.isNotEmpty) 'yamlRef': ref},
-      state: {...plugin.initialState, if (state != null) ...state},
+      state: {
+        ...plugin.initialState,
+        if (state != null) ...CliTextArgumentResolver.resolvePanelState(state),
+      },
       zIndex: zIndex,
       hidden: hidden,
       locked: locked,
@@ -2226,14 +2244,18 @@ class CliServer {
       };
     }
 
-    final result = await handler.handleAction(action, {
+    final actionArgs = CliTextArgumentResolver.resolveActionArgs({
       ...body,
       '_boardId': board.id,
       '_boardName': board.name,
       '_currentBoardPanels': board.panels.map((p) => p.toJson()).toList(),
-    }, panel);
+    });
+    final result = await handler.handleAction(action, actionArgs, panel);
     if (result.stateUpdate != null && result.ok) {
-      final mergedState = {...panel.state, ...result.stateUpdate!};
+      final mergedState = {
+        ...panel.state,
+        ...CliTextArgumentResolver.resolvePanelState(result.stateUpdate!),
+      };
       await cubit.updatePanel(
         panel.id,
         (p) => p.copyWith(state: mergedState),

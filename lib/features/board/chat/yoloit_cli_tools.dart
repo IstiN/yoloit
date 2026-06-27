@@ -2,11 +2,13 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:local_models_flutter/local_models_flutter.dart' as flm;
 import 'package:path/path.dart' as p;
 import 'package:yaml/yaml.dart';
 import 'package:yoloit/core/cli/cli_server.dart';
+import 'package:yoloit/core/cli/cli_text_argument_resolver.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
 import 'package:yoloit/features/board/events/board_event_bus.dart';
 
@@ -148,6 +150,54 @@ class YoloitCliTool {
         ),
     ];
   }
+
+  /// OpenAI-compatible function definition for cloud providers.
+  ///
+  /// When [compact] is true (default), uses short tool aliases and param keys
+  /// without per-field descriptions to reduce token usage.
+  Map<String, Object?> toOpenAiFunctionDefinition({bool compact = true}) {
+    final useCompact = compact;
+    final properties = <String, Object?>{};
+    final requiredKeys = <String>[];
+    for (final param in params) {
+      final propKey = useCompact ? param.compactKey : param.key;
+      properties[propKey] =
+          useCompact ? param.toCompactJsonSchema() : param.toJsonSchema();
+      if (param.required) requiredKeys.add(propKey);
+    }
+    if (destructive) {
+      final confirmKey = useCompact ? 'cf' : 'confirm';
+      properties[confirmKey] =
+          useCompact
+              ? const <String, Object?>{'type': 'boolean'}
+              : const <String, Object?>{
+                'type': 'boolean',
+                'description':
+                    'Set true only after the user explicitly confirmed this destructive action.',
+              };
+      if (!useCompact) requiredKeys.add(confirmKey);
+    }
+    final schema = <String, Object?>{
+      'type': 'object',
+      'properties': properties,
+      if (!useCompact) 'additionalProperties': false,
+      if (requiredKeys.isNotEmpty) 'required': requiredKeys,
+    };
+    final name =
+        useCompact && _allAliases.isNotEmpty ? functionName : fullFunctionName;
+    final desc =
+        useCompact
+            ? description
+            : 'yoloit $command — $description.${destructive ? ' Ask for confirmation before using it.' : ''}';
+    return <String, Object?>{
+      'type': 'function',
+      'function': <String, Object?>{
+        'name': name,
+        'description': desc,
+        'parameters': schema,
+      },
+    };
+  }
 }
 
 class YoloitCliToolCatalog {
@@ -256,6 +306,20 @@ class YoloitCliToolCatalog {
             },
       ],
     });
+  }
+
+  /// OpenAI function-calling payload for cloud LLM providers.
+  static List<Map<String, Object?>> openAiToolDefinitions({
+    Iterable<String> disabledFunctionNames = const <String>{},
+    bool compact = true,
+  }) {
+    final disabled = normalizeFunctionNames(disabledFunctionNames);
+    return <Map<String, Object?>>[
+      for (final tool in _tools)
+        if (!disabled.contains(tool.functionName) &&
+            !disabled.contains(tool.fullFunctionName))
+          tool.toOpenAiFunctionDefinition(compact: compact),
+    ];
   }
 
   static Set<String> normalizeFunctionNames(Iterable<String> values) {
@@ -516,6 +580,7 @@ class YoloitCliToolArgumentNormalizer {
             userMessage.toLowerCase().contains('allowing stopped'))) {
       normalized['any'] = true;
     }
+    CliTextArgumentResolver.resolveInArguments(normalized);
     return normalized;
   }
 
@@ -1267,15 +1332,32 @@ class YoloitCliToolExecutor implements YoloitToolExecutor {
             out.add(param.flag!);
           }
         } else {
+          final rendered = _resolveTextArgument(param, '$value');
+          if (rendered.trim().isEmpty) continue;
           out
             ..add(param.flag!)
-            ..add('$value');
+            ..add(rendered);
         }
         continue;
       }
-      out.add('$value');
+      final rendered = _resolveTextArgument(param, '$value');
+      if (rendered.trim().isEmpty) continue;
+      out.add(rendered);
     }
     return out;
+  }
+
+  String _resolveTextArgument(YoloitCliToolParam param, String value) {
+    if (param.kind != YoloitCliToolParamKind.string) return value;
+    if (CliTextArgumentResolver.jsonKeys.contains(param.key)) {
+      return CliTextArgumentResolver.resolveJsonParameter(value);
+    }
+    if (!CliTextArgumentResolver.textKeys.contains(param.key) &&
+        param.flag != '--text') {
+      return value;
+    }
+    return CliTextArgumentResolver.resolve(value) ??
+        (CliTextArgumentResolver.isClipTextFilePath(value) ? '' : value);
   }
 
   Object? _argumentValue(
@@ -1467,13 +1549,9 @@ class YoloitCliToolExecutor implements YoloitToolExecutor {
       return explicit.trim();
     }
 
-    // Check the well-known install path first (~/.config/yoloit/yoloit).
-    // CliServer._installCliScript() always writes the script here, so this
-    // works for production app bundles where no source tree is present.
-    final home = Platform.environment['HOME'] ?? '';
-    if (home.isNotEmpty) {
-      final installed = File(p.join(home, '.config', 'yoloit', 'yoloit'));
-      if (installed.existsSync()) return installed.path;
+    final installed = CliServer.installedCliExecutable;
+    if (installed != null) {
+      return installed.path;
     }
 
     final checked = <String>[];

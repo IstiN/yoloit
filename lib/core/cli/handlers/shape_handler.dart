@@ -25,6 +25,9 @@ class ShapeCliHandler extends PanelCliHandler with PanelGetSetCliHandler {
   ];
 
   @override
+  Set<String> get numericSettableKeys => const {'strokeWidth'};
+
+  @override
   String get settableName => 'Shape';
 
   @override

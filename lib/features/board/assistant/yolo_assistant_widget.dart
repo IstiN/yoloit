@@ -530,10 +530,16 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
       if (providerPref == 'cloud') {
         final cloudConfig =
             await CloudLlmSettingsService.instance.loadActiveConfig();
-        if (cloudConfig != null && cloudConfig.isValid) {
+        if (cloudConfig != null) {
           providerType = 'cloud:${cloudConfig.id}';
         } else {
-          providerType = 'local';
+          final configs =
+              await CloudLlmSettingsService.instance.loadConfigs();
+          if (configs.isNotEmpty) {
+            providerType = 'cloud:${configs.first.id}';
+          } else {
+            providerType = 'cloud:openrouter';
+          }
         }
       } else {
         providerType = 'local';
@@ -543,12 +549,20 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
       if (_chatProvider == null || _chatProviderType != providerType) {
         _chatProvider?.dispose();
         if (providerType.startsWith('cloud:')) {
+          final configId = providerType.substring(6);
           final cloudConfig =
+              await CloudLlmSettingsService.instance.loadConfigById(
+                configId,
+              ) ??
               await CloudLlmSettingsService.instance.loadActiveConfig();
-          _chatProvider = CloudLlmProvider(
-            config: cloudConfig!,
-            toolExecutor: _wrappedExecutor!,
-          );
+          if (cloudConfig != null) {
+            _chatProvider = CloudLlmProvider(
+              config: cloudConfig,
+              toolExecutor: _wrappedExecutor!,
+            );
+          } else {
+            _chatProvider = CloudLlmProvider.deferred(configId: configId);
+          }
         } else {
           _chatProvider = LocalLlmProvider(toolExecutor: _wrappedExecutor!);
         }

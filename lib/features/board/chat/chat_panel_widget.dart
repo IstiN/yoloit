@@ -49,6 +49,29 @@ import 'package:yoloit/features/terminal/data/smart_clipboard_paste_service.dart
 /// The chat UI rendered inside a board panel.
 ///
 /// Manages its own [ChatProvider] instance, message list, and streaming state.
+/// External control surface for [ChatPanelWidget] (mic, focus) from parent chrome.
+class ChatPanelController {
+  Future<void> Function()? _startMic;
+  VoidCallback? _focusInput;
+
+  void _attach({
+    required Future<void> Function() startMic,
+    required VoidCallback focusInput,
+  }) {
+    _startMic = startMic;
+    _focusInput = focusInput;
+  }
+
+  void _detach() {
+    _startMic = null;
+    _focusInput = null;
+  }
+
+  Future<void> startMic() => _startMic?.call() ?? Future<void>.value();
+
+  void focusInput() => _focusInput?.call();
+}
+
 class ChatPanelWidget extends StatefulWidget {
   const ChatPanelWidget({
     super.key,
@@ -57,12 +80,14 @@ class ChatPanelWidget extends StatefulWidget {
     this.onCreateLinkedPanel,
     this.remoteInfo,
     this.compact = false,
+    this.controller,
   });
 
   final BoardPanelInstance panel;
   final ValueChanged<Map<String, dynamic>> onUpdateState;
   final RemoteBoardInfo? remoteInfo;
   final bool compact;
+  final ChatPanelController? controller;
   final Future<String?> Function(
     String typeId,
     Map<String, dynamic> state,
@@ -359,6 +384,10 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     }
 
     _consumeCliPendingMessage();
+    widget.controller?._attach(
+      startMic: _handleMicInput,
+      focusInput: () => _inputFocusNode.requestFocus(),
+    );
   }
 
   @override
@@ -569,6 +598,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
 
   @override
   void dispose() {
+    widget.controller?._detach();
     ToolCallSettingsService.instance.ignoredToolsListenable.removeListener(
       _handleIgnoredToolsChanged,
     );

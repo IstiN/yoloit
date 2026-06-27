@@ -1,47 +1,34 @@
-import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_svg/flutter_svg.dart';
-import 'package:yoloit/core/utils/clipboard_utils.dart';
-import 'package:yoloit/features/board/bloc/board_cubit.dart';
-import 'package:yoloit/features/board/chat/chat_panel_plugin.dart';
-import 'package:yoloit/features/board/chat/chat_panel_widget.dart';
-import 'package:yoloit/features/board/model/board_models.dart';
-import 'package:yoloit/features/board/model/chat_models.dart';
-import 'package:yoloit/features/board/ui/yolo_assistant_overlay_shell.dart';
-import 'package:yoloit/features/mindmap/widgets/canvas_interaction_lock.dart';
-import 'package:yoloit/features/settings/data/cloud_llm_settings_service.dart';
-import 'package:yoloit/ui/components/buttons/header_icon_button.dart';
+import 'dart:async';
 
-/// Hover-triggered inline YoLo assistant badge anchored to a board panel.
-///
-/// When collapsed it shows a gradient-bordered badge; when expanded it
-/// renders the same [ChatPanelWidget] used by AI/Copilot/Yolo chat panels,
-/// keeping the chat experience unified across the app.
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/features/board/bloc/board_cubit.dart';
+import 'package:yoloit/features/board/model/board_models.dart';
+import 'package:yoloit/features/board/ui/yolo_anchored_assistant_scope.dart';
+
+/// Right-edge YoLo trigger for board panels: subtle strip → hover badge.
 class PanelYoloAssistantBadge extends StatefulWidget {
   const PanelYoloAssistantBadge({
     super.key,
     required this.targetPanel,
-    required this.expanded,
-    required this.onExpandedChanged,
-    this.chatBuilder,
+    required this.assistantOpen,
+    this.highlighted = false,
   });
 
   final BoardPanelInstance targetPanel;
-  final bool expanded;
-  final ValueChanged<bool> onExpandedChanged;
+  final bool assistantOpen;
+  final bool highlighted;
 
-  /// Optional builder used by tests to inject a stub chat body.
-  final Widget Function(
-    BoardPanelInstance assistantPanel,
-    ValueChanged<Map<String, dynamic>> onUpdateState,
-  )?
-  chatBuilder;
-
-  static const double badgeSize = 36;
+  static const double stripWidth = 5;
+  static const double badgeWidth = 34;
+  static const double hitWidth = 22;
+  static const double minTriggerHeight = 88;
   static const double expandedWidth = 360;
   static const double expandedHeight = 420;
+
+  /// Legacy alias used by older layout/tests.
+  static const double badgeSize = badgeWidth;
 
   @override
   State<PanelYoloAssistantBadge> createState() =>
@@ -49,264 +36,245 @@ class PanelYoloAssistantBadge extends StatefulWidget {
 }
 
 class _PanelYoloAssistantBadgeState extends State<PanelYoloAssistantBadge> {
-  bool _expanded = false;
-  late BoardPanelInstance _assistantPanel;
-  BoardCubit? _cubit;
+  bool _hovered = false;
+  Timer? _hoverCollapseTimer;
 
   @override
-  void initState() {
-    super.initState();
-    _expanded = widget.expanded;
-    _assistantPanel = _buildAssistantPanel();
-    if (widget.targetPanel.state['yoloAssistant'] == null ||
-        _assistantPanel.state['assistantProviderResolved'] != true) {
-      _resolveDefaultProvider();
-    }
+  void dispose() {
+    _hoverCollapseTimer?.cancel();
+    super.dispose();
   }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _cubit = context.read<BoardCubit>();
-  }
-
-  @override
-  void didUpdateWidget(covariant PanelYoloAssistantBadge oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.expanded != _expanded) {
-      setState(() => _expanded = widget.expanded);
-    }
-    if (oldWidget.targetPanel.id != widget.targetPanel.id) {
-      _assistantPanel = _buildAssistantPanel();
-      if (widget.targetPanel.state['yoloAssistant'] == null ||
-          _assistantPanel.state['assistantProviderResolved'] != true) {
-        _resolveDefaultProvider();
-      }
-    }
-  }
-
-  BoardPanelInstance _buildAssistantPanel() {
-    const chatPlugin = ChatPanelPlugin();
-    final persisted =
-        widget.targetPanel.state['yoloAssistant'] as Map<String, dynamic>?;
-    final state =
-        persisted == null
-              ? Map<String, dynamic>.from(chatPlugin.initialState)
-              : Map<String, dynamic>.from(chatPlugin.initialState)
-          ..addAll(persisted ?? const {});
-    state['targetPanelId'] = widget.targetPanel.id;
-    state['configured'] = true;
-    state['assistantProviderResolved'] =
-        (persisted?['assistantProviderResolved'] as bool?) ?? false;
-    const defaultConfig = ChatSessionConfig(
-      sessionName: '',
-      workingDir: '',
-      provider: 'local',
-    );
-    final savedConfig = state['config'];
-    if (savedConfig is Map) {
-      state['config'] =
-          ChatSessionConfig.fromJson(
-            Map<String, dynamic>.from(savedConfig),
-          ).toJson();
-    } else {
-      state['config'] = defaultConfig.toJson();
-    }
-    return BoardPanelInstance(
-      id: 'yolo-badge-${widget.targetPanel.id}',
-      type: ChatPanelPlugin.kTypeId,
-      title: 'YoLo: ${widget.targetPanel.title}',
-      bounds: const BoardPanelBounds(
-        x: 0,
-        y: 0,
-        width: PanelYoloAssistantBadge.expandedWidth,
-        height: PanelYoloAssistantBadge.expandedHeight,
-      ),
-      state: state,
-    );
-  }
-
-  void _onAssistantStateChanged(Map<String, dynamic> state) {
-    if (!mounted) return;
-    _assistantPanel = _assistantPanel.copyWith(state: state);
-    _cubit?.updatePanel(
-      widget.targetPanel.id,
-      (panel) =>
-          panel.copyWith(state: {...panel.state, 'yoloAssistant': state}),
-    );
-    final scheduler = SchedulerBinding.instance;
-    if (scheduler.schedulerPhase == SchedulerPhase.persistentCallbacks) {
-      // setState is illegal while the tree is locked (e.g. during dispose).
-      // Defer the rebuild until the next frame; the cubit update above still
-      // persists the new state immediately.
-      scheduler.addPostFrameCallback((_) {
-        if (mounted) setState(() {});
-      });
-    } else {
-      setState(() {});
-    }
-  }
-
-  Future<void> _resolveDefaultProvider() async {
-    if (!mounted) return;
-    String providerPref;
-    try {
-      providerPref =
-          await CloudLlmSettingsService.instance.loadAssistantProviderType();
-    } on MissingPluginException {
-      // SharedPreferences isn't available in headless/widget tests; fall back
-      // to the local provider so the badge can still render.
-      providerPref = 'local';
-    }
-    final cloudConfig =
-        providerPref == 'cloud'
-            ? await CloudLlmSettingsService.instance.loadActiveConfig()
-            : null;
-    final String providerType;
-    final String? model;
-    if (providerPref == 'cloud' && cloudConfig != null && cloudConfig.isValid) {
-      providerType = 'cloud:${cloudConfig.id}';
-      model = cloudConfig.model;
-    } else {
-      providerType = 'local';
-      model = null;
-    }
-
-    final rawConfig = _assistantPanel.state['config'];
-    final config =
-        rawConfig is Map
-            ? ChatSessionConfig.fromJson(Map<String, dynamic>.from(rawConfig))
-            : const ChatSessionConfig(
-              sessionName: '',
-              workingDir: '',
-              provider: 'local',
-            );
-    final alreadyResolved = _assistantPanel.state['assistantProviderResolved'] == true;
-    if (alreadyResolved &&
-        config.provider == providerType &&
-        (model == null || config.model == model)) {
+  void _openAssistant({bool startMic = false}) {
+    if (widget.assistantOpen) {
+      context.read<BoardCubit>().closeYoloAssistant();
       return;
     }
-
-    final newState = {
-      ..._assistantPanel.state,
-      'config': config.copyWith(
-        provider: providerType,
-        model: model,
-      ).toJson(),
-      'assistantProviderResolved': true,
-    };
-    _onAssistantStateChanged(newState);
-  }
-
-  Future<void> _copyHistory() async {
-    final messagesRaw = _assistantPanel.state['messages'];
-    final buffer = StringBuffer();
-    if (messagesRaw is List) {
-      for (final raw in messagesRaw) {
-        if (raw is! Map) continue;
-        try {
-          final message = ChatMessage.fromJson(
-            Map<String, dynamic>.from(raw),
-          );
-          final ts = message.timestamp?.toIso8601String() ?? '-';
-          final role = message.role.name.toUpperCase();
-          final title =
-              message.toolName?.isNotEmpty == true
-                  ? '[$ts] $role (${message.toolName})'
-                  : '[$ts] $role';
-          buffer.writeln(title);
-          if (message.attachments.isNotEmpty) {
-            buffer.writeln(
-              'Attachments: ${message.attachments.join(', ')}',
-            );
-          }
-          buffer.writeln(message.content.trimRight());
-          buffer.writeln('');
-        } catch (_) {}
-      }
-    }
-    await copyToClipboard(buffer.toString().trimRight());
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('YoLo history copied to clipboard'),
-        duration: Duration(seconds: 2),
-      ),
+    context.read<BoardCubit>().openYoloAssistant(
+      widget.targetPanel.id,
+      startMic: startMic,
     );
   }
 
-  void _toggleExpanded() {
-    final next = !_expanded;
-    widget.onExpandedChanged(next);
-    setState(() => _expanded = next);
+  void _onHoverEnter() {
+    _hoverCollapseTimer?.cancel();
+    if (!_hovered) setState(() => _hovered = true);
+  }
+
+  void _onHoverExit() {
+    _hoverCollapseTimer?.cancel();
+    _hoverCollapseTimer = Timer(const Duration(milliseconds: 140), () {
+      if (mounted && !widget.assistantOpen) {
+        setState(() => _hovered = false);
+      }
+    });
+  }
+
+  void _onMicTap() {
+    final controller = YoloAnchoredAssistantScope.controllerFor(
+      context,
+      widget.targetPanel.id,
+    );
+    if (controller != null) {
+      unawaited(controller.startMic());
+      return;
+    }
+    _openAssistant(startMic: true);
   }
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.bottomRight,
-      child: SizedBox(
-        width:
-            _expanded
-                ? PanelYoloAssistantBadge.expandedWidth
-                : PanelYoloAssistantBadge.badgeSize,
-        height:
-            _expanded
-                ? PanelYoloAssistantBadge.expandedHeight
-                : PanelYoloAssistantBadge.badgeSize,
-        child: Tooltip(
-        message: 'Ask YoLo about this panel',
-        child: MouseRegion(
-          cursor: SystemMouseCursors.click,
-          child: GestureDetector(
-            onTap: _toggleExpanded,
-            child: YoloAssistantOverlayShell(
-              expanded: _expanded,
-              badgeSize: PanelYoloAssistantBadge.badgeSize,
-              expandedWidth: PanelYoloAssistantBadge.expandedWidth,
-              expandedHeight: PanelYoloAssistantBadge.expandedHeight,
-              badgeOpacity: 1.0,
-              badgeIcon: SvgPicture.asset(
-                'assets/images/yolo_voice_badge.svg',
-                width: 28,
-                height: 28,
-              ),
-              headerTrailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  HeaderIconButton(
-                    icon: Icons.copy,
-                    tooltip: 'Copy YoLo history',
-                    onPressed: _copyHistory,
-                  ),
-                  const SizedBox(width: 4),
-                  HeaderIconButton(
-                    icon: Icons.close,
-                    tooltip: 'Close YoLo assistant',
-                    onPressed: _toggleExpanded,
-                  ),
-                ],
-              ),
-              content: ScrollableCardRegion(
-                child: ScrollableCardMarker(
-                  child:
-                      widget.chatBuilder?.call(
-                        _assistantPanel,
-                        _onAssistantStateChanged,
-                      ) ??
-                      ChatPanelWidget(
-                        panel: _assistantPanel,
-                        onUpdateState: _onAssistantStateChanged,
-                        compact: true,
+    final colors = context.appColors;
+    final showBadge = _hovered || widget.highlighted || widget.assistantOpen;
+    final idleOpacity = widget.highlighted ? 0.72 : 0.38;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final height =
+            constraints.maxHeight.isFinite && constraints.maxHeight > 0
+                ? constraints.maxHeight
+                : PanelYoloAssistantBadge.minTriggerHeight;
+        final docked = widget.assistantOpen;
+        final visualWidth =
+            showBadge
+                ? PanelYoloAssistantBadge.badgeWidth
+                : PanelYoloAssistantBadge.stripWidth;
+        return Semantics(
+          button: true,
+          label:
+              docked
+                  ? 'Close YoLo assistant'
+                  : 'Ask YoLo about this panel',
+          onTap: _openAssistant,
+          child: SizedBox(
+            width:
+                docked
+                    ? PanelYoloAssistantBadge.badgeWidth
+                    : PanelYoloAssistantBadge.hitWidth,
+            height: height,
+            child: MouseRegion(
+              onEnter: (_) => _onHoverEnter(),
+              onExit: (_) => _onHoverExit(),
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: _openAssistant,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  alignment: Alignment.centerLeft,
+                  children: [
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 220),
+                      curve: Curves.easeOutCubic,
+                      width: visualWidth,
+                      height: height,
+                      decoration: BoxDecoration(
+                        borderRadius:
+                            docked
+                                ? const BorderRadius.horizontal(
+                                  left: Radius.circular(2),
+                                  right: Radius.zero,
+                                )
+                                : BorderRadius.horizontal(
+                                  left: const Radius.circular(2),
+                                  right: Radius.circular(showBadge ? 10 : 3),
+                                ),
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            colors.accentBlue.withValues(
+                              alpha: showBadge ? 0.95 : idleOpacity,
+                            ),
+                            colors.primary.withValues(
+                              alpha: showBadge ? 0.95 : idleOpacity,
+                            ),
+                          ],
+                        ),
+                        boxShadow:
+                            showBadge && !docked
+                                ? [
+                                  BoxShadow(
+                                    color: colors.textMuted.withValues(
+                                      alpha: 0.22,
+                                    ),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ]
+                                : null,
                       ),
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 180),
+                        switchInCurve: Curves.easeOutCubic,
+                        switchOutCurve: Curves.easeInCubic,
+                        child:
+                            showBadge
+                                ? YoloEdgeBadgeMorphContent(
+                                  key: const ValueKey('yolo-edge-badge'),
+                                  height: height,
+                                  colors: colors,
+                                  showMic: !docked,
+                                  showDockedArrow: docked,
+                                  onMicTap: docked ? null : _onMicTap,
+                                )
+                                : const SizedBox(
+                                  key: ValueKey('yolo-edge-strip'),
+                                  width: double.infinity,
+                                ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
           ),
-        ),
+        );
+      },
+    );
+  }
+}
+
+class YoloEdgeBadgeMorphContent extends StatelessWidget {
+  const YoloEdgeBadgeMorphContent({
+    super.key,
+    required this.height,
+    required this.colors,
+    this.showMic = true,
+    this.showDockedArrow = false,
+    this.onMicTap,
+  });
+
+  final double height;
+  final AppColorScheme colors;
+  final bool showMic;
+  final bool showDockedArrow;
+  final VoidCallback? onMicTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final compact = height < 96;
+    final micSize = compact ? 10.0 : 12.0;
+    final micPadding = compact ? 1.5 : 3.0;
+    final labelSize = compact ? 8.5 : 10.0;
+    final verticalPadding = compact ? 2.0 : 5.0;
+
+    return Padding(
+      padding: EdgeInsets.symmetric(
+        vertical: verticalPadding,
+        horizontal: 3,
       ),
-    ),
+      child: Column(
+        mainAxisAlignment:
+            showMic || showDockedArrow
+                ? MainAxisAlignment.spaceBetween
+                : MainAxisAlignment.center,
+        children: [
+          Flexible(
+            child: Center(
+              child: RotatedBox(
+                quarterTurns: 3,
+                child: Text(
+                  'YOLO',
+                  style: TextStyle(
+                    color: colors.textHighlight,
+                    fontSize: labelSize,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.8,
+                    height: 1,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          if (showMic && onMicTap != null)
+            Material(
+              color: colors.surface.withValues(alpha: 0.22),
+              shape: const CircleBorder(),
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: onMicTap,
+                child: Padding(
+                  padding: EdgeInsets.all(micPadding),
+                  child: Icon(
+                    Icons.mic_rounded,
+                    size: micSize,
+                    color: colors.textHighlight,
+                  ),
+                ),
+              ),
+            ),
+          if (showDockedArrow)
+            Padding(
+              padding: EdgeInsets.all(micPadding),
+              child: Icon(
+                Icons.arrow_forward_rounded,
+                size: micSize + 2,
+                color: colors.textHighlight,
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

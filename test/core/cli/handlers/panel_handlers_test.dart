@@ -1,5 +1,8 @@
 // covers-write: board.webpage, board.playlist, board.checklist, board.code.snippet, board.files, board.file.preview, board.sticky, board.shape, board.terminal
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
+import 'package:yoloit/core/platform/platform_dirs.dart';
 import 'package:yoloit/core/cli/handlers/webpage_handler.dart';
 import 'package:yoloit/core/cli/handlers/playlist_handler.dart';
 import 'package:yoloit/core/cli/handlers/checklist_handler.dart';
@@ -261,10 +264,42 @@ void main() {
       final r = await h.handleAction('append', {'text': 'b'}, p);
       expect(r.stateUpdate!['text'], 'a\nb');
     });
+
+    test('append resolves yoloit_clip text file path', () async {
+      final clipDir = Directory('${PlatformDirs.instance.tempDir}/yoloit_clip');
+      await clipDir.create(recursive: true);
+      final clip = File('${clipDir.path}/clip_1782467512509.txt');
+      await clip.writeAsString('Sticky body');
+      addTearDown(() async {
+        if (await clip.exists()) await clip.delete();
+      });
+
+      final r = await h.handleAction('append', {
+        'text': clip.path,
+      }, _panel('board.sticky', state: {'text': 'a'}));
+      expect(r.ok, isTrue);
+      expect(r.stateUpdate!['text'], 'a\nSticky body');
+    });
   });
 
   group('ShapeCliHandler', () {
     final h = const ShapeCliHandler();
+
+    test('set resolves yoloit_clip text file path', () async {
+      final clipDir = Directory('${PlatformDirs.instance.tempDir}/yoloit_clip');
+      await clipDir.create(recursive: true);
+      final clip = File('${clipDir.path}/clip_1782422417319.txt');
+      await clip.writeAsString('Effort →');
+      addTearDown(() async {
+        if (await clip.exists()) await clip.delete();
+      });
+
+      final r = await h.handleAction('set', {
+        'text': clip.path,
+      }, _panel('board.shape'));
+      expect(r.ok, isTrue);
+      expect(r.stateUpdate!['text'], 'Effort →');
+    });
 
     test('set updates shape fields', () async {
       final r = await h.handleAction('set', {
@@ -287,6 +322,28 @@ void main() {
       expect(r.stateUpdate!['textHAlign'], 'right');
       expect(r.stateUpdate!['textVAlign'], 'bottom');
       expect(r.stateUpdate!['textOrientation'], 'vertical');
+    });
+
+    test('set unwraps literal shell quotes from text', () async {
+      final r = await h.handleAction('set', {
+        'text': "'Impact ↑'",
+        'fillColor': '"#FF0000"',
+        'strokeColor': '"#0000FF"',
+      }, _panel('board.shape'));
+
+      expect(r.ok, isTrue);
+      expect(r.stateUpdate!['text'], 'Impact ↑');
+      expect(r.stateUpdate!['fillColor'], '#FF0000');
+      expect(r.stateUpdate!['strokeColor'], '#0000FF');
+    });
+
+    test('set coerces quoted strokeWidth strings to numbers', () async {
+      final r = await h.handleAction('set', {
+        'strokeWidth': '"2"',
+      }, _panel('board.shape'));
+
+      expect(r.ok, isTrue);
+      expect(r.stateUpdate!['strokeWidth'], 2);
     });
   });
 

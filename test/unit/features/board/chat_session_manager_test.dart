@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:yoloit/core/platform/platform_dirs.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
 import 'package:yoloit/features/board/chat/chat_session_manager.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
@@ -358,6 +360,37 @@ void main() {
         '/image.png',
       ]);
       expect(provider.sentRuntimeContexts.single, same(runtimeContext));
+    });
+
+    test('sendMessage inlines yoloit_clip chat export and drops log dumps', () async {
+      final clipDir = Directory('${PlatformDirs.instance.tempDir}/yoloit_clip');
+      await clipDir.create(recursive: true);
+      final chatClip = File('${clipDir.path}/clip_1782557969509.txt');
+      final logClip = File('${clipDir.path}/clip_1782557974961.txt');
+      await chatClip.writeAsString('''
+[2026-06-26T13:35:52.568270] USER
+добавь мне тестовых данных сюда
+
+[2026-06-26T13:35:59.720499] ASSISTANT
+Готово!
+''');
+      await logClip.writeAsString(
+        'Launching lib/main.dart on macOS in debug mode...\n'
+        'flutter: [BoardView] Canvas background pointer down\n',
+      );
+
+      final ok = await session.sendMessage(
+        text: '${chatClip.path} ${logClip.path}',
+      );
+
+      expect(ok, true);
+      expect(session.messages.single.attachments, [chatClip.path]);
+      expect(
+        session.messages.single.content,
+        contains('добавь мне тестовых данных сюда'),
+      );
+      expect(provider.sentMessages.single, contains('добавь мне тестовых данных'));
+      expect(provider.sentMessages.single, isNot(contains('Launching lib/main.dart')));
     });
 
     test('updateConfig notifies listeners and swaps provider', () {

@@ -12,6 +12,15 @@ import 'package:yoloit/ui/components/dialog/editor_dialog_actions.dart';
 import 'package:yoloit/ui/components/input/panel_text_controller_mixin.dart';
 import 'package:yoloit/ui/components/typography/editor_section_label.dart';
 
+double _readStateDouble(Object? value, double fallback) {
+  if (value is num) return value.toDouble();
+  if (value is String) {
+    final parsed = num.tryParse(value.trim());
+    if (parsed != null) return parsed.toDouble();
+  }
+  return fallback;
+}
+
 class ShapePlugin extends BoardPanelPlugin with PanelEditorDialogMixin {
   const ShapePlugin();
 
@@ -70,8 +79,8 @@ class ShapePlugin extends BoardPanelPlugin with PanelEditorDialogMixin {
         parseHexColor(panel.state['strokeColor'] as String?) ?? colors.primaryLight;
     final textColor =
         parseHexColor(panel.state['textColor'] as String?) ?? colors.textPrimary;
-    final strokeWidth = (panel.state['strokeWidth'] as num?)?.toDouble() ?? 3.0;
-    final fontSize = (panel.state['fontSize'] as num?)?.toDouble() ?? 18.0;
+    final strokeWidth = _readStateDouble(panel.state['strokeWidth'], 3.0);
+    final fontSize = _readStateDouble(panel.state['fontSize'], 18.0);
     final textHAlign =
         (panel.state['textHAlign'] as String? ?? 'center').toLowerCase();
     final textVAlign =
@@ -506,8 +515,8 @@ class _ShapeEditorDialogState extends State<_ShapeEditorDialog> {
     _textColor = state['textColor'] as String? ?? '#E2E8F0';
     _text = state['text'] as String? ?? '';
     _textController = TextEditingController(text: _text);
-    _strokeWidth = (state['strokeWidth'] as num?)?.toDouble() ?? 3.0;
-    _fontSize = (state['fontSize'] as num?)?.toDouble() ?? 18.0;
+    _strokeWidth = _readStateDouble(state['strokeWidth'], 3.0);
+    _fontSize = _readStateDouble(state['fontSize'], 18.0);
     _textHAlign = state['textHAlign'] as String? ?? 'center';
     _textVAlign = state['textVAlign'] as String? ?? 'center';
     _textOrientation = state['textOrientation'] as String? ?? 'horizontal';

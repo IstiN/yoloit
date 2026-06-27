@@ -1,3 +1,4 @@
+import 'package:yoloit/core/cli/cli_text_argument_resolver.dart';
 import 'package:yoloit/core/cli/panel_cli_handler.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 
@@ -17,6 +18,9 @@ mixin PanelGetSetCliHandler on PanelCliHandler {
   /// `'Sticky note'`). Used in result messages.
   String get settableName;
 
+  /// State keys whose string values should be parsed as numbers on `set`.
+  Set<String> get numericSettableKeys => const {};
+
   @override
   Future<CliActionResult> handleAction(
     String action,
@@ -27,9 +31,22 @@ mixin PanelGetSetCliHandler on PanelCliHandler {
       case 'get':
         return CliActionResult(data: getContent(panel));
       case 'set':
+        final resolvedArgs = CliTextArgumentResolver.resolveActionArgs(args);
         final update = <String, dynamic>{};
         for (final key in settableKeys) {
-          if (args.containsKey(key)) update[key] = args[key];
+          if (!resolvedArgs.containsKey(key)) continue;
+          final value = resolvedArgs[key];
+          if (numericSettableKeys.contains(key)) {
+            final coerced = _coerceNumeric(value);
+            if (coerced != null) {
+              update[key] = coerced;
+            }
+            continue;
+          }
+          update[key] =
+              value is String
+                  ? CliTextArgumentResolver.unwrapShellQuotedText(value)
+                  : value;
         }
         if (update.isEmpty) {
           return CliActionResult(
@@ -44,5 +61,12 @@ mixin PanelGetSetCliHandler on PanelCliHandler {
       default:
         return CliActionResult(ok: false, message: 'Unknown action: $action');
     }
+  }
+
+  num? _coerceNumeric(Object? value) {
+    if (value is num) return value;
+    if (value is! String) return null;
+    final unwrapped = CliTextArgumentResolver.unwrapShellQuotedText(value).trim();
+    return num.tryParse(unwrapped);
   }
 }

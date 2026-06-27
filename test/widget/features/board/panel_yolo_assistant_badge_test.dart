@@ -10,20 +10,17 @@ import 'package:yoloit/core/theme/app_theme.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/bloc/board_state.dart';
 import 'package:yoloit/features/board/chat/chat_panel_plugin.dart';
+import 'package:yoloit/features/board/chat/chat_panel_widget.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/board/plugins/builtin/markdown_note_plugin.dart';
 import 'package:yoloit/features/board/ui/panel_yolo_assistant_badge.dart';
+import 'package:yoloit/features/board/ui/yolo_anchored_assistant_panel.dart';
 
-Widget _shell({
+Widget _badgeShell({
   required BoardCubit cubit,
   required BoardPanelInstance targetPanel,
-  bool expanded = false,
-  ValueChanged<bool>? onExpandedChanged,
-  Widget Function(
-    BoardPanelInstance assistantPanel,
-    ValueChanged<Map<String, dynamic>> onUpdateState,
-  )? chatBuilder,
+  bool assistantOpen = false,
 }) {
   return MaterialApp(
     theme: AppThemePreset.neonPurple.theme,
@@ -33,13 +30,55 @@ Widget _shell({
         child: Stack(
           children: [
             const SizedBox.expand(),
-            PanelYoloAssistantBadge(
-              targetPanel: targetPanel,
-              expanded: expanded,
-              onExpandedChanged: onExpandedChanged ?? (_) {},
+            Positioned(
+              left: 20,
+              top: 20,
+              width: PanelYoloAssistantBadge.hitWidth,
+              height: PanelYoloAssistantBadge.minTriggerHeight,
+              child: PanelYoloAssistantBadge(
+                targetPanel: targetPanel,
+                assistantOpen: assistantOpen,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+Widget _anchoredShell({
+  required BoardCubit cubit,
+  required BoardPanelInstance targetPanel,
+  Widget Function(
+    BoardPanelInstance assistantPanel,
+    ValueChanged<Map<String, dynamic>> onUpdateState,
+  )? chatBuilder,
+}) {
+  final controller = ChatPanelController();
+  cubit.openYoloAssistant(targetPanel.id);
+  return MaterialApp(
+    theme: AppThemePreset.neonPurple.theme,
+    home: Scaffold(
+      body: BlocProvider.value(
+        value: cubit,
+        child: SizedBox(
+          width: 900,
+          height: 700,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            YoloAnchoredAssistantPanel(
+              anchorPanel: targetPanel,
+              canvasOrigin: Offset.zero,
+              chatController: controller,
+              startMic: false,
+              onStartMicConsumed: () {},
+              onClose: cubit.closeYoloAssistant,
               chatBuilder: chatBuilder,
             ),
           ],
+        ),
         ),
       ),
     ),
@@ -95,15 +134,13 @@ void _seedCloudOpenRouter() {
 Future<BoardPanelInstance> _captureAssistantPanel(
   WidgetTester tester,
   BoardCubit cubit,
-  BoardPanelInstance targetPanel, {
-  bool expanded = true,
-}) async {
+  BoardPanelInstance targetPanel,
+) async {
   BoardPanelInstance? captured;
   await tester.pumpWidget(
-    _shell(
+    _anchoredShell(
       cubit: cubit,
       targetPanel: targetPanel,
-      expanded: expanded,
       chatBuilder: (panel, onUpdate) {
         captured = panel;
         return const SizedBox.shrink();
@@ -111,7 +148,9 @@ Future<BoardPanelInstance> _captureAssistantPanel(
     ),
   );
   await tester.pump();
-  await tester.pump(const Duration(milliseconds: 400));
+  for (var i = 0; i < 30 && captured == null; i++) {
+    await tester.pump(const Duration(milliseconds: 50));
+  }
   return captured!;
 }
 
@@ -122,30 +161,52 @@ ChatSessionConfig _configOf(BoardPanelInstance panel) => ChatSessionConfig.fromJ
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  setUp(() => SharedPreferences.setMockInitialValues({}));
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+    FlutterSecureStorage.setMockInitialValues({});
+  });
 
   group('PanelYoloAssistantBadge', () {
-    testWidgets('collapsed badge renders and expands on tap', (tester) async {
+    testWidgets('collapsed badge opens anchored assistant on tap', (tester) async {
       final fixture = _createFixture();
-
-      var expanded = false;
       await tester.pumpWidget(
-        _shell(
+        _badgeShell(
           cubit: fixture.cubit,
           targetPanel: fixture.targetPanel,
-          onExpandedChanged: (value) => expanded = value,
-          chatBuilder: (_, __) => const SizedBox.shrink(),
         ),
       );
       await tester.pump(const Duration(milliseconds: 300));
 
-      expect(find.byTooltip('Ask YoLo about this panel'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel('Ask YoLo about this panel'),
+        findsOneWidget,
+      );
 
-      await tester.tap(find.byTooltip('Ask YoLo about this panel'));
-      await tester.pump(const Duration(milliseconds: 400));
+      await tester.tap(find.bySemanticsLabel('Ask YoLo about this panel'));
+      await tester.pump();
 
-      expect(expanded, isTrue);
-      expect(find.text('YOLO'), findsOneWidget);
+      expect(fixture.cubit.state.yoloAssistantAnchorPanelId, 'target');
+    });
+
+    testWidgets('focuses message input when anchored assistant opens', (
+      tester,
+    ) async {
+      final fixture = _createFixture();
+      await tester.pumpWidget(
+        _anchoredShell(
+          cubit: fixture.cubit,
+          targetPanel: fixture.targetPanel,
+        ),
+      );
+      await tester.pumpAndSettle(const Duration(milliseconds: 500));
+
+      final messageField = find.byWidgetPredicate(
+        (widget) =>
+            widget is TextField &&
+            widget.decoration?.hintText == 'Message…',
+      );
+      expect(messageField, findsOneWidget);
+      expect(tester.widget<TextField>(messageField).focusNode?.hasFocus, isTrue);
     });
 
     testWidgets('persists assistant state into target panel', (tester) async {
@@ -153,17 +214,19 @@ void main() {
 
       ValueChanged<Map<String, dynamic>>? capturedOnUpdate;
       await tester.pumpWidget(
-        _shell(
+        _anchoredShell(
           cubit: fixture.cubit,
           targetPanel: fixture.targetPanel,
-          expanded: true,
           chatBuilder: (panel, onUpdate) {
             capturedOnUpdate = onUpdate;
             return const SizedBox.shrink();
           },
         ),
       );
-      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pump();
+      for (var i = 0; i < 30 && capturedOnUpdate == null; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
 
       expect(capturedOnUpdate, isNotNull);
       capturedOnUpdate!({
@@ -192,8 +255,51 @@ void main() {
       expect(captured.type, ChatPanelPlugin.kTypeId);
       expect(captured.state['configured'], isTrue);
       expect(captured.state['targetPanelId'], 'target');
-      expect(_configOf(captured).provider, 'local');
+      expect(_configOf(captured).provider, 'cloud:openrouter');
     });
+
+    testWidgets(
+      'keeps cloud provider when active config lacks api key',
+      (tester) async {
+        SharedPreferences.setMockInitialValues({
+          'cloud_llm_active_config_v1': 'openrouter',
+          'assistant_provider_type_v1': 'cloud',
+        });
+        FlutterSecureStorage.setMockInitialValues({
+          'cloud_llm_configs_v1': jsonEncode([
+            {
+              'id': 'openrouter',
+              'name': 'OpenRouter',
+              'baseUrl': 'https://openrouter.ai/api/v1',
+              'apiKey': '',
+              'model': 'openrouter/google/gemma-4-31b-it',
+              'extraHeaders': <String, String>{},
+            },
+          ]),
+        });
+        final fixture = _createFixture(
+          targetState: {
+            'yoloAssistant': {
+              'configured': true,
+              'assistantProviderResolved': true,
+              'config': {
+                'sessionName': 'saved',
+                'workingDir': '/tmp',
+                'provider': 'cloud:openrouter',
+                'model': 'openrouter/google/gemma-4-31b-it',
+              },
+            },
+          },
+        );
+        final captured = await _captureAssistantPanel(
+          tester,
+          fixture.cubit,
+          fixture.targetPanel,
+        );
+
+        expect(_configOf(captured).provider, 'cloud:openrouter');
+      },
+    );
 
     testWidgets('restores persisted provider config', (tester) async {
       final fixture = _createFixture(
@@ -216,7 +322,7 @@ void main() {
       );
 
       final config = _configOf(captured);
-      expect(config.provider, 'local');
+      expect(config.provider, 'cloud:openrouter');
       expect(config.sessionName, 'saved');
     });
 
@@ -350,6 +456,7 @@ void main() {
         fixture.cubit,
         fixture.targetPanel,
       );
+      await tester.pump(const Duration(milliseconds: 500));
 
       await tester.tap(find.byTooltip('Copy YoLo history'));
       await tester.pump();

@@ -37,11 +37,19 @@ class YoloAssistantOverlayShell extends StatelessWidget {
     final colors = context.appColors;
     return LayoutBuilder(
       builder: (context, constraints) {
+        final width =
+            constraints.hasBoundedWidth
+                ? constraints.maxWidth
+                : (expanded ? expandedWidth : badgeSize);
+        final height =
+            constraints.hasBoundedHeight
+                ? constraints.maxHeight
+                : (expanded ? expandedHeight : badgeSize);
         return AnimatedContainer(
           duration: duration,
           curve: Curves.easeInOutCubic,
-          width: constraints.maxWidth,
-          height: constraints.maxHeight,
+          width: width,
+          height: height,
           decoration: BoxDecoration(
             color: colors.surfaceElevated,
             borderRadius: BorderRadius.circular(expanded ? 16 : 18),

@@ -28,6 +28,13 @@ class ChatAttachmentPreview extends StatelessWidget {
     caseSensitive: false,
   );
 
+  static final _clipFileRe = RegExp(r'/yoloit_clip/clip_\d+\.txt$');
+
+  static String _attachmentLabel(String path) {
+    if (_clipFileRe.hasMatch(path)) return 'clipboard';
+    return path.split('/').last;
+  }
+
   @override
   Widget build(BuildContext context) {
     final images = paths.where((p) => _imageRe.hasMatch(p)).toList();
@@ -88,7 +95,7 @@ class ChatAttachmentPreview extends StatelessWidget {
       alignment: WrapAlignment.end,
       children:
           filePaths.map((p) {
-            final name = p.split('/').last;
+            final name = _attachmentLabel(p);
             return GestureDetector(
               onTap: () {
                 if (onOpenFile != null) {

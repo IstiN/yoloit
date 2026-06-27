@@ -18,4 +18,6 @@ IMPORTANT for widget/panel requests:
 - If there is no dedicated command for a widget, use generic flow:
   1) `yoloit panel:create`
   2) `yoloit panel:help` (inspect widget actions)
-  3) `yoloit do` (execute widget action)
+  3) `yoloit do` (only when no typed YoLoIT tool exists for that action)
+- For sticky/shape/note/checklist/kanban edits, use typed tools (`sticky:append`, `shape:set`, `note:append`, …) — not `yoloit do`.
+- `yoloit do` JSON body must be an object (`{"text":"..."}`), never a bare JSON string.

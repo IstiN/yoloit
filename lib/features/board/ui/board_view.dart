@@ -32,8 +32,8 @@ import 'package:yoloit/features/board/ui/board_math.dart';
 import 'package:yoloit/features/board/ui/board_overview_layer.dart';
 import 'package:yoloit/features/board/ui/board_overview_widgets.dart';
 import 'package:yoloit/features/board/ui/board_panel_actions.dart';
-import 'package:yoloit/features/board/ui/board_panel_card.dart';
 import 'package:yoloit/features/board/ui/board_panel_layer.dart';
+import 'package:yoloit/features/board/ui/board_panel_resize_chrome.dart';
 import 'package:yoloit/features/board/ui/board_toolbar.dart';
 import 'package:yoloit/features/board/ui/board_tools_panel.dart';
 import 'package:yoloit/features/board/ui/dialogs/board_settings_dialog.dart';
@@ -51,7 +51,6 @@ import 'package:yoloit/features/board/utils/board_grid_layout.dart';
 import 'package:yoloit/features/mindmap/widgets/canvas_interaction_lock.dart';
 import 'package:yoloit/features/search/ui/file_search_overlay.dart';
 import 'package:yoloit/features/templates/ui/template_wizard_dialog.dart';
-
 
 class BoardView extends StatefulWidget {
   const BoardView({super.key, this.skipOverviewPreviewCapture = false});
@@ -464,6 +463,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                           // Disable pan while actively drawing,
                                           // in multi-select mode, or when canvas is locked.
                                           panEnabled:
+                                              !isLocked &&
                                               (_activeTool !=
                                                       BoardToolId.draw ||
                                                   _drawPointer == null) &&
@@ -611,17 +611,24 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                   ),
                                                 ),
                                                 // ── Canvas background tap — clear focus ──
-                                                // Stack hit-tests children in reverse order
-                                                // (last child first).  Panels are added
-                                                // AFTER this Listener, so they absorb
-                                                // clicks first.  Only clicks on empty
-                                                // canvas reach this Listener.
+                                                // Opaque: only empty-canvas clicks hit this
+                                                // listener. Translucent also fires on panel
+                                                // taps and races with focusPanel.
                                                 Positioned.fill(
                                                   child: Listener(
                                                     behavior:
-                                                        HitTestBehavior
-                                                            .translucent,
-                                                    onPointerDown: (_) {
+                                                        HitTestBehavior.opaque,
+                                                    onPointerDown: (event) {
+                                                      if (kDebugMode) {
+                                                        debugPrint(
+                                                          '[BoardView] Canvas background pointer down at ${event.localPosition} isLocked=${CanvasInteractionLock.instance.isLocked}',
+                                                        );
+                                                      }
+                                                      if (CanvasInteractionLock
+                                                          .instance
+                                                          .isLocked) {
+                                                        return;
+                                                      }
                                                       if (_activeTool ==
                                                           BoardToolId
                                                               .multiSelect) {
@@ -705,27 +712,30 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                     panels: activeBoard.panels,
                                                     origin: _canvasOrigin,
                                                   ),
-                                                BoardPanelLayer(
-                                                  board: activeBoard,
-                                                  canvasOrigin: _canvasOrigin,
-                                                  isCapturingScreenshot:
-                                                      _isCapturingScreenshot,
-                                                  selectedPanelIds:
-                                                      selectedPanelIds.toSet(),
-                                                  activeTool: _activeTool,
-                                                  connectSourceId:
-                                                      _connectSourceId,
-                                                  onMovePanel:
-                                                      _movePanelWithEdgePan,
-                                                  onResizePanel:
-                                                      _resizePanelWithEdgePan,
-                                                  onDragStart:
-                                                      _handlePanelDragStart,
-                                                  onDragEnd: _handlePanelDragEnd,
-                                                  onConnectTap:
-                                                      _handleConnectTap,
-                                                  onFullscreenPanel:
-                                                      _handleFullscreenPanel,
+                                                Positioned.fill(
+                                                  child: BoardPanelLayer(
+                                                    board: activeBoard,
+                                                    canvasOrigin: _canvasOrigin,
+                                                    isCapturingScreenshot:
+                                                        _isCapturingScreenshot,
+                                                    selectedPanelIds:
+                                                        selectedPanelIds.toSet(),
+                                                    activeTool: _activeTool,
+                                                    connectSourceId:
+                                                        _connectSourceId,
+                                                    onMovePanel:
+                                                        _movePanelWithEdgePan,
+                                                    onResizePanel:
+                                                        _resizePanelWithEdgePan,
+                                                    onDragStart:
+                                                        _handlePanelDragStart,
+                                                    onDragEnd:
+                                                        _handlePanelDragEnd,
+                                                    onConnectTap:
+                                                        _handleConnectTap,
+                                                    onFullscreenPanel:
+                                                        _handleFullscreenPanel,
+                                                  ),
                                                 ),
                                                 // ── Drawing layer (above panels visually;
                                                 //    only intercepts gestures on actual stroke

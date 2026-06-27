@@ -1,3 +1,4 @@
+import 'package:yoloit/core/cli/cli_text_argument_resolver.dart';
 import 'package:yoloit/core/cli/panel_cli_handler.dart';
 import 'package:yoloit/core/cli/panel_getset_cli_handler.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
@@ -33,7 +34,8 @@ class StickyNoteCliHandler extends PanelCliHandler with PanelGetSetCliHandler {
   ) async {
     switch (action) {
       case 'append':
-        final text = args['text'] as String?;
+        final resolved = CliTextArgumentResolver.resolveActionArgs(args);
+        final text = resolved['text'] as String?;
         if (text == null) {
           return const CliActionResult(ok: false, message: 'Missing "text"');
         }

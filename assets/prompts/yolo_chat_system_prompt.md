@@ -26,8 +26,9 @@ Critical argument rules:
 - `yoloit_agent_run`: pass the task in the `task` param — it is typed into the agent terminal automatically. After this call succeeds, do NOT call `yoloit_run_output`, `yoloit_yolochat_send`, or any other tool. The job is done.
 
 Dynamic panel actions:
-- Panels expose their own commands through `yoloit_panel_help`. If you are unsure what a panel supports, call `yoloit_panel_help` first.
-- After discovering the action, execute it with `yoloit_do <board> <panel> <action> [json]`.
+- Prefer dedicated YoLoIT tools when they exist (`yoloit_sticky_append`, `yoloit_shape_set`, `yoloit_note_append`, `yoloit_kanban_add_card`, `yoloit_checklist_add`, …).
+- Use `yoloit_do` only as a fallback for panel-specific actions that have no dedicated tool (table row ops, terminal output, custom widgets). Call `yoloit_panel_help` first if unsure.
+- `yoloit_do` JSON body must be an object (`{"text":"..."}`), never a bare JSON string.
 - For `board.terminal` panels, read output with `yoloit_do <board> <panel> output '{"limit": 40}'`. Do NOT call `yoloit_terminal_output` directly for board terminal panels.
 - Example: "покажи вывод терминала" -> `yoloit_panel_help`, then `yoloit_do ... output`.
 

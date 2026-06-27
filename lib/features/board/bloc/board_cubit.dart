@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -574,6 +575,9 @@ class BoardCubit extends Cubit<BoardState> {
     bool zoomOnFocus = false,
   }) async {
     final targetId = boardId ?? state.activeBoard?.id;
+    if (kDebugMode) {
+      debugPrint('[BoardCubit] focusPanel panelId=$panelId targetId=$targetId stateActiveBoardId=${state.activeBoard?.id}');
+    }
     if (targetId == null) return;
     await _updateBoard(targetId, (board) {
       final maxZ = board.panels.fold<int>(
@@ -592,6 +596,9 @@ class BoardCubit extends Cubit<BoardState> {
           focusedPanel != null &&
           focusedPanel.zIndex >= maxZ &&
           !zoomOnFocus; // always re-focus if zoom requested
+      if (kDebugMode) {
+        debugPrint('[BoardCubit] focusPanel alreadyTopAndFocused=$alreadyTopAndFocused boardViewportFocusedPanelId=${board.viewport.focusedPanelId}');
+      }
       if (alreadyTopAndFocused) {
         return board;
       }
@@ -612,6 +619,33 @@ class BoardCubit extends Cubit<BoardState> {
         ),
       );
     });
+  }
+
+  void openYoloAssistant(String panelId, {bool startMic = false}) {
+    emit(
+      state.copyWith(
+        yoloAssistantAnchorPanelId: panelId,
+        yoloAssistantStartMic: startMic,
+      ),
+    );
+  }
+
+  void closeYoloAssistant() {
+    if (state.yoloAssistantAnchorPanelId == null &&
+        !state.yoloAssistantStartMic) {
+      return;
+    }
+    emit(
+      state.copyWith(
+        clearYoloAssistantAnchor: true,
+        yoloAssistantStartMic: false,
+      ),
+    );
+  }
+
+  void consumeYoloAssistantStartMic() {
+    if (!state.yoloAssistantStartMic) return;
+    emit(state.copyWith(yoloAssistantStartMic: false));
   }
 
   /// Clears the zoom-on-focus flag after it has been consumed by the view.
@@ -2034,6 +2068,9 @@ class BoardCubit extends Cubit<BoardState> {
   }
 
   Future<void> removePanel(String panelId, {String? boardId}) async {
+    if (state.yoloAssistantAnchorPanelId == panelId) {
+      closeYoloAssistant();
+    }
     // Release any persistent resources tied to the panel (e.g. media player).
     PlaylistPlayerRegistry.instance.release(panelId);
     WebViewManager.instance.remove(panelId);

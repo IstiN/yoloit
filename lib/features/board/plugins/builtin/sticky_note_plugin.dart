@@ -115,7 +115,7 @@ class _StickyNoteContentState extends State<_StickyNoteContent>
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
         child: TextField(
           controller: controller,
           expands: true,
@@ -128,13 +128,14 @@ class _StickyNoteContentState extends State<_StickyNoteContent>
             border: InputBorder.none,
             enabledBorder: InputBorder.none,
             focusedBorder: InputBorder.none,
+            contentPadding: EdgeInsets.zero,
+            isDense: true,
             hintText: 'Sticky note',
             hintStyle: TextStyle(
               color: widget.textColor.withValues(alpha: 0.55),
               fontSize: widget.fontSize,
               fontWeight: FontWeight.w600,
             ),
-            isCollapsed: true,
           ),
           cursorColor: widget.textColor,
           style: TextStyle(

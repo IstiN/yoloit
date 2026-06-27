@@ -7,12 +7,16 @@ class BoardState extends Equatable {
     this.activeBoardId,
     this.isLoaded = false,
     this.selectedPanelIds = const {},
+    this.yoloAssistantAnchorPanelId,
+    this.yoloAssistantStartMic = false,
   });
 
   final List<BoardDocument> boards;
   final String? activeBoardId;
   final bool isLoaded;
   final Set<String> selectedPanelIds;
+  final String? yoloAssistantAnchorPanelId;
+  final bool yoloAssistantStartMic;
 
   List<BoardDocument> get activeBoards =>
       boards.where((board) => !board.archived).toList();
@@ -39,6 +43,9 @@ class BoardState extends Equatable {
     bool? isLoaded,
     Set<String>? selectedPanelIds,
     bool clearSelection = false,
+    String? yoloAssistantAnchorPanelId,
+    bool clearYoloAssistantAnchor = false,
+    bool? yoloAssistantStartMic,
   }) {
     return BoardState(
       boards: boards ?? this.boards,
@@ -47,9 +54,22 @@ class BoardState extends Equatable {
       isLoaded: isLoaded ?? this.isLoaded,
       selectedPanelIds:
           clearSelection ? const {} : (selectedPanelIds ?? this.selectedPanelIds),
+      yoloAssistantAnchorPanelId:
+          clearYoloAssistantAnchor
+              ? null
+              : (yoloAssistantAnchorPanelId ?? this.yoloAssistantAnchorPanelId),
+      yoloAssistantStartMic:
+          yoloAssistantStartMic ?? this.yoloAssistantStartMic,
     );
   }
 
   @override
-  List<Object?> get props => [boards, activeBoardId, isLoaded, selectedPanelIds];
+  List<Object?> get props => [
+    boards,
+    activeBoardId,
+    isLoaded,
+    selectedPanelIds,
+    yoloAssistantAnchorPanelId,
+    yoloAssistantStartMic,
+  ];
 }

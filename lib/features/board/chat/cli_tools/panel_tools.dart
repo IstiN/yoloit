@@ -643,13 +643,27 @@ final List<YoloitCliTool> panelTools = <YoloitCliTool>[
   YoloitCliTool(
     command: 'do',
     alias: 'pdo',
-    description: 'Execute a panel action',
+    description:
+        'Advanced fallback: run a raw panel action from panel:help when no dedicated '
+        'YoLoIT tool exists (table row ops, terminal output, custom widget actions). '
+        'Do NOT use for sticky/shape/note/checklist/kanban when typed tools exist — '
+        'use sticky:append, shape:set, note:append, checklist:add, kanban:add-card, etc. '
+        'JSON body must be an object like {"text":"..."}, never a bare JSON string.',
     group: 'panel',
     params: <YoloitCliToolParam>[
       boardParam(),
       panelParam(),
-      toolParam('action', 'Action from panel:help', required: true, shortKey: 'a'),
-      toolParam('json', 'Optional JSON body', shortKey: 'j'),
+      toolParam(
+        'action',
+        'Action name from panel:help — only when no dedicated tool exists',
+        required: true,
+        shortKey: 'a',
+      ),
+      toolParam(
+        'json',
+        'JSON object body for the action (not a bare string)',
+        shortKey: 'j',
+      ),
     ],
   ),
 
@@ -719,7 +733,12 @@ final List<YoloitCliTool> panelTools = <YoloitCliTool>[
         shortKey: 's',
       ),
       toolParam('title', 'Panel title', required: true, shortKey: 't'),
-      toolParam('text', 'Centered label', flag: '--text', shortKey: 'tx'),
+      toolParam(
+        'text',
+        'Centered label (clip .txt paths under yoloit_clip are read automatically)',
+        flag: '--text',
+        shortKey: 'tx',
+      ),
       toolParam('fill', 'Fill color as #RRGGBB', flag: '--fill', shortKey: 'f'),
       toolParam('stroke', 'Stroke color as #RRGGBB', flag: '--stroke', shortKey: 'st'),
     ],

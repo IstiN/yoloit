@@ -266,9 +266,20 @@ String _typeGuidance(String typeId) {
   switch (typeId) {
     case 'board.note.markdown':
       return '''
-- Use `yoloit_do <board> <panel> set '{"text":"..."}'` to replace the note content.
-- Use `yoloit_do <board> <panel> append '{"text":"..."}'` to append text.
+- Replace text with `yoloit_note` (`text` param).
+- Append with `yoloit_note_append` — do NOT use `yoloit_do` for simple note edits.
 - When the user says "добавь", "append", "write into it", target this panel.'''.trim();
+    case 'board.sticky':
+      return '''
+- Replace text with `yoloit_sticky_set` (`text` param).
+- Append with `yoloit_sticky_append` — do NOT use `yoloit_do` for sticky edits.
+- Set color with `yoloit_sticky_color`.
+- When the user says "добавь", "append", "write into it", target this panel.'''.trim();
+    case 'board.shape':
+      return '''
+- Read with `yoloit_shape_get`.
+- Update label/style with `yoloit_shape_set` (`text`, `fill`, `stroke`, …).
+- Do NOT use `yoloit_do` for shape label updates.'''.trim();
     case 'board.terminal':
       return '''
 - Read recent output with `yoloit_do <board> <panel> output '{"limit": 30}'`.

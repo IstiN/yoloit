@@ -10,7 +10,6 @@ import 'package:yoloit/features/board/history/board_history_store.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/builtin/markdown_note_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/yolo_assistant_plugin.dart';
-import 'package:yoloit/features/board/ui/board_panel_card.dart';
 import 'package:yoloit/features/board/ui/board_view.dart';
 
 void main() {
@@ -291,31 +290,29 @@ void main() {
       );
       await tester.pump(const Duration(milliseconds: 450));
 
-      expect(find.byTooltip('Ask YoLo about this panel'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel('Ask YoLo about this panel'),
+        findsOneWidget,
+      );
 
-      await tester.tap(find.byTooltip('Ask YoLo about this panel'));
+      cubit.openYoloAssistant('target');
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pump(const Duration(milliseconds: 500));
 
+      expect(cubit.state.yoloAssistantAnchorPanelId, 'target');
       final panels = cubit.state.activeBoard!.panels;
       expect(
         panels.where((p) => p.type == YoloAssistantPlugin.kTypeId),
         isEmpty,
       );
-      expect(
-        find.descendant(
-          of: find.byType(BoardPanelCard),
-          matching: find.text('YOLO'),
-        ),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(
-          of: find.byType(BoardPanelCard),
-          matching: find.widgetWithText(TextField, 'Message…'),
-        ),
-        findsOneWidget,
-      );
+      expect(find.text('YOLO'), findsWidgets);
+      expect(find.byTooltip('Close YoLo assistant'), findsOneWidget);
+
+      cubit.closeYoloAssistant();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(cubit.state.yoloAssistantAnchorPanelId, isNull);
     },
   );
 }

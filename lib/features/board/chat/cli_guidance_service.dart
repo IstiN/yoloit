@@ -1,6 +1,8 @@
 import 'dart:io';
 
 import 'package:flutter/services.dart';
+import 'package:path/path.dart' as p;
+import 'package:yoloit/core/cli/cli_server.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
 
 const _cliAgentGuidanceAsset = 'assets/prompts/cli_agent_guidance.md';
@@ -10,13 +12,23 @@ class CliGuidanceService {
   static final instance = CliGuidanceService._();
 
   String? _cachedHelp;
+  String? _cachedMermaidShort;
 
-  void clearCache() => _cachedHelp = null;
+  void clearCache() {
+    _cachedHelp = null;
+    _cachedMermaidShort = null;
+  }
 
   /// Public access to the CLI help output for preview purposes.
   Future<String?> fetchHelp() async {
-    _cachedHelp ??= await _fetchHelp();
+    _cachedHelp ??= await _fetchHelpFormat('short');
     return _cachedHelp;
+  }
+
+  /// Compact command tree generated from the live CLI registry.
+  Future<String?> fetchMermaidShort() async {
+    _cachedMermaidShort ??= await _fetchHelpFormat('mermaid_short');
+    return _cachedMermaidShort;
   }
 
   Future<String> prependGuidance(
@@ -24,7 +36,7 @@ class CliGuidanceService {
     ChatRuntimeContext? runtimeContext,
   }) async {
     final base = await rootBundle.loadString(_cliAgentGuidanceAsset);
-    final help = _cachedHelp ?? await _fetchHelp();
+    final help = _cachedHelp ?? await fetchHelp();
     _cachedHelp = help;
 
     final boardId = runtimeContext?.boardId?.trim();
@@ -80,14 +92,17 @@ class CliGuidanceService {
     return parts.join('\n');
   }
 
-  Future<String?> _fetchHelp() async {
+  Future<String?> _fetchHelpFormat(String format) async {
     final bin = _resolveYoloitBin();
+    if (bin == null) return null;
     try {
-      final result = await Process.run(bin ?? 'yoloit', [
-        'help',
-        '--format',
-        'short',
-      ]).timeout(const Duration(seconds: 4));
+      final cliPort = Platform.environment['YOLOIT_CLI_PORT'];
+      final result = await Process.run(
+        bin,
+        <String>['help', '--format', format],
+        runInShell: false,
+        environment: cliPort != null ? <String, String>{'YOLOIT_CLI_PORT': cliPort} : null,
+      ).timeout(const Duration(seconds: 10));
       if (result.exitCode == 0) {
         final out = result.stdout.toString().trim();
         return out.isNotEmpty ? out : null;
@@ -97,14 +112,15 @@ class CliGuidanceService {
   }
 
   String? _resolveYoloitBin() {
-    final source = _findSourceTreeCli();
-    if (source != null) return source;
-    final home = Platform.environment['HOME'] ?? '';
-    if (home.isNotEmpty) {
-      final installed = File('$home/.config/yoloit/yoloit');
-      if (installed.existsSync()) return installed.path;
+    final explicit = Platform.environment['YOLOIT_CLI_PATH'];
+    if (explicit != null && explicit.trim().isNotEmpty) {
+      return explicit.trim();
     }
-    return null;
+
+    final installed = CliServer.installedCliExecutable;
+    if (installed != null) return installed.path;
+
+    return _findSourceTreeCli();
   }
 
   String? _findSourceTreeCli() {
@@ -112,18 +128,19 @@ class CliGuidanceService {
       Directory.current.path,
       Platform.environment['PWD'],
       Platform.environment['YOLOIT_PROJECT_ROOT'],
+      Platform.environment['PROJECT_DIR'],
+      p.dirname(Platform.resolvedExecutable),
     ];
     final seen = <String>{};
     for (final raw in roots) {
       if (raw == null || raw.trim().isEmpty) continue;
-      var dir = Directory(raw.trim()).absolute;
+      var dir = Directory(p.normalize(p.absolute(raw.trim())));
       for (var depth = 0; depth < 10; depth++) {
         if (!seen.add(dir.path)) break;
-        final candidates = [
-          File('${dir.path}/tools/yoloit'),
-          File('${dir.path}/yoloit/tools/yoloit'),
-        ];
-        for (final candidate in candidates) {
+        for (final candidate in <File>[
+          File(p.join(dir.path, 'tools', 'yoloit')),
+          File(p.join(dir.path, 'yoloit', 'tools', 'yoloit')),
+        ]) {
           if (candidate.existsSync()) return candidate.path;
         }
         final parent = dir.parent;

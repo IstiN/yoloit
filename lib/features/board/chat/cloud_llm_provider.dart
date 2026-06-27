@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:yoloit/features/board/chat/chat_provider.dart';
+import 'package:yoloit/features/board/chat/cli_guidance_service.dart';
 import 'package:yoloit/features/board/chat/yoloit_cli_tools.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/settings/data/cloud_llm_settings_service.dart';
@@ -141,11 +142,16 @@ class CloudLlmProvider extends ChatProvider {
       var hadToolCalls = false;
       var retriedAfterEmptyResponse = false;
 
-      final tools = _buildToolDefinitions(config.disabledLocalToolNames);
+      final tools = YoloitCliToolCatalog.openAiToolDefinitions(
+        disabledFunctionNames: config.disabledLocalToolNames,
+      );
+      final cliMermaidShort =
+          await CliGuidanceService.instance.fetchMermaidShort();
       final messages = _buildMessages(
         sessionHistory,
         message,
         runtimeContext,
+        cliMermaidShort: cliMermaidShort,
         audioContentOverride: audioContentOverride,
       );
 
@@ -376,6 +382,7 @@ class CloudLlmProvider extends ChatProvider {
     String userMessage,
     ChatRuntimeContext? runtimeContext, {
     List<Map<String, Object?>>? audioContentOverride,
+    String? cliMermaidShort,
   }) {
     final boardId = runtimeContext?.boardId?.trim();
     final boardName = runtimeContext?.boardName?.trim();
@@ -393,50 +400,12 @@ class CloudLlmProvider extends ChatProvider {
       'Keep answers concise. Respond in the user\'s language.',
     );
 
-    // Mermaid decision flowchart — helps LLMs pick the right tool.
-    final scale = runtimeContext?.viewportScale;
-    final scaleNote = scale != null ? ' current=${(scale * 100).round()}%' : '';
-    systemBuf.writeln('''
-
-```mermaid
-flowchart TD
-    MSG([User message]) --> CASUAL{Greeting or\nquestion only?}
-    CASUAL -->|yes| TEXT[Text reply — no tool]
-    CASUAL -->|no| WHAT{Intent}
-
-    WHAT --> MUSIC[🎵 Music]
-    MUSIC --> MV{Verb / keyword}
-    MV -->|"включи / play / запусти / resume / воспроизведи"| T_PLAY[play]
-    MV -->|"пауза / pause / приостанови / поставь на паузу"| T_PAUSE[pause]
-    MV -->|"стоп / stop / останови / выключи музыку"| T_STOP[stop]
-    MV -->|"следующий / next / след трек"| T_NEXT[next]
-    MV -->|"предыдущий / prev / назад / прошлый трек"| T_PREV[prev]
-    MV -->|"список треков / что в плейлисте / перечисли треки"| T_PLL[playlist:list]
-
-    WHAT --> VIEW[👁 View / Navigation]
-    VIEW --> VT{Target}
-    VT -->|"перейди на доску / switch board / открой доску"| T_BF[board:focus]
-    VT -->|"покажи / фокус / открой / show / focus → ANY panel\n(note, playlist, checklist, kanban…)\npanel:focus switches board automatically if needed"| T_PFC[panel:focus]
-    VT -->|"открой файл / покажи файл / preview file / открой README\n→ files:search to find path (use --root if folder is specified), then files:preview"| T_FPV[files:preview]
-    VT -->|"zoom in / увеличь зум / приблизь"| T_BZI["board:zoom scale×1.5$scaleNote"]
-    VT -->|"zoom out / уменьши зум / отдали"| T_BZO["board:zoom scale×0.67$scaleNote"]
-    VT -->|"fit / по экрану / вместить"| T_BFT[board:fit]
-
-    WHAT --> EDIT[✏️ Create / Edit]
-    EDIT --> ET{Target}
-    ET -->|"добавь в заметку / append to note"| T_NA[note:append]
-    ET -->|"создай заметку / new note"| T_NC[note:create]
-    ET -->|"добавь пункт / checklist item"| T_CIA[checklist:item:add]
-    ET -->|"добавь карточку / kanban card"| T_KCA[kanban:card:add]
-    ET -->|"новая панель / new panel"| T_PC[panel:create]
-    ET -->|"увеличь размер / increase size / resize panel\nalso supports presets: small / medium / desktop / large / mobile / tablet\n→ panel:resize, then panel:focus auto-scrolls"| T_PSZ[panel:resize]
-
-    WHAT --> BOARD_OP[🗂 Board ops]
-    BOARD_OP --> BO{Action}
-    BO -->|"создай доску / new board"| T_BC[board:create]
-    BO -->|"переименуй доску"| T_BR[board:rename]
-    BO -->|"удали доску"| T_BD[board:delete]
-```''');
+    if (cliMermaidShort != null && cliMermaidShort.isNotEmpty) {
+      systemBuf.writeln(
+        '\nYoLoIT CLI command map (auto-generated, prefer typed tools over `do`):\n'
+        '```mermaid\n$cliMermaidShort\n```',
+      );
+    }
 
     if (boardId != null && boardId.isNotEmpty) {
       systemBuf.writeln('\nCurrent context:');
@@ -575,43 +544,6 @@ flowchart TD
 
     if (!changed && cleaned.length == history.length) return history;
     return cleaned;
-  }
-
-  List<Map<String, Object?>> _buildToolDefinitions(
-    List<String> disabledToolNames,
-  ) {
-    final disabled = YoloitCliToolCatalog.normalizeFunctionNames(
-      disabledToolNames.map((n) => n.trim()).toSet(),
-    );
-
-    final tools = <Map<String, Object?>>[];
-    for (final tool in YoloitCliToolCatalog.tools) {
-      if (disabled.contains(tool.functionName) ||
-          disabled.contains(tool.fullFunctionName)) {
-        continue;
-      }
-
-      final properties = <String, Object?>{};
-      final requiredKeys = <String>[];
-      for (final param in tool.params) {
-        properties[param.key] = param.toJsonSchema();
-        if (param.required) requiredKeys.add(param.key);
-      }
-
-      tools.add({
-        'type': 'function',
-        'function': {
-          'name': tool.fullFunctionName,
-          'description': '${tool.command} — ${tool.description}',
-          'parameters': {
-            'type': 'object',
-            'properties': properties,
-            if (requiredKeys.isNotEmpty) 'required': requiredKeys,
-          },
-        },
-      });
-    }
-    return tools;
   }
 
   Future<_ApiResponse> _callApi({

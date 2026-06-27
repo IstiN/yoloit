@@ -152,7 +152,7 @@ final List<YoloitCliTool> noteTools = <YoloitCliTool>[
       panelParam(),
       toolParam(
         'text',
-        'Label text',
+        'Label text (clip .txt paths under yoloit_clip are read automatically)',
         flag: '--text',
         shortKey: 'tx',
       ),

@@ -154,12 +154,14 @@ class StickyNoteChrome extends StatelessWidget {
                 ),
                 MiroToolbarDivider(colors: colors),
                 HeaderIconButton(
-                  icon: locked ? Icons.lock : Icons.lock_open,
-                  tooltip: locked ? 'Unlock' : 'Lock',
-                  onPressed: onToggleLocked,
-                  active: locked,
+                  icon: Icons.copy,
+                  tooltip:
+                      isShape ? 'Duplicate shape' : 'Duplicate sticky note',
+                  onPressed: onDuplicate,
                 ),
                 PanelOverflowMenu(
+                  onToggleLocked: onToggleLocked,
+                  locked: locked,
                   onBringToFront: onBringToFront,
                   onSendToBack: onSendToBack,
                   onSettings: onSettings,

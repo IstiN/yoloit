@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:super_clipboard/super_clipboard.dart';
+import 'package:yoloit/core/cli/cli_text_argument_resolver.dart';
 import 'package:yoloit/features/terminal/data/clipboard_file_service.dart';
 
 /// Returns either inline text (for short, safe clipboard content) or an
@@ -47,6 +48,15 @@ class SmartClipboardPasteService {
     text = ClipboardFileService.instance.normalizeText(text);
 
     if (text.isEmpty) return null;
+
+    if (CliTextArgumentResolver.looksLikeTerminalOrLogDump(text)) {
+      if (allowInlineText) {
+        const maxChars = 1500;
+        if (text.length <= maxChars) return text;
+        return '${text.substring(0, maxChars)}\n…[log truncated]';
+      }
+      return null;
+    }
 
     // If the clipboard contains a single existing file path, return it as-is
     // instead of wrapping it in a .txt file.

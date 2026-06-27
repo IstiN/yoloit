@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:yoloit/core/cli/cli_text_argument_resolver.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
 import 'package:yoloit/features/board/chat/chat_session_history.dart';
 import 'package:yoloit/features/board/chat/cloud_llm_provider.dart';
@@ -275,21 +276,21 @@ class ChatSession extends ChangeNotifier {
     // Inline plain-text file contents so the model can see them.
     // (Images are forwarded via the provider's attachment path; other
     // non-image files are shown as chips in the UI.)
+    final keptAttachments = <String>[];
     final textFileExtras = <String>[];
     for (final path in allAttachments) {
       if (path.endsWith('.txt')) {
-        try {
-          final file = File(path);
-          if (await file.exists()) {
-            final content = await file.readAsString();
-            if (content.isNotEmpty) {
-              textFileExtras.add('--- File: $path ---\n$content');
-            }
-          }
-        } catch (_) {
-          // ignore read failures
+        final isClip = CliTextArgumentResolver.isClipTextFilePath(path);
+        final inlined = await _readTextAttachmentForPrompt(path);
+        if (inlined != null) {
+          textFileExtras.add(inlined);
         }
+        if (!isClip || inlined != null) {
+          keptAttachments.add(path);
+        }
+        continue;
       }
+      keptAttachments.add(path);
     }
     if (textFileExtras.isNotEmpty) {
       promptText = promptText.isEmpty
@@ -303,7 +304,7 @@ class ChatSession extends ChangeNotifier {
         id: 'user-${DateTime.now().millisecondsSinceEpoch}',
         role: ChatRole.user,
         content: promptText.isNotEmpty ? promptText : text,
-        attachments: allAttachments,
+        attachments: keptAttachments,
         timestamp: DateTime.now(),
       ),
     );
@@ -314,7 +315,7 @@ class ChatSession extends ChangeNotifier {
 
     // Start streaming
     final imageAttachments =
-        allAttachments.where((t) => imageExtRe.hasMatch(t)).toList();
+        keptAttachments.where((t) => imageExtRe.hasMatch(t)).toList();
 
     // Inject board snapshot as attachment for CLI agents (file path mode)
     final snapshotPath = runtimeContext?.boardSnapshotPath;
@@ -671,6 +672,26 @@ class ChatSession extends ChangeNotifier {
   }
 
   // ── Lifecycle ───────────────────────────────────────────────────────────
+
+  Future<String?> _readTextAttachmentForPrompt(String path) async {
+    if (CliTextArgumentResolver.isClipTextFilePath(path)) {
+      final content = CliTextArgumentResolver.resolve(path);
+      if (content == null || content.isEmpty) return null;
+      return '--- Clipboard ---\n$content';
+    }
+    try {
+      final file = File(path);
+      if (await file.exists()) {
+        final content = await file.readAsString();
+        if (content.isNotEmpty) {
+          return '--- File: $path ---\n$content';
+        }
+      }
+    } catch (_) {
+      // ignore read failures
+    }
+    return null;
+  }
 
   /// Detach from UI without killing processes or stopping event processing.
   ///
