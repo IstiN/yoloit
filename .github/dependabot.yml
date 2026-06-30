@@ -1,0 +1,39 @@
+# Dependabot keeps Dart/Flutter deps and GitHub Actions up to date.
+# Major bumps (fl_chart 1.x, record 7.x, media_kit_video 2.x, etc.) are
+# reviewed manually — see docs/panel_cli_audit_report.md tooling notes.
+version: 2
+updates:
+  - package-ecosystem: pub
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 10
+    groups:
+      flutter-runtime:
+        patterns:
+          - 'flutter_*'
+          - 'bloc'
+          - 'equatable'
+          - 'meta'
+          - 'path'
+          - 'yaml'
+          - 'crypto'
+          - 'shelf*'
+          - 'webview_flutter'
+      flutter-media:
+        patterns:
+          - 'media_kit*'
+          - 'record'
+          - 'volume_controller'
+      flutter-dev:
+        dependency-type: development
+        patterns:
+          - '*'
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5

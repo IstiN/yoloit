@@ -33,7 +33,7 @@ dependencies:
 
   cupertino_icons: ^1.0.8
   flutter_bloc: ^9.1.1
-  bloc: ^9.0.0
+  bloc: ^9.2.1
   equatable: ^2.0.7
   flutter_pty: ^0.4.2
   meta: ^1.16.0
@@ -42,14 +42,14 @@ dependencies:
   window_manager: ^0.5.1
   file_picker: ^11.0.2
   path: ^1.9.1
-  process_run: ^1.2.2
+  process_run: ^1.3.3
   diff_match_patch: ^0.4.1
   highlight: ^0.7.0
   re_highlight: ^0.0.1
   shared_preferences: ^2.5.3
   super_clipboard: ^0.9.1
-  flutter_svg: ^2.2.4
-  flutter_secure_storage: ^10.0.0
+  flutter_svg: ^2.3.0
+  flutter_secure_storage: ^10.3.1
   flutter_colorpicker: ^1.1.0
   flutter_code_editor:
     path: third_party/flutter_code_editor
@@ -67,13 +67,13 @@ dependencies:
   crypto: ^3.0.0
   vector_math: 2.2.0
   cryptography: ^2.9.0
-  webview_flutter: ^4.13.1
+  webview_flutter: ^4.14.0
   fl_chart: ^0.70.2
   pluto_grid: ^8.1.0
   media_kit: ^1.1.11
   media_kit_video: ^1.2.4
   media_kit_libs_video: ^1.0.5
-  record: ^6.1.2
+  record: ^6.2.1
   local_models_sdk:
     path: third_party/flutter_local_models/packages/local_models_sdk
   local_models_flutter:
@@ -95,7 +95,7 @@ dev_dependencies:
   mocktail: ^1.0.4
   golden_toolkit: ^0.15.0
   json_serializable: ^6.9.0
-  build_runner: ^2.4.15
+  build_runner: ^2.15.0
 
 dependency_overrides:
   volume_controller:
