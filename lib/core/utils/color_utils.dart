@@ -17,6 +17,13 @@ Color? parseColor(String? text) {
       return hex.length == 6 ? Color(0xFF000000 | parsed) : Color(parsed);
     }
   }
+  if (RegExp(r'^[0-9a-fA-F]{6}$').hasMatch(normalized) ||
+      RegExp(r'^[0-9a-fA-F]{8}$').hasMatch(normalized)) {
+    final parsed = int.tryParse(normalized, radix: 16);
+    if (parsed != null) {
+      return normalized.length == 6 ? Color(0xFF000000 | parsed) : Color(parsed);
+    }
+  }
   final parsed = int.tryParse(normalized);
   if (parsed != null) return Color(parsed);
   return null;

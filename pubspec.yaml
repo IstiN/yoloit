@@ -79,7 +79,7 @@ dependencies:
   local_models_flutter:
     path: third_party/flutter_local_models/packages/local_models_flutter
 
-  xml: any
+  xml: ^6.6.1
   path_provider: any
   flutter_highlight: any
   json_annotation: ^4.9.0
@@ -94,7 +94,7 @@ dev_dependencies:
   bloc_test: ^10.0.0
   mocktail: ^1.0.4
   golden_toolkit: ^0.15.0
-  json_serializable: ^6.9.0
+  json_serializable: ^6.11.2
   build_runner: ^2.15.0
 
 dependency_overrides:

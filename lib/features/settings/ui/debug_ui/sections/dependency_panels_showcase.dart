@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
+import 'package:record/record.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/theme/app_theme.dart';
+import 'package:yoloit/core/theme/icls_theme_adapter.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/chart_plugin.dart';
@@ -82,8 +86,14 @@ class _DependencyPanelsShowcaseState extends State<DependencyPanelsShowcase> {
         const SectionTitle('Major dependency panels (manual QA)'),
         const SizedBox(height: 6),
         Text(
-          'fl_chart ^1.2 • media_kit_video ^2.0 — use this page after dependency bumps.',
+          'fl_chart ^1.2 • media_kit_video ^2.0 • record ^6.2 • xml ^6.6',
           style: TextStyle(color: colors.textMuted, fontSize: 11),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Blocked until Dart SDK bump: record ≥7 (needs 3.12), xml ≥7 (needs 3.11), '
+          'json_serializable ≥6.13 (needs analyzer 10+).',
+          style: TextStyle(color: colors.textMuted, fontSize: 10, height: 1.4),
         ),
         const SizedBox(height: 20),
         const SectionTitle('Chart panel — all types (fl_chart)'),
@@ -163,6 +173,163 @@ class _DependencyPanelsShowcaseState extends State<DependencyPanelsShowcase> {
           '.mp4/.mp3. File Preview panel opens video files from disk.',
           style: TextStyle(color: colors.textMuted, fontSize: 10, height: 1.5),
         ),
+        const SizedBox(height: 24),
+        const SectionTitle('Microphone / ASR (record)'),
+        const SizedBox(height: 8),
+        const _MicRecordProbe(),
+        const SizedBox(height: 24),
+        const SectionTitle('ICLS theme import (xml)'),
+        const SizedBox(height: 8),
+        const _IclsThemePreview(),
+      ],
+    );
+  }
+}
+
+class _MicRecordProbe extends StatefulWidget {
+  const _MicRecordProbe();
+
+  @override
+  State<_MicRecordProbe> createState() => _MicRecordProbeState();
+}
+
+class _MicRecordProbeState extends State<_MicRecordProbe> {
+  final AudioRecorder _recorder = AudioRecorder();
+  String _status = 'Tap to check microphone permission (record package).';
+  bool _busy = false;
+
+  @override
+  void dispose() {
+    unawaited(_recorder.dispose());
+    super.dispose();
+  }
+
+  Future<void> _checkMic() async {
+    setState(() {
+      _busy = true;
+      _status = 'Checking…';
+    });
+    try {
+      final granted = await _recorder.hasPermission();
+      if (!mounted) return;
+      setState(() {
+        _status = granted
+            ? 'Microphone permission granted. YoLo chat + assistant use record ^6.2.'
+            : 'Microphone permission denied — grant in System Settings → Privacy.';
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _status = 'Mic check failed: $e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Used by YoLo chat panel (WAV file) and anchored assistant (PCM stream).',
+          style: TextStyle(color: colors.textMuted, fontSize: 11, height: 1.5),
+        ),
+        const SizedBox(height: 8),
+        FilledButton.icon(
+          onPressed: _busy ? null : _checkMic,
+          icon: const Icon(Icons.mic, size: 16),
+          label: Text(_busy ? 'Checking…' : 'Check microphone'),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          _status,
+          style: TextStyle(color: colors.textSecondary, fontSize: 11),
+        ),
+      ],
+    );
+  }
+}
+
+class _IclsThemePreview extends StatelessWidget {
+  const _IclsThemePreview();
+
+  static const _sampleIcls = '''
+<scheme name="Debug ICLS" parent_scheme="Darcula">
+  <attributes>
+    <option name="TEXT">
+      <value>
+        <option name="FOREGROUND" value="bbbbbb"/>
+        <option name="BACKGROUND" value="2b2b2b"/>
+      </value>
+    </option>
+    <option name="DEFAULT_KEYWORD">
+      <value>
+        <option name="FOREGROUND" value="cc7832"/>
+      </value>
+    </option>
+  </attributes>
+</scheme>
+''';
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final parsed = IclsThemeAdapter.parse(_sampleIcls);
+    final scheme = parsed.scheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Settings → Theme → Import .icls uses xml ^6.6 via IclsThemeAdapter.',
+          style: TextStyle(color: colors.textMuted, fontSize: 11, height: 1.5),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          'Parsed: ${parsed.name}',
+          style: TextStyle(
+            color: colors.textPrimary,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _Swatch(label: 'background', color: scheme.background),
+            _Swatch(label: 'primary', color: scheme.primary),
+            _Swatch(label: 'text', color: scheme.textPrimary),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _Swatch extends StatelessWidget {
+  const _Swatch({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return Column(
+      children: [
+        Container(
+          width: 48,
+          height: 32,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(color: colors.border),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(label, style: TextStyle(color: colors.textMuted, fontSize: 9)),
       ],
     );
   }
