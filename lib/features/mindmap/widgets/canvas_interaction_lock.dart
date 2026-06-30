@@ -227,14 +227,27 @@ class _ScrollableCardRegionState extends State<ScrollableCardRegion> {
         _ensureEntered(event.position);
         _exitTimer?.cancel();
       },
-      onPointerPanZoomEnd: (event) {
+      onPointerUp: (event) {
         _lastGlobalPosition = event.position;
+        _exitTimer?.cancel();
         _scrollTimer?.cancel();
         _scrollTimer = Timer(const Duration(milliseconds: 100), () {
-          final position = _lastGlobalPosition;
-          if (_mousePhysicallyExited && position != null) {
-            _performExit(position);
-          }
+          _performExit(event.position);
+        });
+      },
+      onPointerCancel: (event) {
+        _exitTimer?.cancel();
+        _scrollTimer?.cancel();
+        if (!_entered) return;
+        _entered = false;
+        CanvasInteractionLock.instance.exit();
+      },
+      onPointerPanZoomEnd: (event) {
+        _lastGlobalPosition = event.position;
+        _exitTimer?.cancel();
+        _scrollTimer?.cancel();
+        _scrollTimer = Timer(const Duration(milliseconds: 100), () {
+          _performExit(event.position);
         });
       },
       child: MouseRegion(onEnter: _enter, onExit: _exit, child: widget.child),

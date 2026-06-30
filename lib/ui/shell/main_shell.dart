@@ -9,7 +9,9 @@ import 'package:window_manager/window_manager.dart';
 import 'package:yoloit/core/hotkeys/hotkey_registry.dart';
 import 'package:yoloit/core/hotkeys/hotkeys.dart';
 import 'package:yoloit/core/services/resource_monitor_service.dart';
+import 'package:yoloit/core/services/resource_usage_report.dart';
 import 'package:yoloit/core/session/session_prefs.dart';
+import 'package:yoloit/core/utils/clipboard_utils.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/bloc/board_state.dart';
@@ -1270,6 +1272,7 @@ class _ResourceChipState extends State<_ResourceChip> {
             child: _ResourcePanel(
               boardCubit: boardCubit,
               snapshot: _snap,
+              messengerContext: context,
               position: Offset(
                 offset.dx - 260 + box.size.width,
                 offset.dy + box.size.height + 4,
@@ -1326,11 +1329,13 @@ class _ResourcePanel extends StatefulWidget {
   const _ResourcePanel({
     required this.boardCubit,
     required this.snapshot,
+    required this.messengerContext,
     required this.position,
     required this.onClose,
   });
   final BoardCubit boardCubit;
   final ResourceSnapshot snapshot;
+  final BuildContext messengerContext;
   final Offset position;
   final VoidCallback onClose;
 
@@ -1354,6 +1359,56 @@ class _ResourcePanelState extends State<_ResourcePanel> {
   void dispose() {
     _sub.cancel();
     super.dispose();
+  }
+
+  Future<void> _copyDiagnosticReport() async {
+    final monitorService = ResourceMonitorService.instance;
+    final boards = widget.boardCubit.state;
+    final activeBoard = boards.activeBoard;
+    final scope = monitorService.scope;
+    final registeredPids = monitorService.registeredPids;
+    final registeredSessions =
+        _snap.sessions
+            .where((s) => registeredPids.contains(s.pid))
+            .map((s) => enrichResourceSessionFromBoards(s, boards.boards))
+            .where((s) => shouldShowYoloitResourceSession(s, scope))
+            .toList();
+    final agentSessions =
+        _snap.sessions.where((s) => !registeredPids.contains(s.pid)).toList();
+
+    final typeCounts = resourcePanelTypeCounts(activeBoard?.panels ?? const []);
+    final labeledTypes = <String, int>{
+      for (final entry in typeCounts.entries)
+        resourcePanelTypeLabel(entry.key): entry.value,
+    };
+    final totalPanels = boards.boards.fold<int>(
+      0,
+      (sum, board) => sum + board.panels.length,
+    );
+
+    final messenger = ScaffoldMessenger.maybeOf(widget.messengerContext);
+    final appVersion = await UpdateService.getAppVersion();
+    final report = formatResourceUsageReport(
+      snapshot: _snap,
+      scope: scope,
+      registeredSessions: registeredSessions,
+      agentSessions: agentSessions,
+      appVersion: appVersion,
+      boards: ResourceBoardSummary(
+        boardCount: boards.boards.length,
+        totalPanels: totalPanels,
+        activeBoardPanels: activeBoard?.panels.length ?? 0,
+        activeBoardName: activeBoard?.name,
+        panelTypeCounts: labeledTypes,
+      ),
+    );
+    await copyToClipboard(report);
+    messenger?.showSnackBar(
+      const SnackBar(
+        content: Text('Resource report copied to clipboard'),
+        duration: Duration(seconds: 2),
+      ),
+    );
   }
 
   @override
@@ -1453,6 +1508,20 @@ class _ResourcePanelState extends State<_ResourcePanel> {
                               Icons.refresh,
                               size: 13,
                               color: mutedColor,
+                            ),
+                          ),
+                        ),
+                        Tooltip(
+                          message: 'Copy diagnostic report',
+                          child: GestureDetector(
+                            onTap: () => unawaited(_copyDiagnosticReport()),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              child: Icon(
+                                Icons.content_copy_outlined,
+                                size: 13,
+                                color: mutedColor,
+                              ),
                             ),
                           ),
                         ),

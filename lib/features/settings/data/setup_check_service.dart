@@ -4,6 +4,8 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:yoloit/core/platform/platform_launcher.dart';
+import 'package:yoloit/core/platform/platform_shell.dart';
+import 'package:yoloit/core/setup/agent_cli_discovery.dart';
 import 'package:yoloit/core/skills/yoloit_global_skills_service.dart';
 
 // ── InstallAction ─────────────────────────────────────────────────────────────
@@ -88,48 +90,9 @@ class SetupCheckService {
   // ── Extended PATH ────────────────────────────────────────────────────────
 
   static String _buildExtendedPathMacOS() {
-    final current = Platform.environment['PATH'] ?? '';
-    final home = Platform.environment['HOME'] ?? '';
-
-    final candidates = <String>[
-      '/opt/homebrew/bin',
-      '/opt/homebrew/sbin',
-      '/usr/local/bin',
-      '/usr/local/sbin',
-      '/usr/bin',
-      '/bin',
-      '/usr/sbin',
-      '/sbin',
-    ];
-
-    if (home.isNotEmpty) {
-      candidates.addAll([
-        '$home/.nvm/versions/node/current/bin',
-        '$home/.kimi-code/bin',
-        '$home/.volta/bin',
-        '$home/.pyenv/shims',
-        '$home/.pyenv/bin',
-        '$home/.cargo/bin',
-        '$home/.local/bin',
-        '$home/bin',
-      ]);
-
-      // Probe NVM directory for installed versions (highest first)
-      final nvmDir = '$home/.nvm/versions/node';
-      try {
-        final dir = Directory(nvmDir);
-        if (dir.existsSync()) {
-          final versions =
-              dir.listSync().whereType<Directory>().map((d) => d.path).toList()
-                ..sort((a, b) => b.compareTo(a));
-          for (final v in versions.take(3)) {
-            candidates.add('$v/bin');
-          }
-        }
-      } catch (_) {}
-    }
-
-    return _mergePath(current, candidates, ':');
+    return PlatformShell.instance.enrichedPath(
+      Platform.environment['PATH'] ?? '',
+    );
   }
 
   static String _mergePath(
@@ -185,23 +148,9 @@ class SetupCheckService {
   }
 
   static String _buildExtendedPathLinux() {
-    final current = Platform.environment['PATH'] ?? '';
-    final home = Platform.environment['HOME'] ?? '';
-
-    final candidates = <String>[
-      '/usr/local/bin',
-      '/usr/bin',
-      '/bin',
-      '/usr/sbin',
-      '/sbin',
-      if (home.isNotEmpty) '$home/.local/bin',
-      if (home.isNotEmpty) '$home/.cargo/bin',
-      if (home.isNotEmpty) '$home/.kimi-code/bin',
-      if (home.isNotEmpty) '$home/.nvm/versions/node/current/bin',
-      if (home.isNotEmpty) '$home/.volta/bin',
-    ];
-
-    return _mergePath(current, candidates, ':');
+    return PlatformShell.instance.enrichedPath(
+      Platform.environment['PATH'] ?? '',
+    );
   }
 
   static String? _extendedPath;
@@ -577,14 +526,16 @@ class SetupCheckService {
     ),
     _checkTool(
       id: 'cursor',
-      name: 'Cursor Agent',
-      description: 'AI-first code editor with agent mode',
-      command: 'cursor',
+      name: 'Cursor Agent CLI',
+      description: 'Cursor autonomous coding agent for terminal and YoLo chats',
+      command: 'cursor-agent',
       versionArgs: ['--version'],
+      fallbackCommand: 'cursor',
+      fallbackVersionArgs: ['--version'],
       installHint:
           winget
               ? 'winget install Anysphere.Cursor'
-              : 'Download from cursor.com',
+              : 'curl -fsSL https://cursor.com/install | bash',
       installUrl: 'https://cursor.com',
       isRequired: false,
       installAction:
@@ -600,7 +551,51 @@ class SetupCheckService {
                   'winget',
                 ],
               )
-              : null,
+              : const InstallAction(
+                executable: 'sh',
+                args: [
+                  '-c',
+                  'curl -fsSL https://cursor.com/install | bash',
+                ],
+                requiresInteractiveTerminal: true,
+                interactiveScript:
+                    'curl -fsSL https://cursor.com/install | bash',
+              ),
+    ),
+    _checkTool(
+      id: 'kimi',
+      name: 'Kimi Code CLI',
+      description: 'Moonshot AI terminal coding agent',
+      command: 'kimi',
+      versionArgs: ['--version'],
+      installHint:
+          _isWindows
+              ? r'powershell -ExecutionPolicy ByPass -c "irm https://code.kimi.com/kimi-code/install.ps1 | iex"'
+              : 'curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash',
+      installUrl: 'https://code.kimi.com',
+      isRequired: false,
+      installAction:
+          _isWindows
+              ? const InstallAction(
+                executable: 'powershell',
+                args: [
+                  '-ExecutionPolicy',
+                  'ByPass',
+                  '-c',
+                  'irm https://code.kimi.com/kimi-code/install.ps1 | iex',
+                ],
+                requiresInteractiveTerminal: true,
+              )
+              : const InstallAction(
+                executable: 'sh',
+                args: [
+                  '-c',
+                  'curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash',
+                ],
+                requiresInteractiveTerminal: true,
+                interactiveScript:
+                    'curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash',
+              ),
     ),
     _checkTool(
       id: 'aider',
@@ -752,21 +747,8 @@ class SetupCheckService {
     return (await _findPath(cmd)) != null;
   }
 
-  static Future<String?> _findPath(String cmd) async {
-    if (_isWindows) {
-      return _findPathWindows(cmd);
-    }
-    try {
-      final r = await Process.run('/bin/bash', [
-        '-c',
-        'which "$cmd" 2>/dev/null',
-      ], environment: _env).timeout(const Duration(seconds: 5));
-      final out = (r.stdout as String).trim().split('\n').first.trim();
-      return (r.exitCode == 0 && out.isNotEmpty) ? out : null;
-    } catch (_) {
-      return null;
-    }
-  }
+  static Future<String?> _findPath(String cmd) =>
+      AgentCliDiscovery.findExecutable(cmd);
 
   static String? _extractOutput(ProcessResult r) {
     final out = (r.stdout as String).trim().split('\n').first.trim();
@@ -845,17 +827,26 @@ class SetupCheckService {
         final resolvedPath = await _findPath(cmd);
         if (resolvedPath == null) return null;
 
-        final versionResult = await Process.run(
-          resolvedPath,
-          verArgs,
-          environment: env,
-          runInShell: _isWindows,
-        ).timeout(const Duration(seconds: 5));
+        String? version;
+        try {
+          final versionResult = await Process.run(
+            resolvedPath,
+            verArgs,
+            environment: env,
+            runInShell: _isWindows,
+          ).timeout(const Duration(seconds: 5));
 
-        final versionOutput =
-            (versionResult.stdout as String).trim().isNotEmpty
-                ? (versionResult.stdout as String).trim().split('\n').first
-                : (versionResult.stderr as String).trim().split('\n').first;
+          final versionOutput =
+              (versionResult.stdout as String).trim().isNotEmpty
+                  ? (versionResult.stdout as String).trim().split('\n').first
+                  : (versionResult.stderr as String).trim().split('\n').first;
+          if (versionOutput.isNotEmpty) {
+            version = _cleanVersion(versionOutput);
+          }
+        } catch (_) {
+          // Binary is on PATH but version probe failed (e.g. cursor-agent
+          // keychain segfault when launched from a GUI app).
+        }
 
         return DependencyStatus(
           id: id,
@@ -865,7 +856,7 @@ class SetupCheckService {
           installUrl: installUrl,
           installAction: installAction,
           isAvailable: true,
-          version: _cleanVersion(versionOutput),
+          version: version,
           isRequired: isRequired,
         );
       } catch (_) {

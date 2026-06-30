@@ -1,5 +1,9 @@
+import 'package:yoloit/core/cli/handlers/ui_handler.dart';
+import 'package:yoloit/features/board/plugins/builtin/ui_view_bindings.dart';
 import 'package:yoloit/core/remote/yoloitd_models.dart';
 import 'package:yoloit/core/remote/yoloitd_panel_catalog.dart';
+import 'package:yoloit/features/board/plugins/builtin/ui_view_plugin.dart';
+import 'package:yoloit/features/board/widgets/app_cli_utils.dart';
 
 class RemotePanelActionResult {
   const RemotePanelActionResult({
@@ -52,6 +56,7 @@ RemotePanelActionResult handleRemotePanelAction(
     'board.table' => _table(panel, action, args),
     'board.calendar' => _calendar(panel, action, args),
     'board.chart' => _chart(panel, action, args),
+    'board.ui' => _uiView(panel, action, args),
     'board.diff.preview' => _diffPreview(panel, action, args),
     'board.yolo_assistant' => _yoloAssistant(panel, action, args),
     'board.widget.custom' => _customWidget(panel, action, args),
@@ -133,6 +138,21 @@ Map<String, dynamic> _content(RemotePanel panel) {
       'messages': _maps(panel.state['messages']),
       'configured': panel.state['configured'] ?? false,
     },
+    'board.ui' => () {
+      final tree =
+          UiViewPlugin.treeFromState(panel.state) ?? UiViewPlugin.defaultTree();
+      final storage = UiViewBindings.storageFromState(panel.state);
+      final resolved = UiViewBindings.applyTree(tree, storage);
+      return <String, dynamic>{
+        'tree': tree,
+        'resolvedTree': resolved,
+        'storage': storage,
+        'scripts': UiViewBindings.scriptsFromState(panel.state),
+        'text': AppCliUtils.extractTextLines(resolved),
+        if (panel.state['_lastEvent'] != null)
+          'lastEvent': panel.state['_lastEvent'],
+      };
+    }(),
     _ => Map<String, dynamic>.from(panel.state),
   };
 }
@@ -1138,6 +1158,81 @@ RemotePanelActionResult _chart(
       return RemotePanelActionResult(
         message: 'Refresh requires board context; state unchanged',
         data: {'tablePanelId': panel.state['tablePanelId']},
+      );
+  }
+  return _unknown(action);
+}
+
+RemotePanelActionResult _uiView(
+  RemotePanel panel,
+  String action,
+  Map<String, dynamic> args,
+) {
+  switch (action) {
+    case 'get':
+      final tree =
+          UiViewPlugin.treeFromState(panel.state) ?? UiViewPlugin.defaultTree();
+      final storage = UiViewBindings.storageFromState(panel.state);
+      final resolved = UiViewBindings.applyTree(tree, storage);
+      return RemotePanelActionResult(
+        data: <String, dynamic>{
+          'tree': tree,
+          'resolvedTree': resolved,
+          'storage': storage,
+          'scripts': UiViewBindings.scriptsFromState(panel.state),
+          'text': AppCliUtils.extractTextLines(resolved),
+          if (panel.state['_lastEvent'] != null)
+            'lastEvent': panel.state['_lastEvent'],
+        },
+      );
+    case 'render':
+      final tree = parseUiTree(args['tree'] ?? args['json']);
+      if (tree == null) {
+        return const RemotePanelActionResult(
+          ok: false,
+          message: 'Missing or invalid "tree" (must be a JSON object)',
+        );
+      }
+      return RemotePanelActionResult(
+        message: 'UI tree rendered',
+        stateUpdate: <String, dynamic>{
+          'tree': tree,
+          '_storage': UiViewBindings.seedFieldsFromTree(
+            tree,
+            UiViewBindings.storageFromState(panel.state),
+          ),
+          '_lastEvent': null,
+        },
+      );
+    case 'set-state':
+      final patch = parseUiStatePatch(args['state'] ?? args['storage']);
+      if (patch == null) {
+        return const RemotePanelActionResult(
+          ok: false,
+          message: 'Missing or invalid "state" object',
+        );
+      }
+      final current = UiViewBindings.storageFromState(panel.state);
+      return RemotePanelActionResult(
+        message: 'UI storage updated',
+        stateUpdate: <String, dynamic>{
+          '_storage': <String, dynamic>{...current, ...patch},
+        },
+      );
+    case 'set-scripts':
+      final patch = parseUiScriptsPatch(args['scripts'] ?? args['_scripts']);
+      if (patch == null) {
+        return const RemotePanelActionResult(
+          ok: false,
+          message: 'Missing or invalid "scripts" object',
+        );
+      }
+      final currentScripts = UiViewBindings.scriptsFromState(panel.state);
+      return RemotePanelActionResult(
+        message: 'UI scripts updated',
+        stateUpdate: <String, dynamic>{
+          '_scripts': <String, dynamic>{...currentScripts, ...patch},
+        },
       );
   }
   return _unknown(action);

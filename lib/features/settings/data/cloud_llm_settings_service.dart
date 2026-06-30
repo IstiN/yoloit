@@ -244,16 +244,25 @@ class CloudLlmSettingsService {
   static const _assistantProviderPrefKey = 'assistant_provider_type_v1';
   static const _voiceSettingsPrefKey = 'voice_settings_v1';
 
+  /// macOS Keychain prompts can block [FlutterSecureStorage.read] until the
+  /// user approves — and occasionally never resume. Never wait forever.
+  static const Duration secureReadTimeout = Duration(seconds: 8);
+
   final _storage = SecureStorageFactory.create();
+
+  Future<String?> _readSecureConfigsRaw() async {
+    try {
+      return await _storage
+          .read(key: _storageKey)
+          .timeout(secureReadTimeout);
+    } on Exception {
+      return null;
+    }
+  }
 
   /// Load all saved cloud provider configs.
   Future<List<CloudLlmConfig>> loadConfigs() async {
-    String? raw;
-    try {
-      raw = await _storage.read(key: _storageKey);
-    } on Exception {
-      raw = null;
-    }
+    var raw = await _readSecureConfigsRaw();
     if (raw == null || raw.isEmpty) {
       final prefs = await SharedPreferences.getInstance();
       raw = prefs.getString(_prefsFallbackKey);

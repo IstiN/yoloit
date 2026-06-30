@@ -76,11 +76,12 @@ class ChecklistCliHandler extends PanelCliHandler {
         );
       case 'rename':
         final items = _items(panel);
+        final newText =
+            (args['newText'] ?? args['new'] ?? args['name']) as String?;
         final index =
             _indexArg(args) ??
             _indexById(items, args['id']?.toString()) ??
-            _indexByText(items, _textArg(args));
-        final newText = (args['newText'] ?? args['text']) as String?;
+            _indexByText(items, args['text'] ?? args['old']);
         if (index == null || newText == null) {
           return const CliActionResult(
             ok: false,

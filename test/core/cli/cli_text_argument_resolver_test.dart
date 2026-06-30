@@ -204,4 +204,59 @@ Another exception was thrown: type String is not a subtype of num
       "yoloit shape:set board-1 Effort --text 'Effort →'",
     );
   });
+
+  test('executor renders uirnd with JSON object tree argument', () async {
+    final executor = YoloitCliToolExecutor(execute: false);
+    final tree = <String, Object?>{
+      'type': 'column',
+      'children': <Map<String, Object?>>[
+        <String, Object?>{'type': 'text', 'data': 'Item 1'},
+      ],
+    };
+    final result =
+        jsonDecode(
+              await executor.invoke('uirnd', <String, Object?>{
+                'b': 'board-1',
+                'p': 'Мой список',
+                'j': tree,
+              }),
+            )
+            as Map<String, Object?>;
+
+    expect(result['ok'], isTrue);
+    expect(result['command'], contains('ui:render'));
+    expect(result['command'], contains('"type":"column"'));
+    expect(result['command'], contains('Item 1'));
+  });
+
+    test('normalizer infers ui:create title and board.ui panel type', () {
+      const message = 'добавь кастом view как пример со списком';
+      final createArgs = YoloitCliToolArgumentNormalizer.normalize(
+        functionName: 'uicrt',
+        arguments: <String, Object?>{'b': 'board-1'},
+        userMessage: message,
+      );
+      expect(createArgs['title'], 'Пример списка');
+
+    final panelArgs = YoloitCliToolArgumentNormalizer.normalize(
+      functionName: 'pmk',
+      arguments: <String, Object?>{'b': 'board-1'},
+      userMessage: message,
+    );
+    expect(panelArgs['type'], 'board.ui');
+  });
+
+  test('normalizer strips chat panel id from uirnd args', () {
+    final normalized = YoloitCliToolArgumentNormalizer.normalize(
+      functionName: 'uirnd',
+      arguments: <String, Object?>{
+        'b': 'board-1',
+        'p': 'panel-yolo-assistant-badge',
+        'j': <String, Object?>{'type': 'text', 'data': 'Hi'},
+      },
+      userMessage: '',
+    );
+    expect(normalized.containsKey('p'), isFalse);
+    expect(normalized['tree'], contains('"type":"text"'));
+  });
 }

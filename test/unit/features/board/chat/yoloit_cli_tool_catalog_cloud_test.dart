@@ -10,7 +10,7 @@ void main() {
           'sta',
     );
     final fn = sticky['function']! as Map<String, Object?>;
-    expect(fn['description'], 'Append text to a sticky note');
+    expect(fn['description'], 'Append text to a sticky note (board and panel optional)');
     expect(fn['description'], isNot(contains('yoloit sticky:append')));
 
     final params = fn['parameters']! as Map<String, Object?>;

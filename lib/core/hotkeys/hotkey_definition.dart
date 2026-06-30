@@ -162,7 +162,7 @@ final kHotkeyDefinitions = <HotkeyDefinition>[
   // Search
   HotkeyDefinition(
     id: 'file_search',
-    description: 'Quick file search',
+    description: 'Quick open (boards, panels, files)',
     category: 'Search',
     defaultActivator:
         const SingleActivator(LogicalKeyboardKey.keyO, meta: true),

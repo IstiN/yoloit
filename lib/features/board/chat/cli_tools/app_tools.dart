@@ -102,7 +102,8 @@ final List<YoloitCliTool> appTools = <YoloitCliTool>[
   YoloitCliTool(
     command: 'agent:default',
     alias: 'agd',
-    description: 'Get or set the default terminal agent (default: copilot)',
+    description:
+        'Get or set the default agent id for agent:run (board.chat provider, default: copilot)',
     group: 'agents',
     params: <YoloitCliToolParam>[toolParam('agent', 'Agent id to set', shortKey: 'a')],
   ),
@@ -111,9 +112,9 @@ final List<YoloitCliTool> appTools = <YoloitCliTool>[
     command: 'agent:run',
     alias: 'agr',
     description:
-        'Launch a terminal agent session in a folder. '
-        'The agent opens its own terminal and the initial task is typed automatically. '
-        'This is NOT a chat command — to send text to an existing terminal panel use yolochat:terminal.',
+        'Start an agent session: creates a board.chat panel in the folder and sends the initial task. '
+        'When task is sent the response includes STOP — do not call yolochat:send again. '
+        'For typing into an existing terminal panel use yolochat:terminal.',
     group: 'agents',
     params: <YoloitCliToolParam>[
       toolParam('agent', 'Agent id (e.g. copilot)', shortKey: 'a'),
@@ -206,7 +207,9 @@ final List<YoloitCliTool> appTools = <YoloitCliTool>[
     alias: 'csd',
     description:
         'Send a message to a YoLo chat panel — non-blocking, returns immediately '
-        'with status:processing. Use yolochat:messages to read the response.',
+        'with status:processing. Use yolochat:messages to read the response. '
+        'Always pass --panel when multiple board.chat panels exist. '
+        'Do NOT call after agent:run with task (task already sent).',
     group: 'yolochat',
     params: <YoloitCliToolParam>[
       toolParam('text', 'Message text', required: true, shortKey: 'tx'),
@@ -505,18 +508,24 @@ final List<YoloitCliTool> appTools = <YoloitCliTool>[
   YoloitCliTool(
     command: 'app:run',
     alias: 'wgo',
-    description: 'Open an app in a new panel on a board',
+    description:
+        'Open an app in a new panel on a board. '
+        'Then use app:help, app:state, or app:snapshot to read app data.',
     group: 'app',
     humanVariants: const {
       'ru': [
         'запусти приложение {id_or_path}',
         'открой {id_or_path}',
         'запусти {id_or_path}',
+        'покажи погоду',
+        'какая погода',
       ],
       'en': [
         'run app {id_or_path}',
         'open app {id_or_path}',
         'launch {id_or_path}',
+        'show weather',
+        'what is the weather',
       ],
     },
     params: <YoloitCliToolParam>[
@@ -547,9 +556,48 @@ final List<YoloitCliTool> appTools = <YoloitCliTool>[
   ),
 
   YoloitCliTool(
+    command: 'app:help',
+    alias: 'aphlp',
+    description:
+        'Show CLI commands, events, and examples for a specific app. '
+        'Call this before app:execute when unsure which events exist.',
+    group: 'app',
+    params: <YoloitCliToolParam>[
+      toolParam('id', 'App id', required: true, shortKey: 'i'),
+    ],
+  ),
+
+  YoloitCliTool(
+    command: 'app:state',
+    alias: 'apst',
+    description:
+        'Read structured state (yoloit.exportState) and visible text from a running app. '
+        'Preferred over app:snapshot for weather, prices, calculator values.',
+    group: 'app',
+    humanVariants: const {
+      'ru': [
+        'сколько градусов',
+        'какая температура',
+        'температура в {city}',
+        'погода в {city}',
+      ],
+      'en': [
+        'how many degrees',
+        'what is the temperature',
+        'weather in {city}',
+      ],
+    },
+    params: <YoloitCliToolParam>[
+      toolParam('id', 'App id', required: true, shortKey: 'i'),
+    ],
+  ),
+
+  YoloitCliTool(
     command: 'app:execute',
     alias: 'apexec',
-    description: 'Execute a JS event/function in a running app',
+    description:
+        'Execute a JS event in a running app. '
+        'Weather city change: set_city \'{"city":"Grodno"}\' then app:state.',
     group: 'app',
     params: <YoloitCliToolParam>[
       toolParam('id', 'App id', required: true, shortKey: 'i'),
@@ -587,7 +635,9 @@ final List<YoloitCliTool> appTools = <YoloitCliTool>[
   YoloitCliTool(
     command: 'app:snapshot',
     alias: 'apsnap',
-    description: 'Get the current JSON render tree of a running app',
+    description:
+        'Get the JSON render tree of a running app plus extracted text lines. '
+        'Use app:state first when the app exports structured data.',
     group: 'app',
     params: <YoloitCliToolParam>[
       toolParam('id', 'App id', required: true, shortKey: 'i'),
@@ -597,7 +647,9 @@ final List<YoloitCliTool> appTools = <YoloitCliTool>[
   YoloitCliTool(
     command: 'app:screenshot',
     alias: 'apss',
-    description: 'Save a screenshot of a running app panel to a PNG file',
+    description:
+        'Save a PNG screenshot of a running app panel (panel must be visible on screen). '
+        'Prefer app:snapshot for the JSON render tree when headless.',
     group: 'app',
     params: <YoloitCliToolParam>[
       toolParam('id', 'App id', required: true, shortKey: 'i'),

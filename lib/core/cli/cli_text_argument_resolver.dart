@@ -32,7 +32,7 @@ class CliTextArgumentResolver {
   };
 
   /// State / action keys whose string values may reference clip temp files.
-  static const Set<String> jsonKeys = <String>{'json', 'j'};
+  static const Set<String> jsonKeys = <String>{'json', 'j', 'tree'};
 
   static final RegExp _chatSessionExport = RegExp(r'^\[\d{4}-\d{2}-\d{2}T');
 

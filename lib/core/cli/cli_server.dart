@@ -5,12 +5,12 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:yaml/yaml.dart';
 import 'package:yoloit/core/cli/cli_installed_paths.dart';
+import 'package:yoloit/core/cli/cli_server_http.dart';
 import 'package:yoloit/core/cli/cli_text_argument_resolver.dart';
 import 'package:yoloit/core/cli/board_screenshot_service.dart';
 import 'package:yoloit/core/cli/board_svg_exporter.dart';
@@ -198,8 +198,9 @@ class CliServer {
     try {
       final home = Platform.environment['HOME'] ?? '';
       if (home.isEmpty) return;
-      final binFile = File('$home/.config/yoloit/yoloit-debug');
-      final data = await rootBundle.loadString('tools/yoloit');
+      final binFile = File('$home/.config/yoloit-dev/yoloit-debug');
+      var data = await _loadWorkspaceYoloitScript();
+      data ??= await rootBundle.loadString('tools/yoloit');
       final transformed = data
           .replaceFirst(
             '#!/usr/bin/env bash',
@@ -220,6 +221,23 @@ class CliServer {
         return true;
       }());
     }
+  }
+
+  Future<String?> _loadWorkspaceYoloitScript() async {
+    final roots = <String?>[
+      Platform.environment['YOLOIT_PROJECT_ROOT'],
+      Platform.environment['PWD'],
+    ];
+    final seen = <String>{};
+    for (final root in roots) {
+      if (root == null || root.trim().isEmpty) continue;
+      final script = File('${root.trim()}/tools/yoloit');
+      if (!seen.add(script.path) || !script.existsSync()) continue;
+      try {
+        return await script.readAsString();
+      } catch (_) {}
+    }
+    return null;
   }
 
   void _writeVmServiceFile() {
@@ -254,12 +272,12 @@ class CliServer {
 
     // Health check
     if (segments.isEmpty || (segments.length == 1 && segments[0] == 'health')) {
-      return _json({'status': 'ok', 'port': _server?.port});
+      return cliJson({'status': 'ok', 'port': _server?.port});
     }
 
     // Must start with /api
     if (segments.isEmpty || segments[0] != 'api') {
-      return _notFound('Unknown route');
+      return cliNotFound('Unknown route');
     }
     final path = segments.sublist(1);
     return _handleApi(method, path, request);
@@ -271,14 +289,14 @@ class CliServer {
     shelf.Request request,
   ) async {
     final cubit = _cubit;
-    if (cubit == null) return _error('Board cubit not available');
+    if (cubit == null) return cliError('Board cubit not available');
 
     // GET /api/vmservice → return VM service WebSocket URI for hot reload
     if (path.length == 1 && path[0] == 'vmservice' && method == 'GET') {
       _writeVmServiceFile(); // refresh
       final f = File(_vmServiceFilePath);
       final uri = f.existsSync() ? f.readAsStringSync().trim() : '';
-      return _json({'vmServiceWsUri': uri, 'ok': uri.isNotEmpty});
+      return cliJson({'vmServiceWsUri': uri, 'ok': uri.isNotEmpty});
     }
 
     // GET /api/catalog → command catalog with humanVariants for router model
@@ -325,8 +343,8 @@ class CliServer {
     // GET /api/active-board → active board details (or first board)
     if (path.length == 1 && path[0] == 'active-board' && method == 'GET') {
       final board = cubit.state.activeBoard ?? cubit.state.boards.firstOrNull;
-      if (board == null) return _json({'board': null});
-      return _json({
+      if (board == null) return cliJson({'board': null});
+      return cliJson({
         'board': {
           'id': board.id,
           'name': board.name,
@@ -358,14 +376,14 @@ class CliServer {
 
     // POST /api/boards  { name: "...", templateId?, templateParams? }
     if (path.length == 1 && path[0] == 'boards' && method == 'POST') {
-      final body = await _body(request);
+      final body = await cliReadJsonBody(request);
       return _createBoard(cubit, body);
     }
 
     // /api/boards/:boardIdOrName/...
     if (path.length >= 2 && path[0] == 'boards') {
       final board = findBoard(cubit, path[1]);
-      if (board == null) return _notFound('Board not found: ${path[1]}');
+      if (board == null) return cliNotFound('Board not found: ${path[1]}');
 
       final sub = path.sublist(2);
       return _handleBoard(method, sub, board, cubit, request);
@@ -381,7 +399,7 @@ class CliServer {
       return _handleApps(method, path.sublist(1), request);
     }
 
-    return _notFound('Unknown route');
+    return cliNotFound('Unknown route');
   }
 
   // ── Cloud provider routes ──────────────────────────────────────────────
@@ -395,10 +413,10 @@ class CliServer {
       method,
       sub,
       request,
-      body: _body,
-      json: _json,
-      error: _error,
-      notFound: _notFound,
+      body: cliReadJsonBody,
+      json: cliJson,
+      error: cliError,
+      notFound: cliNotFound,
     );
   }
 
@@ -413,10 +431,10 @@ class CliServer {
       method,
       sub,
       request,
-      body: _body,
-      json: _json,
-      error: _error,
-      notFound: _notFound,
+      body: cliReadJsonBody,
+      json: cliJson,
+      error: cliError,
+      notFound: cliNotFound,
     );
   }
 
@@ -431,11 +449,11 @@ class CliServer {
       request,
       cubit: _cubit,
       terminalCubit: _terminalCubit,
-      body: _body,
-      json: _json,
-      error: _error,
-      notFound: _notFound,
-      scheduleRebuild: _scheduleRebuild,
+      body: cliReadJsonBody,
+      json: cliJson,
+      error: cliError,
+      notFound: cliNotFound,
+      scheduleRebuild: cliScheduleRebuild,
       nextAvailableBoundsFor: _nextAvailableBoundsFor,
     );
   }
@@ -457,11 +475,11 @@ class CliServer {
       sub,
       request,
       cubit,
-      body: _body,
-      json: _json,
-      error: _error,
-      notFound: _notFound,
-      scheduleRebuild: _scheduleRebuild,
+      body: cliReadJsonBody,
+      json: cliJson,
+      error: cliError,
+      notFound: cliNotFound,
+      scheduleRebuild: cliScheduleRebuild,
       parseColor: parseColor,
     );
   }
@@ -479,9 +497,9 @@ class CliServer {
       sub,
       request,
       cubit,
-      json: _json,
-      error: _error,
-      notFound: _notFound,
+      json: cliJson,
+      error: cliError,
+      notFound: cliNotFound,
     );
   }
 
@@ -496,11 +514,11 @@ class CliServer {
       sub,
       request,
       cubit,
-      body: _body,
-      json: _json,
-      error: _error,
-      notFound: _notFound,
-      scheduleRebuild: _scheduleRebuild,
+      body: cliReadJsonBody,
+      json: cliJson,
+      error: cliError,
+      notFound: cliNotFound,
+      scheduleRebuild: cliScheduleRebuild,
       panelAction: _panelAction,
     );
   }
@@ -518,11 +536,11 @@ class CliServer {
       board,
       cubit,
       request,
-      body: _body,
-      json: _json,
-      error: _error,
-      notFound: _notFound,
-      scheduleRebuild: _scheduleRebuild,
+      body: cliReadJsonBody,
+      json: cliJson,
+      error: cliError,
+      notFound: cliNotFound,
+      scheduleRebuild: cliScheduleRebuild,
       boardDetails: _boardDetails,
       updateBoard: _updateBoard,
       boardSnapshot: _boardSnapshot,
@@ -561,14 +579,14 @@ class CliServer {
       panel,
       cubit,
       request,
-      body: _body,
-      json: _json,
-      error: _error,
-      scheduleRebuild: _scheduleRebuild,
+      body: cliReadJsonBody,
+      json: cliJson,
+      error: cliError,
+      scheduleRebuild: cliScheduleRebuild,
       panelDetails: _panelDetails,
       updatePanel: _updatePanel,
       panelAction: _panelAction,
-      notFound: _notFound,
+      notFound: cliNotFound,
     );
   }
 
@@ -576,7 +594,7 @@ class CliServer {
 
   Future<shelf.Response> _listTemplates() async {
     final templates = await BoardTemplateService.instance.loadAll();
-    return _json({
+    return cliJson({
       'ok': true,
       'templates':
           templates
@@ -598,9 +616,9 @@ class CliServer {
   Future<shelf.Response> _templateDetails(String id) async {
     final template = await BoardTemplateService.instance.resolveById(id);
     if (template == null) {
-      return _notFound('Template not found: $id');
+      return cliNotFound('Template not found: $id');
     }
-    return _json({
+    return cliJson({
       'ok': true,
       'template': {
         'id': template.id,
@@ -616,7 +634,7 @@ class CliServer {
   }
 
   Future<shelf.Response> _syncTemplates(shelf.Request request) async {
-    final body = await _body(request);
+    final body = await cliReadJsonBody(request);
     final sourceId = body['sourceId'] as String?;
     if (sourceId != null && sourceId.isNotEmpty) {
       // Sync a single source if requested.
@@ -625,14 +643,14 @@ class CliServer {
           .where((s) => s.sourceId == sourceId)
           .firstOrNull;
       if (source == null) {
-        return _notFound('Template source not found: $sourceId');
+        return cliNotFound('Template source not found: $sourceId');
       }
       await BoardTemplateService.instance.sync();
     } else {
       await BoardTemplateService.instance.sync();
     }
     final templates = await BoardTemplateService.instance.loadAll();
-    return _json({
+    return cliJson({
       'ok': true,
       'templateCount': templates.length,
       'templates': templates.map((t) => {'id': t.id, 'name': t.name}).toList(),
@@ -645,7 +663,7 @@ class CliServer {
     final boards =
         includeArchived ? cubit.state.boards : cubit.state.activeBoards;
     final active = cubit.state.activeBoardId;
-    return _json({
+    return cliJson({
       'boards': boards.map((b) => _boardSummary(b, activeId: active)).toList(),
     });
   }
@@ -678,7 +696,7 @@ class CliServer {
         templateId,
       );
       if (template == null) {
-        return _notFound('Template not found: $templateId');
+        return cliNotFound('Template not found: $templateId');
       }
       final errors = BoardTemplateService.instance.validateParameters(
         template,
@@ -699,9 +717,9 @@ class CliServer {
         name: name,
         operations: operations,
       );
-      _scheduleRebuild();
-      if (board == null) return _error('Failed to create board');
-      return _json({
+      cliScheduleRebuild();
+      if (board == null) return cliError('Failed to create board');
+      return cliJson({
         'ok': true,
         'board': {'id': board.id, 'name': board.name},
         'templateId': template.id,
@@ -710,16 +728,16 @@ class CliServer {
     }
 
     final board = await cubit.createBoard(name: name);
-    _scheduleRebuild();
-    if (board == null) return _error('Failed to create board');
-    return _json({
+    cliScheduleRebuild();
+    if (board == null) return cliError('Failed to create board');
+    return cliJson({
       'ok': true,
       'board': {'id': board.id, 'name': board.name},
     });
   }
 
   shelf.Response _boardDetails(BoardDocument board) {
-    return _json({
+    return cliJson({
       'id': board.id,
       'name': board.name,
       'viewport': {
@@ -820,7 +838,7 @@ class CliServer {
     bool forceOffscreen = false,
   }) async {
     final activeCubit = cubit ?? _cubit;
-    if (activeCubit == null) return _error('Board cubit not available');
+    if (activeCubit == null) return cliError('Board cubit not available');
 
     Uint8List? png;
     if (forceOffscreen) {
@@ -833,7 +851,7 @@ class CliServer {
       final activeBoard = activeCubit.state.activeBoard;
       final isActiveBoard = activeBoard != null && activeBoard.id == board.id;
       if (isActiveBoard) {
-        _scheduleRebuild();
+        cliScheduleRebuild();
         png = await BoardScreenshotService.instance.capturePng(pixelRatio: 1.5);
       } else {
         assert(() {
@@ -845,7 +863,7 @@ class CliServer {
     }
 
     if (png == null) {
-      return _error('Failed to capture board screenshot');
+      return cliError('Failed to capture board screenshot');
     }
 
     // Also save to the preview cache directory for the overview.
@@ -873,18 +891,18 @@ class CliServer {
   ) async {
     if (body.containsKey('name')) {
       await cubit.renameBoard(board.id, body['name'] as String);
-      _scheduleRebuild();
+      cliScheduleRebuild();
     }
     if (body.containsKey('defaultFolder')) {
       await cubit.updateBoardDefaultFolder(
         board.id,
         body['defaultFolder'] as String?,
       );
-      _scheduleRebuild();
+      cliScheduleRebuild();
     }
     if (body['focus'] == true) {
       await cubit.setActiveBoard(board.id);
-      _scheduleRebuild();
+      cliScheduleRebuild();
     }
     // Viewport update: scale, x (translationX), y (translationY)
     if (body.containsKey('scale') ||
@@ -900,7 +918,7 @@ class CliServer {
         translation: Offset(tx, ty),
       );
       await cubit.updateViewport(vp, boardId: board.id);
-      _scheduleRebuild();
+      cliScheduleRebuild();
     }
     // Fit all panels: fit=true auto-calculates scale+translation
     if (body['fit'] == true) {
@@ -931,10 +949,10 @@ class CliServer {
           translation: Offset(tx, ty),
         );
         await cubit.updateViewport(vp, boardId: board.id);
-        _scheduleRebuild();
+        cliScheduleRebuild();
       }
     }
-    return _json({'ok': true});
+    return cliJson({'ok': true});
   }
 
   Future<shelf.Response> _undoBoard(
@@ -943,11 +961,11 @@ class CliServer {
   ) async {
     final undone = await cubit.undoLatestPanelHistory(board.id);
     if (undone) {
-      _scheduleRebuild();
+      cliScheduleRebuild();
     }
     final updated =
         cubit.state.boards.where((entry) => entry.id == board.id).firstOrNull;
-    return _json({
+    return cliJson({
       'ok': undone,
       'undone': undone,
       'message':
@@ -962,7 +980,7 @@ class CliServer {
   // ── Panel implementations ──────────────────────────────────────────────
 
   shelf.Response _listPanels(BoardDocument board) {
-    return _json({'panels': board.panels.map(_panelSummary).toList()});
+    return cliJson({'panels': board.panels.map(_panelSummary).toList()});
   }
 
   Future<shelf.Response> _createPanel(
@@ -971,10 +989,22 @@ class CliServer {
     Map<String, dynamic> body,
   ) async {
     final typeId = body['type'] as String?;
-    if (typeId == null) return _error('Missing "type" field');
+    if (typeId == null) return cliError('Missing "type" field');
 
     final plugin = BoardPluginRegistry.instance.pluginFor(typeId);
-    if (plugin == null) return _error('Unknown panel type: $typeId');
+    if (plugin == null) return cliError('Unknown panel type: $typeId');
+
+    if (typeId == 'board.widget.custom') {
+      final rawState = body['state'];
+      final widgetId =
+          rawState is Map ? rawState['widgetId'] as String? : null;
+      if (widgetId == null || widgetId.trim().isEmpty) {
+        return cliError(
+          'Use app:run <app-path-or-id> to open a widget app. '
+          'panel:create board.widget.custom only creates an empty shell without a widget.',
+        );
+      }
+    }
 
     final title = body['title'] as String? ?? plugin.displayName;
     final w = (body['width'] as num?)?.toDouble() ?? plugin.defaultSize.width;
@@ -1016,8 +1046,8 @@ class CliServer {
           1,
     );
     await cubit.addPanel(panel, boardId: board.id);
-    _scheduleRebuild();
-    return _json({'ok': true, 'panel': _panelSummary(panel)});
+    cliScheduleRebuild();
+    return cliJson({'ok': true, 'panel': _panelSummary(panel)});
   }
 
   Map<String, dynamic> _initialPanelStateForBoard(
@@ -1104,7 +1134,7 @@ class CliServer {
     final handler = _panelHandlers[panel.type];
     if (handler != null) _warnIfActionHelpIncomplete(handler);
     final content = handler?.getContent(panel);
-    return _json({
+    return cliJson({
       ..._panelSummary(panel),
       'state': panel.state,
       if (content != null) 'content': content,
@@ -1154,7 +1184,7 @@ class CliServer {
         body['title'] as String,
         boardId: board.id,
       );
-      _scheduleRebuild();
+      cliScheduleRebuild();
     }
     if (body.containsKey('x') || body.containsKey('y')) {
       final dx =
@@ -1162,7 +1192,7 @@ class CliServer {
       final dy =
           ((body['y'] as num?)?.toDouble() ?? panel.bounds.y) - panel.bounds.y;
       await cubit.movePanel(panel.id, Offset(dx, dy), boardId: board.id);
-      _scheduleRebuild();
+      cliScheduleRebuild();
     }
     if (body.containsKey('width') || body.containsKey('height')) {
       await cubit.resizePanel(
@@ -1171,20 +1201,20 @@ class CliServer {
         height: (body['height'] as num?)?.toDouble() ?? panel.bounds.height,
         boardId: board.id,
       );
-      _scheduleRebuild();
+      cliScheduleRebuild();
     }
     if (body['focus'] == true) {
       if (cubit.state.activeBoardId != board.id) {
         await cubit.setActiveBoard(board.id);
       }
       await cubit.focusPanel(panel.id, boardId: board.id, zoomOnFocus: true);
-      _scheduleRebuild();
+      cliScheduleRebuild();
     }
     if (body.containsKey('color')) {
       final colorStr = body['color'] as String?;
       final parsed = colorStr == 'clear' ? null : parseColor(colorStr);
       await cubit.updatePanelColor(panel.id, color: parsed, boardId: board.id);
-      _scheduleRebuild();
+      cliScheduleRebuild();
     }
     if (body.containsKey('hidden')) {
       await cubit.updatePanel(
@@ -1192,7 +1222,7 @@ class CliServer {
         (p) => p.copyWith(hidden: body['hidden'] as bool),
         boardId: board.id,
       );
-      _scheduleRebuild();
+      cliScheduleRebuild();
     }
     if (body.containsKey('zIndex')) {
       await cubit.updatePanel(
@@ -1201,9 +1231,9 @@ class CliServer {
             p.copyWith(zIndex: (body['zIndex'] as num?)?.toInt() ?? p.zIndex),
         boardId: board.id,
       );
-      _scheduleRebuild();
+      cliScheduleRebuild();
     }
-    return _json({'ok': true});
+    return cliJson({'ok': true});
   }
 
   Future<shelf.Response> _panelAction(
@@ -1213,14 +1243,14 @@ class CliServer {
     Map<String, dynamic> body,
   ) async {
     final action = body['action'] as String?;
-    if (action == null) return _error('Missing "action" field');
+    if (action == null) return cliError('Missing "action" field');
 
     final handler = _panelHandlers[panel.type];
     if (handler == null) {
-      return _error('No CLI handler for panel type: ${panel.type}');
+      return cliError('No CLI handler for panel type: ${panel.type}');
     }
     if (!handler.supportedActions.contains(action)) {
-      return _error(
+      return cliError(
         'Unsupported action "$action" for ${panel.type}. '
         'Supported: ${handler.supportedActions.join(', ')}. '
         'Use `yoloit panel:help "<board>" "<panel>"` for action details.',
@@ -1290,7 +1320,7 @@ class CliServer {
           boardId: board.id,
         );
       }
-      _scheduleRebuild();
+      cliScheduleRebuild();
     }
 
     // Apply optional state updates to other panels on the same board.
@@ -1310,10 +1340,10 @@ class CliServer {
           boardId: board.id,
         );
       }
-      _scheduleRebuild();
+      cliScheduleRebuild();
     }
 
-    return _json(result.toJson());
+    return cliJson(result.toJson());
   }
 
   double _estimateMarkdownNoteHeight(String markdown, double width) {
@@ -1344,8 +1374,8 @@ class CliServer {
       translation: Offset(tx, ty),
     );
     await cubit.updateViewport(vp, boardId: board.id);
-    _scheduleRebuild();
-    return _json({
+    cliScheduleRebuild();
+    return cliJson({
       'ok': true,
       'viewport': {
         'scale': vp.scale,
@@ -1361,7 +1391,7 @@ class CliServer {
     Map<String, dynamic> body,
   ) async {
     final panels = board.panels.where((p) => !p.hidden).toList();
-    if (panels.isEmpty) return _error('No panels to fit');
+    if (panels.isEmpty) return cliError('No panels to fit');
 
     // Bounding box of all panels
     final minX = panels.map((p) => p.bounds.x).reduce((a, b) => a < b ? a : b);
@@ -1396,8 +1426,8 @@ class CliServer {
       translation: Offset(tx, ty),
     );
     await cubit.updateViewport(vp, boardId: board.id);
-    _scheduleRebuild();
-    return _json({
+    cliScheduleRebuild();
+    return cliJson({
       'ok': true,
       'viewport': {
         'scale': vp.scale,
@@ -1429,7 +1459,7 @@ class CliServer {
     final rootHint = body['rootPanelId'] as String?;
 
     final panels = board.panels.where((p) => !p.hidden).toList();
-    if (panels.isEmpty) return _error('No panels to arrange');
+    if (panels.isEmpty) return cliError('No panels to arrange');
 
     // Build adjacency: fromId → [toId]
     final children = <String, List<String>>{};
@@ -1524,9 +1554,9 @@ class CliServer {
         boardId: board.id,
       );
     }
-    _scheduleRebuild();
+    cliScheduleRebuild();
 
-    return _json({
+    return cliJson({
       'ok': true,
       'arranged': moves.length,
       'layout': 'tree',
@@ -1557,7 +1587,7 @@ class CliServer {
 
     final enabled = body['enabled'];
     if (!reset && enabled is! bool) {
-      return _error('Missing or invalid "enabled" field');
+      return cliError('Missing or invalid "enabled" field');
     }
 
     if (enabled is bool) {
@@ -1582,10 +1612,10 @@ class CliServer {
       await cubit.arrangePanelsByTypeInGrid(board.id);
     }
 
-    _scheduleRebuild();
+    cliScheduleRebuild();
     final updated =
         cubit.state.boards.where((b) => b.id == board.id).firstOrNull;
-    return _json({
+    return cliJson({
       'ok': true,
       'gridMode': (updated ?? board).gridMode.toJson(),
     });
@@ -1659,8 +1689,8 @@ class CliServer {
       }
     }
 
-    _scheduleRebuild();
-    return _json({
+    cliScheduleRebuild();
+    return cliJson({
       'ok': true,
       'applied': results.length,
       'results': results,
@@ -1825,7 +1855,7 @@ class CliServer {
         return _yamlArrangeBoard(cubit, board, raw, index: index);
       case 'board.undo':
         final undone = await cubit.undoLatestPanelHistory(board.id);
-        if (undone) _scheduleRebuild();
+        if (undone) cliScheduleRebuild();
         return {
           'ok': undone,
           'message':
@@ -2571,7 +2601,7 @@ class CliServer {
 
   shelf.Response _listPanelTypes() {
     final plugins = BoardPluginRegistry.instance.all;
-    return _json({
+    return cliJson({
       'types':
           plugins
               .map(
@@ -2595,7 +2625,7 @@ class CliServer {
     Map<String, dynamic> body,
   ) async {
     final link = board.links.where((l) => l.id == linkId).firstOrNull;
-    if (link == null) return _notFound('Link not found: $linkId');
+    if (link == null) return cliNotFound('Link not found: $linkId');
 
     final styleStr = body['style'] as String?;
     final geoStr = body['geometry'] as String?;
@@ -2620,12 +2650,12 @@ class CliServer {
 
     final updated = link.copyWith(style: style, geometry: geo, color: color);
     await cubit.upsertLink(updated, boardId: board.id);
-    _scheduleRebuild();
-    return _json({'ok': true});
+    cliScheduleRebuild();
+    return cliJson({'ok': true});
   }
 
   shelf.Response _listLinks(BoardDocument board) {
-    return _json({
+    return cliJson({
       'links':
           board.links
               .map(
@@ -2649,14 +2679,14 @@ class CliServer {
     final fromRaw = body['from'] as String?;
     final toRaw = body['to'] as String?;
     if (fromRaw == null || toRaw == null) {
-      return _error('Missing "from" or "to" panel id');
+      return cliError('Missing "from" or "to" panel id');
     }
 
     // Resolve panel names/titles to actual IDs.
     final fromPanel = findPanel(board, fromRaw);
     final toPanel = findPanel(board, toRaw);
-    if (fromPanel == null) return _error('Panel not found: $fromRaw');
-    if (toPanel == null) return _error('Panel not found: $toRaw');
+    if (fromPanel == null) return cliError('Panel not found: $fromRaw');
+    if (toPanel == null) return cliError('Panel not found: $toRaw');
 
     final styleStr = body['style'] as String? ?? 'arrow';
     final geoStr = body['geometry'] as String? ?? 'bezier';
@@ -2678,8 +2708,8 @@ class CliServer {
       geometry: geo,
     );
     await cubit.upsertLink(link, boardId: board.id);
-    _scheduleRebuild();
-    return _json({
+    cliScheduleRebuild();
+    return cliJson({
       'ok': true,
       'link': {'id': link.id},
     });
@@ -2722,10 +2752,10 @@ class CliServer {
       method,
       sub,
       request,
-      body: _body,
-      json: _json,
-      error: _error,
-      notFound: _notFound,
+      body: cliReadJsonBody,
+      json: cliJson,
+      error: cliError,
+      notFound: cliNotFound,
     );
   }
 
@@ -2740,10 +2770,10 @@ class CliServer {
       method,
       sub,
       request,
-      body: _body,
-      json: _json,
-      error: _error,
-      notFound: _notFound,
+      body: cliReadJsonBody,
+      json: cliJson,
+      error: cliError,
+      notFound: cliNotFound,
     );
   }
 
@@ -2753,43 +2783,6 @@ class CliServer {
     List<String> path,
     shelf.Request request,
   ) async {
-    return handleTheme(method, path, request, json: _json, notFound: _notFound);
+    return handleTheme(method, path, request, json: cliJson, notFound: cliNotFound);
   }
 }
-
-// ── Top-level helpers used by handlers ────────────────────────────────────
-
-/// Schedule a UI frame so Flutter repaints after a cubit mutation.
-/// Shelf runs on the same isolate, so cubit mutations work directly —
-/// we just need to tell the engine a new frame is needed.
-void _scheduleRebuild() {
-  try {
-    SchedulerBinding.instance.scheduleFrame();
-  } catch (_) {}
-}
-
-Future<Map<String, dynamic>> _body(shelf.Request request) async {
-  try {
-    final raw = await request.readAsString();
-    if (raw.isEmpty) return {};
-    return jsonDecode(raw) as Map<String, dynamic>;
-  } catch (_) {
-    return {};
-  }
-}
-
-shelf.Response _json(Object data) => shelf.Response.ok(
-  jsonEncode(data),
-  headers: {'content-type': 'application/json; charset=utf-8'},
-);
-
-shelf.Response _error(String msg) => shelf.Response(
-  400,
-  body: jsonEncode({'ok': false, 'error': msg}),
-  headers: {'content-type': 'application/json; charset=utf-8'},
-);
-
-shelf.Response _notFound(String msg) => shelf.Response.notFound(
-  jsonEncode({'ok': false, 'error': msg}),
-  headers: {'content-type': 'application/json; charset=utf-8'},
-);

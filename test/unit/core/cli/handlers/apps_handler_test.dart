@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:yoloit/core/cli/handlers/apps_handler.dart';
+import 'package:yoloit/features/board/widgets/js_widget_engine.dart';
 import 'package:yoloit/features/board/widgets/widget_app_registry.dart';
 import 'package:yoloit/features/board/widgets/widget_manifest.dart';
 import 'package:yoloit/features/board/widgets/widget_registry_service.dart';
@@ -11,6 +12,8 @@ import 'package:yoloit/features/board/widgets/widget_registry_service.dart';
 class _MockWidgetRegistryService extends Mock implements WidgetRegistryService {}
 
 class _MockWidgetAppRegistry extends Mock implements WidgetAppRegistry {}
+
+class _MockJsWidgetEngine extends Mock implements JsWidgetEngine {}
 
 shelf.Request _getRequest(String path) {
   return shelf.Request('GET', Uri.parse('http://localhost:8080$path'));
@@ -57,6 +60,10 @@ void main() {
     setUp(() {
       mockRegistry = _MockWidgetRegistryService();
       mockAppRegistry = _MockWidgetAppRegistry();
+      when(() => mockAppRegistry.resolveLookupKey(any())).thenAnswer(
+        (invocation) => invocation.positionalArguments.first as String,
+      );
+      when(() => mockRegistry.find(any())).thenAnswer((_) async => null);
     });
 
     test('GET / returns apps list', () async {
@@ -150,6 +157,7 @@ void main() {
     });
 
     test('GET /:id/snapshot not running returns error', () async {
+      when(() => mockAppRegistry.resolveLookupKey('w1')).thenReturn('w1');
       when(() => mockAppRegistry.tree('w1')).thenReturn(null);
 
       final response = await handleApps(
@@ -170,7 +178,11 @@ void main() {
     });
 
     test('GET /:id/snapshot returns tree when running', () async {
-      when(() => mockAppRegistry.tree('w1')).thenReturn({'type': 'root'});
+      when(() => mockAppRegistry.resolveLookupKey('w1')).thenReturn('w1');
+      when(() => mockAppRegistry.tree('w1')).thenReturn({
+        'type': 'text',
+        'data': 'Hello',
+      });
 
       final response = await handleApps(
         'GET',
@@ -187,7 +199,87 @@ void main() {
       expect(response.statusCode, 200);
       final body = jsonDecode(await response.readAsString()) as Map<String, dynamic>;
       expect(body['ok'], true);
-      expect(body['tree'], {'type': 'root'});
+      expect(body['tree'], isA<Map<String, dynamic>>());
+      expect(body['text'], ['Hello']);
+    });
+
+    test('GET /:id/help returns manifest cli help', () async {
+      when(() => mockAppRegistry.resolveLookupKey('weather')).thenReturn('weather');
+      when(() => mockAppRegistry.engine('weather')).thenReturn(null);
+      when(() => mockRegistry.find('weather')).thenAnswer(
+        (_) async => const WidgetManifest(
+          id: 'weather',
+          name: 'Weather',
+          description: 'Weather',
+          version: '1.0.0',
+          icon: '🌤',
+          allowedCommands: [],
+          networkEnabled: true,
+          widgetPath: '/tmp/weather',
+          isSingleFile: false,
+          cli: {'summary': 'City weather'},
+        ),
+      );
+
+      final response = await handleApps(
+        'GET',
+        ['weather', 'help'],
+        _getRequest('/api/apps/weather/help'),
+        body: _body,
+        json: _json,
+        error: _error,
+        notFound: _notFound,
+        registryService: mockRegistry,
+        appRegistry: mockAppRegistry,
+      );
+
+      expect(response.statusCode, 200);
+      final body = jsonDecode(await response.readAsString()) as Map<String, dynamic>;
+      expect(body['ok'], true);
+      expect(body['summary'], 'City weather');
+      expect(body['globalCommands'], isNotEmpty);
+    });
+
+    test('GET /:id/state returns exported state and text', () async {
+      final mockEngine = _MockJsWidgetEngine();
+      when(() => mockAppRegistry.resolveLookupKey('weather')).thenReturn('weather');
+      when(() => mockAppRegistry.engine('weather')).thenReturn(mockEngine);
+      when(() => mockEngine.exportedState).thenReturn({'tempC': '10'});
+      when(() => mockAppRegistry.tree('weather')).thenReturn({
+        'type': 'text',
+        'data': '10°C',
+      });
+      when(() => mockRegistry.find('weather')).thenAnswer(
+        (_) async => const WidgetManifest(
+          id: 'weather',
+          name: 'Weather',
+          description: 'Weather',
+          version: '1.0.0',
+          icon: '🌤',
+          allowedCommands: [],
+          networkEnabled: true,
+          widgetPath: '/tmp/weather',
+          isSingleFile: false,
+        ),
+      );
+
+      final response = await handleApps(
+        'GET',
+        ['weather', 'state'],
+        _getRequest('/api/apps/weather/state'),
+        body: _body,
+        json: _json,
+        error: _error,
+        notFound: _notFound,
+        registryService: mockRegistry,
+        appRegistry: mockAppRegistry,
+      );
+
+      expect(response.statusCode, 200);
+      final body = jsonDecode(await response.readAsString()) as Map<String, dynamic>;
+      expect(body['ok'], true);
+      expect(body['state'], {'tempC': '10'});
+      expect(body['text'], ['10°C']);
     });
 
     test('POST /:id/execute missing action returns error', () async {
@@ -204,6 +296,45 @@ void main() {
       );
 
       expect(response.statusCode, 400);
+    });
+
+    test('POST /:id/execute returns state after event', () async {
+      final mockEngine = _MockJsWidgetEngine();
+      when(() => mockAppRegistry.resolveLookupKey('weather')).thenReturn('weather');
+      when(() => mockAppRegistry.engine('weather')).thenReturn(mockEngine);
+      when(
+        () => mockEngine.callEvent('set_city', any()),
+      ).thenAnswer((_) async {});
+      when(() => mockEngine.exportedState).thenReturn({
+        'city': 'Grodno',
+        'tempC': '18',
+        'loading': false,
+      });
+
+      final response = await handleApps(
+        'POST',
+        ['weather', 'execute'],
+        _postRequest(
+          '/api/apps/weather/execute',
+          body: {
+            'action': 'set_city',
+            'payload': {'city': 'Grodno'},
+          },
+        ),
+        body: _body,
+        json: _json,
+        error: _error,
+        notFound: _notFound,
+        registryService: mockRegistry,
+        appRegistry: mockAppRegistry,
+      );
+
+      expect(response.statusCode, 200);
+      final body = jsonDecode(await response.readAsString()) as Map<String, dynamic>;
+      expect(body['ok'], true);
+      expect(body['action'], 'set_city');
+      expect(body['state'], {'city': 'Grodno', 'tempC': '18', 'loading': false});
+      verify(() => mockEngine.callEvent('set_city', {'city': 'Grodno'})).called(1);
     });
 
     test('POST /:id/execute not running returns error', () async {

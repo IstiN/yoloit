@@ -17,6 +17,7 @@
 
   async function load() {
     _chartCoin = null;
+    yoloit.exportState({ loading: true, view: 'list' });
     yoloit.render({type:'center',child:{type:'circularProgressIndicator',size:24}});
     try {
       var ids = COINS.map(function(c){return c.id;}).join(',');
@@ -86,7 +87,19 @@
           }},
         ]
       });
+      var exported = COINS.map(function(coin) {
+        var info = data[coin.id];
+        if (!info) return null;
+        return {
+          id: coin.id,
+          symbol: coin.sym,
+          usd: info.usd,
+          change24h: info.usd_24h_change || 0,
+        };
+      }).filter(function(item) { return item != null; });
+      yoloit.exportState({ loading: false, view: 'list', updatedAt: now, prices: exported });
     } catch(e) {
+      yoloit.exportState({ loading: false, view: 'list', error: e.message || String(e) });
       yoloit.showError('Could not load prices:\n'+e.message);
     }
   }

@@ -50,12 +50,15 @@ class YoloAnchoredAssistantPanel extends StatefulWidget {
 }
 
 class _YoloAnchoredAssistantPanelState extends State<YoloAnchoredAssistantPanel>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final AnimationController _entryController;
   late final Animation<double> _entry;
   late BoardPanelInstance _assistantPanel;
   BoardCubit? _cubit;
   bool _providerBootstrapped = false;
+  bool _bootstrapInFlight = false;
+
+  static const Duration _providerBootstrapTimeout = Duration(seconds: 12);
 
   ChatPanelController get _chatController => widget.chatController;
 
@@ -70,6 +73,7 @@ class _YoloAnchoredAssistantPanelState extends State<YoloAnchoredAssistantPanel>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _assistantPanel = _buildAssistantPanel(widget.anchorPanel);
     _entryController = AnimationController(
       vsync: this,
@@ -115,8 +119,16 @@ class _YoloAnchoredAssistantPanelState extends State<YoloAnchoredAssistantPanel>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _entryController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && !_providerBootstrapped) {
+      unawaited(_bootstrapProvider());
+    }
   }
 
   BoardPanelInstance _buildAssistantPanel(BoardPanelInstance anchor) {
@@ -173,14 +185,20 @@ class _YoloAnchoredAssistantPanelState extends State<YoloAnchoredAssistantPanel>
   }
 
   Future<void> _bootstrapProvider() async {
+    if (_bootstrapInFlight) return;
+    _bootstrapInFlight = true;
     try {
-      await _resolveDefaultProvider();
-    } catch (_) {
+      await _resolveDefaultProvider().timeout(_providerBootstrapTimeout);
+    } on Object {
       // Still mount chat — provider errors surface on send.
+    } finally {
+      _bootstrapInFlight = false;
+      if (!mounted) return;
+      if (!_providerBootstrapped) {
+        setState(() => _providerBootstrapped = true);
+      }
+      _requestChatInputFocus();
     }
-    if (!mounted) return;
-    setState(() => _providerBootstrapped = true);
-    _requestChatInputFocus();
   }
 
   Future<void> _resolveDefaultProvider() async {
@@ -214,6 +232,7 @@ class _YoloAnchoredAssistantPanelState extends State<YoloAnchoredAssistantPanel>
       return;
     }
 
+    if (!mounted) return;
     final nextConfigJson = config.toJson()
       ..['provider'] = resolved.provider
       ..['model'] = resolvedModel;

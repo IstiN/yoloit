@@ -55,6 +55,7 @@ class _MockToolExecutor implements YoloitToolExecutor {
     String functionName,
     Map<String, Object?> arguments, {
     ChatRuntimeContext? runtimeContext,
+    bool argumentsPreNormalized = false,
   }) async {
     calls.add((name: functionName, args: Map<String, Object?>.from(arguments)));
     return jsonEncode(<String, Object?>{
@@ -427,6 +428,7 @@ class _ErrorThenOkExecutor implements YoloitToolExecutor {
     String functionName,
     Map<String, Object?> arguments, {
     ChatRuntimeContext? runtimeContext,
+    bool argumentsPreNormalized = false,
   }) async {
     _callCount++;
     if (_callCount == 1) {

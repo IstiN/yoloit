@@ -84,6 +84,7 @@ class WidgetEngineManager {
     if (manifest == null) {
       throw _WidgetEngineLoadError('Widget "$widgetId" not found');
     }
+    final canonicalId = manifest.id;
 
     final js = await _readJs(manifest);
     if (js == null) {
@@ -92,7 +93,7 @@ class WidgetEngineManager {
 
     late final _WidgetEngineEntry entry;
     final engine = _createEngine(
-      widgetId: widgetId,
+      widgetId: canonicalId,
       appDir: manifest.appDir,
       initialStorage: Map<String, dynamic>.from(
         panel.state['_storage'] as Map? ?? const {},
@@ -100,7 +101,7 @@ class WidgetEngineManager {
       initialTheme: Map<String, dynamic>.from(initialTheme),
       onRender: (tree) {
         entry.uiTree = Map<String, dynamic>.from(tree);
-        _appRegistry.updateTree(widgetId, tree);
+        _appRegistry.updateTree(canonicalId, tree);
         entry.onRenderUI?.call(Map<String, dynamic>.from(tree));
       },
       onSetTitle: (title) => _updatePanelTitle(panelId, title),
@@ -109,7 +110,7 @@ class WidgetEngineManager {
 
     entry = _WidgetEngineEntry(
       engine: engine,
-      widgetId: widgetId,
+      widgetId: canonicalId,
       uiTree: null,
       onRenderUI: onRenderUI,
     );
@@ -117,11 +118,14 @@ class WidgetEngineManager {
 
     try {
       await engine.run(js);
-      _appRegistry.register(widgetId, engine, entry.uiTree);
+      _appRegistry.register(canonicalId, engine, entry.uiTree);
+      if (widgetId != canonicalId) {
+        _appRegistry.registerAlias(widgetId, canonicalId);
+      }
       return engine;
     } catch (_) {
       _engines.remove(panelId);
-      _appRegistry.unregister(widgetId, engine: engine);
+      _appRegistry.unregister(canonicalId, engine: engine);
       unawaited(engine.dispose());
       rethrow;
     }

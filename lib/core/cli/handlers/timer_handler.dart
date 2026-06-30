@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:yoloit/core/cli/panel_cli_handler.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 
@@ -94,11 +96,14 @@ class TimerCliHandler extends PanelCliHandler {
             message: 'Timer is not running',
           );
         }
-        return const CliActionResult(
+        final remaining = _remainingSeconds(panel);
+        return CliActionResult(
           message: 'Timer paused',
           stateUpdate: {
+            'remaining': remaining,
             'isRunning': false,
             'isPaused': true,
+            'lastTick': DateTime.now().millisecondsSinceEpoch,
           },
         );
       }
@@ -181,5 +186,15 @@ class TimerCliHandler extends PanelCliHandler {
     final m = (seconds ~/ 60).toString();
     final s = (seconds % 60).toString().padLeft(2, '0');
     return '$m:$s';
+  }
+
+  int _remainingSeconds(BoardPanelInstance panel) {
+    final stored = panel.state['remaining'] as int? ?? 300;
+    if (panel.state['isRunning'] != true) return stored;
+    final lastTick =
+        panel.state['lastTick'] as int? ??
+        DateTime.now().millisecondsSinceEpoch;
+    final elapsed = DateTime.now().millisecondsSinceEpoch - lastTick;
+    return math.max(0, stored - elapsed ~/ 1000);
   }
 }

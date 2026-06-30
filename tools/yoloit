@@ -153,6 +153,18 @@ _merge_action_body() {
 import json,sys,pathlib,re
 CLIP_RE = re.compile(r'/yoloit_clip/clip_\\d+\\.txt$')
 TEXT_KEYS = {'text','content','code','markdown','item','label','body','tx'}
+ACTION_PAYLOAD_KEY = {
+    'render': 'tree',
+    'setState': 'state',
+    'set-state': 'state',
+    'setScripts': 'scripts',
+    'set-scripts': 'scripts',
+    'setMarkdown': 'markdown',
+    'setCode': 'code',
+    'set': 'text',
+    'append': 'text',
+    'add': 'text',
+}
 
 def extract_usable(raw):
     s = raw.strip()
@@ -185,7 +197,9 @@ except json.JSONDecodeError:
     if CLIP_RE.search(p) and pathlib.Path(p).is_file():
         b = {'text': extract_usable(pathlib.Path(p).read_text())}
     elif raw.strip():
-        b = {'text': raw}
+        action = sys.argv[2]
+        key = ACTION_PAYLOAD_KEY.get(action, 'text')
+        b = {key: raw}
     else:
         b = {}
 if isinstance(b, str):
@@ -290,23 +304,23 @@ commands = [{'group': 'app',
   'example': 'yoloit help --format tools'},
  {'group': 'remote',
   'name': 'remote:connect',
-  'description': 'Connect this CLI to a remote yoloitd daemon',
+  'description': 'Connect the CLI to a remote yoloitd daemon',
   'params': [['url', 'Remote base URL, e.g. http://127.0.0.1:43110', True], ['token', 'Bearer token', False]],
   'example': 'yoloit remote:connect http://127.0.0.1:43110',
   'aliases': ['rcon']},
  {'group': 'remote',
   'name': 'remote:disconnect',
-  'description': 'Return CLI to the local desktop app server',
+  'description': 'Disconnect remote yoloitd and use local desktop server',
   'params': [],
   'example': 'yoloit remote:disconnect',
   'aliases': ['rdisc']},
  {'group': 'remote',
   'name': 'remote:status',
-  'description': 'Show active remote daemon connection',
+  'description': 'Show active remote yoloitd connection',
   'params': [],
   'example': 'yoloit remote:status',
   'aliases': ['rst']},
- {'group': 'board', 'name': 'boards', 'description': 'List boards', 'params': [['--archived', 'Include archived boards', False]], 'example': 'yoloit boards --archived'},
+ {'group': 'board', 'name': 'boards', 'description': 'List all boards', 'params': [['--archived', 'Include archived boards', False]], 'example': 'yoloit boards --archived'},
  {'group': 'board',
   'name': 'board',
   'description': 'Show board details',
@@ -314,7 +328,7 @@ commands = [{'group': 'app',
   'example': 'yoloit board "My Board"'},
  {'group': 'board',
   'name': 'board:create',
-  'description': 'Create a new board, optionally from a template',
+  'description': 'Create a board, optionally from a template',
   'params': [['name', 'New board name', True],
              ['--template <id>', 'Template id', False],
              ['--params <json|k=v,...>', 'Template parameters', False]],
@@ -326,7 +340,7 @@ commands = [{'group': 'app',
   'example': 'yoloit template:list'},
  {'group': 'template',
   'name': 'template:sync',
-  'description': 'Refresh templates from configured sources',
+  'description': 'Refresh templates from all configured sources',
   'params': [['--source <id>', 'Sync only this source', False]],
   'example': 'yoloit template:sync'},
  {'group': 'template',
@@ -342,13 +356,13 @@ commands = [{'group': 'app',
   'example': 'yoloit board:snapshot "My Board" --format mermaid'},
  {'group': 'board',
   'name': 'board:diagram',
-  'description': 'Alias for board snapshot focused on diagram output',
+  'description': 'Mermaid-focused board diagram',
   'params': [['id|name', 'Board identifier or board name', True],
              ['--format mermaid|md', 'Output format (default: mermaid)', False]],
   'example': 'yoloit board:diagram "My Board" --format mermaid'},
  {'group': 'board',
   'name': 'boards:snapshot',
-  'description': 'Snapshot all boards with panels as Mermaid graph',
+  'description': 'Snapshot all boards and panels as Mermaid graph',
   'params': [['--format mermaid|md', 'Output format (default: mermaid)', False]],
   'example': 'yoloit boards:snapshot --format mermaid'},
  {'group': 'board',
@@ -363,32 +377,32 @@ commands = [{'group': 'app',
   'example': 'yoloit board:svg "My Board" layout.svg'},
  {'group': 'board',
   'name': 'board:apply',
-  'description': 'Apply YAML bulk operations from file or stdin',
+  'description': 'Apply YAML bulk operations to a board (create/move/rename panels). Pass inline `yaml` string or a `file` path.',
   'params': [['id|name', 'Board identifier or board name', True], ['file|-', "YAML file path or '-' for stdin", False]],
   'example': 'yoloit board:apply "My Board" flow.yaml'},
  {'group': 'panel',
   'name': 'panels',
-  'description': 'List panels on board',
+  'description': 'List panels on a board',
   'params': [['board', 'Board id or name', True]],
   'example': 'yoloit panels "My Board"'},
  {'group': 'panel',
   'name': 'panel',
-  'description': 'Show panel details and content (useful for note content search)',
+  'description': 'Show panel details and content. Use this to inspect note markdown when searching by content.',
   'params': [['board', 'Board id or name', True], ['panel', 'Panel id or title', True]],
   'example': 'yoloit panel "My Board" "Run"'},
  {'group': 'panel',
   'name': 'panel:help',
-  'description': 'Show dynamic panel actions with parameter docs',
+  'description': 'List dynamic panel actions and parameter docs (use panel / pgt for panel content)',
   'params': [['board', 'Board id or name', True], ['panel', 'Panel id or title', True]],
   'example': 'yoloit panel:help "My Board" "Run"'},
  {'group': 'panel',
   'name': 'panel:create',
-  'description': 'Create a panel. Use exact panel type id; call panel:types first if unsure.',
+  'description': 'Create a panel. Include exact panel type id (call panel:types first). For custom JS widget apps use app:run — NOT panel:create board.widget.custom. For folder browser use board.filetree or filetree:create.',
   'params': [['board', 'Board id or name', True], ['type', 'Panel type id', True], ['title', 'Panel title', True]],
   'example': 'yoloit panel:create "My Board" board.note.markdown "Notes"'},
  {'group': 'panel',
   'name': 'do',
-  'description': 'Execute panel action',
+  'description': 'Advanced fallback: run a raw panel action from panel:help when no dedicated YoLoIT tool exists (table row ops, terminal output, custom widget actions). Do NOT use for sticky/shape/note/checklist/kanban/board.ui when typed tools exist — use sticky:append, shape:set, note:append, checklist:add, kanban:add-card, uirnd, etc. JSON body must be an object like {"text":"..."}, never a bare JSON string.',
   'params': [['board', 'Board id or name', True],
              ['panel', 'Panel id or title', True],
              ['action', 'Action name from panel:help', True],
@@ -467,12 +481,12 @@ commands = [{'group': 'app',
   'example': 'yoloit group:cycle-focus "My Board" "Research"'},
  {'group': 'run',
   'name': 'run:list',
-  'description': 'List run configurations and sessions',
+  'description': 'List run configs and sessions. If the user names a panel, pass that exact panel title.',
   'params': [['board', 'Board id or name', True], ['panel', 'Run panel id or title', True]],
   'example': 'yoloit run:list "My Board" "Run"'},
  {'group': 'run',
   'name': 'run:input',
-  'description': 'Send stdin to running run session',
+  'description': 'Send stdin to a run session',
   'params': [['board', 'Board id or name', True],
              ['panel', 'Run panel id or title', True],
              ['sessionId|id|name', 'Session or config selector', True],
@@ -481,7 +495,7 @@ commands = [{'group': 'app',
   'example': 'yoloit run:input "My Board" "Run" preset_flutter_run_macos r'},
  {'group': 'run',
   'name': 'run:attach',
-  'description': 'Attach run console to matching session',
+  'description': 'Attach run console to a session',
   'params': [['board', 'Board id or name', True],
              ['panel', 'Run panel id or title', True],
              ['sessionId|id|name', 'Session or config selector', False],
@@ -496,17 +510,17 @@ commands = [{'group': 'app',
   'example': 'yoloit run:popout "My Board" "Run"'},
  {'group': 'agents',
   'name': 'agent:list',
-  'description': 'List configured agents, default agent, and live sessions',
+  'description': 'List configured agents, default agent, and live agent sessions',
   'params': [],
   'example': 'yoloit agent:list'},
  {'group': 'agents',
   'name': 'agent:default',
-  'description': 'Get or set the default terminal agent',
+  'description': 'Get or set the default agent id for agent:run (board.chat provider, default: copilot)',
   'params': [['agent-id', 'Optional agent id to set', False]],
   'example': 'yoloit agent:default copilot'},
  {'group': 'agents',
   'name': 'agent:run',
-  'description': 'Launch an agent in a folder and optionally send an initial task',
+  'description': 'Start an agent session: creates a board.chat panel in the folder and sends the initial task. When task is sent the response includes STOP — do not call yolochat:send again. For typing into an existing terminal panel use yolochat:terminal.',
   'params': [['agent-id', 'Optional agent id (default: configured default agent)', False],
              ['path', 'Workspace or folder path', True],
              ['task', 'Optional initial task text', False],
@@ -528,7 +542,7 @@ commands = [{'group': 'app',
   'example': 'yoloit agent:asr copilot cloud --provider openai-cfg --model whisper-1'},
  {'group': 'search',
   'name': 'search',
-  'description': 'Search text across boards, panels, active chats, and saved chat sessions',
+  'description': 'Search text across all boards, panels, active chats, and saved chat sessions',
   'params': [['query', 'Search text', True], ['--scope all|boards|active-chats|sessions', 'Search scope', False]],
   'example': 'yoloit search mermaid --scope all'},
  {'group': 'yolochat',
@@ -538,14 +552,14 @@ commands = [{'group': 'app',
   'example': 'yoloit yolochat:panels'},
  {'group': 'yolochat',
   'name': 'yolochat:send',
-  'description': 'Send a message to a YoLo chat panel',
+  'description': 'Send a message to a YoLo chat panel — non-blocking, returns immediately with status:processing. Use yolochat:messages to read the response. Always pass --panel when multiple board.chat panels exist. Do NOT call after agent:run with task (task already sent).',
   'params': [['text', 'Message text', True],
              ['--board id|name', 'Target board (optional)', False],
              ['--panel id|title', 'Target chat panel (optional)', False]],
   'example': 'yoloit yolochat:send "Summarize this board" --board "Main" --panel "AI Chat"'},
  {'group': 'yolochat',
   'name': 'yolochat:terminal',
-  'description': 'Send text to a board terminal and press Enter by default',
+  'description': 'Send literal text to an existing terminal panel and press Enter. The `text` parameter is the command/characters to type (e.g. "npm test", not an agent name). Use --no-enter to type without pressing Enter.',
   'params': [['text', 'Terminal input text', True],
              ['--board id|name', 'Target board (optional)', False],
              ['--panel id|title', 'Target terminal panel (optional)', False],
@@ -555,49 +569,49 @@ commands = [{'group': 'app',
   'aliases': ['chat:terminal', 'terminal:send', 'term:send']},
  {'group': 'yolochat',
   'name': 'yolochat:messages',
-  'description': 'Read chat messages from a YoLo chat panel',
+  'description': 'Read YoLo chat messages',
   'params': [['--board id|name', 'Target board (optional)', False],
              ['--panel id|title', 'Target chat panel (optional)', False],
              ['--limit N', 'Limit message count (optional)', False]],
   'example': 'yoloit yolochat:messages --board "Main" --panel "AI Chat" --limit 20'},
  {'group': 'yolochat',
   'name': 'yolochat:clear',
-  'description': 'Clear all messages in a chat session',
+  'description': 'Clear YoLo chat messages',
   'params': [['--board id|name', 'Target board (optional)', False],
              ['--panel id|title', 'Target chat panel (optional)', False]],
   'example': 'yoloit yolochat:clear --board "Main"'},
  {'group': 'yolochat',
   'name': 'yolochat:sessions',
-  'description': 'List all active chat sessions',
+  'description': 'List active YoLo chat sessions',
   'params': [],
   'example': 'yoloit yolochat:sessions'},
  {'group': 'yolochat',
   'name': 'yolochat:history',
-  'description': 'List saved chat sessions from history',
+  'description': 'List saved YoLo chat sessions from chat history',
   'params': [],
   'example': 'yoloit yolochat:history'},
  {'group': 'yolochat',
   'name': 'yolochat:restore',
-  'description': 'Restore a saved chat session into a panel',
+  'description': 'Restore a saved YoLo chat session into a chat panel',
   'params': [['session-id', 'Saved session id', True],
              ['--board id|name', 'Target board (optional)', False],
              ['--panel id|title', 'Target chat panel (optional)', False]],
   'example': 'yoloit yolochat:restore session-123 --board "Main"'},
  {'group': 'yolochat',
   'name': 'yolochat:status',
-  'description': 'Show current chat session status (provider, model, processing)',
+  'description': 'Show YoLo chat status',
   'params': [['--board id|name', 'Target board (optional)', False],
              ['--panel id|title', 'Target chat panel (optional)', False]],
   'example': 'yoloit yolochat:status --board "Main"'},
  {'group': 'yolochat',
   'name': 'yolochat:stop',
-  'description': 'Stop active streaming in a chat session',
+  'description': 'Stop active YoLo chat streaming (target panel or any active)',
   'params': [['--board id|name', 'Target board (optional)', False],
              ['--panel id|title', 'Target chat panel (optional)', False]],
   'example': 'yoloit yolochat:stop'},
  {'group': 'yolochat',
   'name': 'yolochat:logs',
-  'description': 'Export full chat session log as plain text (for debugging/copy-paste)',
+  'description': 'Dump full YoLo chat log for debugging',
   'params': [['--board id|name', 'Target board (optional)', False],
              ['--panel id|title', 'Target chat panel (optional)', False]],
   'example': 'yoloit yolochat:logs --board "Main"'},
@@ -648,7 +662,7 @@ commands = [{'group': 'app',
   'example': 'yoloit cloud:update cloud-123 --model gpt-4o'},
  {'group': 'files',
   'name': 'files:search',
-  'description': 'Read-only search for files and folders (default root: home)',
+  'description': 'Read-only search for files and folders on the local file system. If user names a folder/scope ("в папке ai.m", "in ~/project"), pass it via --root to restrict results.',
   'params': [['query', 'File or folder query', True],
              ['--root path', 'Search root path', False],
              ['--type files|dirs|all', 'Search item type', False],
@@ -656,24 +670,24 @@ commands = [{'group': 'app',
   'example': 'yoloit files:search README.md --root ~/ai.m'},
  {'group': 'files',
   'name': 'files:list',
-  'description': 'Read-only list of a directory path',
+  'description': 'Read-only list of directory entries for a file system path',
   'params': [['path', 'Directory path', True]],
   'example': 'yoloit files:list ~/ai.m'},
  {'group': 'files',
   'name': 'files:read',
-  'description': 'Read-only display of a text file',
+  'description': 'Read-only display of a text file from the local file system',
   'params': [['path', 'File path', True], ['--lines N', 'Max lines', False]],
   'example': 'yoloit files:read ~/ai.m/README.md --lines 120'},
  {'group': 'files',
   'name': 'files:preview',
-  'description': 'Open a file as a preview panel on the board (image, markdown, text, etc.)',
+  'description': 'Open a file as a preview panel on the board (supports markdown, images, text, code). Use this when user asks to "открой", "покажи", "preview" a file. Do NOT use note:create — use files:preview to show the actual file.',
   'params': [['board', 'Board id or name', True],
              ['path', 'Absolute file path to preview', True],
              ['--title TITLE', 'Optional panel title (default: filename)', False]],
   'example': 'yoloit files:preview "My Board" ~/ai.m/README.md'},
  {'group': 'cloud',
   'name': 'cloud:provider',
-  'description': 'Get or set assistant provider type (local or cloud)',
+  'description': 'Get or set assistant provider type (cloud only)',
   'params': [['local|cloud', 'Provider type (omit to show current)', False]],
   'example': 'yoloit cloud:provider cloud'},
  {'group': 'theme',
@@ -688,38 +702,38 @@ commands = [{'group': 'app',
   'example': 'yoloit theme:presets'},
  {'group': 'theme',
   'name': 'theme:set',
-  'description': 'Set the active theme preset',
+  'description': 'Set the active theme preset. Use preset id for built-in themes or custom id for user-imported themes.',
   'params': [['preset', 'Preset id (e.g. neonPurple, islandsDark) or custom id', True]],
   'example': 'yoloit theme:set islandsDark'},
  {'group': 'theme',
   'name': 'theme:brightness',
-  'description': 'Set theme brightness (dark or light)',
+  'description': 'Set theme brightness mode',
   'params': [['dark|light', 'Brightness mode', True]],
   'example': 'yoloit theme:brightness light'},
  {'group': 'theme',
   'name': 'theme:color',
-  'description': 'Set a color override for a theme slot',
+  'description': 'Set a color override for a specific theme slot. Use theme:slots to see available slot names.',
   'params': [['slot', 'Color slot name (e.g. primary, accentGreen, textPrimary)', True],
              ['color', 'Hex color (e.g. #FF548AF7 or #548AF7)', True]],
   'example': 'yoloit theme:color primary #548AF7'},
  {'group': 'theme',
   'name': 'theme:reset-color',
-  'description': 'Remove a color override, reverting to theme default',
+  'description': 'Remove a color override, reverting slot to theme default',
   'params': [['slot', 'Color slot name', True]],
   'example': 'yoloit theme:reset-color primary'},
  {'group': 'theme',
   'name': 'theme:reset-all',
-  'description': 'Clear all color overrides',
+  'description': 'Clear all color overrides, reverting to base theme',
   'params': [],
   'example': 'yoloit theme:reset-all'},
  {'group': 'theme',
   'name': 'theme:save',
-  'description': 'Save current theme (with overrides) as a named custom preset',
+  'description': 'Save current theme (with any overrides) as a named custom preset',
   'params': [['name', 'Preset name', True]],
   'example': 'yoloit theme:save "My Custom Dark"'},
  {'group': 'theme',
   'name': 'theme:export',
-  'description': 'Export current theme as JSON (prints to stdout)',
+  'description': 'Export current theme as JSON to stdout',
   'params': [],
   'example': 'yoloit theme:export > my_theme.json'},
  {'group': 'theme',
@@ -744,7 +758,7 @@ commands = [{'group': 'app',
   'example': 'yoloit theme:slots'},
  {'group': 'link',
   'name': 'links',
-  'description': 'List links on board',
+  'description': 'List links on a board',
   'params': [['board', 'Board id or name', True]],
   'example': 'yoloit links "My Board"'},
  {'group': 'link',
@@ -780,7 +794,7 @@ commands = [{'group': 'app',
   'example': 'yoloit board:unarchive "Old Project"'},
  {'group': 'board',
   'name': 'board:focus',
-  'description': 'Focus a board',
+  'description': 'Focus a board in the UI',
   'params': [['id|name', 'Board identifier or board name', True]],
   'example': 'yoloit board:focus "My Board"'},
  {'group': 'board',
@@ -791,7 +805,7 @@ commands = [{'group': 'app',
   'example': 'yoloit board:undo "My Board"'},
  {'group': 'board',
   'name': 'board:zoom',
-  'description': 'Set board zoom scale',
+  'description': 'Set board zoom/scale level. Use for "уменьши зум", "увеличь зум", "zoom in", "zoom out", "приблизь", "отдали". Pass absolute scale: 0.5 = 50%, 1.0 = 100%, 2.0 = 200%.',
   'params': [['id|name', 'Board identifier or board name', True], ['scale', 'Zoom scale', True]],
   'example': 'yoloit board:zoom "My Board" 0.8'},
  {'group': 'board',
@@ -809,7 +823,7 @@ commands = [{'group': 'app',
   'example': 'yoloit board:arrange "My Board" right 80 60'},
  {'group': 'board',
   'name': 'board:grid',
-  'description': 'Toggle or reset grid view for a board',
+  'description': 'Toggle, reset or configure grid view for a board. Use "on" to enable, "off" to disable, or "reset" to restore defaults.',
   'params': [['id|name', 'Board identifier or board name', True],
              ['on|off|reset', 'Enable, disable or reset grid view', True],
              ['--cell N', 'Grid cell size in pixels', False],
@@ -826,7 +840,7 @@ commands = [{'group': 'app',
   'example': 'yoloit select "My Board" --rect 0,0,1200,800'},
  {'group': 'board',
   'name': 'board:use',
-  'description': 'Set current board context for subsequent commands (does not switch UI focus)',
+  'description': 'Set default board for subsequent commands (no UI switch)',
   'params': [['board', 'Board id or name', True]],
   'example': 'yoloit board:use "My Board"'},
  {'group': 'board',
@@ -856,7 +870,7 @@ commands = [{'group': 'app',
   'example': 'yoloit panel:move "My Board" "Notes" 120 160'},
  {'group': 'panel',
   'name': 'panel:resize',
-  'description': 'Resize a panel (numeric w h OR preset alias)',
+  'description': 'Resize a panel. Supports explicit width/height or presets: small(420x300), medium(720x480), desktop(1200x800), large(1400x900), mobile(390x844), tablet(768x1024).',
   'params': [['board', 'Board id or name', True],
              ['panel', 'Panel id or title', True],
              ['w|preset', 'Width or preset: small|medium|desktop|large|mobile|tablet', True],
@@ -864,7 +878,7 @@ commands = [{'group': 'app',
   'example': 'yoloit panel:resize "My Board" "Notes" desktop'},
  {'group': 'panel',
   'name': 'panel:z',
-  'description': 'Set panel depth/layer order',
+  'description': 'Set panel depth/layer order. Use front/back or an explicit integer zIndex.',
   'params': [['board', 'Board id or name', True],
              ['panel', 'Panel id or title', True],
              ['front|back|zIndex', 'Move to front/back or set explicit integer zIndex', True]],
@@ -877,7 +891,7 @@ commands = [{'group': 'app',
   'example': 'yoloit panel:delete "My Board" "Scratch"'},
  {'group': 'panel',
   'name': 'panel:focus',
-  'description': "Focus a panel (for 'show/open note' flows after finding target panel)",
+  'description': 'Focus/scroll-to/zoom a panel to bring it into view. Use for "сделай фокус на", "фокус на", "покажи", "открой" any panel — notes, playlists, kanban, etc. Examples: "сделай фокус на плейлист", "focus playlist", "show note", "открой заметку".',
   'params': [['board', 'Board id or name', True], ['panel', 'Panel id or title', True]],
   'example': 'yoloit panel:focus "My Board" "Run"'},
  {'group': 'panel',
@@ -907,12 +921,12 @@ commands = [{'group': 'app',
   'aliases': ['psc']},
  {'group': 'panel',
   'name': 'panel:types',
-  'description': 'List available panel/widget type ids',
+  'description': 'List all available panel/widget type ids on the board. Use this before panel:create when user asks for a specific widget type.',
   'params': [['board', 'Board id or name', True]],
   'example': 'yoloit panel:types "My Board"'},
  {'group': 'panel',
   'name': 'panel:copy',
-  'description': 'Copy selected panel(s) to the clipboard',
+  'description': 'Copy selected panel(s) to the clipboard. If no panel ids are given, copies the currently selected panel(s).',
   'params': [['board', 'Board id or name', True],
              ['panels', 'Comma-separated panel ids or titles (optional)', False]],
   'example': 'yoloit panel:copy "My Board" "Notes,Kanban"',
@@ -925,14 +939,14 @@ commands = [{'group': 'app',
   'aliases': ['ppt']},
  {'group': 'panel',
   'name': 'panel:duplicate',
-  'description': 'Duplicate selected panel(s)',
+  'description': 'Duplicate selected panel(s). If no panel ids are given, duplicates the currently selected panel(s).',
   'params': [['board', 'Board id or name', True],
              ['panels', 'Comma-separated panel ids or titles (optional)', False]],
   'example': 'yoloit panel:duplicate "My Board" "Notes"',
   'aliases': ['pdp']},
  {'group': 'panel',
   'name': 'calendar:create',
-  'description': 'Create a Calendar panel',
+  'description': 'Create a Calendar panel on a board',
   'params': [['board', 'Board id or name', True],
              ['title', 'Panel title', True]],
   'example': 'yoloit calendar:create "My Board" "Sprint Calendar"',
@@ -1117,9 +1131,54 @@ commands = [{'group': 'app',
              ['tablePanelId', 'Table panel id (optional if already linked)', False]],
   'example': 'yoloit chart:refresh "My Board" "Sales Chart"',
   'aliases': ['chfr']},
+ {'group': 'ui',
+  'name': 'ui:create',
+  'description': 'Create a declarative UI View panel (board.ui) for JSON-driven layouts',
+  'params': [['board', 'Board id or name', True],
+             ['title', 'Panel title', True]],
+  'example': 'yoloit ui:create "My Board" "Dashboard"',
+  'aliases': ['uicrt']},
+ {'group': 'ui',
+  'name': 'ui:render',
+  'description': 'Render declarative JSON UI on a board.ui panel (auto-creates panel if none). SVG inside a card: {"type":"svg","data":"<svg>...</svg>"} or {"type":"svg","path":"M..."} — NOT draw:svg (that draws on the board canvas). Buttons: {"type":"button","data":"Label","onTap":"actionId"}. textField id → yoloit.get("id"). Scripts: ui:set-scripts. Full JS apps: app:run.',
+  'params': [['board', 'Board id or name', True],
+             ['panel', 'Panel id or title', True],
+             ['tree', 'Root JSON node object', True]],
+  'example': 'yoloit ui:render "My Board" "Dashboard" \'{"type":"column","children":[{"type":"text","data":"Hi"}]}\'',
+  'aliases': ['uirnd']},
+ {'group': 'ui',
+  'name': 'ui:get',
+  'description': 'Read JSON tree, resolvedTree, storage, scripts, and text lines',
+  'params': [['board', 'Board id or name', True],
+             ['panel', 'Panel id or title', True]],
+  'example': 'yoloit ui:get "My Board" "Dashboard"',
+  'aliases': ['uiget']},
+ {'group': 'ui',
+  'name': 'ui:set-state',
+  'description': 'Merge storage for {{bindings}} in UI labels. Example: {"taps":3,"message":"Hi"}',
+  'params': [['board', 'Board id or name', True],
+             ['panel', 'Panel id or title', True],
+             ['state', 'JSON object to merge', True]],
+  'example': 'yoloit ui:set-state "My Board" "Dashboard" \'{"taps":3,"message":"Hi"}\'',
+  'aliases': ['uist']},
+ {'group': 'ui',
+  'name': 'ui:set-scripts',
+  'description': 'Set onTap JS handlers map. Example: {"bump":"yoloit.inc(\"taps\");"}',
+  'params': [['board', 'Board id or name', True],
+             ['panel', 'Panel id or title', True],
+             ['scripts', 'JSON map actionId→JS', True]],
+  'example': 'yoloit ui:set-scripts "My Board" "Dashboard" \'{"bump":"yoloit.inc(\\"taps\\");"}\'',
+  'aliases': ['uisc']},
+ {'group': 'ui',
+  'name': 'ui:edit',
+  'description': 'Focus a UI View panel only — user must open the JSON editor from the panel menu manually',
+  'params': [['board', 'Board id or name', True],
+             ['panel', 'Panel id or title', True]],
+  'example': 'yoloit ui:edit "My Board" "Dashboard"',
+  'aliases': ['uiedt']},
  {'group': 'panel',
   'name': 'filetree:create',
-  'description': 'Create a File Tree panel bound to a root path (for file tree / directory tree requests).',
+  'description': 'Create a File Tree panel on a board and set its root directory. Use this when the user asks to show a file tree, directory tree, folder browser, or "дерево файлов". The panel shows an interactive expandable file browser.',
   'params': [['board', 'Board id or name (defaults to active board)', False],
              ['path', 'Root directory path', True],
              ['title', 'Panel title (optional)', False]],
@@ -1127,7 +1186,7 @@ commands = [{'group': 'app',
   'aliases': ['ftc']},
  {'group': 'panel',
   'name': 'filetree:set-root',
-  'description': 'Change root path of an existing File Tree panel.',
+  'description': 'Set the root directory path of an existing File Tree panel.',
   'params': [['board', 'Board id or name', True],
              ['panel', 'File Tree panel id or title', True],
              ['path', 'New root directory path', True]],
@@ -1135,7 +1194,7 @@ commands = [{'group': 'app',
   'aliases': ['ftsr']},
  {'group': 'panel',
   'name': 'terminal:output',
-  'description': 'Read terminal output',
+  'description': 'Read the latest output from an interactive terminal panel. Pass the panel title or id; the session is resolved automatically.',
   'params': [['board', 'Board id or name', True],
              ['panel', 'Terminal panel id or title', True],
              ['session', 'Session id or name', False]],
@@ -1147,7 +1206,7 @@ commands = [{'group': 'app',
   'example': 'yoloit terminal:config "My Board" "Terminal"'},
  {'group': 'panel',
   'name': 'terminal:set-dir',
-  'description': 'Set terminal working directory',
+  'description': 'Set the working directory of an interactive terminal panel',
   'params': [['board', 'Board id or name', True],
              ['panel', 'Terminal panel id or title', True],
              ['dir', 'Working directory', True]],
@@ -1185,7 +1244,7 @@ commands = [{'group': 'app',
   'example': 'yoloit filetree:refresh "My Board" "Project Tree"'},
  {'group': 'files',
   'name': 'filetree:read',
-  'description': 'Read directory structure as text tree (no panel required).',
+  'description': 'Read and print a directory tree as text (no panel required). Useful for agents to understand folder structure without creating a UI panel. Use this for "what files are in X", "show me the structure of X".',
   'params': [['path', 'Directory path', True],
              ['--depth N', 'Max depth (default 3)', False],
              ['--all', 'Include hidden files', False]],
@@ -1269,6 +1328,99 @@ commands = [{'group': 'app',
              ['sessionId|id|name', 'Session or config selector', True],
              ['--limit', 'Maximum number of output lines', False]],
   'example': 'yoloit run:logs "My Board" "Run" sess_123 --limit 100'},
+ {'group': 'run',
+  'name': 'run:set-group',
+  'description': 'Set the run session group scope for a board.run panel',
+  'params': [['board', 'Board id or name', True],
+             ['panel', 'Run panel id or title', True],
+             ['group', 'Group id', True]],
+  'example': 'yoloit run:set-group "My Board" "Run" review'},
+ {'group': 'run',
+  'name': 'run:select-session',
+  'description': 'Focus a run session tab in a board.run panel',
+  'params': [['board', 'Board id or name', True],
+             ['panel', 'Run panel id or title', True],
+             ['sessionId', 'Run session id', True]],
+  'example': 'yoloit run:select-session "My Board" "Run" sess_123'},
+ {'group': 'run',
+  'name': 'run:clear-session',
+  'description': 'Clear the focused run session tab in a board.run panel',
+  'params': [['board', 'Board id or name', True],
+             ['panel', 'Run panel id or title', True]],
+  'example': 'yoloit run:clear-session "My Board" "Run"'},
+ {'group': 'diff',
+  'name': 'diff:open',
+  'description': 'Open a file in a diff preview panel',
+  'params': [['board', 'Board id or name', True],
+             ['panel', 'Diff preview panel id or title', True],
+             ['path', 'Absolute file path', True]],
+  'example': 'yoloit diff:open "My Board" "Diff" ~/repo/lib/main.dart'},
+ {'group': 'diff',
+  'name': 'diff:set-root',
+  'description': 'Set repository root for a diff preview panel',
+  'params': [['board', 'Board id or name', True],
+             ['panel', 'Diff preview panel id or title', True],
+             ['rootPath', 'Absolute repository root', True]],
+  'example': 'yoloit diff:set-root "My Board" "Diff" ~/repo'},
+ {'group': 'setup',
+  'name': 'setup:select',
+  'description': 'Select a setup package in a setup guide panel',
+  'params': [['board', 'Board id or name', True],
+             ['panel', 'Setup guide panel id or title', True],
+             ['packageId', 'Package id', True]],
+  'example': 'yoloit setup:select "My Board" "Setup" codex'},
+ {'group': 'setup',
+  'name': 'setup:unselect',
+  'description': 'Unselect a setup package in a setup guide panel',
+  'params': [['board', 'Board id or name', True],
+             ['panel', 'Setup guide panel id or title', True],
+             ['packageId', 'Package id', True]],
+  'example': 'yoloit setup:unselect "My Board" "Setup" codex'},
+ {'group': 'panel-files',
+  'name': 'panel-files:list',
+  'description': 'List files attached to a board.files panel',
+  'params': [['board', 'Board id or name', True],
+             ['panel', 'Files panel id or title', True]],
+  'example': 'yoloit panel-files:list "My Board" "Files"'},
+ {'group': 'panel-files',
+  'name': 'panel-files:add',
+  'description': 'Attach a file path to a board.files panel',
+  'params': [['board', 'Board id or name', True],
+             ['panel', 'Files panel id or title', True],
+             ['path', 'Absolute file path', True]],
+  'example': 'yoloit panel-files:add "My Board" "Files" ~/doc.pdf'},
+ {'group': 'panel-files',
+  'name': 'panel-files:remove',
+  'description': 'Remove a file from a board.files panel by path or id',
+  'params': [['board', 'Board id or name', True],
+             ['panel', 'Files panel id or title', True],
+             ['path|id', 'File path or entry id', True]],
+  'example': 'yoloit panel-files:remove "My Board" "Files" ~/doc.pdf'},
+ {'group': 'calendar',
+  'name': 'calendar:update-event',
+  'description': 'Update an existing calendar event by id',
+  'params': [['board', 'Board id or name', True],
+             ['panel', 'Calendar panel id or title', True],
+             ['eventId', 'Event id', True],
+             ['title', 'New title', False],
+             ['start', 'New start ISO datetime', False],
+             ['end', 'New end ISO datetime', False],
+             ['description', 'New description', False],
+             ['color', 'New color', False]],
+  'example': 'yoloit calendar:update-event "My Board" "Calendar" ev-1 --title "Sync"'},
+ {'group': 'chart',
+  'name': 'chart:get',
+  'description': 'Read chart panel configuration and data',
+  'params': [['board', 'Board id or name', True],
+             ['panel', 'Chart panel id or title', True]],
+  'example': 'yoloit chart:get "My Board" "Sales Chart"'},
+ {'group': 'terminal',
+  'name': 'terminal:set-session',
+  'description': 'Attach a terminal panel to an existing session id',
+  'params': [['board', 'Board id or name', True],
+             ['panel', 'Terminal panel id or title', True],
+             ['sessionId', 'Terminal session id', True]],
+  'example': 'yoloit terminal:set-session "My Board" "Terminal" sess_123'},
  {'group': 'link',
   'name': 'link:delete',
   'description': 'Delete panel link',
@@ -1289,7 +1441,7 @@ commands = [{'group': 'app',
   'example': 'yoloit link:color "My Board" link_123 "#7c3aed"'},
  {'group': 'note',
   'name': 'note',
-  'description': 'Set note text — board and panel optional (uses active board/first note panel)',
+  'description': 'Set markdown note text',
   'params': [['text', 'Markdown text (1 arg: current board)', True],
              ['[panel]', 'Panel title', False],
              ['[board]', 'Board name (3 args)', False]],
@@ -1297,7 +1449,7 @@ commands = [{'group': 'app',
   'aliases': ['note']},
  {'group': 'note',
   'name': 'note:add',
-  'description': 'Append text to note — board and panel optional (alias: n:a)',
+  'description': 'Append text to note — board and panel optional',
   'params': [['text', 'Text to append', True],
              ['[panel]', 'Panel title (2 args)', False],
              ['[board]', 'Board name (3 args)', False]],
@@ -1305,7 +1457,7 @@ commands = [{'group': 'app',
   'aliases': ['n:a']},
  {'group': 'note',
   'name': 'note:create',
-  'description': 'Create a new note panel (alias: n:c)',
+  'description': 'Create a new note panel',
   'params': [['title', 'Note title', True],
              ['[content]', 'Markdown content', False],
              ['[board]', 'Board name (first arg when 3+)', False]],
@@ -1313,7 +1465,7 @@ commands = [{'group': 'app',
   'aliases': ['n:c']},
  {'group': 'board',
   'name': 'sticky:create',
-  'description': 'Create a Miro-style sticky note panel',
+  'description': 'Create a Miro-style sticky note panel. Board is optional and defaults to the current board.',
   'params': [['[board]', 'Board id or name (optional)', False],
              ['title', 'Sticky title', True],
              ['text', 'Sticky text', False],
@@ -1322,7 +1474,7 @@ commands = [{'group': 'app',
   'aliases': ['sticky:new']},
  {'group': 'board',
   'name': 'shape:create',
-  'description': 'Create a geometric shape panel',
+  'description': 'Create a geometric board panel: rectangle, circle, diamond, triangle, hexagon, or frame.',
   'params': [['[board]', 'Board id or name (optional)', False],
              ['shape', 'rectangle|circle|diamond|triangle|hexagon|frame', True],
              ['title', 'Panel title', True],
@@ -1333,7 +1485,7 @@ commands = [{'group': 'app',
   'aliases': ['shape:new']},
  {'group': 'board',
   'name': 'frame:create',
-  'description': 'Create a Miro-style frame panel for grouping board content',
+  'description': 'Create a Miro-style frame panel for grouping a section of the board.',
   'params': [['[board]', 'Board id or name (optional)', False], ['title', 'Frame title', True]],
   'example': 'yoloit frame:create "Sprint scope"',
   'aliases': ['frame:new']},
@@ -1357,25 +1509,25 @@ commands = [{'group': 'app',
   'example': 'yoloit note:nowrap "My Board" "Notes"'},
  {'group': 'note',
   'name': 'note:get',
-  'description': 'Read note content',
+  'description': 'Read note content (board and panel optional)n:g',
   'params': [['board', 'Board id or name', True], ['panel', 'Note panel id or title', True]],
   'example': 'yoloit note:get "My Board" "Notes"',
   'alias_override': 'n:g'},
  {'group': 'note',
   'name': 'sticky:get',
-  'description': 'Read sticky note content',
+  'description': 'Read sticky note content (board and panel optional)',
   'params': [['board', 'Board id or name', True], ['panel', 'Sticky panel id or title', True]],
   'example': 'yoloit sticky:get "My Board" "Idea"'},
  {'group': 'note',
   'name': 'sticky:set',
-  'description': 'Set sticky note text',
+  'description': 'Set sticky note text (board and panel optional)',
   'params': [['board', 'Board id or name', True],
              ['panel', 'Sticky panel id or title', True],
              ['text', 'Note text', True]],
   'example': 'yoloit sticky:set "My Board" "Idea" "Buy milk"'},
  {'group': 'note',
   'name': 'sticky:append',
-  'description': 'Append text to a sticky note',
+  'description': 'Append text to a sticky note (board and panel optional)',
   'params': [['board', 'Board id or name', True],
              ['panel', 'Sticky panel id or title', True],
              ['text', 'Text to append', True]],
@@ -1416,7 +1568,7 @@ commands = [{'group': 'app',
   'example': 'yoloit code:set "My Board" "Snippet" "print(1)"'},
  {'group': 'checklist',
   'name': 'checklist:add',
-  'description': 'Add checklist item — board and panel optional (alias: cl:a)',
+  'description': 'Add checklist item',
   'params': [['item', 'Item text (1 arg: current board/panel)', True],
              ['[panel]', 'Panel title (2 args)', False],
              ['[board]', 'Board name (3 args)', False]],
@@ -1424,13 +1576,13 @@ commands = [{'group': 'app',
   'aliases': ['cl:a']},
  {'group': 'checklist',
   'name': 'checklist:new',
-  'description': 'Create a new checklist panel (alias: cl:n)',
+  'description': 'Create a new checklist panel',
   'params': [['title', 'Panel title', True], ['[board]', 'Board name', False]],
   'example': 'yoloit checklist:new "Shopping"',
   'aliases': ['cl:n']},
  {'group': 'checklist',
   'name': 'checklist:check',
-  'description': 'Check checklist item — board and panel optional (alias: cl:ch)',
+  'description': 'Mark a checklist item done by text, id, or zero-based index. Use checklist:uncheck to revert.',
   'params': [['item', 'Item text/id (1 arg: current board/panel)', True],
              ['[panel]', 'Panel title (2 args)', False],
              ['[board]', 'Board name (3 args)', False]],
@@ -1438,19 +1590,19 @@ commands = [{'group': 'app',
   'aliases': ['cl:ch']},
  {'group': 'checklist',
   'name': 'checklist:uncheck',
-  'description': 'Uncheck checklist item — board and panel optional (alias: cl:u)',
+  'description': 'Mark a checklist item not done (by text, id, or index)',
   'params': [['item', 'Item text/id', True], ['[panel]', 'Panel title', False], ['[board]', 'Board name', False]],
   'example': 'yoloit checklist:uncheck "Купить кофе"',
   'aliases': ['cl:u']},
  {'group': 'checklist',
   'name': 'checklist:items',
-  'description': 'List checklist items',
+  'description': 'List checklist items (board and panel optional)cl:ls',
   'params': [['board', 'Board id or name', True], ['panel', 'Checklist panel id or title', True]],
   'example': 'yoloit checklist:items "My Board" "Shopping"',
   'alias_override': 'cl:ls'},
  {'group': 'checklist',
   'name': 'checklist:remove',
-  'description': 'Remove a checklist item',
+  'description': 'Remove a checklist itemcl:rm',
   'params': [['board', 'Board id or name', True],
              ['panel', 'Checklist panel id or title', True],
              ['item', 'Item text', True]],
@@ -1458,7 +1610,7 @@ commands = [{'group': 'app',
   'alias_override': 'cl:rm'},
  {'group': 'checklist',
   'name': 'checklist:rename',
-  'description': 'Rename a checklist item',
+  'description': 'Rename a checklist itemcl:rn',
   'params': [['board', 'Board id or name', True],
              ['panel', 'Checklist panel id or title', True],
              ['old', 'Current item text', True],
@@ -1474,7 +1626,7 @@ commands = [{'group': 'app',
   'aliases': ['k:col']},
  {'group': 'kanban',
   'name': 'kanban:add-column',
-  'description': 'Add kanban column — board and panel optional (alias: k:c)',
+  'description': 'Add kanban column',
   'params': [['column-name', 'Column name (1 arg: current board/panel)', True],
              ['[panel]', 'Panel title (2 args)', False],
              ['[board]', 'Board name (3 args)', False]],
@@ -1482,7 +1634,7 @@ commands = [{'group': 'app',
   'aliases': ['k:c']},
  {'group': 'kanban',
   'name': 'kanban:rename-column',
-  'description': 'Rename kanban column — board and panel optional (alias: k:rc)',
+  'description': 'Rename kanban column',
   'params': [['col-name', 'Column name', True],
              ['new-name', 'New name', True],
              ['[panel]', 'Panel title (3 args)', False],
@@ -1510,7 +1662,7 @@ commands = [{'group': 'app',
   'aliases': ['k:a', 'kanban:card']},
  {'group': 'kanban',
   'name': 'kanban:move-card',
-  'description': 'Move kanban card — board and panel optional (alias: k:mv)',
+  'description': 'Move kanban card',
   'params': [['cardId', 'Card id', True],
              ['to-column', 'Destination column', True],
              ['[panel]', 'Panel title (3 args)', False],
@@ -1528,7 +1680,7 @@ commands = [{'group': 'app',
   'aliases': ['k:rm']},
  {'group': 'kanban',
   'name': 'kanban:update-card',
-  'description': 'Update kanban card title — board and panel optional (alias: k:up)',
+  'description': 'Update kanban card title',
   'params': [['cardId', 'Card id', True],
              ['new-title', 'New title', True],
              ['[panel]', 'Panel title (3 args)', False],
@@ -1544,7 +1696,7 @@ commands = [{'group': 'app',
   'aliases': ['k:ls']},
  {'group': 'kanban',
   'name': 'kanban:paste',
-  'description': 'Create a kanban card from text — board and panel optional (alias: k:p)',
+  'description': 'Create a kanban card from text — board and panel optional (alias: k:p)k:p',
   'params': [['text', 'Card text (first line becomes title)', True],
              ['[column]', 'Column index or title (default first)', False],
              ['[panel]', 'Panel title', False],
@@ -1553,7 +1705,7 @@ commands = [{'group': 'app',
   'aliases': ['k:p']},
  {'group': 'kanban',
   'name': 'kanban:send-card-to-chat',
-  'description': 'Send a kanban card to a chat panel',
+  'description': 'Send a kanban card to a chat panelk:sc',
   'params': [['board', 'Board id or name', True],
              ['panel', 'Kanban panel id or title', True],
              ['cardId', 'Card id', True]],
@@ -1561,20 +1713,20 @@ commands = [{'group': 'app',
   'alias_override': 'k:sc'},
  {'group': 'playlist',
   'name': 'play',
-  'description': 'Start playlist playback (optionally add media first)',
+  'description': 'START or RESUME music/audio playback in a playlist panel. Use ONLY when the user wants to START playing — not for pause, stop, listing tracks, or showing the panel. Examples: "включи музыку", "play music", "resume", "продолжи воспроизведение".',
   'params': [['board', 'Board id or name', False],
              ['panel', 'Playlist panel id or title', False],
              ['file-or-url', 'Media path or URL', False]],
   'example': 'yoloit play "My Board" "Playlist" video.mp4'},
  {'group': 'playlist',
   'name': 'pause',
-  'description': 'Pause playlist playback',
+  'description': 'PAUSE music playback (temporary stop, can be resumed). Use for "пауза", "поставь на паузу", "поставь музыку на паузу", "pause music", "приостанови". NOT for stopping completely or showing playlist.',
   'params': [['board', 'Board id or name', False], ['panel', 'Playlist panel id or title', False]],
   'example': 'yoloit pause music',
   'aliases': ['pause']},
  {'group': 'playlist',
   'name': 'stop',
-  'description': 'Stop playlist playback',
+  'description': 'STOP music playback completely (resets to beginning). Use for "останови", "выключи музыку", "стоп", "stop music". NOT for pause or listing tracks.',
   'params': [['board', 'Board id or name', False], ['panel', 'Playlist panel id or title', False]],
   'example': 'yoloit stop music',
   'aliases': ['stop']},
@@ -1592,7 +1744,7 @@ commands = [{'group': 'app',
   'aliases': ['prev']},
  {'group': 'playlist',
   'name': 'playlist:list',
-  'description': 'List tracks in a playlist panel',
+  'description': 'SHOW/LIST tracks in a playlist panel. Use for "покажи плейлист", "что в плейлисте", "список треков", "show playlist", "list tracks". NOT for playing music.',
   'params': [['board', 'Board id or name', False], ['panel', 'Playlist panel id or title', False]],
   'example': 'yoloit playlist:list music',
   'aliases': ['pll']},
@@ -1721,8 +1873,7 @@ commands = [{'group': 'app',
   'aliases': ['widget:remove', 'wg:rm']},
  {'group': 'app',
   'name': 'app:run',
-  'description': 'Open an app in a new panel on a board. Accepts app id or local path (e.g. ./my-app) for dev '
-                 'workflow.',
+  'description': 'Open an app in a new panel on a board. Then use app:help, app:state, or app:snapshot to read app data.',
   'params': [['id_or_path', 'App id or local directory path', True],
              ['[board]', 'Board name (optional)', False],
              ['[panel-title]', 'Panel title (optional)', False]],
@@ -1735,8 +1886,20 @@ commands = [{'group': 'app',
   'example': 'yoloit app:create my-app --template network',
   'aliases': ['widget:create', 'wg:new']},
  {'group': 'app',
+  'name': 'app:help',
+  'description': 'Show CLI commands, events, and examples for a specific app. Call this before app:execute when unsure which events exist.',
+  'params': [['id', 'App id', True]],
+  'example': 'yoloit app:help weather',
+  'aliases': []},
+ {'group': 'app',
+  'name': 'app:state',
+  'description': 'Read structured state (yoloit.exportState) and visible text from a running app. Preferred over app:snapshot for weather, prices, calculator values.',
+  'params': [['id', 'App id', True]],
+  'example': 'yoloit app:state weather',
+  'aliases': []},
+ {'group': 'app',
   'name': 'app:execute',
-  'description': 'Execute a JS event/function in a running app',
+  'description': "Execute a JS event in a running app. Weather city change: set_city '{\"city\":\"Grodno\"}' then app:state.",
   'params': [['id', 'App id', True],
              ['action', 'Action id (e.g. btn_5, refresh)', True],
              ['[payload]', 'JSON payload string (optional)', False]],
@@ -1744,7 +1907,7 @@ commands = [{'group': 'app',
   'aliases': []},
  {'group': 'app',
   'name': 'app:reload',
-  'description': 'Hot-reload a running app (re-reads JS from disk, no full restart needed)',
+  'description': 'Hot-reload a running app (re-reads JS from disk)',
   'params': [['id', 'App id', True]],
   'example': 'yoloit app:reload weather',
   'aliases': ['app:refresh', 'widget:reload']},
@@ -1756,45 +1919,43 @@ commands = [{'group': 'app',
   'aliases': []},
  {'group': 'app',
   'name': 'app:snapshot',
-  'description': 'Get the current JSON render tree of a running app',
+  'description': 'Get the JSON render tree of a running app plus extracted text lines. Use app:state first when the app exports structured data.',
   'params': [['id', 'App id', True]],
   'example': 'yoloit app:snapshot calculator',
   'aliases': []},
  {'group': 'app',
   'name': 'app:screenshot',
-  'description': 'Save a screenshot of a running app panel to a PNG file',
+  'description': 'Save a PNG screenshot of a running app panel (panel must be visible on screen). Prefer app:snapshot for the JSON render tree when headless.',
   'params': [['id', 'App id', True], ['[output]', 'Output PNG path (default: /tmp/<id>.png)', False]],
   'example': 'yoloit app:screenshot calculator /tmp/calc.png',
   'aliases': []},
  {'group': 'app',
   'name': 'app:dev-skill',
-  'description': 'Print the full YoLoIT app development guide (JS API, node types, examples). Useful for AI agents '
-                 'writing apps.',
+  'description': 'Print the full YoLoIT app development guide (JS API, node types, examples). Useful for AI agents writing apps.',
   'params': [],
   'example': 'yoloit app:dev-skill',
   'aliases': ['app:skill', 'app:docs']},
  {'group': 'app',
   'name': 'app:demo',
-  'description': 'List built-in demo apps with their local paths and descriptions.',
+  'description': 'List built-in demo apps with their local paths. Use app:demo-view <id> to read a full example.',
   'params': [],
   'example': 'yoloit app:demo',
   'aliases': []},
  {'group': 'app',
   'name': 'app:demo-view',
-  'description': 'Show the full source (manifest.json + widget.js) of a built-in demo app. Use to learn patterns '
-                 'before writing a new app.',
+  'description': 'Show the full source (manifest.json + widget.js) of a built-in demo app. Great for learning patterns before writing a new app.',
   'params': [['id', 'Demo app id (from app:demo list)', True]],
   'example': 'yoloit app:demo-view calculator',
   'aliases': []},
  {'name': 'draw:list',
   'group': 'board',
-  'description': 'List all drawings on a board.',
+  'description': 'List all drawings (freehand strokes / shapes) on a board. Returns id, position, size, strokeColor, zIndex for each element.',
   'params': [['board', 'Board id or name (defaults to active board)', False]],
   'example': 'yoloit draw:list board-123',
   'aliases': ['drl']},
  {'name': 'draw:add',
   'group': 'board',
-  'description': 'Add a shape drawing to a board. Types: line, circle, rect, arrow, freehand, svg.',
+  'description': 'Add a shape drawing to a board. Supports BOTH positional and named-flag syntax. POSITIONAL (preferred for brevity): "draw:add <boardId> <type> <params...>" — circle: draw:add board-123 circle <cx> <cy> <r>; line: draw:add board-123 line <x1> <y1> <x2> <y2>; arrow: draw:add board-123 arrow <x1> <y1> <x2> <y2>; rect: draw:add board-123 rect <x> <y> <width> <height>; freehand: draw:add board-123 freehand <points-json>. Board defaults to active board. Returns the new drawing id.',
   'params': [['board', 'Board id or name', False],
              ['type', 'Shape type: line|circle|rect|arrow|freehand|svg', False],
              ['color', 'Stroke color #RRGGBB (default #FFFFFF)', False],
@@ -1803,7 +1964,7 @@ commands = [{'group': 'app',
   'aliases': ['dra']},
  {'name': 'draw:remove',
   'group': 'board',
-  'description': 'Remove a specific drawing by id from a board.',
+  'description': 'Remove a specific drawing from a board by its id.',
   'params': [['board', 'Board id or name', True], ['id', 'Drawing id (from draw:list)', True]],
   'example': 'yoloit draw:remove --board board-123 --id drawing-456',
   'aliases': ['drr']},
@@ -1815,8 +1976,7 @@ commands = [{'group': 'app',
   'aliases': ['drc']},
  {'name': 'draw:svg',
   'group': 'board',
-  'description': 'Draw using SVG path data (M, L, C, Q, Z commands). Great for complex shapes and agent-generated '
-                 'diagrams.',
+  'description': 'Draw SVG path data on the board canvas as a free-floating drawing (M/L/C/Q/Z). NOT for images inside board.ui cards — use ui:render with {"type":"svg",...} instead.',
   'params': [['board', 'Board id or name', True],
              ['d', 'SVG path data string', True],
              ['x', 'X origin offset (default 100)', False],
@@ -1827,15 +1987,14 @@ commands = [{'group': 'app',
   'aliases': ['drsvg']},
  {'name': 'draw:export',
   'group': 'board',
-  'description': 'Export all drawings on a board as SVG. Pipe to a file or read as text to inspect what has been '
-                 'drawn.',
+  'description': 'Export all drawings on a board as SVG. Prints SVG to stdout or saves to a file. Agents can read this to understand what has been drawn.',
   'params': [['board', 'Board id or name (defaults to active board)', False],
              ['out', 'Output file path (prints to stdout if omitted)', False]],
   'example': 'yoloit draw:export board-123 --out drawings.svg',
   'aliases': ['drex']},
  {'name': 'draw:file',
   'group': 'board',
-  'description': 'Render an SVG file as drawings on a board. All paths in the SVG file are drawn as strokes.',
+  'description': 'Render an SVG file as drawings on a board. All path elements in the SVG file are drawn as strokes. Use to import diagrams, icons, or illustrations from .svg files.',
   'params': [['board', 'Board id or name', True],
              ['file', 'Path to SVG file', True],
              ['x', 'X position offset (default 100)', False],
@@ -2105,6 +2264,15 @@ usage() {
 # ── Helpers ────────────────────────────────────────────────────────────
 
 _encode() { python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$1"; }
+
+_resolve_app_arg() {
+  local raw_id="$1"
+  if [[ "$raw_id" == ./* || "$raw_id" == ../* || ( "$raw_id" == /* && -d "$raw_id" ) || "$raw_id" == "." ]]; then
+    (cd "$raw_id" 2>/dev/null && pwd)
+  else
+    echo "$raw_id"
+  fi
+}
 
 _auto_panel() {
   local bid=$1 type=$2 title=$3 state=${4:-}
@@ -3215,6 +3383,21 @@ PY
     eventId_json=$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$3")
     _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"delete-event\",\"eventId\":$eventId_json}" | python3 -m json.tool 2>/dev/null
     ;;
+  calendar:update-event)
+    [[ $# -lt 3 ]] && { echo "Usage: yoloit calendar:update-event <board> <panel> <eventId> [--title T] [--start S] [--end E] [--description D] [--color C]" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
+    event_id="$3"
+    shift 3
+    body=$(python3 -c "import json,sys; event_id=sys.argv[1]; payload={'action':'update-event','eventId':event_id}; args=sys.argv[2:]; i=0
+while i < len(args):
+  key=args[i]
+  if key.startswith('--') and i+1 < len(args):
+    payload[key[2:]]=args[i+1]; i+=2
+  else:
+    i+=1
+print(json.dumps(payload))" "$event_id" "$@")
+    _post "/boards/${bid}/panels/${pid}/action" "$body" | python3 -m json.tool 2>/dev/null
+    ;;
   calendar:set-view|csv)
     [[ $# -lt 3 ]] && { echo "Usage: yoloit calendar:set-view <board> <panel> <view>" >&2; exit 1; }
     bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
@@ -3340,6 +3523,70 @@ PY
     fi
     ;;
 
+  ui:create|uicrt)
+    [[ $# -lt 2 ]] && { echo "Usage: yoloit ui:create <board> <title>" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"; title="$2"
+    pid=$(_auto_panel "$bid" "board.ui" "$title")
+    python3 -c "import json,sys; print(json.dumps({'ok': True, 'panel': {'id': sys.argv[1], 'type': 'board.ui', 'title': sys.argv[2]}}, ensure_ascii=False))" "$pid" "$title"
+    ;;
+  ui:render|uirnd)
+    [[ $# -lt 2 ]] && { echo "Usage: yoloit ui:render <board> [panel] <tree-json>" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"
+    local panel_hint="" tree=""
+    if [[ $# -eq 2 ]]; then
+      tree="$2"
+    else
+      panel_hint="$2"
+      tree="$3"
+    fi
+    pid=$(_smart_panel "$bid" "board.ui" "$panel_hint"); pid=$(_encode "$pid")
+    body=$(TREE="$tree" python3 -c 'import json,os; tree=json.loads(os.environ["TREE"]); print(json.dumps({"action":"render","tree":tree}))')
+    _post "/boards/${bid}/panels/${pid}/action" "$body" | python3 -m json.tool 2>/dev/null
+    ;;
+  ui:get|uiget)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit ui:get <board> [panel]" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"
+    panel_hint="${2:-}"
+    pid=$(_smart_panel "$bid" "board.ui" "$panel_hint"); pid=$(_encode "$pid")
+    _post "/boards/${bid}/panels/${pid}/action" '{"action":"get"}' | python3 -m json.tool 2>/dev/null
+    ;;
+  ui:set-state|uist)
+    [[ $# -lt 2 ]] && { echo "Usage: yoloit ui:set-state <board> [panel] <state-json>" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"
+    local panel_hint="" state=""
+    if [[ $# -eq 2 ]]; then
+      state="$2"
+    else
+      panel_hint="$2"
+      state="$3"
+    fi
+    pid=$(_smart_panel "$bid" "board.ui" "$panel_hint"); pid=$(_encode "$pid")
+    body=$(STATE="$state" python3 -c 'import json,os; state=json.loads(os.environ["STATE"]); print(json.dumps({"action":"set-state","state":state}))')
+    _post "/boards/${bid}/panels/${pid}/action" "$body" | python3 -m json.tool 2>/dev/null
+    ;;
+  ui:set-scripts|uisc)
+    [[ $# -lt 2 ]] && { echo "Usage: yoloit ui:set-scripts <board> [panel] <scripts-json>" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"
+    local panel_hint="" scripts=""
+    if [[ $# -eq 2 ]]; then
+      scripts="$2"
+    else
+      panel_hint="$2"
+      scripts="$3"
+    fi
+    pid=$(_smart_panel "$bid" "board.ui" "$panel_hint"); pid=$(_encode "$pid")
+    body=$(SCRIPTS="$scripts" python3 -c 'import json,os; scripts=json.loads(os.environ["SCRIPTS"]); print(json.dumps({"action":"set-scripts","scripts":scripts}))')
+    _post "/boards/${bid}/panels/${pid}/action" "$body" | python3 -m json.tool 2>/dev/null
+    ;;
+  ui:edit|uiedt)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit ui:edit <board> [panel]" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"
+    panel_hint="${2:-}"
+    pid=$(_smart_panel "$bid" "board.ui" "$panel_hint"); pid=$(_encode "$pid")
+    "$0" panel:focus "$1" "$pid" >/dev/null 2>&1 || true
+    python3 -c "import json; print(json.dumps({'ok': True, 'message': 'Panel focused — open JSON editor from the panel header (edit icon).'}))"
+    ;;
+
   # ── panel actions ──
   do)
     [[ $# -lt 3 ]] && { echo "Usage: yoloit do <board> <panel> <action> [json-body]" >&2; exit 1; }
@@ -3461,6 +3708,85 @@ PY
     else
       _post "/boards/${bid}/panels/${new_pid}/action" '{"action":"attach","runningOnly":true}' | python3 -m json.tool 2>/dev/null
     fi
+    ;;
+
+  run:set-group)
+    [[ $# -lt 3 ]] && { echo "Usage: yoloit run:set-group <board> <panel> <group>" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
+    group_json=$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$3")
+    _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"set-group\",\"group\":${group_json}}" | python3 -m json.tool 2>/dev/null
+    ;;
+  run:select-session)
+    [[ $# -lt 3 ]] && { echo "Usage: yoloit run:select-session <board> <panel> <sessionId>" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
+    sid_json=$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$3")
+    _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"select-session\",\"sessionId\":${sid_json}}" | python3 -m json.tool 2>/dev/null
+    ;;
+  run:clear-session)
+    [[ $# -lt 2 ]] && { echo "Usage: yoloit run:clear-session <board> <panel>" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
+    _post "/boards/${bid}/panels/${pid}/action" '{"action":"clear-session"}' | python3 -m json.tool 2>/dev/null
+    ;;
+
+  diff:open)
+    [[ $# -lt 3 ]] && { echo "Usage: yoloit diff:open <board> <panel> <path>" >&2; exit 1; }
+    board="$1"; panel="$2"; path="$3"; _use_board "$board"
+    json=$(python3 -c "import json,sys; print(json.dumps({'path': sys.argv[1]}))" "$path")
+    "$0" do "$board" "$panel" open "$json"
+    ;;
+  diff:set-root)
+    [[ $# -lt 3 ]] && { echo "Usage: yoloit diff:set-root <board> <panel> <rootPath>" >&2; exit 1; }
+    board="$1"; panel="$2"; root="$3"; _use_board "$board"
+    json=$(python3 -c "import json,sys; print(json.dumps({'rootPath': sys.argv[1]}))" "$root")
+    "$0" do "$board" "$panel" set-root "$json"
+    ;;
+
+  setup:select)
+    [[ $# -lt 3 ]] && { echo "Usage: yoloit setup:select <board> <panel> <packageId>" >&2; exit 1; }
+    board="$1"; panel="$2"; pkg="$3"; _use_board "$board"
+    json=$(python3 -c "import json,sys; print(json.dumps({'packageId': sys.argv[1]}))" "$pkg")
+    "$0" do "$board" "$panel" select "$json"
+    ;;
+  setup:unselect)
+    [[ $# -lt 3 ]] && { echo "Usage: yoloit setup:unselect <board> <panel> <packageId>" >&2; exit 1; }
+    board="$1"; panel="$2"; pkg="$3"; _use_board "$board"
+    json=$(python3 -c "import json,sys; print(json.dumps({'packageId': sys.argv[1]}))" "$pkg")
+    "$0" do "$board" "$panel" unselect "$json"
+    ;;
+
+  panel-files:list)
+    [[ $# -lt 2 ]] && { echo "Usage: yoloit panel-files:list <board> <panel>" >&2; exit 1; }
+    board="$1"; panel="$2"; _use_board "$board"
+    "$0" do "$board" "$panel" list '{}'
+    ;;
+  panel-files:add)
+    [[ $# -lt 3 ]] && { echo "Usage: yoloit panel-files:add <board> <panel> <path>" >&2; exit 1; }
+    board="$1"; panel="$2"; path="$3"; _use_board "$board"
+    json=$(python3 -c "import json,sys; print(json.dumps({'path': sys.argv[1]}))" "$path")
+    "$0" do "$board" "$panel" add "$json"
+    ;;
+  panel-files:remove)
+    [[ $# -lt 3 ]] && { echo "Usage: yoloit panel-files:remove <board> <panel> <path|id>" >&2; exit 1; }
+    board="$1"; panel="$2"; target="$3"; _use_board "$board"
+    if [[ "$target" == /* || "$target" == ~* || "$target" == ./* ]]; then
+      json=$(python3 -c "import json,sys; print(json.dumps({'path': sys.argv[1]}))" "$target")
+    else
+      json=$(python3 -c "import json,sys; print(json.dumps({'id': sys.argv[1]}))" "$target")
+    fi
+    "$0" do "$board" "$panel" remove "$json"
+    ;;
+
+  chart:get)
+    [[ $# -lt 2 ]] && { echo "Usage: yoloit chart:get <board> <panel>" >&2; exit 1; }
+    board="$1"; panel="$2"; _use_board "$board"
+    "$0" do "$board" "$panel" get '{}'
+    ;;
+
+  terminal:set-session)
+    [[ $# -lt 3 ]] && { echo "Usage: yoloit terminal:set-session <board> <panel> <sessionId>" >&2; exit 1; }
+    board="$1"; panel="$2"; sid="$3"; _use_board "$board"
+    json=$(python3 -c "import json,sys; print(json.dumps({'sessionId': sys.argv[1]}))" "$sid")
+    "$0" do "$board" "$panel" set-session "$json"
     ;;
 
   agent:list)
@@ -4297,7 +4623,11 @@ PYEOF
     pid=$(_smart_panel "$bid" "board.checklist" "$panel_hint")
     [[ -z "$pid" ]] && { echo "Error: failed to resolve checklist panel" >&2; exit 1; }
     pid=$(_encode "$pid")
-    _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"check\",\"id\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$target"),\"text\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$target")}" | python3 -m json.tool 2>/dev/null
+    if [[ "$target" =~ ^[0-9]+$ ]]; then
+      _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"check\",\"index\":$target}" | python3 -m json.tool 2>/dev/null
+    else
+      _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"check\",\"id\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$target"),\"text\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$target")}" | python3 -m json.tool 2>/dev/null
+    fi
     ;;
   checklist:uncheck|cl:u)
     local bid_raw="" panel_hint="" target=""
@@ -4312,7 +4642,11 @@ PYEOF
     pid=$(_smart_panel "$bid" "board.checklist" "$panel_hint")
     [[ -z "$pid" ]] && { echo "Error: failed to resolve checklist panel" >&2; exit 1; }
     pid=$(_encode "$pid")
-    _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"uncheck\",\"id\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$target"),\"text\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$target")}" | python3 -m json.tool 2>/dev/null
+    if [[ "$target" =~ ^[0-9]+$ ]]; then
+      _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"uncheck\",\"index\":$target}" | python3 -m json.tool 2>/dev/null
+    else
+      _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"uncheck\",\"id\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$target"),\"text\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$target")}" | python3 -m json.tool 2>/dev/null
+    fi
     ;;
   kanban:columns|k:col)
     local bid_raw="" panel_hint=""
@@ -4583,14 +4917,27 @@ PYEOF
     result=$(_post "/boards/${bid}/panels/${panel_id}/action" "{\"action\":\"setState\",\"state\":{\"widgetId\":\"${widget_id}\"}}")
     if echo "$result" | python3 -c "import sys,json; d=json.load(sys.stdin); exit(0 if d.get('ok') or d.get('panel') or d.get('state') else 1)" 2>/dev/null; then
       echo "✅ App running: $(basename "$widget_id")"
-      echo "   Reload: yoloit app:reload ."
-      echo "   Logs:   yoloit app:logs ."
-      echo "   Stop:   close the panel"
+      echo "   Help:     yoloit app:help $(basename "$widget_id")"
+      echo "   State:    yoloit app:state $(basename "$widget_id")"
+      echo "   Snapshot: yoloit app:snapshot $(basename "$widget_id")"
+      echo "   Reload:   yoloit app:reload $(basename "$widget_id")"
+      echo "   Logs:     yoloit app:logs $(basename "$widget_id")"
+      echo "   Stop:     close the panel"
     else
       echo "❌ Failed to run app:" >&2
       echo "$result" >&2
       exit 1
     fi
+    ;;
+  app:help)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit app:help <id|path>" >&2; exit 1; }
+    app_id="$(_resolve_app_arg "$1")"
+    _get "/apps/$(_encode "$app_id")/help" | python3 -m json.tool 2>/dev/null
+    ;;
+  app:state)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit app:state <id|path>" >&2; exit 1; }
+    app_id="$(_resolve_app_arg "$1")"
+    _get "/apps/$(_encode "$app_id")/state" | python3 -m json.tool 2>/dev/null
     ;;
   app:execute)
     [[ $# -lt 2 ]] && { echo "Usage: yoloit app:execute <id|path> <action> [payload_json]" >&2; exit 1; }
@@ -4600,7 +4947,55 @@ PYEOF
     else
       app_id="$raw_id"
     fi
-    _post "/apps/$(_encode "$app_id")/execute" "{\"action\":\"${action_id}\",\"payload\":${payload}}" | python3 -m json.tool 2>/dev/null
+    YOLOIT_ACTION_ID="$action_id" YOLOIT_PAYLOAD="$payload" YOLOIT_APP_ID="$app_id" \
+    YOLOIT_CLI_PORT="${YOLOIT_CLI_PORT:-}" YOLOIT_PORT_FILE="$PORT_FILE" \
+    python3 - <<'PY' | python3 -m json.tool 2>/dev/null
+import json
+import os
+import urllib.parse
+import urllib.request
+
+def resolve_base() -> str:
+    port = os.environ.get('YOLOIT_CLI_PORT', '').strip()
+    if port:
+        return f'http://127.0.0.1:{port}/api'
+    port_file = os.environ.get('YOLOIT_PORT_FILE', '')
+    if port_file and os.path.exists(port_file):
+        with open(port_file, encoding='utf-8') as handle:
+            saved = handle.read().strip()
+        if saved:
+            return f'http://127.0.0.1:{saved}/api'
+    print('{"ok":false,"error":"CLI server not reachable — is the YoLoIT app running?"}')
+    raise SystemExit(1)
+
+action = os.environ['YOLOIT_ACTION_ID'].strip()
+raw_payload = os.environ.get('YOLOIT_PAYLOAD', '{}').strip() or '{}'
+try:
+    payload_obj = json.loads(raw_payload)
+except json.JSONDecodeError:
+    payload_obj = {'value': raw_payload}
+app_id = os.environ['YOLOIT_APP_ID']
+body = json.dumps({'action': action, 'payload': payload_obj}).encode('utf-8')
+url = (
+    resolve_base()
+    + '/apps/'
+    + urllib.parse.quote(app_id, safe='')
+    + '/execute'
+)
+request = urllib.request.Request(
+    url,
+    data=body,
+    method='POST',
+    headers={'Content-Type': 'application/json'},
+)
+try:
+    with urllib.request.urlopen(request, timeout=30) as response:
+        print(response.read().decode('utf-8'))
+except urllib.error.HTTPError as error:
+    print(error.read().decode('utf-8') or json.dumps({'ok': False, 'error': str(error)}))
+except Exception as error:
+    print(json.dumps({'ok': False, 'error': str(error)}))
+PY
     ;;
   app:reload|widget:reload|app:refresh)
     [[ $# -lt 1 ]] && { echo "Usage: yoloit app:reload <id|path>" >&2; exit 1; }
@@ -5314,16 +5709,32 @@ PY
     "$0" do "$board" "$panel" logs "$json"
     ;;
   note:get|n:g)
-    [[ $# -lt 2 ]] && { echo "Usage: yoloit note:get <board> <panel>" >&2; exit 1; }
-    board="$1"; panel="$2"; _use_board "$board"
+    local bid_raw="" panel_hint=""
+    case $# in
+      0|1) panel_hint="${1:-}" ;;
+      *) bid_raw="$1"; panel_hint="$2" ;;
+    esac
+    bid_raw=$(_require_board "$bid_raw")
+    bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
+    pid=$(_smart_panel "$bid" "board.note.markdown" "$panel_hint")
+    [[ -z "$pid" ]] && { echo "Error: failed to resolve note panel" >&2; exit 1; }
+    pid=$(_encode "$pid")
     json=$(python3 -c "import json,sys; print(json.dumps({}))")
-    "$0" do "$board" "$panel" get "$json"
+    "$0" do "$bid_raw" "$pid" get "$json"
     ;;
   checklist:items|cl:ls)
-    [[ $# -lt 2 ]] && { echo "Usage: yoloit checklist:items <board> <panel>" >&2; exit 1; }
-    board="$1"; panel="$2"; _use_board "$board"
+    local bid_raw="" panel_hint=""
+    case $# in
+      0|1) panel_hint="${1:-}" ;;
+      *) bid_raw="$1"; panel_hint="$2" ;;
+    esac
+    bid_raw=$(_require_board "$bid_raw")
+    bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
+    pid=$(_smart_panel "$bid" "board.checklist" "$panel_hint")
+    [[ -z "$pid" ]] && { echo "Error: failed to resolve checklist panel" >&2; exit 1; }
+    pid=$(_encode "$pid")
     json=$(python3 -c "import json,sys; print(json.dumps({}))")
-    "$0" do "$board" "$panel" items "$json"
+    "$0" do "$bid_raw" "$pid" items "$json"
     ;;
   checklist:remove|cl:rm)
     [[ $# -lt 3 ]] && { echo "Usage: yoloit checklist:remove <board> <panel> <item>" >&2; exit 1; }
@@ -5385,25 +5796,53 @@ PY
     json=$(python3 -c "import json,sys; print(json.dumps({'index': int(sys.argv[1])}))" "$arg")
     "$0" do "$board" "$panel" remove "$json"
     ;;
-  sticky:get)
-    [[ $# -lt 2 ]] && { echo "Usage: yoloit sticky:get <board> <panel>" >&2; exit 1; }
-    board="$1"; panel="$2"; _use_board "$board"
+  sticky:get|stg)
+    local bid_raw="" panel_hint=""
+    case $# in
+      0|1) panel_hint="${1:-}" ;;
+      *) bid_raw="$1"; panel_hint="$2" ;;
+    esac
+    bid_raw=$(_require_board "$bid_raw")
+    bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
+    pid=$(_smart_panel "$bid" "board.sticky" "$panel_hint")
+    [[ -z "$pid" ]] && { echo "Error: failed to resolve sticky panel" >&2; exit 1; }
+    pid=$(_encode "$pid")
     json=$(python3 -c "import json,sys; print(json.dumps({}))")
-    "$0" do "$board" "$panel" get "$json"
+    "$0" do "$bid_raw" "$pid" get "$json"
     ;;
-  sticky:set)
-    [[ $# -lt 3 ]] && { echo "Usage: yoloit sticky:set <board> <panel> <text>" >&2; exit 1; }
-    board="$1"; panel="$2"; _use_board "$board"
-    text=$(_collect_text_arg "$@")
+  sticky:set|sts)
+    local bid_raw="" panel_hint="" text=""
+    case $# in
+      0) echo "Usage: yoloit sticky:set [board] [panel] <text>" >&2; exit 1 ;;
+      1) text="$1" ;;
+      2) panel_hint="$1"; text="$2" ;;
+      *) bid_raw="$1"; panel_hint="$2"; shift 2; text="$*" ;;
+    esac
+    bid_raw=$(_require_board "$bid_raw")
+    bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
+    pid=$(_smart_panel "$bid" "board.sticky" "$panel_hint")
+    [[ -z "$pid" ]] && { echo "Error: failed to resolve sticky panel" >&2; exit 1; }
+    pid=$(_encode "$pid")
+    text=$(_resolve_text_value "$text")
     json=$(python3 -c "import json,sys; print(json.dumps({'text': sys.argv[1]}))" "$text")
-    "$0" do "$board" "$panel" set "$json"
+    "$0" do "$bid_raw" "$pid" set "$json"
     ;;
-  sticky:append)
-    [[ $# -lt 3 ]] && { echo "Usage: yoloit sticky:append <board> <panel> <text>" >&2; exit 1; }
-    board="$1"; panel="$2"; _use_board "$board"
-    text=$(_collect_text_arg "$@")
+  sticky:append|sta)
+    local bid_raw="" panel_hint="" text=""
+    case $# in
+      0) echo "Usage: yoloit sticky:append [board] [panel] <text>" >&2; exit 1 ;;
+      1) text="$1" ;;
+      2) panel_hint="$1"; text="$2" ;;
+      *) bid_raw="$1"; panel_hint="$2"; shift 2; text="$*" ;;
+    esac
+    bid_raw=$(_require_board "$bid_raw")
+    bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
+    pid=$(_smart_panel "$bid" "board.sticky" "$panel_hint")
+    [[ -z "$pid" ]] && { echo "Error: failed to resolve sticky panel" >&2; exit 1; }
+    pid=$(_encode "$pid")
+    text=$(_resolve_text_value "$text")
     json=$(python3 -c "import json,sys; print(json.dumps({'text': sys.argv[1]}))" "$text")
-    "$0" do "$board" "$panel" append "$json"
+    "$0" do "$bid_raw" "$pid" append "$json"
     ;;
   sticky:color)
     [[ $# -lt 3 ]] && { echo "Usage: yoloit sticky:color <board> <panel> <color>" >&2; exit 1; }

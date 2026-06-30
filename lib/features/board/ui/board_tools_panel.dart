@@ -490,6 +490,7 @@ class PanelCatalogCategoryButton extends StatelessWidget {
         pluginItem('board.playlist'),
         pluginItem('board.run_configs'),
         pluginItem('board.widget.custom'),
+        pluginItem('board.ui'),
       ],
     };
     return items.whereType<PopupMenuEntry<String>>().toList();

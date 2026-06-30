@@ -19,6 +19,7 @@
   }
 
   async function load() {
+    yoloit.exportState({ loading: true, query: city });
     yoloit.render({type:'center',child:{type:'circularProgressIndicator',size:24}});
     try {
       var url = 'https://wttr.in/' + encodeURIComponent(city) + '?format=j1';
@@ -87,7 +88,20 @@
           }},
         ]
       }});
+      yoloit.exportState({
+        loading: false,
+        query: city,
+        city: areaName,
+        country: country,
+        tempC: cur.temp_C,
+        feelsLikeC: cur.FeelsLikeC,
+        humidity: cur.humidity,
+        windKmph: cur.windspeedKmph,
+        visibilityKm: cur.visibility,
+        description: cur.weatherDesc[0].value,
+      });
     } catch(e) {
+      yoloit.exportState({ loading: false, query: city, error: e.message || String(e) });
       yoloit.showError('Could not load weather:\n'+e.message);
     }
   }
@@ -101,11 +115,22 @@
     ]};
   }
 
+  function cityFromPayload(payload) {
+    if (!payload) return '';
+    return String(
+      payload.city || payload.value || payload.name || '',
+    ).trim();
+  }
+
   async function handleEvent(actionId, payload) {
     if (actionId === 'city_input_change') {
       _inputCity = payload.value;
-    } else if (actionId === 'submit_city' || actionId === 'submit_city_btn') {
-      var newCity = (payload && payload.value) ? payload.value.trim() : _inputCity.trim();
+    } else if (
+      actionId === 'set_city' ||
+      actionId === 'submit_city' ||
+      actionId === 'submit_city_btn'
+    ) {
+      var newCity = cityFromPayload(payload) || _inputCity.trim();
       if (!newCity) return;
       city = newCity;
       _inputCity = city;

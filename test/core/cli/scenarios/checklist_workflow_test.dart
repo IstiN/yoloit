@@ -92,7 +92,7 @@ void main() {
       // Rename index=4 to Organic Butter
       final renameResult = await handler.handleAction(
         'rename',
-        {'index': 4, 'text': 'Organic Butter'},
+        {'index': 4, 'newText': 'Organic Butter'},
         panel,
       );
       expect(renameResult.ok, isTrue);

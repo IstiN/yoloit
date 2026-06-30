@@ -134,6 +134,7 @@ final class _FakeToolExecutor implements YoloitToolExecutor {
     String functionName,
     Map<String, Object?> arguments, {
     ChatRuntimeContext? runtimeContext,
+    bool argumentsPreNormalized = false,
   }) async => jsonEncode(<String, Object?>{'ok': true, 'tool': functionName});
 }
 

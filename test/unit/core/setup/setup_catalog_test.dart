@@ -31,6 +31,13 @@ void main() {
     );
   });
 
+  test('catalog includes Cursor Agent CLI package', () {
+    final cursorAgent = SetupCatalog.packages.singleWhere(
+      (pkg) => pkg.id == 'cursor-agent',
+    );
+    expect(cursorAgent.command, 'cursor-agent');
+  });
+
   test('check snapshot serializes package install metadata', () {
     const snapshot = SetupCheckSnapshot(
       runtime: SetupRuntimeInfo(

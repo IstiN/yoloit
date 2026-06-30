@@ -84,6 +84,53 @@ void main() {
     expect(updated.zIndex, greaterThan(sibling.zIndex));
   });
 
+  testWidgets('markdown panel header exposes edit content action', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    tester.view.physicalSize = const Size(1200, 760);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final cubit = BoardCubit();
+    addTearDown(cubit.close);
+    const target = BoardPanelInstance(
+      id: 'target',
+      type: MarkdownNotePlugin.kTypeId,
+      title: 'Weather — Spitalfields',
+      bounds: BoardPanelBounds(x: 56, y: 74, width: 520, height: 300),
+      zIndex: 1,
+      state: {'markdown': 'Weather panel'},
+    );
+    const board = BoardDocument(
+      id: 'board',
+      name: 'Board',
+      viewport: BoardViewport(scale: 1),
+      panels: [target],
+    );
+    cubit.emit(
+      const BoardState(boards: [board], activeBoardId: 'board', isLoaded: true),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppThemePreset.neonPurple.theme,
+        home: Scaffold(
+          body: BlocProvider.value(value: cubit, child: const BoardView()),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 450));
+
+    expect(find.byTooltip('Edit content'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Edit content'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Edit markdown note'), findsOneWidget);
+  });
+
   testWidgets('left toolbar opens board history and restores deleted panel', (
     tester,
   ) async {
@@ -311,6 +358,7 @@ void main() {
       cubit.closeYoloAssistant();
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
+      await tester.pump(const Duration(seconds: 13));
 
       expect(cubit.state.yoloAssistantAnchorPanelId, isNull);
     },

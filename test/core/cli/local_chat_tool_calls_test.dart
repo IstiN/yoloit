@@ -440,7 +440,7 @@ void main() {
               )
               as Map<String, Object?>;
       expect(result['ok'], true);
-      expect(result['command'], 'yoloit play board-1');
+      expect(result['command'], 'yoloit play');
     },
   );
 
@@ -457,7 +457,7 @@ void main() {
             as Map<String, Object?>;
     expect(result['ok'], isTrue);
     expect(result['executed'], isFalse);
-    expect(result['command'], 'yoloit note:create board-1 milk');
+    expect(result['command'], 'yoloit note:create milk');
   });
 
   test(

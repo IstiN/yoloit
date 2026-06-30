@@ -207,7 +207,11 @@ void main() {
   group('ChecklistCliHandler — rename action', () {
     test('rename by index updates text', () async {
       final panel = _panelFromFixture('checklist_shopping');
-      final r = await handler.handleAction('rename', {'index': 0, 'text': 'Oat Milk'}, panel);
+      final r = await handler.handleAction(
+        'rename',
+        {'index': 0, 'newText': 'Oat Milk'},
+        panel,
+      );
       expect(r.ok, isTrue);
       final items = r.stateUpdate!['items'] as List;
       expect(items[0]['text'], 'Oat Milk');
@@ -215,11 +219,15 @@ void main() {
 
     test('rename out of range returns ok=false', () async {
       final panel = _panelFromFixture('checklist_shopping');
-      final r = await handler.handleAction('rename', {'index': 99, 'text': 'X'}, panel);
+      final r = await handler.handleAction(
+        'rename',
+        {'index': 99, 'newText': 'X'},
+        panel,
+      );
       expect(r.ok, isFalse);
     });
 
-    test('rename without text returns ok=false', () async {
+    test('rename without newText returns ok=false', () async {
       final panel = _panelFromFixture('checklist_shopping');
       final r = await handler.handleAction('rename', {'index': 0}, panel);
       expect(r.ok, isFalse);

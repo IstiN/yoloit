@@ -146,7 +146,7 @@ class BoardPanelResizeOverlay {
   }
 }
 
-class PanelResizeHandleWidget extends StatelessWidget {
+class PanelResizeHandleWidget extends StatefulWidget {
   const PanelResizeHandleWidget({
     super.key,
     required this.handle,
@@ -162,43 +162,75 @@ class PanelResizeHandleWidget extends StatelessWidget {
   final VoidCallback onEnd;
   final AppColorScheme colors;
 
+  @override
+  State<PanelResizeHandleWidget> createState() =>
+      _PanelResizeHandleWidgetState();
+}
+
+class _PanelResizeHandleWidgetState extends State<PanelResizeHandleWidget> {
   static const double _hitSize = 24;
   static const double _dotSize = 10;
+  bool _holdingCanvasLock = false;
+
+  @override
+  void dispose() {
+    _releaseCanvasLock();
+    super.dispose();
+  }
+
+  void _acquireCanvasLock() {
+    if (_holdingCanvasLock) return;
+    _holdingCanvasLock = true;
+    CanvasInteractionLock.instance.enter();
+  }
+
+  void _releaseCanvasLock() {
+    if (!_holdingCanvasLock) return;
+    _holdingCanvasLock = false;
+    CanvasInteractionLock.instance.exit();
+  }
+
+  void _finishResize() {
+    widget.onEnd();
+    _releaseCanvasLock();
+  }
 
   @override
   Widget build(BuildContext context) {
     final child = Listener(
       onPointerDown: (_) {
         if (kDebugMode) {
-          debugPrint('[BoardPanelResizeChrome] handle.pointerDown $handle');
+          debugPrint(
+            '[BoardPanelResizeChrome] handle.pointerDown ${widget.handle}',
+          );
         }
-        CanvasInteractionLock.instance.enter();
+        _acquireCanvasLock();
       },
-      onPointerUp: (_) => CanvasInteractionLock.instance.exit(),
-      onPointerCancel: (_) => CanvasInteractionLock.instance.exit(),
+      onPointerUp: (_) => _releaseCanvasLock(),
+      onPointerCancel: (_) => _releaseCanvasLock(),
       child: MouseRegion(
-        cursor: handle.cursor,
+        cursor: widget.handle.cursor,
         child: Tooltip(
-          message: handle.tooltip,
+          message: widget.handle.tooltip,
           child: GestureDetector(
-            key: ValueKey('panel-resize-handle-${handle.name}'),
+            key: ValueKey('panel-resize-handle-${widget.handle.name}'),
             behavior: HitTestBehavior.opaque,
-            onPanStart: onStart,
-            onPanUpdate: onUpdate,
-            onPanEnd: (_) => onEnd(),
-            onPanCancel: onEnd,
+            onPanStart: widget.onStart,
+            onPanUpdate: widget.onUpdate,
+            onPanEnd: (_) => _finishResize(),
+            onPanCancel: _finishResize,
             child: SizedBox(
               width: _hitSize,
               height: _hitSize,
               child: Center(
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    color: colors.surface,
+                    color: widget.colors.surface,
                     shape: BoxShape.circle,
-                    border: Border.all(color: colors.primary, width: 2),
+                    border: Border.all(color: widget.colors.primary, width: 2),
                     boxShadow: [
                       BoxShadow(
-                        color: colors.border.withValues(alpha: 0.16),
+                        color: widget.colors.border.withValues(alpha: 0.16),
                         blurRadius: 5,
                         offset: const Offset(0, 1),
                       ),
@@ -213,7 +245,7 @@ class PanelResizeHandleWidget extends StatelessWidget {
       ),
     );
 
-    return switch (handle) {
+    return switch (widget.handle) {
       BoardPanelResizeHandle.topLeft => Positioned(
         left: 0,
         top: 0,

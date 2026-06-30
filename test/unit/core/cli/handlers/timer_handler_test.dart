@@ -107,6 +107,22 @@ void main() {
       expect(r.stateUpdate!['isPaused'], true);
     });
 
+    test('pause stores elapsed remaining time', () async {
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final r = await handler.handleAction(
+        'pause',
+        {},
+        _panel(state: {
+          'remaining': 120,
+          'isRunning': true,
+          'lastTick': now - 5000,
+        }),
+      );
+      expect(r.ok, isTrue);
+      expect(r.stateUpdate!['remaining'], lessThanOrEqualTo(116));
+      expect(r.stateUpdate!['remaining'], greaterThanOrEqualTo(115));
+    });
+
     test('resume returns error when timer not paused', () async {
       final r = await handler.handleAction('resume', {}, _panel());
       expect(r.ok, isFalse);

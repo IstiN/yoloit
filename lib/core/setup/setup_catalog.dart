@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:json_annotation/json_annotation.dart';
+import 'package:yoloit/core/setup/agent_cli_discovery.dart';
 import 'package:yoloit/core/setup/setup_skills_service_vm.dart'
     if (dart.library.ui) 'package:yoloit/core/setup/setup_skills_service_flutter.dart' as skills_service;
 
@@ -281,6 +282,28 @@ class SetupCatalog {
       },
     ),
     SetupPackageSpec(
+      id: 'cursor-agent',
+      name: 'Cursor Agent CLI',
+      category: SetupPackageCategory.agents,
+      description:
+          'Cursor autonomous coding agent used by YoLo chat and terminal sessions.',
+      command: 'cursor-agent',
+      versionArgs: <String>['--version'],
+      install: <SetupTargetOs, SetupInstallAction>{
+        SetupTargetOs.macos: SetupInstallAction(
+          command: 'curl -fsSL https://cursor.com/install | bash',
+        ),
+        SetupTargetOs.linux: SetupInstallAction(
+          command: 'curl -fsSL https://cursor.com/install | bash',
+        ),
+        SetupTargetOs.windows: SetupInstallAction(
+          command:
+              'powershell -ExecutionPolicy ByPass -c "irm https://cursor.com/install.ps1 | iex"',
+          requiresInteraction: true,
+        ),
+      },
+    ),
+    SetupPackageSpec(
       id: 'opencode',
       name: 'OpenCode',
       category: SetupPackageCategory.agents,
@@ -513,26 +536,8 @@ class SetupCatalog {
     );
   }
 
-  static Future<String?> _findPath(String command) async {
-    try {
-      final shell = Platform.isWindows ? 'where' : '/bin/sh';
-      final args =
-          Platform.isWindows
-              ? <String>[command]
-              : <String>['-lc', 'command -v ${_shellQuote(command)}'];
-      final result = await Process.run(
-        shell,
-        args,
-        environment: _extendedEnv(),
-        runInShell: Platform.isWindows,
-      ).timeout(const Duration(seconds: 5));
-      if (result.exitCode != 0) return null;
-      final out = (result.stdout as String).trim();
-      return out.isEmpty ? null : out.split('\n').first.trim();
-    } catch (_) {
-      return null;
-    }
-  }
+  static Future<String?> _findPath(String command) =>
+      AgentCliDiscovery.findExecutable(command);
 
   static Future<String?> _version(String executable, List<String> args) async {
     try {
@@ -613,28 +618,8 @@ class SetupCatalog {
     }
   }
 
-  static Map<String, String> _extendedEnv() {
-    final env = Map<String, String>.from(Platform.environment);
-    final current = env['PATH'] ?? '';
-    final home = env['HOME'] ?? env['USERPROFILE'] ?? '';
-    final extras = <String>[
-      '/opt/homebrew/bin',
-      '/usr/local/bin',
-      '/usr/bin',
-      '/bin',
-      '/usr/sbin',
-      '/sbin',
-      if (home.isNotEmpty) '$home/.local/bin',
-      if (home.isNotEmpty) '$home/.cargo/bin',
-      if (home.isNotEmpty) '$home/.npm-global/bin',
-      if (home.isNotEmpty) '$home/.nvm/versions/node/current/bin',
-    ];
-    env['PATH'] = <String>{
-      ...extras.where((entry) => entry.isNotEmpty),
-      ...current.split(Platform.isWindows ? ';' : ':'),
-    }.where((entry) => entry.isNotEmpty).join(Platform.isWindows ? ';' : ':');
-    return env;
-  }
+  static Map<String, String> _extendedEnv() =>
+      AgentCliDiscovery.extendedEnvironment();
 
   static String _shellQuote(String value) =>
       "'${value.replaceAll("'", "'\\''")}'";

@@ -136,6 +136,7 @@ Apps run in a sandboxed JavaScript engine (JavaScriptCore on macOS/iOS). They co
 | `icon` | ✅ | Emoji used in the app picker |
 | `network` | ❌ | `true` to allow HTTP requests (default: false) |
 | `allowedCommands` | ❌ | Reserved for future CLI command permissions |
+| `cli` | ❌ | Per-app CLI help for agents: events, examples, read hints |
 | `files` | ❌ | Ordered list of JS files to concatenate before evaluation (multi-file apps) |
 
 ---
@@ -320,6 +321,23 @@ Update the panel header title.
 ```javascript
 yoloit.panel.setTitle('Weather — London');
 ```
+
+---
+
+### `yoloit.exportState(object)`
+Export structured data for `yoloit app:state` (preferred for AI agents).
+
+```javascript
+yoloit.exportState({
+  loading: false,
+  city: 'Moscow',
+  tempC: '18',
+  description: 'Partly cloudy',
+});
+```
+
+Also add a `cli` section to `manifest.json` with `events`, `examples`, and `read` hints.
+Run `yoloit app:help <id>` to print the merged help.
 
 ---
 

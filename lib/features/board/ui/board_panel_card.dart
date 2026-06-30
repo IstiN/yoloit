@@ -352,6 +352,7 @@ class BoardPanelCardState extends State<BoardPanelCard>
                                       onEditColor: onEditColor,
                                       onBringToFront: onBringToFront,
                                       onSendToBack: onSendToBack,
+                                      onEdit: onEditNote,
                                       onFullscreen: onFullscreen,
                                       onSettings:
                                           () => _showPanelSettingsDialog(

@@ -26,6 +26,7 @@
 
   async function load() {
     _chartSymbol = null;
+    yoloit.exportState({ loading: true, symbols: symbols, view: 'list' });
     yoloit.render({type:'center',child:{type:'circularProgressIndicator',size:24}});
     try {
       var quotes = await Promise.all(symbols.map(fetchQuote));
@@ -80,7 +81,23 @@
           }},
         ]
       });
+      yoloit.exportState({
+        loading: false,
+        view: 'list',
+        symbols: symbols,
+        updatedAt: now,
+        quotes: quotes.map(function(q) {
+          return {
+            symbol: q.symbol,
+            name: q.longName,
+            price: q.price,
+            changeAbs: q.chgAbs,
+            changePct: q.chgPct,
+          };
+        }),
+      });
     } catch(e) {
+      yoloit.exportState({ loading: false, symbols: symbols, error: e.message || String(e) });
       yoloit.showError('Could not load stocks:\n' + e.message);
     }
   }

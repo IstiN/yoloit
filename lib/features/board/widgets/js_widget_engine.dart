@@ -57,7 +57,9 @@ class JsWidgetEngine {
 
   final Map<String, dynamic> _storage;
   final Map<String, dynamic> _initialTheme;
+  Map<String, dynamic>? _exportedState;
   JavascriptRuntime? _runtime;
+  Completer<void>? _eventCompleter;
   bool _disposed = false;
   final Map<String, Timer> _intervals = {};
   final List<Map<String, dynamic>> _consoleLogs = [];
@@ -85,6 +87,10 @@ class JsWidgetEngine {
   List<Map<String, dynamic>> peekLogs() =>
       List<Map<String, dynamic>>.from(_consoleLogs);
 
+  /// Last structured state exported via `yoloit.exportState(...)`.
+  Map<String, dynamic>? get exportedState =>
+      _exportedState == null ? null : Map<String, dynamic>.from(_exportedState!);
+
   /// Push updated theme colors into the running JS widget.
   void updateTheme(Map<String, dynamic> colors) {
     final rt = _runtime;
@@ -104,6 +110,7 @@ class JsWidgetEngine {
     await dispose();
     _disposed = false;
     _consoleLogs.clear();
+    _exportedState = null;
 
     // Ensure permissions are loaded before checking them in bridges
     await WidgetPermissionsService.instance.load();
@@ -149,19 +156,49 @@ class JsWidgetEngine {
   }
 
   /// Call the JS `handleEvent(actionId, payload)` function.
-  void callEvent(String actionId, [Map<String, dynamic>? payload]) {
+  ///
+  /// Waits until the handler finishes, including async handlers that return
+  /// a Promise (e.g. weather city changes that await fetch + render).
+  Future<void> callEvent(
+    String actionId, [
+    Map<String, dynamic>? payload,
+  ]) async {
     final rt = _runtime;
     if (rt == null || _disposed) return;
+    final completer = Completer<void>();
+    _eventCompleter?.complete();
+    _eventCompleter = completer;
     try {
-      final p = jsonEncode(payload ?? {});
-      // Support both yoloit.onEvent(fn) registration and global handleEvent
+      final encodedAction = jsonEncode(actionId);
+      final encodedPayload = jsonEncode(payload ?? {});
       rt.evaluate(
+        '(function(){'
         'var __h=yoloit._handler||(typeof handleEvent==="function"?handleEvent:null);'
-        'if(__h){try{__h(${jsonEncode(actionId)},$p);}catch(e){yoloit.showError(e.message||String(e));}}'
+        'if(!__h){sendMessage("__yoloit_event_done","{}");return;}'
+        'try{'
+        'var __r=__h($encodedAction,$encodedPayload);'
+        'if(__r&&typeof __r.then==="function"){'
+        '__r.then(function(){sendMessage("__yoloit_event_done","{}");},'
+        'function(e){sendMessage("__yoloit_event_done",JSON.stringify({error:e.message||String(e)}));});'
+        '}else{sendMessage("__yoloit_event_done","{}");}'
+        '}catch(e){sendMessage("__yoloit_event_done",JSON.stringify({error:e.message||String(e)}));}'
+        '})();',
+      );
+      rt.executePendingJob();
+      await completer.future.timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          debugPrint('[JsWidgetEngine] callEvent timeout for $actionId');
+        },
       );
       rt.executePendingJob();
     } catch (e) {
       debugPrint('[JsWidgetEngine] callEvent error: $e');
+      if (!completer.isCompleted) completer.complete();
+    } finally {
+      if (identical(_eventCompleter, completer)) {
+        _eventCompleter = null;
+      }
     }
   }
 
@@ -266,6 +303,35 @@ class JsWidgetEngine {
     rt.setupBridge('__yoloit_set_title', (title) {
       if (_disposed) return;
       onSetTitle(title?.toString() ?? '');
+    });
+
+    // Async widget event completion (see callEvent).
+    rt.setupBridge('__yoloit_event_done', (args) {
+      if (_disposed) return;
+      try {
+        if (args is Map && args['error'] != null) {
+          debugPrint(
+            '[JsWidgetEngine] event error: ${args['error']}',
+          );
+        }
+      } catch (_) {}
+      final pending = _eventCompleter;
+      if (pending != null && !pending.isCompleted) {
+        pending.complete();
+      }
+    });
+
+    // yoloit.exportState(obj) — structured data for app:state CLI
+    rt.setupBridge('__yoloit_export_state', (args) {
+      if (_disposed) return;
+      try {
+        _exportedState =
+            args is Map
+                ? Map<String, dynamic>.from(args)
+                : Map<String, dynamic>.from(_parseArgs(args));
+      } catch (_) {
+        _exportedState = null;
+      }
     });
 
     // console.log
@@ -528,6 +594,9 @@ var yoloit = {
   },
 
   panel:{setTitle:function(t){sendMessage('__yoloit_set_title', JSON.stringify(t));}},
+
+  // Structured state for CLI (yoloit app:state)
+  exportState:function(obj){sendMessage('__yoloit_export_state', JSON.stringify(obj||{}));},
 
   // Event handler registration — called from IIFE widgets:
   //   yoloit.onEvent(function handleEvent(actionId, payload) { ... });

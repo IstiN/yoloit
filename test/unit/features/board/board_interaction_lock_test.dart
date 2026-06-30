@@ -102,5 +102,43 @@ void main() {
         CanvasInteractionLock.instance.endCanvasGesture();
       },
     );
+
+    testWidgets(
+      'releases lock after pan-zoom ends outside the scrollable region',
+      (tester) async {
+        await tester.pumpWidget(
+          const MaterialApp(
+            home: Scaffold(
+              body: SizedBox(
+                width: 200,
+                height: 120,
+                child: ScrollableCardRegion(
+                  child: ColoredBox(color: Colors.red),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        final center = tester.getCenter(find.byType(ScrollableCardRegion));
+        await tester.sendEventToBinding(
+          PointerPanZoomStartEvent(pointer: 1, position: center),
+        );
+        await tester.pump();
+        expect(CanvasInteractionLock.instance.activeCount.value, 1);
+
+        await tester.sendEventToBinding(
+          PointerPanZoomEndEvent(
+            pointer: 1,
+            position: center + const Offset(400, 400),
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 120));
+
+        expect(CanvasInteractionLock.instance.activeCount.value, 0);
+      },
+    );
   });
 }

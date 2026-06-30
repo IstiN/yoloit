@@ -197,11 +197,18 @@ final List<YoloitCliTool> boardTools = <YoloitCliTool>[
   YoloitCliTool(
     command: 'board:apply',
     alias: 'bap',
-    description: 'Apply YAML bulk operations',
+    description:
+        'Apply YAML bulk operations to a board (create/move/rename panels). '
+        'Pass inline `yaml` string or a `file` path.',
     group: 'board',
     params: <YoloitCliToolParam>[
       boardParam('id_or_name'),
-      toolParam('file', "YAML file path or '-' for stdin"),
+      toolParam(
+        'yaml',
+        'Inline YAML operations (preferred for LLM). Written to a temp file server-side.',
+        required: false,
+      ),
+      toolParam('file', "YAML file path or '-' for stdin", required: false),
     ],
   ),
 
@@ -497,8 +504,8 @@ final List<YoloitCliTool> boardTools = <YoloitCliTool>[
     command: 'draw:svg',
     alias: 'drsvg',
     description:
-        'Draw an SVG path on a board using SVG path data (M, L, C, Q, Z commands). '
-        'Useful for complex shapes, icons, or agent-generated diagrams.',
+        'Draw SVG path data on the board canvas as a free-floating drawing (M/L/C/Q/Z). '
+        'NOT for images inside board.ui cards — use ui:render with {"type":"svg",...} instead.',
     group: 'board',
     params: <YoloitCliToolParam>[
       toolParam('board', 'Board id or name', required: true, shortKey: 'b'),

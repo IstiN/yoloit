@@ -66,6 +66,11 @@
       type:'padding',padding:[12,12,12,12],
       child:{type:'column',crossAxisAlignment:'stretch',children:[display].concat(rows)},
     });
+    yoloit.exportState({
+      expression: expr,
+      preview: _preview(),
+      display: _preview() || '0',
+    });
   }
 
   function _preview() {

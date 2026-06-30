@@ -117,8 +117,22 @@ YoloitCliToolParam boardParam([String key = 'board']) {
 YoloitCliToolParam panelParam([String key = 'panel']) {
   return toolParam(
     key,
-    'Panel id or title. Defaults to the current chat panel.',
+    'Panel id or title. Defaults to current panel. '
+    'For note/checklist/kanban/ui tools, omit to auto-resolve by panel type (not chat).',
     required: true,
+    aliases: const <String>['panel_id', 'panel_title', 'id'],
+    runtimeDefault: YoloitCliRuntimeDefault.panel,
+    shortKey: 'p',
+  );
+}
+
+/// Panel selector for smart-parse CLI commands (`[board] [panel] <payload>`).
+/// Omit panel to let bash auto-resolve the only/first panel of that type.
+YoloitCliToolParam optionalPanelParam([String key = 'panel']) {
+  return toolParam(
+    key,
+    'Panel id or title. Omit to auto-resolve the only/first panel of this type.',
+    required: false,
     aliases: const <String>['panel_id', 'panel_title', 'id'],
     runtimeDefault: YoloitCliRuntimeDefault.panel,
     shortKey: 'p',
@@ -203,6 +217,7 @@ YoloitCliToolParam panelTypeParam() {
       'board.run_configs',
       'board.table',
       'board.chart',
+      'board.ui',
       'board.widget.custom',
     ],
     shortKey: 'tp',

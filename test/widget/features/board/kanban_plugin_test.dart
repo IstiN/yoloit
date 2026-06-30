@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:yoloit/core/theme/app_theme.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/kanban_plugin.dart';
@@ -36,6 +37,7 @@ void main() {
     late StateSetter refresh;
     await tester.pumpWidget(
       MaterialApp(
+        theme: AppThemePreset.neonPurple.theme,
         home: Scaffold(
           body: SizedBox(
             width: 640,
@@ -84,5 +86,78 @@ void main() {
     expect(card['title'], 'New title');
     expect(card['description'], 'Long card description');
     expect(card['columnIndex'], 1);
+  });
+
+  testWidgets('kanban card editor preview renders markdown description', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1200, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    var state = <String, dynamic>{
+      'columns': ['Todo'],
+      'cards': <Map<String, dynamic>>[
+        {
+          'id': 'card-1',
+          'title': 'Card',
+          'description': '',
+          'columnIndex': 0,
+        },
+      ],
+    };
+
+    BoardPanelInstance panelForState() => BoardPanelInstance(
+      id: 'kanban',
+      type: KanbanPlugin.kTypeId,
+      title: 'Kanban',
+      bounds: const BoardPanelBounds(x: 0, y: 0, width: 640, height: 420),
+      state: state,
+    );
+
+    late StateSetter refresh;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppThemePreset.neonPurple.theme,
+        home: Scaffold(
+          body: SizedBox(
+            width: 640,
+            height: 420,
+            child: StatefulBuilder(
+              builder: (context, setState) {
+                refresh = setState;
+                return plugin.buildContent(
+                  context,
+                  panelForState(),
+                  BoardPanelRenderContext(
+                    isSelected: true,
+                    onFocus: () {},
+                    onDelete: () {},
+                    onUpdateState: (nextState) {
+                      state = nextState;
+                      refresh(() {});
+                    },
+                    onShowEditor: () {},
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Card'));
+    await tester.pumpAndSettle();
+
+    final fields = find.byType(TextField);
+    await tester.enterText(fields.at(1), '**Preview me**');
+    await tester.tap(find.text('Preview'));
+    await tester.pumpAndSettle();
+
+    expect(fields, findsOneWidget);
+    expect(find.text('**Preview me**'), findsNothing);
+    expect(find.textContaining('Preview me'), findsWidgets);
   });
 }

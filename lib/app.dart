@@ -16,11 +16,15 @@ import 'package:yoloit/core/cli/handlers/kanban_handler.dart';
 import 'package:yoloit/core/cli/handlers/note_handler.dart';
 import 'package:yoloit/core/cli/handlers/playlist_handler.dart';
 import 'package:yoloit/core/cli/handlers/run_configs_handler.dart';
+import 'package:yoloit/core/cli/handlers/run_panel_handler.dart';
+import 'package:yoloit/core/cli/handlers/diff_preview_handler.dart';
+import 'package:yoloit/core/cli/handlers/setup_guide_handler.dart';
 import 'package:yoloit/core/cli/handlers/shape_handler.dart';
 import 'package:yoloit/core/cli/handlers/sticky_note_handler.dart';
 import 'package:yoloit/core/cli/handlers/table_handler.dart';
 import 'package:yoloit/core/cli/handlers/terminal_handler.dart';
 import 'package:yoloit/core/cli/handlers/timer_handler.dart';
+import 'package:yoloit/core/cli/handlers/ui_handler.dart';
 import 'package:yoloit/core/cli/handlers/webpage_handler.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/theme/theme_manager.dart';
@@ -730,9 +734,9 @@ class _AutoHostShellState extends State<_AutoHostShell> {
     server.registerPanelHandler(const FilesCliHandler());
     server.registerPanelHandler(const FilePreviewCliHandler());
     server.registerPanelHandler(const RunConfigsCliHandler());
-    server.registerPanelHandler(
-      const RunConfigsCliHandler(panelTypeId: 'board.run'),
-    );
+    server.registerPanelHandler(const RunPanelCliHandler());
+    server.registerPanelHandler(const DiffPreviewCliHandler());
+    server.registerPanelHandler(const SetupGuideCliHandler());
     server.registerPanelHandler(const TerminalCliHandler());
     server.registerPanelHandler(const FileTreeCliHandler());
     server.registerPanelHandler(const AssistantCliHandler());
@@ -741,6 +745,7 @@ class _AutoHostShellState extends State<_AutoHostShell> {
     server.registerPanelHandler(const TableCliHandler());
     server.registerPanelHandler(const ChartCliHandler());
     server.registerPanelHandler(const CustomWidgetCliHandler());
+    server.registerPanelHandler(const UiViewCliHandler());
     server.start(cubit, terminalCubit: terminalCubit);
     // Wire service managers to BoardCubit for headless state updates
     TimerManager.instance.setCubit(cubit);

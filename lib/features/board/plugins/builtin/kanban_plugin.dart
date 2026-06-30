@@ -11,6 +11,7 @@ import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/terminal/data/smart_clipboard_paste_service.dart';
 import 'package:yoloit/ui/components/dialog/editor_dialog_actions.dart';
+import 'package:yoloit/ui/components/editor/markdown_editor_pane.dart';
 
 
 final _kanbanDefaultColors = AppColorScheme.fromAccent(Colors.indigo);
@@ -1155,6 +1156,13 @@ class _KanbanCardEditorDialogState extends State<_KanbanCardEditorDialog> {
     _descriptionFocusNode = FocusNode();
     _columnIndex = _readColumnIndex(widget.card);
     _color = _readColor(widget.card['color']);
+    if (_titleCtrl.text.trim().isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _descriptionFocusNode.requestFocus();
+        }
+      });
+    }
   }
 
   @override
@@ -1234,127 +1242,163 @@ class _KanbanCardEditorDialogState extends State<_KanbanCardEditorDialog> {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final textColor = Theme.of(context).colorScheme.onSurface;
+    final size = MediaQuery.sizeOf(context);
+    final dialogWidth = (size.width - 96).clamp(640.0, 920.0);
+    final dialogHeight = (size.height - 96).clamp(520.0, 820.0);
+
     return Dialog(
       backgroundColor: colors.surface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 420),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: SizedBox(
+        width: dialogWidth,
+        height: dialogHeight,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 8, 12),
+              child: Row(
                 children: [
                   Icon(
                     Icons.view_kanban_outlined,
-                    size: 18,
+                    size: 20,
                     color: colors.primary,
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       'Edit kanban card',
                       style: TextStyle(
                         color: textColor,
-                        fontSize: 15,
+                        fontSize: 18,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
                   IconButton(
                     tooltip: 'Close',
-                    icon: const Icon(Icons.close, size: 18),
+                    icon: const Icon(Icons.close, size: 20),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _titleCtrl,
-                autofocus: true,
-                decoration: const InputDecoration(
-                  labelText: 'Title',
-                  isDense: true,
-                  border: OutlineInputBorder(),
-                ),
-                onSubmitted: (_) => _save(),
-              ),
-              const SizedBox(height: 10),
-              Focus(
-                onKeyEvent: (node, event) {
-                  if (event is! KeyDownEvent) {
-                    return KeyEventResult.ignored;
-                  }
-                  final isPaste =
-                      event.logicalKey == LogicalKeyboardKey.keyV &&
-                      (HardwareKeyboard.instance.isMetaPressed ||
-                          HardwareKeyboard.instance.isControlPressed);
-                  if (isPaste) {
-                    _handleDescriptionPaste();
-                    return KeyEventResult.handled;
-                  }
-                  return KeyEventResult.ignored;
-                },
-                child: TextField(
-                  controller: _descriptionCtrl,
-                  focusNode: _descriptionFocusNode,
-                  minLines: 3,
-                  maxLines: 5,
-                  decoration: const InputDecoration(
-                    labelText: 'Description',
-                    isDense: true,
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
-              if (widget.columns.isNotEmpty)
-                DropdownButtonFormField<int>(
-                  initialValue: _columnIndex,
-                  decoration: const InputDecoration(
-                    labelText: 'Column',
-                    isDense: true,
-                    border: OutlineInputBorder(),
-                  ),
-                  items: [
-                    for (var i = 0; i < widget.columns.length; i++)
-                      DropdownMenuItem<int>(
-                        value: i,
-                        child: Text(widget.columns[i]),
+            ),
+            Divider(height: 1, color: colors.divider),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TextField(
+                      controller: _titleCtrl,
+                      autofocus: _titleCtrl.text.trim().isEmpty,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
                       ),
-                  ],
-                  onChanged:
-                      (value) =>
-                          setState(() => _columnIndex = value ?? _columnIndex),
-                ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _ColorChoice(
-                    label: 'None',
-                    selected: _color == null,
-                    color: colors.surfaceElevated,
-                    onTap: () => setState(() => _color = null),
-                  ),
-                  for (final color in widget.palette)
-                    _ColorChoice(
-                      color: color,
-                      selected: _color?.toARGB32() == color.toARGB32(),
-                      onTap: () => setState(() => _color = color),
+                      decoration: const InputDecoration(
+                        labelText: 'Title',
+                        border: OutlineInputBorder(),
+                      ),
+                      textInputAction: TextInputAction.next,
+                      onSubmitted:
+                          (_) => _descriptionFocusNode.requestFocus(),
                     ),
+                    const SizedBox(height: 14),
+                    Expanded(
+                      child: MarkdownEditorPane(
+                        controller: _descriptionCtrl,
+                        focusNode: _descriptionFocusNode,
+                        hintText:
+                            'Details, links, acceptance criteria… (Markdown)',
+                        onPaste: _handleDescriptionPaste,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Divider(height: 1, color: colors.divider),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (widget.columns.isNotEmpty) ...[
+                        Expanded(
+                          flex: 2,
+                          child: DropdownButtonFormField<int>(
+                            initialValue: _columnIndex,
+                            decoration: const InputDecoration(
+                              labelText: 'Column',
+                              border: OutlineInputBorder(),
+                            ),
+                            items: [
+                              for (var i = 0; i < widget.columns.length; i++)
+                                DropdownMenuItem<int>(
+                                  value: i,
+                                  child: Text(widget.columns[i]),
+                                ),
+                            ],
+                            onChanged:
+                                (value) => setState(
+                                  () => _columnIndex = value ?? _columnIndex,
+                                ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                      ],
+                      Expanded(
+                        flex: 3,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Label color',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: colors.textSecondary,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                _ColorChoice(
+                                  label: 'None',
+                                  selected: _color == null,
+                                  color: colors.surfaceElevated,
+                                  onTap: () => setState(() => _color = null),
+                                ),
+                                for (final color in widget.palette)
+                                  _ColorChoice(
+                                    color: color,
+                                    selected:
+                                        _color?.toARGB32() == color.toARGB32(),
+                                    onTap: () => setState(() => _color = color),
+                                  ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  EditorDialogActions(
+                    onApply: _save,
+                    applyLabel: 'Save',
+                  ),
                 ],
               ),
-              const SizedBox(height: 16),
-              EditorDialogActions(
-                onApply: _save,
-                applyLabel: 'Save',
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

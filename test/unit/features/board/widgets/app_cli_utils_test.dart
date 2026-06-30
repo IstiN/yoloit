@@ -1,0 +1,48 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:yoloit/features/board/widgets/app_cli_utils.dart';
+import 'package:yoloit/features/board/widgets/widget_manifest.dart';
+
+void main() {
+  test('extractTextLines collects text and label nodes', () {
+    final lines = AppCliUtils.extractTextLines({
+      'type': 'column',
+      'children': [
+        {'type': 'text', 'data': '22°C'},
+        {'type': 'textButton', 'text': 'Go'},
+        {
+          'type': 'padding',
+          'child': {'type': 'text', 'data': 'Moscow'},
+        },
+      ],
+    });
+
+    expect(lines, containsAll(['22°C', 'Go', 'Moscow']));
+  });
+
+  test('buildHelp merges manifest cli metadata', () {
+    final help = AppCliUtils.buildHelp(
+      manifest: const WidgetManifest(
+        id: 'weather',
+        name: 'Weather',
+        description: 'Weather app',
+        version: '1.0.0',
+        icon: '🌤️',
+        allowedCommands: [],
+        networkEnabled: true,
+        widgetPath: '/tmp/weather',
+        isSingleFile: false,
+        cli: {
+          'summary': 'City weather',
+          'examples': ['yoloit app:state weather'],
+        },
+      ),
+      running: true,
+    );
+
+    expect(help['id'], 'weather');
+    expect(help['running'], true);
+    expect(help['summary'], 'City weather');
+    expect(help['globalCommands'], isNotEmpty);
+    expect(help['examples'], ['yoloit app:state weather']);
+  });
+}

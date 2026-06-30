@@ -588,6 +588,7 @@ class LocalLlmProvider extends ChatProvider {
         name,
         normalizedArgs,
         runtimeContext: runtimeContext,
+        argumentsPreNormalized: true,
       );
       final success = _toolResultSucceeded(result);
       controller.add(

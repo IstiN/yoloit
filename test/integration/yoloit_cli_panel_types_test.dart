@@ -1,4 +1,4 @@
-// covers: panel:types, panel:color, panel:help, template:list, template:sync, board:delete, board:undo, group:rename, group:color, group:collapse, group:expand, group:move, group:add, group:remove, group:delete, link:delete, link:color, link:style, table:remove-row, table:add-column, table:remove-column, table:clear, note:get, code:set, calendar:create, calendar:add-event, calendar:events, calendar:delete-event, chart:create, chart:set-data, chart:set-type, files:list, shape:create, sticky:create, checklist:new, checklist:add, checklist:items, checklist:check, kanban:add-column, kanban:add-card, kanban:cards, filetree:create, filetree:list
+// covers: panel:types, panel:color, panel:help, template:list, template:sync, board:delete, board:undo, group:rename, group:color, group:collapse, group:expand, group:move, group:add, group:remove, group:delete, link:delete, link:color, link:style, table:remove-row, table:add-column, table:remove-column, table:clear, note:get, code:set, calendar:create, calendar:add-event, calendar:events, calendar:delete-event, chart:create, chart:set-data, chart:set-type, files:list, shape:create, sticky:create, checklist:new, checklist:add, checklist:items, checklist:check, kanban:add-column, kanban:add-card, kanban:cards, filetree:create, filetree:list, ui:create, ui:render, ui:get
 
 import 'dart:io';
 
@@ -448,6 +448,35 @@ void main() {
       final content = panel['content'] as Map<String, dynamic>;
       expect(content['type'], 'bar');
       expect((content['data'] as List<dynamic>), hasLength(2));
+    });
+
+    test('ui view panel', () async {
+      await cli.json(['board:create', 'UI Board']);
+      final created = await cli.json(['ui:create', 'UI Board', 'Dashboard']);
+      expect(created['ok'], isTrue);
+      final panel = created['panel'] as Map<String, dynamic>;
+      expect(panel['type'], 'board.ui');
+      expect(panel['title'], 'Dashboard');
+
+      const tree =
+          '{"type":"column","children":[{"type":"text","data":"Hello UI"}]}';
+      final rendered = await cli.json([
+        'ui:render',
+        'UI Board',
+        'Dashboard',
+        tree,
+      ]);
+      expect(rendered['ok'], isTrue);
+
+      final got = await cli.json(['ui:get', 'UI Board', 'Dashboard']);
+      expect(got['ok'], isTrue);
+      final data = got['data'] as Map<String, dynamic>;
+      final gotTree = data['tree'] as Map<String, dynamic>;
+      expect(gotTree['type'], 'column');
+      final children = gotTree['children'] as List<dynamic>;
+      expect((children.first as Map<String, dynamic>)['data'], 'Hello UI');
+      final textLines = data['text'] as List<dynamic>;
+      expect(textLines, contains('Hello UI'));
     });
 
     test('files and filetree', () async {

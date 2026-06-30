@@ -20,6 +20,7 @@ class UnifiedPanelHeader extends StatelessWidget {
     required this.onEditColor,
     required this.onBringToFront,
     required this.onSendToBack,
+    this.onEdit,
     this.onFullscreen,
     required this.onSettings,
     required this.onDelete,
@@ -36,6 +37,7 @@ class UnifiedPanelHeader extends StatelessWidget {
   final VoidCallback onEditColor;
   final VoidCallback onBringToFront;
   final VoidCallback onSendToBack;
+  final VoidCallback? onEdit;
   final VoidCallback? onFullscreen;
   final VoidCallback onSettings;
   final VoidCallback onDelete;
@@ -96,6 +98,12 @@ class UnifiedPanelHeader extends StatelessWidget {
             onPressed: onEditColor,
             swatch: accent == Colors.transparent ? null : accent,
           ),
+          if (onEdit != null)
+            HeaderIconButton(
+              icon: Icons.edit_outlined,
+              tooltip: 'Edit content',
+              onPressed: onEdit!,
+            ),
           ...pluginActions,
           PanelOverflowMenu(
             onToggleLocked: onToggleLocked,

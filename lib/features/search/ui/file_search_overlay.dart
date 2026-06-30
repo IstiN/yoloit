@@ -16,6 +16,7 @@ import 'package:yoloit/features/editor/bloc/file_editor_cubit.dart';
 import 'package:yoloit/features/review/bloc/review_cubit.dart';
 import 'package:yoloit/features/search/data/file_search_service.dart';
 import 'package:yoloit/features/search/utils/fuzzy_matcher.dart';
+import 'package:yoloit/features/search/utils/quick_open_search.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_cubit.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_state.dart';
 import 'package:yoloit/ui/components/typography/caption.dart';
@@ -59,7 +60,7 @@ Future<void> showFileSearch(
 
 // ─── Quick-open result types ─────────────────────────────────────────────────
 
-enum _QuickResultKind { panel, file }
+enum _QuickResultKind { board, panel, file }
 
 class _QuickResult {
   const _QuickResult({
@@ -183,7 +184,28 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
     // 0. If the query looks like an existing file path, surface it first.
     await _tryAddPathResult(rawQuery, results, appColors);
 
-    // 1. Search panels across all boards by title and shallow state content.
+    final boardState = context.read<BoardCubit>().state;
+
+    // 1. Search boards by name (quick board switch).
+    for (final board in matchBoardsForQuickOpen(boardState.boards, rawQuery)) {
+      final panelCount = board.panels.where((panel) => !panel.hidden).length;
+      results.add(
+        _QuickResult(
+          kind: _QuickResultKind.board,
+          title: board.name,
+          subtitle:
+              panelCount == 0
+                  ? 'Board'
+                  : '$panelCount panel${panelCount == 1 ? '' : 's'}',
+          icon: Icons.space_dashboard_outlined,
+          iconColor: appColors.primary,
+          boardId: board.id,
+          boardName: board.name,
+        ),
+      );
+    }
+
+    // 2. Search panels across all boards by title and shallow state content.
     for (final entry in _panels) {
       final board = entry.board;
       final panel = entry.panel;
@@ -218,7 +240,7 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
       }
     }
 
-    // 2. Search files inside file-tree directories
+    // 3. Search files inside file-tree directories
     for (final root in _fileTreeRoots) {
       if (generation != _searchGeneration) return;
       final dir = Directory(root);
@@ -233,7 +255,7 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
       );
     }
 
-    // 3. Also search workspace files via existing service
+    // 4. Also search workspace files via existing service
     if (wsState is WorkspaceLoaded) {
       if (generation != _searchGeneration) return;
       final active =
@@ -271,6 +293,9 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
     }
 
     if (!mounted || generation != _searchGeneration) return;
+    results.sort(
+      (a, b) => _kindRank(a.kind).compareTo(_kindRank(b.kind)),
+    );
     setState(() {
       _results = results;
       _loading = false;
@@ -413,7 +438,9 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
     final result = _results[_selectedIndex];
     Navigator.of(context).pop();
 
-    if (result.kind == _QuickResultKind.panel && result.panelId != null) {
+    if (result.kind == _QuickResultKind.board && result.boardId != null) {
+      await context.read<BoardCubit>().setActiveBoard(result.boardId!);
+    } else if (result.kind == _QuickResultKind.panel && result.panelId != null) {
       final boardCubit = context.read<BoardCubit>();
       if (result.boardId != null) {
         await boardCubit.setActiveBoard(result.boardId!);
@@ -664,8 +691,18 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
     );
   }
 
+  static int _kindRank(_QuickResultKind kind) {
+    return switch (kind) {
+      _QuickResultKind.board => 0,
+      _QuickResultKind.panel => 1,
+      _QuickResultKind.file => 2,
+    };
+  }
+
   Widget _buildFooter() {
     final colors = context.appColors;
+    final boardCount =
+        _results.where((r) => r.kind == _QuickResultKind.board).length;
     final panelCount =
         _results.where((r) => r.kind == _QuickResultKind.panel).length;
     final fileCount =
@@ -678,9 +715,13 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
       ),
       child: Row(
         children: [
+          if (boardCount > 0)
+            Caption('$boardCount board${boardCount > 1 ? 's' : ''}'),
+          if (boardCount > 0 && panelCount > 0)
+            const Caption(' · '),
           if (panelCount > 0)
             Caption('$panelCount panel${panelCount > 1 ? 's' : ''}',),
-          if (panelCount > 0 && fileCount > 0)
+          if ((boardCount > 0 || panelCount > 0) && fileCount > 0)
             const Caption(' · '),
           if (fileCount > 0)
             Caption('$fileCount file${fileCount > 1 ? 's' : ''}',),
@@ -850,7 +891,23 @@ class _QuickResultTile extends StatelessWidget {
                 ],
               ),
             ),
-            if (result.kind == _QuickResultKind.panel)
+            if (result.kind == _QuickResultKind.board)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: result.iconColor.withAlpha(20),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  'BOARD',
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w600,
+                    color: result.iconColor,
+                  ),
+                ),
+              )
+            else if (result.kind == _QuickResultKind.panel)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(

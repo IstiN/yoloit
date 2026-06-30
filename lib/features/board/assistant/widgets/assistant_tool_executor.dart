@@ -36,6 +36,7 @@ class AssistantToolExecutor implements YoloitToolExecutor {
     String functionName,
     Map<String, Object?> arguments, {
     ChatRuntimeContext? runtimeContext,
+    bool argumentsPreNormalized = false,
   }) async {
     final tool = YoloitCliToolCatalog.byFunctionName(functionName);
     final toolCommand = tool?.command ?? functionName;
@@ -61,6 +62,7 @@ class AssistantToolExecutor implements YoloitToolExecutor {
       functionName,
       mutableArgs,
       runtimeContext: runtimeContext,
+      argumentsPreNormalized: argumentsPreNormalized,
     );
 
     final success = _toolResultSucceeded(result);

@@ -298,6 +298,13 @@ yoloitdPanelDescriptors = <RemotePanelTypeDescriptor>[
       'refresh',
     ],
   ),
+  RemotePanelTypeDescriptor(
+    type: 'board.ui',
+    displayName: 'UI View',
+    defaultWidth: 420,
+    defaultHeight: 320,
+    actions: <String>['get', 'render', 'set-state', 'set-scripts'],
+  ),
 ];
 
 final List<Map<String, dynamic>> yoloitdPanelTypes = yoloitdPanelDescriptors

@@ -508,6 +508,10 @@
     "reason": "Requires running Flutter app / widget runtime (hot reload, install, dev mode); not available in headless yoloitd"
   },
   {
+    "command": "ui:edit",
+    "reason": "Focuses panel in desktop UI; JSON editing is manual via panel header editor"
+  },
+  {
     "command": "app:execute",
     "reason": "Requires running Flutter app / widget runtime (hot reload, install, dev mode); not available in headless yoloitd"
   },
@@ -522,6 +526,14 @@
   {
     "command": "app:snapshot",
     "reason": "Requires running Flutter app / widget runtime (hot reload, install, dev mode); not available in headless yoloitd"
+  },
+  {
+    "command": "app:help",
+    "reason": "Reads installed app manifests from desktop app registry; not available in headless yoloitd"
+  },
+  {
+    "command": "app:state",
+    "reason": "Requires running Flutter app / widget runtime; not available in headless yoloitd"
   },
   {
     "command": "app:screenshot",
@@ -566,5 +578,57 @@
   {
     "command": "draw:file",
     "reason": "Drawing UI operations are local-app only"
+  },
+  {
+    "command": "run:set-group",
+    "reason": "Panel state action; covered by test/unit/core/cli/handlers/run_panel_handler_test.dart"
+  },
+  {
+    "command": "run:select-session",
+    "reason": "Panel state action; covered by test/unit/core/cli/handlers/run_panel_handler_test.dart"
+  },
+  {
+    "command": "run:clear-session",
+    "reason": "Panel state action; covered by test/unit/core/cli/handlers/run_panel_handler_test.dart"
+  },
+  {
+    "command": "diff:open",
+    "reason": "Panel state action; covered by test/unit/core/cli/handlers/diff_preview_handler_test.dart"
+  },
+  {
+    "command": "diff:set-root",
+    "reason": "Panel state action; covered by test/unit/core/cli/handlers/diff_preview_handler_test.dart"
+  },
+  {
+    "command": "setup:select",
+    "reason": "Panel state action; covered by test/unit/core/cli/handlers/setup_guide_handler_test.dart"
+  },
+  {
+    "command": "setup:unselect",
+    "reason": "Panel state action; covered by test/unit/core/cli/handlers/setup_guide_handler_test.dart"
+  },
+  {
+    "command": "panel-files:list",
+    "reason": "Panel state action; covered by test/core/cli/handlers/panel_handlers_test.dart"
+  },
+  {
+    "command": "panel-files:add",
+    "reason": "Panel state action; covered by test/core/cli/handlers/panel_handlers_test.dart"
+  },
+  {
+    "command": "panel-files:remove",
+    "reason": "Panel state action; covered by test/core/cli/handlers/panel_handlers_test.dart"
+  },
+  {
+    "command": "calendar:update-event",
+    "reason": "Calendar handler action; covered by test/unit/core/cli/handlers/calendar_handler_test.dart"
+  },
+  {
+    "command": "chart:get",
+    "reason": "Chart handler get action; covered by test/unit/core/cli/handlers/chart_handler_test.dart"
+  },
+  {
+    "command": "terminal:set-session",
+    "reason": "Terminal panel state action; covered by test/core/cli/handlers/panel_handlers_test.dart"
   }
 ]

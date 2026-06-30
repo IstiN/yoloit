@@ -18,6 +18,7 @@ class WidgetManifest {
     required this.widgetPath,
     required this.isSingleFile,
     this.files,
+    this.cli,
   });
 
   /// Unique identifier (directory name or file stem).
@@ -49,6 +50,9 @@ class WidgetManifest {
   /// Explicit ordered list of JS files to concatenate (relative to widgetPath).
   /// When null or empty, falls back to reading widget.js.
   final List<String>? files;
+
+  /// Optional CLI help for agents: events, examples, read-state hints.
+  final Map<String, dynamic>? cli;
 
   /// Absolute path to the main widget.js entry point.
   String get mainJsPath =>
@@ -136,6 +140,7 @@ class WidgetManifest {
       try {
         final raw = jsonDecode(await manifestFile.readAsString()) as Map<String, dynamic>;
         final filesList = raw['files'] as List?;
+        final cliRaw = raw['cli'];
         return WidgetManifest(
           id: (raw['id'] as String? ?? id).trim(),
           name: (raw['name'] as String? ?? id),
@@ -147,6 +152,10 @@ class WidgetManifest {
           widgetPath: dir.path,
           isSingleFile: false,
           files: filesList != null ? List<String>.from(filesList) : null,
+          cli:
+              cliRaw is Map
+                  ? Map<String, dynamic>.from(cliRaw)
+                  : null,
         );
       } catch (_) {}
     }
@@ -195,6 +204,7 @@ class WidgetManifest {
     'widgetPath': widgetPath,
     'isSingleFile': isSingleFile,
     if (files != null) 'files': files,
+    if (cli != null) 'cli': cli,
   };
 
   static String _titleCase(String s) =>

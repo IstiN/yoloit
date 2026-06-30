@@ -167,7 +167,11 @@ void main() {
           ],
         },
       );
-      final r = await h.handleAction('rename', {'index': 0, 'text': 'New'}, p);
+      final r = await h.handleAction(
+        'rename',
+        {'index': 0, 'newText': 'New'},
+        p,
+      );
       expect((r.stateUpdate!['items'] as List)[0]['text'], 'New');
     });
   });
@@ -210,10 +214,31 @@ void main() {
       expect(r.stateUpdate!['selectedPath'], '/home');
     });
 
-    test('get returns path', () async {
-      final p = _panel('board.files', state: {'selectedPath': '/docs'});
+    test('get returns path and files', () async {
+      final p = _panel('board.files', state: {
+        'selectedPath': '/docs',
+        'files': [
+          {'id': '1', 'path': '/docs/a.txt', 'name': 'a.txt'},
+        ],
+      });
       final r = await h.handleAction('get', {}, p);
       expect(r.data!['selectedPath'], '/docs');
+      expect((r.data!['files'] as List).length, 1);
+    });
+
+    test('add and remove file entries', () async {
+      final add = await h.handleAction('add', {
+        'path': '/tmp/demo.pdf',
+      }, _panel('board.files'));
+      expect(add.ok, isTrue);
+      final files = add.stateUpdate!['files'] as List;
+      expect(files.length, 1);
+
+      final remove = await h.handleAction('remove', {
+        'path': '/tmp/demo.pdf',
+      }, _panel('board.files', state: {'files': files}));
+      expect(remove.ok, isTrue);
+      expect((remove.stateUpdate!['files'] as List), isEmpty);
     });
   });
 

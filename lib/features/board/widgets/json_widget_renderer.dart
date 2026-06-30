@@ -1,8 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/utils/input_decoration_utils.dart';
+import 'package:yoloit/features/board/plugins/builtin/ui_view_field_registry.dart';
 
 final _jsonWidgetDefaultColors = AppColorScheme.fromAccent(Colors.deepPurple);
 
@@ -10,10 +13,12 @@ final _jsonWidgetDefaultColors = AppColorScheme.fromAccent(Colors.deepPurple);
 ///
 /// Supported node types:
 /// Layout:   column, row, stack, center, padding, sizedBox, expanded, flexible, wrap, align
-/// Display:  text, icon, divider, spacer, image, circularProgressIndicator
-/// Container: container, card, inkWell, safeArea
-/// List:     listView, gridView
-/// Input:    button (ElevatedButton), textButton, outlinedButton, iconButton
+/// Display:  text, icon, markdown, divider, spacer, image, svg, avatar, chip, badge,
+///           linearProgressIndicator, circularProgressIndicator
+/// Container: container, card, inkWell, safeArea, scroll
+/// List:     listView, gridView, listTile
+/// Input:    button, textButton, outlinedButton, iconButton, textField,
+///           switch, checkbox, slider, dropdown
 ///
 /// Node shape:
 /// ```json
@@ -25,10 +30,14 @@ final _jsonWidgetDefaultColors = AppColorScheme.fromAccent(Colors.deepPurple);
 /// }
 /// ```
 class JsonWidgetRenderer {
-  const JsonWidgetRenderer({required this.onEvent});
+  const JsonWidgetRenderer({
+    required this.onEvent,
+    this.fieldRegistry,
+  });
 
   /// Called when a user-triggered event fires (e.g. button tap).
   final void Function(String actionId, Map<String, dynamic> payload) onEvent;
+  final UiViewFieldRegistry? fieldRegistry;
 
   Widget build(Map<String, dynamic>? tree, [BuildContext? ctx]) {
     if (tree == null) return const SizedBox.shrink();
@@ -63,16 +72,28 @@ class JsonWidgetRenderer {
       'icon' => _icon(m),
       'divider' => _divider(m),
       'circularProgressIndicator' => _spinner(m),
+      'linearProgressIndicator' => _linearProgress(m),
       'container' => _container(m),
       'card' => _card(m),
       'inkWell' => _inkWell(m),
+      'scroll' => _scroll(m),
       'listView' => _listView(m),
       'gridView' => _gridView(m),
+      'listTile' => _listTile(m),
+      'markdown' => _markdown(m),
+      'circleAvatar' => _circleAvatar(m),
+      'chip' => _chip(m),
+      'badge' => _badge(m),
+      'switch' => _switchNode(m),
+      'checkbox' => _checkboxNode(m),
+      'slider' => _sliderNode(m),
+      'dropdown' => _dropdown(m),
       'button' => _elevatedButton(m),
       'textButton' => _textButton(m),
       'outlinedButton' => _outlinedButton(m),
       'iconButton' => _iconButton(m),
       'image' => _image(m),
+      'svg' => _svg(m),
       'aspectRatio' => _aspectRatio(m),
       'opacity' => Opacity(
         opacity: _double(m['opacity'], 1.0),
@@ -90,7 +111,7 @@ class JsonWidgetRenderer {
       // Gesture input
       'gestureDetector' => _gestureDetector(m),
 
-      _ => const SizedBox.shrink(),
+      _ => _unknownType(m),
     };
   }
 
@@ -197,6 +218,203 @@ class JsonWidgetRenderer {
     ),
   );
 
+  Widget _linearProgress(Map<String, dynamic> m) => LinearProgressIndicator(
+    value: _doubleOrNull(m['value']),
+    minHeight: _double(m['height'], 4),
+    color: _color(m['color'] as String?),
+    backgroundColor: _color(m['backgroundColor'] as String?),
+  );
+
+  Widget _scroll(Map<String, dynamic> m) => SingleChildScrollView(
+    padding: _edgeInsetsOrNull(m['padding']),
+    reverse: m['reverse'] as bool? ?? false,
+    child: _child(m) ?? Column(children: _children(m)),
+  );
+
+  Widget _listTile(Map<String, dynamic> m) {
+    final title = (m['title'] ?? m['data'] ?? m['label'] ?? '').toString();
+    final subtitle = m['subtitle'] as String?;
+    final leading = _childFromKey(m, 'leading');
+    final trailing = _childFromKey(m, 'trailing');
+    return ListTile(
+      dense: m['dense'] as bool? ?? false,
+      enabled: m['enabled'] as bool? ?? true,
+      title: Text(title),
+      subtitle: subtitle == null ? null : Text(subtitle),
+      leading: leading,
+      trailing: trailing,
+      onTap: _tapHandler(m['onTap'] ?? m['onPress'], m['payload']),
+    );
+  }
+
+  Widget? _childFromKey(Map<String, dynamic> m, String key) {
+    final raw = m[key];
+    if (raw is Map) return _build(raw);
+    if (raw is String && raw.isNotEmpty) {
+      return Icon(_iconData(raw), size: 20);
+    }
+    return null;
+  }
+
+  Widget _markdown(Map<String, dynamic> m) {
+    final data = (m['data'] ?? m['text'] ?? m['markdown'] ?? '').toString();
+    if (data.trim().isEmpty) return const SizedBox.shrink();
+    return MarkdownBody(
+      data: data,
+      selectable: m['selectable'] as bool? ?? false,
+      shrinkWrap: true,
+    );
+  }
+
+  Widget _circleAvatar(Map<String, dynamic> m) {
+    final radius = _double(m['radius'], 20);
+    final bg = _color(m['backgroundColor'] as String? ?? m['color'] as String?);
+    final label = (m['data'] ?? m['label'] ?? m['text'] ?? '').toString();
+    final url = m['url'] as String? ?? m['image'] as String?;
+    if (url != null && url.isNotEmpty) {
+      return CircleAvatar(
+        radius: radius,
+        backgroundImage: NetworkImage(url),
+        backgroundColor: bg,
+      );
+    }
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: bg ?? _jsonWidgetDefaultColors.primary,
+      child: Text(
+        label.isEmpty ? '?' : label.characters.first.toUpperCase(),
+        style: TextStyle(
+          color: _color(m['foregroundColor'] as String? ?? 'white'),
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
+  Widget _chip(Map<String, dynamic> m) {
+    final label = (m['label'] ?? m['data'] ?? m['text'] ?? '').toString();
+    return ActionChip(
+      label: Text(label),
+      avatar:
+          m['icon'] is String
+              ? Icon(_iconData(m['icon'] as String), size: 16)
+              : null,
+      onPressed: _tapHandler(m['onTap'], m['payload']) ?? () {},
+    );
+  }
+
+  Widget _badge(Map<String, dynamic> m) {
+    final label = (m['label'] ?? m['data'] ?? m['text'] ?? '').toString();
+    final child = _child(m);
+    return Badge(
+      label: Text(label),
+      isLabelVisible: label.isNotEmpty,
+      backgroundColor: _color(m['backgroundColor'] as String?),
+      child: child ?? const Icon(Icons.notifications_none),
+    );
+  }
+
+  Widget _switchNode(Map<String, dynamic> m) {
+    final value = m['value'] as bool? ?? false;
+    return Switch(
+      value: value,
+      activeThumbColor: _color(m['color'] as String?),
+      onChanged: (next) {
+        final action = m['onChange'] ?? m['onChanged'] ?? m['onTap'];
+        if (action == null) return;
+        onEvent('$action', <String, dynamic>{'value': next});
+      },
+    );
+  }
+
+  Widget _checkboxNode(Map<String, dynamic> m) {
+    final value = m['value'] as bool? ?? false;
+    final label = m['label'] as String?;
+    final control = Checkbox(
+      value: value,
+      activeColor: _color(m['color'] as String?),
+      onChanged: (next) {
+        final action = m['onChange'] ?? m['onChanged'] ?? m['onTap'];
+        if (action == null || next == null) return;
+        onEvent('$action', <String, dynamic>{'value': next});
+      },
+    );
+    if (label == null) return control;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        control,
+        const SizedBox(width: 8),
+        Flexible(child: Text(label)),
+      ],
+    );
+  }
+
+  Widget _sliderNode(Map<String, dynamic> m) {
+    final value = _double(m['value'], 0);
+    final min = _double(m['min'], 0);
+    final max = _double(m['max'], 1);
+    return Slider(
+      value: value.clamp(min, max),
+      min: min,
+      max: max,
+      activeColor: _color(m['color'] as String?),
+      onChanged: (next) {
+        final action = m['onChange'] ?? m['onChanged'] ?? m['onTap'];
+        if (action == null) return;
+        onEvent('$action', <String, dynamic>{'value': next});
+      },
+    );
+  }
+
+  Widget _dropdown(Map<String, dynamic> m) {
+    final items = _dropdownItems(m);
+    if (items.isEmpty) return const SizedBox.shrink();
+    final value = (m['value'] ?? items.first.value)?.toString();
+    return DropdownButton<String>(
+      isExpanded: m['expanded'] as bool? ?? true,
+      value: items.any((item) => item.value == value) ? value : items.first.value,
+      items: items,
+      onChanged: (next) {
+        final action = m['onChange'] ?? m['onChanged'] ?? m['onTap'];
+        if (action == null || next == null) return;
+        onEvent('$action', <String, dynamic>{'value': next});
+      },
+    );
+  }
+
+  List<DropdownMenuItem<String>> _dropdownItems(Map<String, dynamic> m) {
+    final raw = m['items'] as List? ?? m['options'] as List? ?? const <dynamic>[];
+    return raw.map((item) {
+      if (item is String) {
+        return DropdownMenuItem<String>(value: item, child: Text(item));
+      }
+      if (item is Map) {
+        final map = item.cast<String, dynamic>();
+        final value = (map['value'] ?? map['id'] ?? map['label'] ?? '').toString();
+        final label = (map['label'] ?? map['text'] ?? value).toString();
+        return DropdownMenuItem<String>(value: value, child: Text(label));
+      }
+      return DropdownMenuItem<String>(value: '$item', child: Text('$item'));
+    }).toList();
+  }
+
+  Widget _unknownType(Map<String, dynamic> m) {
+    final type = m['type'] as String? ?? '?';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.orange.withValues(alpha: 0.6)),
+        borderRadius: BorderRadius.circular(6),
+        color: Colors.orange.withValues(alpha: 0.08),
+      ),
+      child: Text(
+        'Unknown type: $type',
+        style: const TextStyle(fontSize: 11, color: Colors.orange),
+      ),
+    );
+  }
+
   Widget _image(Map<String, dynamic> m) {
     final url = m['url'] as String? ?? m['src'] as String? ?? '';
     final w = _doubleOrNull(m['width']);
@@ -213,15 +431,64 @@ class JsonWidgetRenderer {
     );
   }
 
+  Widget _svg(Map<String, dynamic> m) {
+    final raw =
+        m['data'] as String? ??
+        m['svg'] as String? ??
+        m['path'] as String? ??
+        '';
+    final w = _doubleOrNull(m['width']) ?? _doubleOrNull(m['size']);
+    final h = _doubleOrNull(m['height']) ?? _doubleOrNull(m['size']);
+    final fit = _boxFit(m['fit'] as String?);
+    final tint = _color(m['color'] as String? ?? m['fill'] as String?);
+    if (raw.trim().isEmpty) {
+      return Icon(Icons.image_not_supported_outlined, size: w ?? 48);
+    }
+
+    final markup = _normalizeSvgMarkup(raw, m);
+    Widget picture = SvgPicture.string(
+      markup,
+      fit: fit,
+      width: w,
+      height: h,
+      colorFilter:
+          tint == null
+              ? null
+              : ColorFilter.mode(tint, BlendMode.srcIn),
+    );
+    if (w != null || h != null) {
+      picture = SizedBox(width: w, height: h, child: picture);
+    }
+    return picture;
+  }
+
+  String _normalizeSvgMarkup(String raw, Map<String, dynamic> m) {
+    final trimmed = raw.trim();
+    if (trimmed.startsWith('<')) return trimmed;
+
+    final fill =
+        m['fill'] as String? ??
+        m['color'] as String? ??
+        '#FF5733';
+    final viewBox = m['viewBox'] as String? ?? '0 0 100 100';
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="$viewBox">'
+        '<path d="$trimmed" fill="$fill"/></svg>';
+  }
+
   // ── Container & decoration ────────────────────────────────────────────────
 
   Decoration? _containerDecoration(Map<String, dynamic> m) {
     final deco = m['decoration'] as Map?;
-    return deco != null
-        ? _boxDecoration(deco.cast<String, dynamic>())
-        : (m['color'] != null
-            ? BoxDecoration(color: _color(m['color'] as String?))
-            : null);
+    if (deco != null) {
+      return _boxDecoration(deco.cast<String, dynamic>());
+    }
+    final bg =
+        m['backgroundColor'] as String? ??
+        m['color'] as String?;
+    if (bg != null) {
+      return BoxDecoration(color: _color(bg));
+    }
+    return null;
   }
 
   ({double? width, double? height, EdgeInsetsGeometry? padding, EdgeInsetsGeometry? margin, Alignment? alignment, Decoration? decoration, Widget? child}) _containerProps(Map<String, dynamic> m) => (
@@ -312,32 +579,102 @@ class JsonWidgetRenderer {
 
   Widget _elevatedButton(Map<String, dynamic> m) {
     final label = _buttonLabel(m);
-    final onTap = _tapHandler(m['onTap'], m['payload']);
-    final style = m['style'] as Map?;
-    final bg = _color(style?['backgroundColor'] as String?);
-    final fg = _color(style?['foregroundColor'] as String?);
+    final onTap = _tapHandler(_buttonActionId(m), m['payload']);
     return ElevatedButton(
       onPressed: onTap,
-      style:
-          bg != null || fg != null
-              ? ElevatedButton.styleFrom(
-                backgroundColor: bg,
-                foregroundColor: fg,
-              )
-              : null,
+      style: _materialButtonStyle(
+        m['style'] is Map
+            ? Map<String, dynamic>.from(
+              (m['style'] as Map).cast<String, dynamic>(),
+            )
+            : null,
+      ),
       child: label,
     );
   }
 
-  Widget _textButton(Map<String, dynamic> m) => TextButton(
-    onPressed: _tapHandler(m['onTap'], m['payload']),
-    child: _buttonLabel(m),
-  );
+  Widget _textButton(Map<String, dynamic> m) {
+    return TextButton(
+      onPressed: _tapHandler(_buttonActionId(m), m['payload']),
+      style: _materialButtonStyle(
+        m['style'] is Map
+            ? Map<String, dynamic>.from(
+              (m['style'] as Map).cast<String, dynamic>(),
+            )
+            : null,
+        textButton: true,
+      ),
+      child: _buttonLabel(m),
+    );
+  }
 
-  Widget _outlinedButton(Map<String, dynamic> m) => OutlinedButton(
-    onPressed: _tapHandler(m['onTap'], m['payload']),
-    child: _buttonLabel(m),
-  );
+  Widget _outlinedButton(Map<String, dynamic> m) {
+    final style =
+        m['style'] is Map
+            ? Map<String, dynamic>.from(
+              (m['style'] as Map).cast<String, dynamic>(),
+            )
+            : null;
+    final border = _color(style?['borderColor'] as String?);
+    final base = _materialButtonStyle(style, outlined: true);
+    return OutlinedButton(
+      onPressed: _tapHandler(_buttonActionId(m), m['payload']),
+      style:
+          border != null
+              ? (base ?? const ButtonStyle()).merge(
+                ButtonStyle(side: WidgetStatePropertyAll(BorderSide(color: border))),
+              )
+              : base,
+      child: _buttonLabel(m),
+    );
+  }
+
+  String _buttonActionId(Map<String, dynamic> m) {
+    final raw = m['onTap'] ?? m['action'] ?? m['actionId'];
+    if (raw == null) return '_tap';
+    final text = '$raw'.trim();
+    return text.isEmpty ? '_tap' : text;
+  }
+
+  ButtonStyle? _materialButtonStyle(
+    Map<String, dynamic>? style, {
+    bool textButton = false,
+    bool outlined = false,
+  }) {
+    if (style == null) return null;
+    final bg = _color(style['backgroundColor'] as String?);
+    final fg = _color(
+      style['foregroundColor'] as String? ?? style['color'] as String?,
+    );
+    if (bg == null && fg == null) return null;
+    if (textButton) {
+      return TextButton.styleFrom(foregroundColor: fg).merge(
+        ButtonStyle(
+          foregroundColor: fg != null ? WidgetStatePropertyAll(fg) : null,
+        ),
+      );
+    }
+    if (outlined) {
+      return OutlinedButton.styleFrom(
+        backgroundColor: bg,
+        foregroundColor: fg,
+      ).merge(
+        ButtonStyle(
+          backgroundColor: bg != null ? WidgetStatePropertyAll(bg) : null,
+          foregroundColor: fg != null ? WidgetStatePropertyAll(fg) : null,
+        ),
+      );
+    }
+    return ElevatedButton.styleFrom(
+      backgroundColor: bg,
+      foregroundColor: fg,
+    ).merge(
+      ButtonStyle(
+        backgroundColor: bg != null ? WidgetStatePropertyAll(bg) : null,
+        foregroundColor: fg != null ? WidgetStatePropertyAll(fg) : null,
+      ),
+    );
+  }
 
   Widget _iconButton(Map<String, dynamic> m) => IconButton(
     icon: Icon(_iconData(m['icon'] as String? ?? 'info')),
@@ -348,7 +685,11 @@ class JsonWidgetRenderer {
   );
 
   Widget _buttonLabel(Map<String, dynamic> m) {
-    final text = m['text'] as String? ?? m['label'] as String? ?? '';
+    final text =
+        m['text'] as String? ??
+        m['label'] as String? ??
+        m['data'] as String? ??
+        '';
     final icon = m['icon'] as String?;
     if (icon != null && text.isNotEmpty) {
       return Row(
@@ -467,8 +808,8 @@ class JsonWidgetRenderer {
   Color? _namedColor(String name) {
     return switch (name.toLowerCase()) {
       'transparent' => Colors.transparent,
-      'white' => _jsonWidgetDefaultColors.textPrimary,
-      'black' => _jsonWidgetDefaultColors.background,
+      'white' => Colors.white,
+      'black' => Colors.black,
       'red' => Colors.red,
       'green' => Colors.green,
       'blue' => Colors.blue,
@@ -657,10 +998,16 @@ class JsonWidgetRenderer {
   double? _doubleOrNull(dynamic v) => v == null ? null : (v as num).toDouble();
 
   Widget _textFieldNode(Map<String, dynamic> m) => _TextFieldNode(
-    initialValue: m['value'] as String? ?? '',
+    initialValue:
+        m['initialValue'] as String? ?? m['value'] as String? ?? '',
     hint: m['hint'] as String? ?? '',
+    storageKey:
+        m['storageKey'] as String? ??
+        m['id'] as String? ??
+        m['name'] as String?,
+    fieldRegistry: fieldRegistry,
     onSubmit: m['onSubmit'] as String?,
-    onChange: m['onChange'] as String?,
+    onChange: m['onChange'] as String? ?? m['onChanged'] as String?,
     style: _textStyle(m['style'] as Map?),
     obscure: m['obscure'] == true,
     onEvent: onEvent,
@@ -817,6 +1164,8 @@ class _TextFieldNode extends StatefulWidget {
   const _TextFieldNode({
     required this.initialValue,
     required this.hint,
+    required this.storageKey,
+    required this.fieldRegistry,
     required this.onSubmit,
     required this.onChange,
     required this.style,
@@ -826,6 +1175,8 @@ class _TextFieldNode extends StatefulWidget {
 
   final String initialValue;
   final String hint;
+  final String? storageKey;
+  final UiViewFieldRegistry? fieldRegistry;
   final String? onSubmit;
   final String? onChange;
   final TextStyle? style;
@@ -838,26 +1189,60 @@ class _TextFieldNode extends StatefulWidget {
 
 class _TextFieldNodeState extends State<_TextFieldNode> {
   late final TextEditingController _ctrl;
+  late final FocusNode _focusNode;
 
   @override
   void initState() {
     super.initState();
     _ctrl = TextEditingController(text: widget.initialValue);
+    _focusNode = FocusNode();
+    _registerField();
   }
 
   @override
   void didUpdateWidget(_TextFieldNode old) {
     super.didUpdateWidget(old);
-    // Only update controller if value changes externally and field is not focused
-    if (widget.initialValue != old.initialValue && !_ctrl.selection.isValid) {
+    if (widget.storageKey != old.storageKey) {
+      _unregisterField(old.storageKey);
+      _registerField();
+    }
+    if (widget.initialValue != old.initialValue &&
+        widget.initialValue != _ctrl.text &&
+        !_focusNode.hasFocus) {
       _ctrl.text = widget.initialValue;
     }
   }
 
+  void _registerField() {
+    final key = widget.storageKey;
+    final registry = widget.fieldRegistry;
+    if (key == null || key.isEmpty || registry == null) return;
+    registry.register(key, () => _ctrl.text);
+  }
+
+  void _unregisterField(String? key) {
+    final registry = widget.fieldRegistry;
+    if (key == null || key.isEmpty || registry == null) return;
+    registry.unregister(key);
+  }
+
   @override
   void dispose() {
+    _unregisterField(widget.storageKey);
+    _focusNode.dispose();
     _ctrl.dispose();
     super.dispose();
+  }
+
+  void _emitChange(String value) {
+    final key = widget.storageKey;
+    if (key != null && key.isNotEmpty) {
+      widget.onEvent('_field', <String, dynamic>{'key': key, 'value': value});
+    }
+    final action = widget.onChange;
+    if (action != null) {
+      widget.onEvent(action, <String, dynamic>{'value': value});
+    }
   }
 
   @override
@@ -865,6 +1250,7 @@ class _TextFieldNodeState extends State<_TextFieldNode> {
     final colors = context.appColors;
     return TextField(
       controller: _ctrl,
+      focusNode: _focusNode,
       obscureText: widget.obscure,
       style: widget.style ?? TextStyle(color: colors.textPrimary, fontSize: 14),
       decoration: appInputDecoration(
@@ -883,13 +1269,13 @@ class _TextFieldNodeState extends State<_TextFieldNode> {
         ),
       ),
       onSubmitted: (val) {
+        _emitChange(val);
         final action = widget.onSubmit;
-        if (action != null) widget.onEvent(action, {'value': val});
+        if (action != null) {
+          widget.onEvent(action, <String, dynamic>{'value': val});
+        }
       },
-      onChanged: (val) {
-        final action = widget.onChange;
-        if (action != null) widget.onEvent(action, {'value': val});
-      },
+      onChanged: _emitChange,
     );
   }
 }

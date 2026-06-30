@@ -11,7 +11,7 @@ class TerminalCliHandler extends PanelCliHandler {
   String get typeId => 'board.terminal';
 
   @override
-  List<String> get supportedActions => ['config', 'set-dir', 'output'];
+  List<String> get supportedActions => ['config', 'set-dir', 'set-session', 'output'];
 
   @override
   Map<String, dynamic> getContent(BoardPanelInstance panel) {
@@ -97,6 +97,24 @@ class TerminalCliHandler extends PanelCliHandler {
           message: 'Working directory set to $dir',
           stateUpdate: {'config': config},
         );
+      case 'set-session':
+        final sessionId =
+            args['sessionId'] as String? ?? args['session'] as String?;
+        if (sessionId == null || sessionId.trim().isEmpty) {
+          return const CliActionResult(
+            ok: false,
+            message: 'Missing "sessionId" field',
+          );
+        }
+        final config = Map<String, dynamic>.from(
+          (panel.state['config'] as Map<String, dynamic>?) ??
+              <String, dynamic>{},
+        );
+        config['sessionId'] = sessionId.trim();
+        return CliActionResult(
+          message: 'Terminal session set to $sessionId',
+          stateUpdate: {'config': config},
+        );
       case 'output':
         return _readOutput(args, panel);
       default:
@@ -113,6 +131,12 @@ class TerminalCliHandler extends PanelCliHandler {
       description: 'Set terminal working directory for the panel',
       params: {'dir': 'Absolute working directory path'},
       example: 'yoloit do "<board>" "<terminal>" set-dir \'{"dir":"/repo"}\'',
+    ),
+    'set-session': const CliActionHelp(
+      description: 'Attach the terminal panel to an existing session id',
+      params: {'sessionId': 'Terminal session id (required)'},
+      example:
+          'yoloit do "<board>" "<terminal>" set-session \'{"sessionId":"sess_123"}\'',
     ),
     'output': const CliActionHelp(
       description: 'Read recent output from the live terminal session',

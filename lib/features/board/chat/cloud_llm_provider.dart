@@ -247,6 +247,7 @@ class CloudLlmProvider extends ChatProvider {
                 resolvedName,
                 normalizedArgs,
                 runtimeContext: runtimeContext,
+                argumentsPreNormalized: true,
               );
               success = _toolResultSucceeded(result);
             } catch (e) {

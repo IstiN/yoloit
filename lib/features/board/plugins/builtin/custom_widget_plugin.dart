@@ -246,7 +246,9 @@ class _CustomWidgetContentState extends State<_CustomWidgetContent> {
 
   JsonWidgetRenderer _buildRenderer(JsWidgetEngine engine) {
     return JsonWidgetRenderer(
-      onEvent: (actionId, payload) => engine.callEvent(actionId, payload),
+      onEvent: (actionId, payload) {
+        unawaited(engine.callEvent(actionId, payload));
+      },
     );
   }
 
@@ -530,6 +532,30 @@ class CustomWidgetCliHandler extends PanelCliHandler {
   ];
 
   @override
+  Map<String, CliActionHelp> get actionHelp => {
+    'execute': const CliActionHelp(
+      description:
+          'Send a JS event to the widget (same as yoloit app:execute)',
+      params: {
+        'actionId': 'Event id from app:help (alias: action)',
+        'payload': 'JSON object passed to the handler',
+      },
+      example:
+          'yoloit do "<board>" "<panel>" execute \'{"actionId":"set_city","payload":{"city":"Grodno"}}\'',
+    ),
+    'snapshot': const CliActionHelp(
+      description: 'Return the current declarative UI render tree',
+    ),
+    'info': const CliActionHelp(
+      description: 'Return widget id and manifest metadata',
+    ),
+    'setState': const CliActionHelp(
+      description: 'Replace persisted widget panel state',
+      params: {'state': 'JSON object merged into panel state'},
+    ),
+  };
+
+  @override
   Map<String, dynamic> getContent(BoardPanelInstance panel) => {
     'widgetId': panel.state['widgetId'] ?? '',
   };
@@ -566,11 +592,12 @@ class CustomWidgetCliHandler extends PanelCliHandler {
         );
       case 'execute':
         final widgetId = panel.state['widgetId'] as String? ?? '';
-        final actionId = args['actionId'] as String?;
-        if (actionId == null) {
+        final actionId =
+            (args['actionId'] ?? args['action']) as String?;
+        if (actionId == null || actionId.trim().isEmpty) {
           return const CliActionResult(
             ok: false,
-            message: 'Missing "actionId" field',
+            message: 'Missing "actionId" field (alias: action)',
           );
         }
         final payload = args['payload'] as Map<String, dynamic>?;
@@ -581,10 +608,16 @@ class CustomWidgetCliHandler extends PanelCliHandler {
             message: 'Widget "$widgetId" is not currently running',
           );
         }
-        engine.callEvent(actionId, payload);
+        await engine.callEvent(actionId, payload);
+        final exported = engine.exportedState;
         return CliActionResult(
           ok: true,
           message: 'Event "$actionId" sent to widget "$widgetId"',
+          data: {
+            'widgetId': widgetId,
+            'actionId': actionId,
+            if (exported != null) 'state': exported,
+          },
         );
       case 'snapshot':
         final widgetId = panel.state['widgetId'] as String? ?? '';

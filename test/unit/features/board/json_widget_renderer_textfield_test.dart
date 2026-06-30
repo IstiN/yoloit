@@ -60,6 +60,26 @@ void main() {
       expect(events, contains('city_input_change'));
     });
 
+    testWidgets('syncs id to storage on change via _field event', (tester) async {
+      final events = <String, Map<String, dynamic>>{};
+      final r = JsonWidgetRenderer(
+        onEvent: (id, payload) => events[id] = payload,
+      );
+      await tester.pumpWidget(_wrap(
+        r.build(<String, dynamic>{
+          'type': 'textField',
+          'id': 'nameInput',
+          'value': '',
+          'hint': 'Name',
+        }),
+      ));
+      await tester.enterText(find.byType(TextField), 'Anna');
+      await tester.pump();
+      expect(events['_field'], isNotNull);
+      expect(events['_field']!['key'], 'nameInput');
+      expect(events['_field']!['value'], 'Anna');
+    });
+
     testWidgets('does not fire event when no action id set', (tester) async {
       final events = <String>[];
       final r = _renderer(events: events);
@@ -83,11 +103,10 @@ void main() {
   });
 
   group('JsonWidgetRenderer — unknown type', () {
-    testWidgets('unknown type does not throw', (tester) async {
+    testWidgets('unknown type shows placeholder', (tester) async {
       final r = _renderer();
       await tester.pumpWidget(_wrap(r.build({'type': 'nonExistentWidgetType'})));
-      // Should render without exception — just an empty SizedBox
-      expect(find.byType(SizedBox), findsWidgets);
+      expect(find.textContaining('Unknown type'), findsOneWidget);
     });
   });
 }

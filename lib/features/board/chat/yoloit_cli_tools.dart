@@ -11,6 +11,9 @@ import 'package:yoloit/core/cli/cli_server.dart';
 import 'package:yoloit/core/cli/cli_text_argument_resolver.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
 import 'package:yoloit/features/board/events/board_event_bus.dart';
+import 'package:yoloit/features/board/chat/ui_cli_inprocess.dart';
+import 'package:yoloit/features/board/chat/cli_tools/ui_tools.dart';
+import 'package:yoloit/features/board/widgets/widget_app_registry.dart';
 
 import 'package:yoloit/features/board/chat/cli_tools/app_tools.dart';
 import 'package:yoloit/features/board/chat/cli_tools/auto_tools.dart';
@@ -459,6 +462,7 @@ class YoloitCliToolArgumentNormalizer {
   }) {
     final text = userMessage.toLowerCase();
     if (functionName == 'yoloit_panel_help' &&
+        text.isNotEmpty &&
         (text.contains('details') || text.contains('content')) &&
         !text.contains('actions') &&
         !text.contains('available')) {
@@ -554,6 +558,7 @@ class YoloitCliToolArgumentNormalizer {
         normalized['type'] = type;
       }
     }
+    _normalizeUiArguments(tool?.command, normalized, userMessage);
     _normalizeHelpArguments(tool?.command, normalized, userMessage);
     _normalizeBoardArguments(tool?.command, normalized, userMessage);
     _normalizePanelArguments(tool?.command, normalized, userMessage);
@@ -580,6 +585,7 @@ class YoloitCliToolArgumentNormalizer {
             userMessage.toLowerCase().contains('allowing stopped'))) {
       normalized['any'] = true;
     }
+    _encodeStructuredJsonArguments(normalized);
     CliTextArgumentResolver.resolveInArguments(normalized);
     return normalized;
   }
@@ -611,7 +617,11 @@ class YoloitCliToolArgumentNormalizer {
   ) {
     if (tool == null) return;
     final g = tool.group;
-    if (g != 'note' && g != 'checklist' && g != 'kanban' && g != 'playlist') {
+    if (g != 'note' &&
+        g != 'checklist' &&
+        g != 'kanban' &&
+        g != 'playlist' &&
+        g != 'ui') {
       return;
     }
     for (final key in const [
@@ -637,6 +647,66 @@ class YoloitCliToolArgumentNormalizer {
     return lower.contains('assistant') ||
         lower.contains('yolo_badge') ||
         lower.contains('yolochat');
+  }
+
+  static void _normalizeUiArguments(
+    String? command,
+    Map<String, Object?> normalized,
+    String userMessage,
+  ) {
+    if (command != 'ui:render' && command != 'do') return;
+    final tree = normalized['tree'] ?? normalized['j'] ?? normalized['json'];
+    if (tree is Map) {
+      final map = Map<String, dynamic>.from(tree);
+      if (command == 'ui:render' &&
+          map.containsKey('tree') &&
+          !map.containsKey('type')) {
+        normalized['tree'] = map['tree'];
+        return;
+      }
+      if (command == 'do' &&
+          normalized['action'] == 'render' &&
+          map.containsKey('tree')) {
+        normalized['json'] = jsonEncode(map);
+      }
+    }
+  }
+
+  static void _encodeStructuredJsonArguments(Map<String, Object?> normalized) {
+    for (final key in CliTextArgumentResolver.jsonKeys) {
+      final value = normalized[key];
+      if (value is Map || value is List) {
+        normalized[key] = jsonEncode(value);
+        continue;
+      }
+      if (value is String) {
+        final trimmed = value.trim();
+        if (trimmed.startsWith('```')) {
+          normalized[key] = UiCliInProcessClient.stripMarkdownFence(trimmed);
+        }
+      }
+    }
+  }
+
+  static String? _inferUiPanelTitle(String userMessage) {
+    final text = userMessage.toLowerCase();
+    if (text.contains('мой список') || text.contains('my list')) {
+      return 'Мой список';
+    }
+    if (text.contains('пример') && RegExp(r'списк').hasMatch(text)) {
+      return 'Пример списка';
+    }
+    if (RegExp(r'списк|checklist item').hasMatch(text) ||
+        RegExp(r'\blists?\b').hasMatch(text)) {
+      return 'Список';
+    }
+    if (text.contains('карточк') || text.contains('card')) return 'Карточка';
+    if (text.contains('dashboard') || text.contains('дашборд')) {
+      return 'Dashboard';
+    }
+    if (text.contains('кастомн') && text.contains('ui')) return 'UI View';
+    if (text.contains('custom ui')) return 'UI View';
+    return null;
   }
 
   static void _normalizeHelpArguments(
@@ -779,6 +849,17 @@ class YoloitCliToolArgumentNormalizer {
       final title = _extractTitle(userMessage);
       if (title != null) normalized['title'] = title;
     }
+    if (command == 'ui:create' && _isMissing(normalized['title'])) {
+      final title = _extractTitle(userMessage) ?? _inferUiPanelTitle(userMessage);
+      if (title != null) normalized['title'] = title;
+    }
+    if (command == 'ui:render' || command == 'ui:get' || command == 'ui:edit') {
+      if (_isMissing(normalized['panel'])) {
+        final panel =
+            _extractTitle(userMessage) ?? _inferUiPanelTitle(userMessage);
+        if (panel != null) normalized['panel'] = panel;
+      }
+    }
     if (command != null &&
         (command == 'panel' || command.startsWith('panel:')) &&
         _isMissing(normalized['panel']) &&
@@ -875,6 +956,7 @@ class YoloitCliToolArgumentNormalizer {
     return command == 'panel' ||
         command.startsWith('panel:') ||
         command == 'do' ||
+        command.startsWith('ui:') ||
         command == 'note' ||
         command.startsWith('note:') ||
         command.startsWith('checklist:') ||
@@ -919,6 +1001,25 @@ class YoloitCliToolArgumentNormalizer {
     }
     if (text.contains('playlist') || text.contains('media')) {
       return 'board.playlist';
+    }
+    if (text.contains('кастомн') && text.contains('ui')) {
+      return 'board.ui';
+    }
+    if (text.contains('кастом') &&
+        (text.contains('ui') || text.contains('view'))) {
+      return 'board.ui';
+    }
+    if (text.contains('custom ui') ||
+        text.contains('ui view') ||
+        text.contains('json ui') ||
+        text.contains('декларатив')) {
+      return 'board.ui';
+    }
+    if ((text.contains('ui') || text.contains('json')) &&
+        (text.contains('список') ||
+            text.contains('карточ') ||
+            text.contains('панел'))) {
+      return 'board.ui';
     }
     if (text.contains('chat panel')) return 'board.chat';
     return null;
@@ -1122,6 +1223,7 @@ abstract interface class YoloitToolExecutor {
     String functionName,
     Map<String, Object?> arguments, {
     ChatRuntimeContext? runtimeContext,
+    bool argumentsPreNormalized = false,
   });
 }
 
@@ -1141,6 +1243,7 @@ class YoloitCliToolExecutor implements YoloitToolExecutor {
     String functionName,
     Map<String, Object?> arguments, {
     ChatRuntimeContext? runtimeContext,
+    bool argumentsPreNormalized = false,
   }) async {
     if (functionName == 'get_tools' || functionName == 'list_tools') {
       return YoloitCliToolCatalog.compactToolsJson();
@@ -1153,13 +1256,25 @@ class YoloitCliToolExecutor implements YoloitToolExecutor {
       });
     }
 
-    final normalized = YoloitCliToolArgumentNormalizer.normalize(
-      functionName: functionName,
-      arguments: arguments,
-      userMessage: '',
-      runtimeContext: runtimeContext,
-    );
-    final cliArgs = _buildCliArgs(tool, normalized, runtimeContext);
+    final normalized =
+        argumentsPreNormalized
+            ? arguments
+            : YoloitCliToolArgumentNormalizer.normalize(
+              functionName: functionName,
+              arguments: arguments,
+              userMessage: '',
+              runtimeContext: runtimeContext,
+            );
+    final List<String> cliArgs;
+    try {
+      cliArgs = _buildCliArgs(tool, normalized, runtimeContext);
+    } on ArgumentError catch (e) {
+      return jsonEncode(<String, Object?>{
+        'ok': false,
+        'executed': false,
+        'error': '$e',
+      });
+    }
     final validation = _validateCliArgs(tool, cliArgs);
     if (validation != null) {
       return jsonEncode(<String, Object?>{
@@ -1187,41 +1302,107 @@ class YoloitCliToolExecutor implements YoloitToolExecutor {
       });
     }
 
-    final executable = executablePath ?? _resolveYoloitExecutable();
     final cliPort = CliServer.instance.port;
-    final result = await Process.run(
-      executable,
-      cliArgs.map(_argvQuote).toList(),
-      runInShell: false,
-      environment:
-          cliPort == null
-              ? null
-              : <String, String>{'YOLOIT_CLI_PORT': '$cliPort'},
-    ).timeout(timeout);
-
-    final stdoutText = result.stdout.toString().trim();
-    final stderrText = result.stderr.toString().trim();
-    final ok = result.exitCode == 0;
-
-    // Notify the UI so remote boards can be refreshed after mutations.
-    if (ok && !_isReadOnlyCommand(tool.command)) {
-      try {
-        final decoded = jsonDecode(stdoutText) as Map<String, dynamic>?;
-        if (decoded?['ok'] == true) {
+    if (cliPort != null && tool.command.startsWith('ui:')) {
+      final inProcess = await UiCliInProcessClient.tryExecute(
+        command: tool.command,
+        arguments: normalized,
+        port: cliPort,
+      );
+      if (inProcess != null) {
+        var ok = true;
+        try {
+          final decoded = jsonDecode(inProcess);
+          if (decoded is Map && decoded['ok'] is bool) {
+            ok = decoded['ok'] as bool;
+          }
+        } catch (_) {}
+        if (ok && !_isReadOnlyCommand(tool.command)) {
           BoardEventBus.instance.emit(BoardToolMutationEvent(tool.command));
         }
-      } catch (_) {
-        // Non-JSON output is fine for some legacy commands; ignore.
+        return inProcess;
       }
     }
 
-    return jsonEncode(<String, Object?>{
-      'ok': ok,
-      'command': rendered,
-      'exitCode': result.exitCode,
-      if (stdoutText.isNotEmpty) 'stdout': stdoutText,
-      if (stderrText.isNotEmpty) 'stderr': stderrText,
-    });
+    final executable = executablePath ?? _resolveYoloitExecutable();
+    File? boardApplyYamlTemp;
+    var runArgs = cliArgs;
+    if (tool.command == 'board:apply') {
+      final yaml = normalized['yaml']?.toString().trim();
+      if (yaml != null && yaml.isNotEmpty) {
+        boardApplyYamlTemp = File(
+          '${Directory.systemTemp.path}/yoloit_apply_'
+          '${DateTime.now().millisecondsSinceEpoch}.yaml',
+        );
+        await boardApplyYamlTemp.writeAsString(yaml);
+        final boardArg =
+            cliArgs.length > 1
+                ? cliArgs[1]
+                : _firstNotEmpty(
+                  runtimeContext?.boardId,
+                  runtimeContext?.boardName,
+                );
+        if (boardArg == null || '$boardArg'.trim().isEmpty) {
+          return jsonEncode(<String, Object?>{
+            'ok': false,
+            'executed': false,
+            'error': 'Missing board for board:apply',
+          });
+        }
+        runArgs = <String>[tool.command, '$boardArg', boardApplyYamlTemp.path];
+      }
+    }
+    try {
+      final result = await Process.run(
+        executable,
+        runArgs.map(_argvQuote).toList(),
+        runInShell: false,
+        environment:
+            cliPort == null
+                ? null
+                : <String, String>{'YOLOIT_CLI_PORT': '$cliPort'},
+      ).timeout(timeout);
+
+      final stdoutText = result.stdout.toString().trim();
+      final stderrText = result.stderr.toString().trim();
+      var ok = result.exitCode == 0;
+      if (ok && stdoutText.isNotEmpty) {
+        try {
+          final decoded = jsonDecode(stdoutText);
+          if (decoded is Map && decoded['ok'] is bool) {
+            ok = decoded['ok'] as bool;
+          }
+        } catch (_) {}
+      }
+
+      // Notify the UI so remote boards can be refreshed after mutations.
+      if (ok && !_isReadOnlyCommand(tool.command)) {
+        try {
+          final decoded = jsonDecode(stdoutText) as Map<String, dynamic>?;
+          if (decoded?['ok'] == true) {
+            BoardEventBus.instance.emit(BoardToolMutationEvent(tool.command));
+          }
+        } catch (_) {
+          // Non-JSON output is fine for some legacy commands; ignore.
+        }
+      }
+
+      return jsonEncode(<String, Object?>{
+        'ok': ok,
+        'command': rendered,
+        'exitCode': result.exitCode,
+        if (stdoutText.isNotEmpty) 'stdout': stdoutText,
+        if (stderrText.isNotEmpty) 'stderr': stderrText,
+      });
+    } finally {
+      if (boardApplyYamlTemp != null) {
+        try {
+          if (boardApplyYamlTemp.existsSync()) {
+            boardApplyYamlTemp.deleteSync();
+          }
+        } catch (_) {}
+      }
+    }
   }
 
   static const _readOnlySuffixes = <String>{
@@ -1314,7 +1495,33 @@ class YoloitCliToolExecutor implements YoloitToolExecutor {
     ChatRuntimeContext? runtimeContext,
   ) {
     final out = <String>[tool.command];
+    final smartPanelGroup = _cliAutoResolvesPanel(tool.group);
+    YoloitCliToolParam? panelParamDef;
     for (final param in tool.params) {
+      if (param.key == 'panel') {
+        panelParamDef = param;
+        break;
+      }
+    }
+    final panelValue =
+        panelParamDef == null
+            ? null
+            : _argumentValue(
+              panelParamDef,
+              arguments,
+              runtimeContext,
+              tool,
+            );
+    // Bash smart-parse treats the first positional arg as a panel hint when
+    // board is omitted. Injecting board without panel breaks e.g.
+    // checklist:check "My Board" "item" → panel="My Board".
+    final omitBoardForSmartParse =
+        smartPanelGroup && _isMissing(panelValue);
+
+    for (final param in tool.params) {
+      if (omitBoardForSmartParse && param.key == 'board') {
+        continue;
+      }
       final value = _argumentValue(param, arguments, runtimeContext, tool);
       if (_isMissing(value)) {
         if (param.required &&
@@ -1340,11 +1547,18 @@ class YoloitCliToolExecutor implements YoloitToolExecutor {
         }
         continue;
       }
-      final rendered = _resolveTextArgument(param, '$value');
+      final rendered = _stringifyArgument(param, value);
       if (rendered.trim().isEmpty) continue;
       out.add(rendered);
     }
     return out;
+  }
+
+  String _stringifyArgument(YoloitCliToolParam param, Object? value) {
+    if (value is Map || value is List) {
+      return jsonEncode(value);
+    }
+    return _resolveTextArgument(param, '$value');
   }
 
   String _resolveTextArgument(YoloitCliToolParam param, String value) {
@@ -1377,14 +1591,22 @@ class YoloitCliToolExecutor implements YoloitToolExecutor {
         runtimeContext?.boardName,
       ),
       YoloitCliRuntimeDefault.panel => _panelDefault(runtimeContext, tool),
-      null => null,
+      null => _appIdDefault(tool, param),
     };
+  }
+
+  Object? _appIdDefault(YoloitCliTool tool, YoloitCliToolParam param) {
+    if (tool.group != 'app' || param.key != 'id') return null;
+    final active = WidgetAppRegistry.instance.activeIds();
+    if (active.length == 1) return active.first;
+    return null;
   }
 
   /// Returns the runtime panel default, but skips chat/assistant panels for
   /// tools that operate on typed panels (note, checklist, kanban). The CLI
   /// auto-resolves the correct panel by type when none is provided.
   Object? _panelDefault(ChatRuntimeContext? ctx, YoloitCliTool tool) {
+    if (tool.group == 'ui') return null;
     final id = _firstNotEmpty(ctx?.panelId, ctx?.panelTitle);
     if (id == null) return null;
     if (_cliAutoResolvesPanel(tool.group) &&
@@ -1411,7 +1633,8 @@ class YoloitCliToolExecutor implements YoloitToolExecutor {
     return group == 'note' ||
         group == 'checklist' ||
         group == 'kanban' ||
-        group == 'playlist';
+        group == 'playlist' ||
+        group == 'ui';
   }
 
   bool _isMissing(Object? value) {
@@ -1597,6 +1820,7 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
   ...appTools,
   ...boardTools,
   ...panelTools,
+  ...uiTools,
   ...groupTools,
   ...runTools,
   ...noteTools,

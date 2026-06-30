@@ -30,14 +30,16 @@ graph LR
   g_app --> g_app_5["app:remove · widget:remove · wg:rm"]
   g_app --> g_app_6["app:run · app:open · widget:open · wg:o"]
   g_app --> g_app_7["app:create · widget:create · wg:new"]
-  g_app --> g_app_8["app:execute"]
-  g_app --> g_app_9["app:reload · app:refresh · widget:reload"]
-  g_app --> g_app_10["app:logs"]
-  g_app --> g_app_11["app:snapshot"]
-  g_app --> g_app_12["app:screenshot"]
-  g_app --> g_app_13["app:dev-skill · app:skill · app:docs"]
-  g_app --> g_app_14["app:demo"]
-  g_app --> g_app_15["app:demo-view"]
+  g_app --> g_app_8["app:help"]
+  g_app --> g_app_9["app:state"]
+  g_app --> g_app_10["app:execute"]
+  g_app --> g_app_11["app:reload · app:refresh · widget:reload"]
+  g_app --> g_app_12["app:logs"]
+  g_app --> g_app_13["app:snapshot"]
+  g_app --> g_app_14["app:screenshot"]
+  g_app --> g_app_15["app:dev-skill · app:skill · app:docs"]
+  g_app --> g_app_16["app:demo"]
+  g_app --> g_app_17["app:demo-view"]
   root --> g_board(("board"))
   g_board --> g_board_0["boards"]
   g_board --> g_board_1["board"]
@@ -140,6 +142,9 @@ graph LR
   g_run --> g_run_11["run:config"]
   g_run --> g_run_12["run:close"]
   g_run --> g_run_13["run:logs"]
+  g_run --> g_run_14["run:set-group"]
+  g_run --> g_run_15["run:select-session"]
+  g_run --> g_run_16["run:clear-session"]
   root --> g_timer(("timer"))
   g_timer --> g_timer_0["timer:create"]
   g_timer --> g_timer_1["timer:status"]
@@ -263,52 +268,58 @@ graph LR
 - **`app:remove`** *(aliases: widget:remove, wg:rm)* — Remove an installed app by id
   - params: id*
   - example: `yoloit app:remove weather`
-- **`app:run`** *(aliases: app:open, widget:open, wg:o)* — Open an app in a new panel on a board. Accepts app id or local path (e.g. ./my-app) for dev workflow.
+- **`app:run`** *(aliases: app:open, widget:open, wg:o)* — Open an app in a new panel on a board. Then use app:help, app:state, or app:snapshot to read app data.
   - params: id_or_path*, [board], [panel-title]
   - example: `yoloit app:run calculator`
 - **`app:create`** *(aliases: widget:create, wg:new)* — Scaffold a new app in the apps directory
   - params: name*, --template
   - example: `yoloit app:create my-app --template network`
-- **`app:execute`** — Execute a JS event/function in a running app
+- **`app:help`** — Show CLI commands, events, and examples for a specific app. Call this before app:execute when unsure which events exist.
+  - params: id*
+  - example: `yoloit app:help weather`
+- **`app:state`** — Read structured state (yoloit.exportState) and visible text from a running app. Preferred over app:snapshot for weather, prices, calculator values.
+  - params: id*
+  - example: `yoloit app:state weather`
+- **`app:execute`** — Execute a JS event in a running app. Weather city change: set_city '{"city":"Grodno"}' then app:state.
   - params: id*, action*, [payload]
   - example: `yoloit app:execute calculator btn_5`
-- **`app:reload`** *(aliases: app:refresh, widget:reload)* — Hot-reload a running app (re-reads JS from disk, no full restart needed)
+- **`app:reload`** *(aliases: app:refresh, widget:reload)* — Hot-reload a running app (re-reads JS from disk)
   - params: id*
   - example: `yoloit app:reload weather`
 - **`app:logs`** — Show console.log output from a running app
   - params: id*, -f
   - example: `yoloit app:logs .`
-- **`app:snapshot`** — Get the current JSON render tree of a running app
+- **`app:snapshot`** — Get the JSON render tree of a running app plus extracted text lines. Use app:state first when the app exports structured data.
   - params: id*
   - example: `yoloit app:snapshot calculator`
-- **`app:screenshot`** — Save a screenshot of a running app panel to a PNG file
+- **`app:screenshot`** — Save a PNG screenshot of a running app panel (panel must be visible on screen). Prefer app:snapshot for the JSON render tree when headless.
   - params: id*, [output]
   - example: `yoloit app:screenshot calculator /tmp/calc.png`
 - **`app:dev-skill`** *(aliases: app:skill, app:docs)* — Print the full YoLoIT app development guide (JS API, node types, examples). Useful for AI agents writing apps.
   - example: `yoloit app:dev-skill`
-- **`app:demo`** — List built-in demo apps with their local paths and descriptions.
+- **`app:demo`** — List built-in demo apps with their local paths. Use app:demo-view <id> to read a full example.
   - example: `yoloit app:demo`
-- **`app:demo-view`** — Show the full source (manifest.json + widget.js) of a built-in demo app. Use to learn patterns before writing a new app.
+- **`app:demo-view`** — Show the full source (manifest.json + widget.js) of a built-in demo app. Great for learning patterns before writing a new app.
   - params: id*
   - example: `yoloit app:demo-view calculator`
 
 ### board
-- **`boards`** — List boards
+- **`boards`** — List all boards
   - params: --archived
   - example: `yoloit boards --archived`
 - **`board`** — Show board details
   - params: id|name*
   - example: `yoloit board "My Board"`
-- **`board:create`** — Create a new board, optionally from a template
+- **`board:create`** — Create a board, optionally from a template
   - params: name*, --template <id>, --params <json|k=v,...>
   - example: `yoloit board:create "My Board" --template flutter-project --params projectPath=/projects/shop`
 - **`board:snapshot`** — Text snapshot of board layout
   - params: id|name*, --format md|mermaid
   - example: `yoloit board:snapshot "My Board" --format mermaid`
-- **`board:diagram`** — Alias for board snapshot focused on diagram output
+- **`board:diagram`** — Mermaid-focused board diagram
   - params: id|name*, --format mermaid|md
   - example: `yoloit board:diagram "My Board" --format mermaid`
-- **`boards:snapshot`** — Snapshot all boards with panels as Mermaid graph
+- **`boards:snapshot`** — Snapshot all boards and panels as Mermaid graph
   - params: --format mermaid|md
   - example: `yoloit boards:snapshot --format mermaid`
 - **`board:screenshot`** — Save PNG screenshot
@@ -317,7 +328,7 @@ graph LR
 - **`board:svg`** — Export SVG layout
   - params: id|name*, file.svg
   - example: `yoloit board:svg "My Board" layout.svg`
-- **`board:apply`** — Apply YAML bulk operations from file or stdin
+- **`board:apply`** — Apply YAML bulk operations to a board (create/move/rename panels). Pass inline `yaml` string or a `file` path.
   - params: id|name*, file|-
   - example: `yoloit board:apply "My Board" flow.yaml`
 - **`board:rename`** — Rename a board
@@ -335,13 +346,13 @@ graph LR
 - **`board:unarchive`** — Restore an archived board
   - params: id|name*
   - example: `yoloit board:unarchive "Old Project"`
-- **`board:focus`** — Focus a board
+- **`board:focus`** — Focus a board in the UI
   - params: id|name*
   - example: `yoloit board:focus "My Board"`
 - **`board:undo`** *(aliases: bundo)* — Undo the latest panel history batch on a board
   - params: id|name*
   - example: `yoloit board:undo "My Board"`
-- **`board:zoom`** — Set board zoom scale
+- **`board:zoom`** — Set board zoom/scale level. Use for "уменьши зум", "увеличь зум", "zoom in", "zoom out", "приблизь", "отдали". Pass absolute scale: 0.5 = 50%, 1.0 = 100%, 2.0 = 200%.
   - params: id|name*, scale*
   - example: `yoloit board:zoom "My Board" 0.8`
 - **`board:fit`** — Fit board to viewport
@@ -350,13 +361,13 @@ graph LR
 - **`board:arrange`** — Arrange visible panels
   - params: id|name*, direction, hSpacing, vSpacing
   - example: `yoloit board:arrange "My Board" right 80 60`
-- **`board:grid`** — Toggle or reset grid view for a board
+- **`board:grid`** — Toggle, reset or configure grid view for a board. Use "on" to enable, "off" to disable, or "reset" to restore defaults.
   - params: id|name*, on|off|reset*, --cell N, --spacing N, --arrange, --group
   - example: `yoloit board:grid "My Board" on --cell 220 --spacing 24 --arrange`
 - **`select`** — Select panels by ids or rectangle, or show current selection
   - params: board*, --panels p1,p2, --rect x,y,w,h
   - example: `yoloit select "My Board" --rect 0,0,1200,800`
-- **`board:use`** — Set current board context for subsequent commands (does not switch UI focus)
+- **`board:use`** — Set default board for subsequent commands (no UI switch)
   - params: board*
   - example: `yoloit board:use "My Board"`
 - **`board:current`** — Show current board
@@ -364,51 +375,51 @@ graph LR
 - **`board:translate`** — Move board viewport
   - params: board*, x*, y*
   - example: `yoloit board:translate "My Board" 0 0`
-- **`sticky:create`** *(aliases: sticky:new)* — Create a Miro-style sticky note panel
+- **`sticky:create`** *(aliases: sticky:new)* — Create a Miro-style sticky note panel. Board is optional and defaults to the current board.
   - params: [board], title*, text, --color #RRGGBB
   - example: `yoloit sticky:create "Ideas" "Ship terminal control" --color "#FEF08A"`
-- **`shape:create`** *(aliases: shape:new)* — Create a geometric shape panel
+- **`shape:create`** *(aliases: shape:new)* — Create a geometric board panel: rectangle, circle, diamond, triangle, hexagon, or frame.
   - params: [board], shape*, title*, --text label, --fill #RRGGBB, --stroke #RRGGBB
   - example: `yoloit shape:create diamond "Decision" --text "Go / No-go"`
-- **`frame:create`** *(aliases: frame:new)* — Create a Miro-style frame panel for grouping board content
+- **`frame:create`** *(aliases: frame:new)* — Create a Miro-style frame panel for grouping a section of the board.
   - params: [board], title*
   - example: `yoloit frame:create "Sprint scope"`
-- **`draw:list`** *(aliases: drl)* — List all drawings on a board.
+- **`draw:list`** *(aliases: drl)* — List all drawings (freehand strokes / shapes) on a board. Returns id, position, size, strokeColor, zIndex for each element.
   - params: board
   - example: `yoloit draw:list board-123`
-- **`draw:add`** *(aliases: dra)* — Add a shape drawing to a board. Types: line, circle, rect, arrow, freehand, svg.
+- **`draw:add`** *(aliases: dra)* — Add a shape drawing to a board. Supports BOTH positional and named-flag syntax. POSITIONAL (preferred for brevity): "draw:add <boardId> <type> <params...>" — circle: draw:add board-123 circle <cx> <cy> <r>; line: draw:add board-123 line <x1> <y1> <x2> <y2>; arrow: draw:add board-123 arrow <x1> <y1> <x2> <y2>; rect: draw:add board-123 rect <x> <y> <width> <height>; freehand: draw:add board-123 freehand <points-json>. Board defaults to active board. Returns the new drawing id.
   - params: board, type, color, width
   - example: `yoloit draw:add --board board-123 --shape line --x1 100 --y1 100 --x2 300 --y2 200 --color '#FF0000'`
-- **`draw:remove`** *(aliases: drr)* — Remove a specific drawing by id from a board.
+- **`draw:remove`** *(aliases: drr)* — Remove a specific drawing from a board by its id.
   - params: board*, id*
   - example: `yoloit draw:remove --board board-123 --id drawing-456`
 - **`draw:clear`** *(aliases: drc)* — Remove ALL drawings from a board.
   - params: board*
   - example: `yoloit draw:clear board-123`
-- **`draw:svg`** *(aliases: drsvg)* — Draw using SVG path data (M, L, C, Q, Z commands). Great for complex shapes and agent-generated diagrams.
+- **`draw:svg`** *(aliases: drsvg)* — Draw SVG path data on the board canvas as a free-floating drawing (M/L/C/Q/Z). NOT for images inside board.ui cards — use ui:render with {"type":"svg",...} instead.
   - params: board*, d*, x, y, color, width
   - example: `yoloit draw:svg board-123 'M 10 10 L 200 200 Z'`
-- **`draw:export`** *(aliases: drex)* — Export all drawings on a board as SVG. Pipe to a file or read as text to inspect what has been drawn.
+- **`draw:export`** *(aliases: drex)* — Export all drawings on a board as SVG. Prints SVG to stdout or saves to a file. Agents can read this to understand what has been drawn.
   - params: board, out
   - example: `yoloit draw:export board-123 --out drawings.svg`
-- **`draw:file`** *(aliases: drf)* — Render an SVG file as drawings on a board. All paths in the SVG file are drawn as strokes.
+- **`draw:file`** *(aliases: drf)* — Render an SVG file as drawings on a board. All path elements in the SVG file are drawn as strokes. Use to import diagrams, icons, or illustrations from .svg files.
   - params: board*, file*, x, y, color, width
   - example: `yoloit draw:file board-123 diagram.svg`
 
 ### panel
-- **`panels`** — List panels on board
+- **`panels`** — List panels on a board
   - params: board*
   - example: `yoloit panels "My Board"`
-- **`panel`** — Show panel details and content (useful for note content search)
+- **`panel`** — Show panel details and content. Use this to inspect note markdown when searching by content.
   - params: board*, panel*
   - example: `yoloit panel "My Board" "Run"`
-- **`panel:help`** — Show dynamic panel actions with parameter docs
+- **`panel:help`** — List dynamic panel actions and parameter docs (use panel / pgt for panel content)
   - params: board*, panel*
   - example: `yoloit panel:help "My Board" "Run"`
-- **`panel:create`** — Create a panel. Use exact panel type id; call panel:types first if unsure.
+- **`panel:create`** — Create a panel. Include exact panel type id (call panel:types first). For custom JS widget apps use app:run — NOT panel:create board.widget.custom. For folder browser use board.filetree or filetree:create.
   - params: board*, type*, title*
   - example: `yoloit panel:create "My Board" board.note.markdown "Notes"`
-- **`do`** — Execute panel action
+- **`do`** — Advanced fallback: run a raw panel action from panel:help when no dedicated YoLoIT tool exists (table row ops, terminal output, custom widget actions). Do NOT use for sticky/shape/note/checklist/kanban/board.ui when typed tools exist — use sticky:append, shape:set, note:append, checklist:add, kanban:add-card, uirnd, etc. JSON body must be an object like {"text":"..."}, never a bare JSON string.
   - params: board*, panel*, action*, json
   - example: `yoloit do "My Board" "Run" list`
 - **`panel:rename`** — Rename a panel
@@ -417,16 +428,16 @@ graph LR
 - **`panel:move`** — Move a panel
   - params: board*, panel*, x*, y*
   - example: `yoloit panel:move "My Board" "Notes" 120 160`
-- **`panel:resize`** — Resize a panel (numeric w h OR preset alias)
+- **`panel:resize`** — Resize a panel. Supports explicit width/height or presets: small(420x300), medium(720x480), desktop(1200x800), large(1400x900), mobile(390x844), tablet(768x1024).
   - params: board*, panel*, w|preset*, h
   - example: `yoloit panel:resize "My Board" "Notes" desktop`
-- **`panel:z`** *(aliases: panel:front, panel:back)* — Set panel depth/layer order
+- **`panel:z`** *(aliases: panel:front, panel:back)* — Set panel depth/layer order. Use front/back or an explicit integer zIndex.
   - params: board*, panel*, front|back|zIndex*
   - example: `yoloit panel:z "My Board" "Shape" front`
 - **`panel:delete`** — Delete a panel
   - params: board*, panel*
   - example: `yoloit panel:delete "My Board" "Scratch"`
-- **`panel:focus`** — Focus a panel (for 'show/open note' flows after finding target panel)
+- **`panel:focus`** — Focus/scroll-to/zoom a panel to bring it into view. Use for "сделай фокус на", "фокус на", "покажи", "открой" any panel — notes, playlists, kanban, etc. Examples: "сделай фокус на плейлист", "focus playlist", "show note", "открой заметку".
   - params: board*, panel*
   - example: `yoloit panel:focus "My Board" "Run"`
 - **`panel:color`** — Set or clear panel color
@@ -441,19 +452,19 @@ graph LR
 - **`panel:screenshot`** *(aliases: psc)* — Save PNG screenshot of a single panel (headless offscreen render)
   - params: board*, panel*, file_png
   - example: `yoloit panel:screenshot "My Board" "Kanban" /tmp/kanban.png`
-- **`panel:types`** — List available panel/widget type ids
+- **`panel:types`** — List all available panel/widget type ids on the board. Use this before panel:create when user asks for a specific widget type.
   - params: board*
   - example: `yoloit panel:types "My Board"`
-- **`panel:copy`** *(aliases: pcy)* — Copy selected panel(s) to the clipboard
+- **`panel:copy`** *(aliases: pcy)* — Copy selected panel(s) to the clipboard. If no panel ids are given, copies the currently selected panel(s).
   - params: board*, panels
   - example: `yoloit panel:copy "My Board" "Notes,Kanban"`
 - **`panel:paste`** *(aliases: ppt)* — Paste copied panels onto the board
   - params: board*
   - example: `yoloit panel:paste "My Board"`
-- **`panel:duplicate`** *(aliases: pdp)* — Duplicate selected panel(s)
+- **`panel:duplicate`** *(aliases: pdp)* — Duplicate selected panel(s). If no panel ids are given, duplicates the currently selected panel(s).
   - params: board*, panels
   - example: `yoloit panel:duplicate "My Board" "Notes"`
-- **`calendar:create`** *(aliases: ccr)* — Create a Calendar panel
+- **`calendar:create`** *(aliases: ccr)* — Create a Calendar panel on a board
   - params: board*, title*
   - example: `yoloit calendar:create "My Board" "Sprint Calendar"`
 - **`calendar:events`** *(aliases: cev)* — List events from a Calendar panel
@@ -519,19 +530,19 @@ graph LR
 - **`chart:refresh`** *(aliases: chfr)* — Snapshot linked Table panel data into Chart panel state
   - params: board*, panel*, tablePanelId
   - example: `yoloit chart:refresh "My Board" "Sales Chart"`
-- **`filetree:create`** *(aliases: ftc)* — Create a File Tree panel bound to a root path (for file tree / directory tree requests).
+- **`filetree:create`** *(aliases: ftc)* — Create a File Tree panel on a board and set its root directory. Use this when the user asks to show a file tree, directory tree, folder browser, or "дерево файлов". The panel shows an interactive expandable file browser.
   - params: board, path*, title
   - example: `yoloit filetree:create "My Board" ~/git/project "Project Tree"`
-- **`filetree:set-root`** *(aliases: ftsr)* — Change root path of an existing File Tree panel.
+- **`filetree:set-root`** *(aliases: ftsr)* — Set the root directory path of an existing File Tree panel.
   - params: board*, panel*, path*
   - example: `yoloit filetree:set-root "My Board" "Project Tree" ~/git/project`
-- **`terminal:output`** — Read terminal output
+- **`terminal:output`** — Read the latest output from an interactive terminal panel. Pass the panel title or id; the session is resolved automatically.
   - params: board*, panel*, session
   - example: `yoloit terminal:output "My Board" "Terminal"`
 - **`terminal:config`** — Get terminal configuration
   - params: board*, panel*
   - example: `yoloit terminal:config "My Board" "Terminal"`
-- **`terminal:set-dir`** — Set terminal working directory
+- **`terminal:set-dir`** — Set the working directory of an interactive terminal panel
   - params: board*, panel*, dir*
   - example: `yoloit terminal:set-dir "My Board" "Terminal" ~/project`
 - **`filetree:list`** — List file tree nodes
@@ -551,13 +562,13 @@ graph LR
   - example: `yoloit filetree:refresh "My Board" "Project Tree"`
 
 ### run
-- **`run:list`** — List run configurations and sessions
+- **`run:list`** — List run configs and sessions. If the user names a panel, pass that exact panel title.
   - params: board*, panel*
   - example: `yoloit run:list "My Board" "Run"`
-- **`run:input`** — Send stdin to running run session
+- **`run:input`** — Send stdin to a run session
   - params: board*, panel*, sessionId|id|name*, text*, --enter
   - example: `yoloit run:input "My Board" "Run" preset_flutter_run_macos r`
-- **`run:attach`** — Attach run console to matching session
+- **`run:attach`** — Attach run console to a session
   - params: board*, panel*, sessionId|id|name, --any
   - example: `yoloit run:attach "My Board" "Run" --any`
 - **`run:popout`** — Open detached session in a new Run panel
@@ -593,6 +604,15 @@ graph LR
 - **`run:logs`** — Read the full output of a run session
   - params: board*, panel*, sessionId|id|name*, --limit
   - example: `yoloit run:logs "My Board" "Run" sess_123 --limit 100`
+- **`run:set-group`** — Set the run session group scope for a board.run panel
+  - params: board*, panel*, group*
+  - example: `yoloit run:set-group "My Board" "Run" review`
+- **`run:select-session`** — Focus a run session tab in a board.run panel
+  - params: board*, panel*, sessionId*
+  - example: `yoloit run:select-session "My Board" "Run" sess_123`
+- **`run:clear-session`** — Clear the focused run session tab in a board.run panel
+  - params: board*, panel*
+  - example: `yoloit run:clear-session "My Board" "Run"`
 
 ### timer
 - **`timer:create`** — Create and optionally start a timer
@@ -632,17 +652,17 @@ graph LR
 - **`cloud:update`** — Update fields of an existing cloud provider config
   - params: id*, --name name, --url base-url, --key api-key, --model model-id
   - example: `yoloit cloud:update cloud-123 --model gpt-4o`
-- **`cloud:provider`** — Get or set assistant provider type (local or cloud)
+- **`cloud:provider`** — Get or set assistant provider type (cloud only)
   - params: local|cloud
   - example: `yoloit cloud:provider cloud`
 
 ### agents
-- **`agent:list`** — List configured agents, default agent, and live sessions
+- **`agent:list`** — List configured agents, default agent, and live agent sessions
   - example: `yoloit agent:list`
-- **`agent:default`** — Get or set the default terminal agent
+- **`agent:default`** — Get or set the default agent id for agent:run (board.chat provider, default: copilot)
   - params: agent-id
   - example: `yoloit agent:default copilot`
-- **`agent:run`** — Launch an agent in a folder and optionally send an initial task
+- **`agent:run`** — Start an agent session: creates a board.chat panel in the folder and sends the initial task. When task is sent the response includes STOP — do not call yolochat:send again. For typing into an existing terminal panel use yolochat:terminal.
   - params: agent-id, path*, task, --name label
   - example: `yoloit agent:run copilot ~/src/project "fix tests"`
 - **`agent:model`** — Get or set the default LLM model for an agent
@@ -655,32 +675,32 @@ graph LR
 ### yolochat
 - **`yolochat:panels`** — List all board.chat panels
   - example: `yoloit yolochat:panels`
-- **`yolochat:send`** — Send a message to a YoLo chat panel
+- **`yolochat:send`** — Send a message to a YoLo chat panel — non-blocking, returns immediately with status:processing. Use yolochat:messages to read the response. Always pass --panel when multiple board.chat panels exist. Do NOT call after agent:run with task (task already sent).
   - params: text*, --board id|name, --panel id|title
   - example: `yoloit yolochat:send "Summarize this board" --board "Main" --panel "AI Chat"`
-- **`yolochat:terminal`** *(aliases: chat:terminal, terminal:send, term:send)* — Send text to a board terminal and press Enter by default
+- **`yolochat:terminal`** *(aliases: chat:terminal, terminal:send, term:send)* — Send literal text to an existing terminal panel and press Enter. The `text` parameter is the command/characters to type (e.g. "npm test", not an agent name). Use --no-enter to type without pressing Enter.
   - params: text*, --board id|name, --panel id|title, --session id, --no-enter
   - example: `yoloit yolochat:terminal "npm test" --board "Main" --panel "Terminal"`
-- **`yolochat:messages`** — Read chat messages from a YoLo chat panel
+- **`yolochat:messages`** — Read YoLo chat messages
   - params: --board id|name, --panel id|title, --limit N
   - example: `yoloit yolochat:messages --board "Main" --panel "AI Chat" --limit 20`
-- **`yolochat:clear`** — Clear all messages in a chat session
+- **`yolochat:clear`** — Clear YoLo chat messages
   - params: --board id|name, --panel id|title
   - example: `yoloit yolochat:clear --board "Main"`
-- **`yolochat:sessions`** — List all active chat sessions
+- **`yolochat:sessions`** — List active YoLo chat sessions
   - example: `yoloit yolochat:sessions`
-- **`yolochat:history`** — List saved chat sessions from history
+- **`yolochat:history`** — List saved YoLo chat sessions from chat history
   - example: `yoloit yolochat:history`
-- **`yolochat:restore`** — Restore a saved chat session into a panel
+- **`yolochat:restore`** — Restore a saved YoLo chat session into a chat panel
   - params: session-id*, --board id|name, --panel id|title
   - example: `yoloit yolochat:restore session-123 --board "Main"`
-- **`yolochat:status`** — Show current chat session status (provider, model, processing)
+- **`yolochat:status`** — Show YoLo chat status
   - params: --board id|name, --panel id|title
   - example: `yoloit yolochat:status --board "Main"`
-- **`yolochat:stop`** — Stop active streaming in a chat session
+- **`yolochat:stop`** — Stop active YoLo chat streaming (target panel or any active)
   - params: --board id|name, --panel id|title
   - example: `yoloit yolochat:stop`
-- **`yolochat:logs`** — Export full chat session log as plain text (for debugging/copy-paste)
+- **`yolochat:logs`** — Dump full YoLo chat log for debugging
   - params: --board id|name, --panel id|title
   - example: `yoloit yolochat:logs --board "Main"`
 - **`yolochat:config`** — Get chat panel configuration
@@ -691,29 +711,29 @@ graph LR
   - example: `yoloit yolochat:follow-up --board "My Board" --panel "AI Chat" "Q1" "Q2"`
 
 ### files
-- **`files:search`** — Read-only search for files and folders (default root: home)
+- **`files:search`** — Read-only search for files and folders on the local file system. If user names a folder/scope ("в папке ai.m", "in ~/project"), pass it via --root to restrict results.
   - params: query*, --root path, --type files|dirs|all, --limit N
   - example: `yoloit files:search README.md --root ~/ai.m`
-- **`files:list`** — Read-only list of a directory path
+- **`files:list`** — Read-only list of directory entries for a file system path
   - params: path*
   - example: `yoloit files:list ~/ai.m`
-- **`files:read`** — Read-only display of a text file
+- **`files:read`** — Read-only display of a text file from the local file system
   - params: path*, --lines N
   - example: `yoloit files:read ~/ai.m/README.md --lines 120`
-- **`files:preview`** — Open a file as a preview panel on the board (image, markdown, text, etc.)
+- **`files:preview`** — Open a file as a preview panel on the board (supports markdown, images, text, code). Use this when user asks to "открой", "покажи", "preview" a file. Do NOT use note:create — use files:preview to show the actual file.
   - params: board*, path*, --title TITLE
   - example: `yoloit files:preview "My Board" ~/ai.m/README.md`
-- **`filetree:read`** *(aliases: ftr)* — Read directory structure as text tree (no panel required).
+- **`filetree:read`** *(aliases: ftr)* — Read and print a directory tree as text (no panel required). Useful for agents to understand folder structure without creating a UI panel. Use this for "what files are in X", "show me the structure of X".
   - params: path*, --depth N, --all
   - example: `yoloit filetree:read ~/git/project --depth 3`
 
 ### search
-- **`search`** — Search text across boards, panels, active chats, and saved chat sessions
+- **`search`** — Search text across all boards, panels, active chats, and saved chat sessions
   - params: query*, --scope all|boards|active-chats|sessions
   - example: `yoloit search mermaid --scope all`
 
 ### link
-- **`links`** — List links on board
+- **`links`** — List links on a board
   - params: board*
   - example: `yoloit links "My Board"`
 - **`link:create`** — Create panel link
@@ -730,13 +750,13 @@ graph LR
   - example: `yoloit link:color "My Board" link_123 "#7c3aed"`
 
 ### note
-- **`note`** *(aliases: note)* — Set note text — board and panel optional (uses active board/first note panel)
+- **`note`** *(aliases: note)* — Set markdown note text
   - params: text*, [panel], [board]
   - example: `yoloit note "# Plan"`
-- **`note:add`** *(aliases: n:a)* — Append text to note — board and panel optional (alias: n:a)
+- **`note:add`** *(aliases: n:a)* — Append text to note — board and panel optional
   - params: text*, [panel], [board]
   - example: `yoloit note:add "Купить кофе"`
-- **`note:create`** *(aliases: n:c)* — Create a new note panel (alias: n:c)
+- **`note:create`** *(aliases: n:c)* — Create a new note panel
   - params: title*, [content], [board]
   - example: `yoloit note:create "Sprint Plan" "# Goals\n- Ship"`
 - **`note:append`** — Append markdown text (explicit board+panel)
@@ -748,16 +768,16 @@ graph LR
 - **`note:nowrap`** — Disable note auto-height wrapping
   - params: board*, panel*
   - example: `yoloit note:nowrap "My Board" "Notes"`
-- **`note:get`** — Read note content
+- **`note:get`** — Read note content (board and panel optional)n:g
   - params: board*, panel*
   - example: `yoloit note:get "My Board" "Notes"`
-- **`sticky:get`** — Read sticky note content
+- **`sticky:get`** — Read sticky note content (board and panel optional)
   - params: board*, panel*
   - example: `yoloit sticky:get "My Board" "Idea"`
-- **`sticky:set`** — Set sticky note text
+- **`sticky:set`** — Set sticky note text (board and panel optional)
   - params: board*, panel*, text*
   - example: `yoloit sticky:set "My Board" "Idea" "Buy milk"`
-- **`sticky:append`** — Append text to a sticky note
+- **`sticky:append`** — Append text to a sticky note (board and panel optional)
   - params: board*, panel*, text*
   - example: `yoloit sticky:append "My Board" "Idea" " tomorrow"`
 - **`sticky:color`** — Set sticky note color
@@ -777,25 +797,25 @@ graph LR
   - example: `yoloit code:set "My Board" "Snippet" "print(1)"`
 
 ### checklist
-- **`checklist:add`** *(aliases: cl:a)* — Add checklist item — board and panel optional (alias: cl:a)
+- **`checklist:add`** *(aliases: cl:a)* — Add checklist item
   - params: item*, [panel], [board]
   - example: `yoloit checklist:add "Купить кофе"`
-- **`checklist:new`** *(aliases: cl:n)* — Create a new checklist panel (alias: cl:n)
+- **`checklist:new`** *(aliases: cl:n)* — Create a new checklist panel
   - params: title*, [board]
   - example: `yoloit checklist:new "Shopping"`
-- **`checklist:check`** *(aliases: cl:ch)* — Check checklist item — board and panel optional (alias: cl:ch)
+- **`checklist:check`** *(aliases: cl:ch)* — Mark a checklist item done by text, id, or zero-based index. Use checklist:uncheck to revert.
   - params: item*, [panel], [board]
   - example: `yoloit checklist:check "Купить кофе"`
-- **`checklist:uncheck`** *(aliases: cl:u)* — Uncheck checklist item — board and panel optional (alias: cl:u)
+- **`checklist:uncheck`** *(aliases: cl:u)* — Mark a checklist item not done (by text, id, or index)
   - params: item*, [panel], [board]
   - example: `yoloit checklist:uncheck "Купить кофе"`
-- **`checklist:items`** — List checklist items
+- **`checklist:items`** — List checklist items (board and panel optional)cl:ls
   - params: board*, panel*
   - example: `yoloit checklist:items "My Board" "Shopping"`
-- **`checklist:remove`** — Remove a checklist item
+- **`checklist:remove`** — Remove a checklist itemcl:rm
   - params: board*, panel*, item*
   - example: `yoloit checklist:remove "My Board" "Shopping" "milk"`
-- **`checklist:rename`** — Rename a checklist item
+- **`checklist:rename`** — Rename a checklist itemcl:rn
   - params: board*, panel*, old*, new*
   - example: `yoloit checklist:rename "My Board" "Shopping" "milk" "oat milk"`
 
@@ -803,10 +823,10 @@ graph LR
 - **`kanban:columns`** *(aliases: k:col)* — List kanban columns — board and panel optional (alias: k:col)
   - params: [panel], [board]
   - example: `yoloit kanban:columns`
-- **`kanban:add-column`** *(aliases: k:c)* — Add kanban column — board and panel optional (alias: k:c)
+- **`kanban:add-column`** *(aliases: k:c)* — Add kanban column
   - params: column-name*, [panel], [board]
   - example: `yoloit kanban:add-column "Review"`
-- **`kanban:rename-column`** *(aliases: k:rc)* — Rename kanban column — board and panel optional (alias: k:rc)
+- **`kanban:rename-column`** *(aliases: k:rc)* — Rename kanban column
   - params: col-name*, new-name*, [panel], [board]
   - example: `yoloit kanban:rename-column "Todo" "Backlog"`
 - **`kanban:remove-column`** *(aliases: k:dc)* — Remove kanban column — board and panel optional (alias: k:dc)
@@ -815,33 +835,33 @@ graph LR
 - **`kanban:add-card`** *(aliases: k:a, kanban:card)* — Add kanban card — board and panel optional (alias: k:a, kanban:card)
   - params: column*, title*, [panel], [board]
   - example: `yoloit kanban:card "Todo" "Fix mic"`
-- **`kanban:move-card`** *(aliases: k:mv)* — Move kanban card — board and panel optional (alias: k:mv)
+- **`kanban:move-card`** *(aliases: k:mv)* — Move kanban card
   - params: cardId*, to-column*, [panel], [board]
   - example: `yoloit kanban:move-card card_1 Done`
 - **`kanban:remove-card`** *(aliases: k:rm)* — Remove kanban card — board and panel optional (alias: k:rm)
   - params: cardId*, [panel], [board]
   - example: `yoloit kanban:remove-card card_1`
-- **`kanban:update-card`** *(aliases: k:up)* — Update kanban card title — board and panel optional (alias: k:up)
+- **`kanban:update-card`** *(aliases: k:up)* — Update kanban card title
   - params: cardId*, new-title*, [panel], [board]
   - example: `yoloit kanban:update-card card_1 "New title"`
 - **`kanban:cards`** *(aliases: k:ls)* — List kanban cards — board and panel optional (alias: k:ls)
   - params: [panel], [board]
   - example: `yoloit kanban:cards`
-- **`kanban:paste`** *(aliases: k:p)* — Create a kanban card from text — board and panel optional (alias: k:p)
+- **`kanban:paste`** *(aliases: k:p)* — Create a kanban card from text — board and panel optional (alias: k:p)k:p
   - params: text*, [column], [panel], [board]
   - example: `yoloit kanban:paste "Fix bug\nDescription here"`
-- **`kanban:send-card-to-chat`** — Send a kanban card to a chat panel
+- **`kanban:send-card-to-chat`** — Send a kanban card to a chat panelk:sc
   - params: board*, panel*, cardId*
   - example: `yoloit kanban:send-card-to-chat "My Board" "Kanban" card_123`
 
 ### playlist
-- **`play`** — Start playlist playback (optionally add media first)
+- **`play`** — START or RESUME music/audio playback in a playlist panel. Use ONLY when the user wants to START playing — not for pause, stop, listing tracks, or showing the panel. Examples: "включи музыку", "play music", "resume", "продолжи воспроизведение".
   - params: board, panel, file-or-url
   - example: `yoloit play "My Board" "Playlist" video.mp4`
-- **`pause`** *(aliases: pause)* — Pause playlist playback
+- **`pause`** *(aliases: pause)* — PAUSE music playback (temporary stop, can be resumed). Use for "пауза", "поставь на паузу", "поставь музыку на паузу", "pause music", "приостанови". NOT for stopping completely or showing playlist.
   - params: board, panel
   - example: `yoloit pause music`
-- **`stop`** *(aliases: stop)* — Stop playlist playback
+- **`stop`** *(aliases: stop)* — STOP music playback completely (resets to beginning). Use for "останови", "выключи музыку", "стоп", "stop music". NOT for pause or listing tracks.
   - params: board, panel
   - example: `yoloit stop music`
 - **`next`** *(aliases: next)* — Skip to the next track in the playlist
@@ -850,7 +870,7 @@ graph LR
 - **`prev`** *(aliases: prev)* — Go to the previous track in the playlist
   - params: board, panel
   - example: `yoloit prev music`
-- **`playlist:list`** *(aliases: pll)* — List tracks in a playlist panel
+- **`playlist:list`** *(aliases: pll)* — SHOW/LIST tracks in a playlist panel. Use for "покажи плейлист", "что в плейлисте", "список треков", "show playlist", "list tracks". NOT for playing music.
   - params: board, panel
   - example: `yoloit playlist:list music`
 - **`playlist:add`** — Add a track to a playlist

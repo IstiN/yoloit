@@ -27,7 +27,8 @@ final List<YoloitCliTool> panelTools = <YoloitCliTool>[
   YoloitCliTool(
     command: 'panel:help',
     alias: 'phx',
-    description: 'Show dynamic panel actions',
+    description:
+        'List dynamic panel actions and parameter docs (use panel / pgt for panel content)',
     group: 'panel',
     params: <YoloitCliToolParam>[boardParam(), panelParam()],
   ),
@@ -36,9 +37,9 @@ final List<YoloitCliTool> panelTools = <YoloitCliTool>[
     command: 'panel:create',
     alias: 'pmk',
     description:
-        'Create a panel. Always include the exact panel type id in `type`. '
-        'If unsure, call `panel:types` first. '
-        'For file trees/folder browser use type `board.filetree` (or `filetree:create`).',
+        'Create a panel. Include exact panel type id (call panel:types first). '
+        'For custom JS widget apps use app:run — NOT panel:create board.widget.custom. '
+        'For folder browser use board.filetree or filetree:create.',
     group: 'panel',
     humanVariants: const {
       'ru': [
@@ -437,6 +438,103 @@ final List<YoloitCliTool> panelTools = <YoloitCliTool>[
   ),
 
   YoloitCliTool(
+    command: 'calendar:update-event',
+    description: 'Update an existing calendar event by id',
+    group: 'panel',
+    params: <YoloitCliToolParam>[
+      boardParam(),
+      panelParam(),
+      toolParam('eventId', 'Event id', required: true),
+      toolParam('title', 'New title'),
+      toolParam('start', 'New start ISO datetime'),
+      toolParam('end', 'New end ISO datetime'),
+      toolParam('description', 'New description'),
+      toolParam('color', 'New color'),
+    ],
+  ),
+
+  YoloitCliTool(
+    command: 'chart:get',
+    description: 'Read chart panel configuration and data',
+    group: 'panel',
+    params: <YoloitCliToolParam>[boardParam(), panelParam()],
+  ),
+
+  YoloitCliTool(
+    command: 'diff:open',
+    description: 'Open a file in a diff preview panel',
+    group: 'panel',
+    params: <YoloitCliToolParam>[
+      boardParam(),
+      panelParam(),
+      toolParam('path', 'Absolute file path', required: true),
+    ],
+  ),
+
+  YoloitCliTool(
+    command: 'diff:set-root',
+    description: 'Set repository root for a diff preview panel',
+    group: 'panel',
+    params: <YoloitCliToolParam>[
+      boardParam(),
+      panelParam(),
+      toolParam('rootPath', 'Absolute repository root', required: true),
+    ],
+  ),
+
+  YoloitCliTool(
+    command: 'setup:select',
+    description: 'Select a setup package in a setup guide panel',
+    group: 'panel',
+    params: <YoloitCliToolParam>[
+      boardParam(),
+      panelParam(),
+      toolParam('packageId', 'Package id', required: true),
+    ],
+  ),
+
+  YoloitCliTool(
+    command: 'setup:unselect',
+    description: 'Unselect a setup package in a setup guide panel',
+    group: 'panel',
+    params: <YoloitCliToolParam>[
+      boardParam(),
+      panelParam(),
+      toolParam('packageId', 'Package id', required: true),
+    ],
+  ),
+
+  YoloitCliTool(
+    command: 'panel-files:list',
+    description: 'List files attached to a board.files panel',
+    group: 'panel',
+    params: <YoloitCliToolParam>[boardParam(), panelParam()],
+  ),
+
+  YoloitCliTool(
+    command: 'panel-files:add',
+    description: 'Attach a file path to a board.files panel',
+    group: 'panel',
+    params: <YoloitCliToolParam>[
+      boardParam(),
+      panelParam(),
+      toolParam('path', 'Absolute file path', required: true),
+    ],
+  ),
+
+  YoloitCliTool(
+    command: 'panel-files:remove',
+    description: 'Remove a file from a board.files panel by path or id',
+    group: 'panel',
+    params: <YoloitCliToolParam>[
+      boardParam(),
+      panelParam(),
+      toolParam('path', 'File path'),
+      toolParam('id', 'File entry id'),
+    ],
+  ),
+
+  YoloitCliTool(
     command: 'table:create',
     alias: 'tbc',
     description: 'Create a Table panel on a board',
@@ -646,8 +744,8 @@ final List<YoloitCliTool> panelTools = <YoloitCliTool>[
     description:
         'Advanced fallback: run a raw panel action from panel:help when no dedicated '
         'YoLoIT tool exists (table row ops, terminal output, custom widget actions). '
-        'Do NOT use for sticky/shape/note/checklist/kanban when typed tools exist — '
-        'use sticky:append, shape:set, note:append, checklist:add, kanban:add-card, etc. '
+        'Do NOT use for sticky/shape/note/checklist/kanban/board.ui when typed tools exist — '
+        'use sticky:append, shape:set, note:append, checklist:add, kanban:add-card, uirnd, etc. '
         'JSON body must be an object like {"text":"..."}, never a bare JSON string.',
     group: 'panel',
     params: <YoloitCliToolParam>[

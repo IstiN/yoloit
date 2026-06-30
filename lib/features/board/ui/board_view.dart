@@ -367,12 +367,12 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                       return Listener(
                                         behavior: HitTestBehavior.translucent,
                                         onPointerSignal: (event) {
+                                          final overScrollable =
+                                              _isPointerOverScrollableCard(
+                                                event.position,
+                                                event.viewId,
+                                              );
                                           if (event is PointerScrollEvent) {
-                                            final overScrollable =
-                                                _isPointerOverScrollableCard(
-                                                  event.position,
-                                                  event.viewId,
-                                                );
                                             final scale = matrixScaleOf(
                                               _transformController.value,
                                             );
@@ -386,7 +386,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                               'pos=${fmtOffset(event.position)} '
                                               'scale=${fmtDouble(scale)}',
                                             );
-                                            if (!isLocked && !overScrollable) {
+                                            if (!overScrollable) {
                                               CanvasInteractionLock.instance
                                                   .markCanvasSignalGesture();
                                             }
@@ -394,12 +394,13 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                             _boardSupportLog(
                                               'pointerSignal locked=$isLocked '
                                               'canvasGesture=${CanvasInteractionLock.instance.isCanvasGestureActive} '
+                                              'overScrollable=$overScrollable '
                                               'tool=${_activeTool.name} '
                                               'type=${event.runtimeType} '
                                               'pos=${fmtOffset(event.position)}',
                                             );
                                           }
-                                          if (isLocked) {
+                                          if (isLocked && overScrollable) {
                                             // Swallow the event here so
                                             // InteractiveViewer never sees it.
                                             return;
@@ -411,7 +412,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                 event.position,
                                                 event.viewId,
                                               );
-                                          if (!isLocked && !overScrollable) {
+                                          if (!overScrollable) {
                                             CanvasInteractionLock.instance
                                                 .beginCanvasGesture();
                                           }
@@ -1804,8 +1805,9 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     String panelId,
     DragUpdateDetails details,
   ) {
-    _panViewportNearEdge(details.globalPosition);
     final delta = _consumePanelDragDelta(details.globalPosition, details.delta);
+    _panViewportNearEdge(details.globalPosition);
+    _reanchorPanelDragPointer(details.globalPosition);
     final board = context.read<BoardCubit>().state.activeBoard;
     if (board != null && board.gridMode.enabled) {
       _gridDragAccumulatedDelta += delta;
@@ -1822,8 +1824,9 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     String groupId,
     DragUpdateDetails details,
   ) {
-    _panViewportNearEdge(details.globalPosition);
     final delta = _consumePanelDragDelta(details.globalPosition, details.delta);
+    _panViewportNearEdge(details.globalPosition);
+    _reanchorPanelDragPointer(details.globalPosition);
     final board = context.read<BoardCubit>().state.activeBoard;
     if (board == null) return;
     context.read<BoardCubit>().moveGroup(board.id, groupId, delta);
@@ -1834,8 +1837,9 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     BoardPanelInstance panel,
     BoardPanelResizeUpdate update,
   ) {
-    _panViewportNearEdge(update.globalPosition);
     final delta = _consumePanelDragDelta(update.globalPosition, update.delta);
+    _panViewportNearEdge(update.globalPosition);
+    _reanchorPanelDragPointer(update.globalPosition);
     _isCurrentTransformResize = true;
     final next = _resizeBoundsForHandle(panel, update.handle, delta);
     context.read<BoardCubit>().updatePanel(
@@ -2011,7 +2015,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     final current = _boardPointFromGlobal(globalPosition);
     if (previous == null || current == null) {
       _lastPanelDragBoardPointer = current;
-      return fallbackDelta;
+      return _scaledDragFallbackDelta(fallbackDelta);
     }
     _lastPanelDragBoardPointer = current;
     final delta = current - previous;
@@ -2019,6 +2023,17 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
       'panelDrag.delta pointer=${fmtOffset(current)} delta=${fmtOffset(delta)} fallback=${fmtOffset(fallbackDelta)}',
     );
     return delta;
+  }
+
+  void _reanchorPanelDragPointer(Offset globalPosition) {
+    if (!_isPanelDragging) return;
+    _lastPanelDragBoardPointer = _boardPointFromGlobal(globalPosition);
+  }
+
+  Offset _scaledDragFallbackDelta(Offset fallbackDelta) {
+    final scale = matrixScaleOf(_transformController.value);
+    if (scale == 0) return fallbackDelta;
+    return fallbackDelta / scale;
   }
 
   Widget _buildMultiSelectOverlay(

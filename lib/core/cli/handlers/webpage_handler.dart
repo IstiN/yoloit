@@ -155,7 +155,7 @@ class WebpageCliHandler extends PanelCliHandler {
   return true;
 })();
 ''');
-      if (clicked != true) {
+      if (clicked != true && !_jsTruthy(clicked)) {
         return CliActionResult(
           ok: false,
           message: 'No element matched selector: $selector',
@@ -199,6 +199,12 @@ class WebpageCliHandler extends PanelCliHandler {
       return value.toInt().toString();
     }
     return value.toString();
+  }
+
+  bool _jsTruthy(dynamic value) {
+    if (value == true) return true;
+    if (value is String) return value.toLowerCase() == 'true';
+    return false;
   }
 
   @override

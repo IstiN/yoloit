@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:yoloit/core/cli/handlers/server_helpers.dart';
+import 'package:yoloit/features/board/widgets/app_cli_utils.dart';
 import 'package:yoloit/features/board/widgets/widget_app_registry.dart';
 import 'package:yoloit/features/board/widgets/widget_registry_service.dart';
 
@@ -194,20 +195,69 @@ Future<shelf.Response> handleApps(
 
   // /api/apps/:id/...
   if (sub.length >= 2) {
-    final id = sub[0];
+    final rawId = sub[0];
     final action = sub[1];
+    final lookupId = appReg.resolveLookupKey(rawId);
+    final manifest = await registry.find(rawId);
+    final resolvedId = manifest?.id ?? lookupId;
 
-    // GET /api/apps/:id/snapshot — return current UI tree JSON
-    if (action == 'snapshot' && method == 'GET') {
-      final tree = appReg.tree(id);
-      if (tree == null) {
+    // GET /api/apps/:id/help — CLI help for this app
+    if (action == 'help' && method == 'GET') {
+      if (manifest == null) {
+        return json(
+          errorJson('App "$rawId" not found. Run app:list to see installed apps.'),
+        );
+      }
+      final running = appReg.engine(resolvedId) != null;
+      return json(
+        okJson(AppCliUtils.buildHelp(manifest: manifest, running: running)),
+      );
+    }
+
+    // GET /api/apps/:id/state — structured export + visible text
+    if (action == 'state' && method == 'GET') {
+      final engine = appReg.engine(resolvedId);
+      final tree = appReg.tree(resolvedId);
+      if (engine == null && tree == null) {
         return json(
           errorJson(
-            'No render tree available for widget "$id". Is it running?',
+            'App "$resolvedId" is not running. Start with: yoloit app:run $resolvedId',
           ),
         );
       }
-      return json(okJson({'widgetId': id, 'tree': tree}));
+      final exported = engine?.exportedState;
+      final text =
+          tree == null ? <String>[] : AppCliUtils.extractTextLines(tree);
+      return json(
+        okJson({
+          'widgetId': resolvedId,
+          'running': engine != null,
+          if (exported != null) 'state': exported,
+          'text': text,
+          if (manifest != null)
+            'help': AppCliUtils.buildHelp(manifest: manifest, running: true),
+        }),
+      );
+    }
+
+    // GET /api/apps/:id/snapshot — return current UI tree JSON
+    if (action == 'snapshot' && method == 'GET') {
+      final tree = appReg.tree(resolvedId);
+      if (tree == null) {
+        return json(
+          errorJson(
+            'No render tree available for app "$resolvedId". '
+            'Run: yoloit app:run $resolvedId',
+          ),
+        );
+      }
+      return json(
+        okJson({
+          'widgetId': resolvedId,
+          'tree': tree,
+          'text': AppCliUtils.extractTextLines(tree),
+        }),
+      );
     }
 
     // POST /api/apps/:id/execute — call JS event
@@ -217,42 +267,51 @@ Future<shelf.Response> handleApps(
       if (actionId == null || actionId.isEmpty) {
         return error(missingField('action'));
       }
-      final engine = appReg.engine(id);
+      final engine = appReg.engine(resolvedId);
       if (engine == null) {
         return json(
-          errorJson('Widget "$id" is not currently running'),
+          errorJson(
+            'App "$resolvedId" is not running. Run: yoloit app:run $resolvedId',
+          ),
         );
       }
       final payload = requestBody['payload'] as Map<String, dynamic>?;
-      engine.callEvent(actionId, payload);
-      return json(okJson({'widgetId': id, 'action': actionId}));
+      await engine.callEvent(actionId, payload);
+      final exported = engine.exportedState;
+      return json(
+        okJson({
+          'widgetId': resolvedId,
+          'action': actionId,
+          if (exported != null) 'state': exported,
+        }),
+      );
     }
 
     // GET /api/apps/:id/logs — return console.log buffer
     if (action == 'logs' && method == 'GET') {
-      final engine = appReg.engine(id);
+      final engine = appReg.engine(resolvedId);
       if (engine == null) {
         return json(
           errorJson(
-            'App "$id" is not currently running',
+            'App "$resolvedId" is not running',
             extra: {'logs': <Map<String, dynamic>>[]},
           ),
         );
       }
       final logs = engine.peekLogs();
-      return json(okJson({'widgetId': id, 'logs': logs}));
+      return json(okJson({'widgetId': resolvedId, 'logs': logs}));
     }
 
     // POST /api/apps/:id/reload — hot-reload widget JS without restarting the app
     if (action == 'reload' && method == 'POST') {
-      final ok = await appReg.triggerReload(id);
+      final ok = await appReg.triggerReload(resolvedId);
       if (!ok) {
         return json(
-          errorJson('Widget "$id" is not currently running'),
+          errorJson('App "$resolvedId" is not currently running'),
         );
       }
       return json(
-        okJson({'widgetId': id, 'message': 'Widget reloaded'}),
+        okJson({'widgetId': resolvedId, 'message': 'Widget reloaded'}),
       );
     }
 
@@ -261,7 +320,8 @@ Future<shelf.Response> handleApps(
       // TODO: implement full screenshot once BoardScreenshotService.capturePanel(panelId) is wired to widgetId lookup
       return json(
         errorJson(
-          'Widget screenshot requires the panel to be visible on screen. Use app:snapshot for the render tree.',
+          'Widget screenshot requires the panel to be visible on screen. '
+          'Use app:snapshot for the JSON render tree instead.',
         ),
       );
     }

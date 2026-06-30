@@ -16,6 +16,8 @@ mkfifo "$FIFO"
 # separate writer (hot_reload.sh opens the pipe briefly to send "r").
 exec 3<>"$FIFO"
 
+export YOLOIT_PROJECT_ROOT="$(cd "$(dirname "$0")" && pwd)"
+
 echo "🚀 Starting yoloit..."
 echo "💡 Use ./hot_reload.sh to hot reload"
 

@@ -84,6 +84,17 @@ final List<YoloitCliTool> runTools = <YoloitCliTool>[
   ),
 
   YoloitCliTool(
+    command: 'terminal:set-session',
+    description: 'Attach a terminal panel to an existing session id',
+    group: 'run',
+    params: <YoloitCliToolParam>[
+      boardParam(),
+      panelParam(),
+      toolParam('sessionId', 'Terminal session id', required: true),
+    ],
+  ),
+
+  YoloitCliTool(
     command: 'run:detach',
     alias: 'rdt',
     description: 'Detach run session from panel',
@@ -124,6 +135,36 @@ final List<YoloitCliTool> runTools = <YoloitCliTool>[
       panelParam(),
       toolParam('session', 'Session id, config id, or name', shortKey: 's'),
     ],
+  ),
+
+  YoloitCliTool(
+    command: 'run:set-group',
+    description:
+        'Set the run session group scope for a board.run panel (not run_configs)',
+    group: 'run',
+    params: <YoloitCliToolParam>[
+      boardParam(),
+      panelParam(),
+      toolParam('group', 'Group id', required: true),
+    ],
+  ),
+
+  YoloitCliTool(
+    command: 'run:select-session',
+    description: 'Focus a run session tab in a board.run panel',
+    group: 'run',
+    params: <YoloitCliToolParam>[
+      boardParam(),
+      panelParam(),
+      toolParam('sessionId', 'Run session id', required: true),
+    ],
+  ),
+
+  YoloitCliTool(
+    command: 'run:clear-session',
+    description: 'Clear the focused run session tab in a board.run panel',
+    group: 'run',
+    params: <YoloitCliToolParam>[boardParam(), panelParam()],
   ),
 
   YoloitCliTool(

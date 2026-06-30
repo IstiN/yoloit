@@ -18,7 +18,7 @@ final List<YoloitCliTool> noteTools = <YoloitCliTool>[
     },
     params: <YoloitCliToolParam>[
       boardParam(),
-      panelParam(),
+      optionalPanelParam(),
       toolParam('text', 'Markdown text', required: true, shortKey: 'tx'),
     ],
   ),
@@ -67,7 +67,7 @@ final List<YoloitCliTool> noteTools = <YoloitCliTool>[
     },
     params: <YoloitCliToolParam>[
       boardParam(),
-      panelParam(),
+      optionalPanelParam(),
       toolParam('text', 'Text to append', required: true, shortKey: 'tx'),
     ],
   ),
@@ -75,19 +75,19 @@ final List<YoloitCliTool> noteTools = <YoloitCliTool>[
   YoloitCliTool(
     command: 'sticky:get',
     alias: 'stg',
-    description: 'Read sticky note content',
+    description: 'Read sticky note content (board and panel optional)',
     group: 'note',
-    params: <YoloitCliToolParam>[boardParam(), panelParam()],
+    params: <YoloitCliToolParam>[boardParam(), optionalPanelParam()],
   ),
 
   YoloitCliTool(
     command: 'sticky:set',
     alias: 'sts',
-    description: 'Set sticky note text',
+    description: 'Set sticky note text (board and panel optional)',
     group: 'note',
     params: <YoloitCliToolParam>[
       boardParam(),
-      panelParam(),
+      optionalPanelParam(),
       toolParam(
         'text',
         'Note text',
@@ -101,11 +101,11 @@ final List<YoloitCliTool> noteTools = <YoloitCliTool>[
   YoloitCliTool(
     command: 'sticky:append',
     alias: 'sta',
-    description: 'Append text to a sticky note',
+    description: 'Append text to a sticky note (board and panel optional)',
     group: 'note',
     params: <YoloitCliToolParam>[
       boardParam(),
-      panelParam(),
+      optionalPanelParam(),
       toolParam(
         'text',
         'Text to append',
@@ -224,7 +224,7 @@ final List<YoloitCliTool> noteTools = <YoloitCliTool>[
     },
     params: <YoloitCliToolParam>[
       boardParam(),
-      panelParam(),
+      optionalPanelParam(),
       toolParam(
         'item',
         'Checklist item text',
@@ -238,7 +238,9 @@ final List<YoloitCliTool> noteTools = <YoloitCliTool>[
   YoloitCliTool(
     command: 'checklist:check',
     alias: 'chck',
-    description: 'Toggle checklist item state',
+    description:
+        'Mark a checklist item done by text, id, or zero-based index. '
+        'Use checklist:uncheck to revert.',
     group: 'checklist',
     humanVariants: const {
       'ru': [
@@ -256,12 +258,12 @@ final List<YoloitCliTool> noteTools = <YoloitCliTool>[
     },
     params: <YoloitCliToolParam>[
       boardParam(),
-      panelParam(),
+      optionalPanelParam(),
       toolParam(
         'item',
-        'Item id or text',
+        'Item id, text, or zero-based index',
         required: true,
-        aliases: const ['id', 'text'],
+        aliases: const ['id', 'text', 'index'],
         shortKey: 'it',
       ),
     ],
@@ -270,11 +272,11 @@ final List<YoloitCliTool> noteTools = <YoloitCliTool>[
   YoloitCliTool(
     command: 'checklist:uncheck',
     alias: 'chun',
-    description: 'Toggle checklist item state',
+    description: 'Mark a checklist item not done (by text, id, or index)',
     group: 'checklist',
     params: <YoloitCliToolParam>[
       boardParam(),
-      panelParam(),
+      optionalPanelParam(),
       toolParam(
         'item',
         'Item id or text',
