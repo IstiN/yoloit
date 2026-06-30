@@ -68,10 +68,10 @@ dependencies:
   vector_math: 2.2.0
   cryptography: ^2.9.0
   webview_flutter: ^4.14.0
-  fl_chart: ^0.70.2
+  fl_chart: ^1.2.0
   pluto_grid: ^8.1.0
   media_kit: ^1.1.11
-  media_kit_video: ^1.2.4
+  media_kit_video: ^2.0.1
   media_kit_libs_video: ^1.0.5
   record: ^6.2.1
   local_models_sdk:

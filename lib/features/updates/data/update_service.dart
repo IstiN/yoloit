@@ -6,6 +6,9 @@ import 'package:flutter/foundation.dart';
 import 'package:yoloit/core/platform/platform_installer.dart';
 import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/core/session/session_prefs.dart';
+import 'package:yoloit/features/updates/data/update_check_result.dart';
+
+export 'package:yoloit/features/updates/data/update_check_result.dart';
 
 // ── UpdateInfo ────────────────────────────────────────────────────────────────
 
@@ -67,27 +70,39 @@ class UpdateService {
   // ── Public API ─────────────────────────────────────────────────────────────
 
   /// Checks GitHub for a newer release.
-  /// Returns [UpdateInfo] when an update is available, null otherwise.
-  /// Also updates the last-check timestamp in prefs.
+  /// Also updates the last-check timestamp in prefs on success.
   ///
   /// Pass [force] = true to skip the dev-build guard (e.g. "Check Now" button).
-  static Future<UpdateInfo?> checkForUpdate({bool force = false}) async {
+  static Future<UpdateCheckResult> checkForUpdate({bool force = false}) async {
     // Never auto-check in dev builds — only allow manual force-check
-    if (!force && isDevBuild) return null;
+    if (!force && isDevBuild) return UpdateCheckResult.upToDate();
 
     try {
       final appVersion = await getAppVersion();
       final info = await _fetchLatestRelease();
+      if (info == null) {
+        return UpdateCheckResult.failed(
+          'Could not reach GitHub releases API. '
+          'If you hit rate limits, set GITHUB_TOKEN in your environment.',
+        );
+      }
+
       await SessionPrefs.saveLastUpdateCheckMs(
-          DateTime.now().millisecondsSinceEpoch);
-      if (info == null) return null;
+        DateTime.now().millisecondsSinceEpoch,
+      );
 
       final skipped = await SessionPrefs.getSkippedVersion();
-      if (skipped == info.version) return null; // user dismissed this version
+      if (skipped == info.version) {
+        return UpdateCheckResult.skipped(info.version);
+      }
 
-      return _isNewer(info.version, appVersion) ? info : null;
-    } catch (_) {
-      return null;
+      return isVersionNewer(info.version, appVersion)
+          ? UpdateCheckResult.available(info)
+          : UpdateCheckResult.upToDate();
+    } on SocketException {
+      return UpdateCheckResult.failed('No network connection.');
+    } catch (e) {
+      return UpdateCheckResult.failed('Update check failed: $e');
     }
   }
 
@@ -158,58 +173,91 @@ class UpdateService {
       req.headers
         ..set(HttpHeaders.acceptHeader, 'application/vnd.github+json')
         ..set(HttpHeaders.userAgentHeader, 'YoLoIT/$currentVersion');
+      final token = Platform.environment['GITHUB_TOKEN'];
+      if (token != null && token.isNotEmpty) {
+        req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
+      }
 
       final resp = await req.close().timeout(const Duration(seconds: 10));
-      if (resp.statusCode != 200) return null;
+      if (resp.statusCode != 200) {
+        if (resp.statusCode == 403) {
+          throw StateError(
+            'GitHub API rate limit exceeded. Set GITHUB_TOKEN to raise limits.',
+          );
+        }
+        return null;
+      }
 
       final body = await resp.transform(utf8.decoder).join();
       final json = jsonDecode(body) as Map<String, dynamic>;
-
-      final tagName = (json['tag_name'] as String? ?? '').trim();
-      final version = tagName.startsWith('v') ? tagName.substring(1) : tagName;
-      final htmlUrl = json['html_url'] as String? ?? '';
-      final notes = json['body'] as String? ?? '';
-
-      // Pick the platform-specific asset
-      final assets = json['assets'] as List<dynamic>? ?? [];
-      final expectedAsset = Platform.isMacOS ? _expectedMacosAssetName(version) : null;
-      String? downloadUrl;
-      String? fallbackUrl;
-      for (final a in assets) {
-        final asset = a as Map<String, dynamic>;
-        final name = (asset['name'] as String? ?? '').toLowerCase();
-        final url = asset['browser_download_url'] as String?;
-        if (Platform.isMacOS && name.endsWith('.dmg')) {
-          fallbackUrl ??= url;
-          if (expectedAsset != null && name == expectedAsset) {
-            downloadUrl = url;
-            break;
-          }
-        } else if (Platform.isWindows && name.endsWith('.zip')) {
-          downloadUrl = url;
-          break;
-        } else if (Platform.isLinux && name.endsWith('.tar.gz')) {
-          downloadUrl = url;
-          break;
-        }
-      }
-      downloadUrl ??= fallbackUrl;
-
-      return UpdateInfo(
-        version: version,
-        tagName: tagName,
-        releaseUrl: htmlUrl,
-        releaseNotes: notes,
-        downloadUrl: downloadUrl,
+      return parseGitHubReleaseJson(
+        json,
+        isMacOS: Platform.isMacOS,
+        isWindows: Platform.isWindows,
+        isLinux: Platform.isLinux,
+        macosAssetName: Platform.isMacOS ? expectedMacosAssetName(versionFromTag(json)) : null,
       );
     } finally {
       client.close();
     }
   }
 
+  @visibleForTesting
+  static String versionFromTag(Map<String, dynamic> json) {
+    final tagName = (json['tag_name'] as String? ?? '').trim();
+    return tagName.startsWith('v') ? tagName.substring(1) : tagName;
+  }
+
+  @visibleForTesting
+  static UpdateInfo? parseGitHubReleaseJson(
+    Map<String, dynamic> json, {
+    required bool isMacOS,
+    required bool isWindows,
+    required bool isLinux,
+    String? macosAssetName,
+  }) {
+    final tagName = (json['tag_name'] as String? ?? '').trim();
+    if (tagName.isEmpty) return null;
+    final version = versionFromTag(json);
+    final htmlUrl = json['html_url'] as String? ?? '';
+    final notes = json['body'] as String? ?? '';
+
+    final assets = json['assets'] as List<dynamic>? ?? [];
+    String? downloadUrl;
+    String? fallbackUrl;
+    for (final a in assets) {
+      final asset = a as Map<String, dynamic>;
+      final name = (asset['name'] as String? ?? '').toLowerCase();
+      final url = asset['browser_download_url'] as String?;
+      if (isMacOS && name.endsWith('.dmg')) {
+        fallbackUrl ??= url;
+        if (macosAssetName != null && name == macosAssetName.toLowerCase()) {
+          downloadUrl = url;
+          break;
+        }
+      } else if (isWindows && name.endsWith('.zip')) {
+        downloadUrl = url;
+        break;
+      } else if (isLinux && name.endsWith('.tar.gz')) {
+        downloadUrl = url;
+        break;
+      }
+    }
+    downloadUrl ??= fallbackUrl;
+
+    return UpdateInfo(
+      version: version,
+      tagName: tagName,
+      releaseUrl: htmlUrl,
+      releaseNotes: notes,
+      downloadUrl: downloadUrl,
+    );
+  }
+
   /// Returns the expected macOS DMG asset name for the current CPU architecture,
   /// or `null` if the architecture cannot be determined.
-  static String? _expectedMacosAssetName(String version) {
+  @visibleForTesting
+  static String? expectedMacosAssetName(String version) {
     final abi = Abi.current();
     if (abi == Abi.macosArm64) {
       return 'yoloit-macos-arm64-$version.dmg';
@@ -222,7 +270,8 @@ class UpdateService {
 
   /// Returns true when [candidate] is strictly newer than [current].
   /// Compares semver segments numerically (major.minor.patch).
-  static bool _isNewer(String candidate, String current) {
+  @visibleForTesting
+  static bool isVersionNewer(String candidate, String current) {
     List<int> parse(String v) => v
         .split('.')
         .map((s) => int.tryParse(s.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0)

@@ -103,4 +103,16 @@ void main() {
     expect(find.byType(ChartPanelContent), findsOneWidget);
     expect(find.text('Bar'), findsOneWidget);
   });
+
+  testWidgets('renders all chart types with fl_chart 1.x', (tester) async {
+    for (final type in ['line', 'bar', 'pie', 'scatter', 'radar', 'area']) {
+      final storage = <Map<String, dynamic>?>[null];
+      await pumpChart(
+        tester,
+        chartPanel(state: {'type': type, 'animated': false}),
+        context(storage),
+      );
+      expect(find.byType(ChartPanelContent), findsOneWidget);
+    }
+  });
 }

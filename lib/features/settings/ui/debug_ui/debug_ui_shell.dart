@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/features/settings/ui/debug_ui/sections/dependency_panels_showcase.dart';
 import 'package:yoloit/features/settings/ui/debug_ui/sections/chat_message_showcase.dart';
 import 'package:yoloit/features/settings/ui/debug_ui/sections/color_showcase.dart';
 import 'package:yoloit/features/settings/ui/debug_ui/sections/component_showcase.dart';
@@ -28,6 +29,7 @@ class _DebugUIShellState extends State<DebugUIShell> {
     ('Colors', ColorShowcase()),
     ('Components', ComponentShowcase()),
     ('Panel Chrome Prototype', PanelChromePrototype()),
+    ('Dependency Panels', DependencyPanelsShowcase()),
     ('Chat Messages', ChatMessageShowcase()),
   ];
 

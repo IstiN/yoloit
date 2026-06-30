@@ -15,6 +15,7 @@ class AboutSectionState extends State<AboutSection> {
   bool _autoCheck = true;
   UpdateInfo? _updateInfo;
   String? _upToDateMsg;
+  String? _checkError;
   bool _installing = false;
   double? _installProgress;
   String _installStatus = '';
@@ -35,16 +36,25 @@ class AboutSectionState extends State<AboutSection> {
     setState(() {
       _checking = true;
       _upToDateMsg = null;
+      _checkError = null;
       _updateInfo = null;
     });
-    final info = await UpdateService.checkForUpdate(force: true);
+    final result = await UpdateService.checkForUpdate(force: true);
     if (!mounted) return;
     setState(() {
       _checking = false;
-      _updateInfo = info;
-      if (info == null) {
-        _upToDateMsg =
-            'You are on the latest version (${UpdateService.currentVersion}).';
+      switch (result.status) {
+        case UpdateCheckStatus.available:
+          _updateInfo = result.info;
+        case UpdateCheckStatus.upToDate:
+          _upToDateMsg =
+              'You are on the latest version (${UpdateService.currentVersion}).';
+        case UpdateCheckStatus.skipped:
+          _upToDateMsg =
+              'v${result.skippedVersion} is available but was skipped. '
+              'Clear skip in prefs or wait for a newer release.';
+        case UpdateCheckStatus.failed:
+          _checkError = result.errorMessage;
       }
     });
   }
@@ -211,7 +221,9 @@ class AboutSectionState extends State<AboutSection> {
               ),
               const SizedBox(height: 4),
               Text(
-                'Checks GitHub releases once per day in release builds.',
+                UpdateService.isDevBuild
+                    ? 'DEV build: auto-check is off. Use “Check for Updates” manually.'
+                    : 'Checks GitHub releases once per day in release builds.',
                 style: TextStyle(
                   color: context.appColors.textMuted,
                   fontSize: 10,
@@ -251,6 +263,27 @@ class AboutSectionState extends State<AboutSection> {
               ),
 
               // Result
+              if (_checkError != null) ...[
+                const SizedBox(height: 10),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      size: 14,
+                      color: colors.accentRed,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        _checkError!,
+                        style: TextStyle(color: colors.accentRed, fontSize: 11),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+
               if (_upToDateMsg != null) ...[
                 const SizedBox(height: 10),
                 Row(

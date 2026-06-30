@@ -129,8 +129,9 @@ class _MainShellState extends State<MainShell> with WindowListener {
       if (elapsed < const Duration(hours: 24).inMilliseconds) return;
     }
 
-    final info = await UpdateService.checkForUpdate();
-    if (!mounted || info == null) return;
+    final result = await UpdateService.checkForUpdate();
+    if (!mounted || result.status != UpdateCheckStatus.available) return;
+    final info = result.info!;
 
     // ── Found an update — start silent download immediately ──────────────────
     setState(() {
