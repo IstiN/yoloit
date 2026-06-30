@@ -32,10 +32,9 @@ const _$SkillStoreTypeEnumMap = {
 
 SkillsStoreConfig _$SkillsStoreConfigFromJson(Map<String, dynamic> json) =>
     SkillsStoreConfig(
-      stores:
-          (json['stores'] as List<dynamic>)
-              .map((e) => SkillStore.fromJson(e as Map<String, dynamic>))
-              .toList(),
+      stores: (json['stores'] as List<dynamic>)
+          .map((e) => SkillStore.fromJson(e as Map<String, dynamic>))
+          .toList(),
       catalog:
           (json['catalog'] as List<dynamic>?)
               ?.map((e) => SkillEntry.fromJson(e as Map<String, dynamic>))

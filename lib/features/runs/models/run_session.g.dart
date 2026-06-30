@@ -32,10 +32,9 @@ RunSession _$RunSessionFromJson(Map<String, dynamic> json) => RunSession(
           .toList() ??
       const [],
   exitCode: (json['exitCode'] as num?)?.toInt(),
-  startedAt:
-      json['startedAt'] == null
-          ? null
-          : DateTime.parse(json['startedAt'] as String),
+  startedAt: json['startedAt'] == null
+      ? null
+      : DateTime.parse(json['startedAt'] as String),
 );
 
 Map<String, dynamic> _$RunSessionToJson(RunSession instance) =>

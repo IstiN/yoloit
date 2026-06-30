@@ -53,12 +53,11 @@ SetupPackageStatus _$SetupPackageStatusFromJson(Map<String, dynamic> json) =>
       required: json['required'] as bool,
       available: json['available'] as bool,
       version: json['version'] as String?,
-      installAction:
-          json['installAction'] == null
-              ? null
-              : SetupInstallAction.fromJson(
-                json['installAction'] as Map<String, dynamic>,
-              ),
+      installAction: json['installAction'] == null
+          ? null
+          : SetupInstallAction.fromJson(
+              json['installAction'] as Map<String, dynamic>,
+            ),
     );
 
 Map<String, dynamic> _$SetupPackageStatusToJson(SetupPackageStatus instance) =>
@@ -80,15 +79,15 @@ const _$SetupPackageCategoryEnumMap = {
   SetupPackageCategory.optional: 'optional',
 };
 
-SetupCheckSnapshot _$SetupCheckSnapshotFromJson(
-  Map<String, dynamic> json,
-) => SetupCheckSnapshot(
-  runtime: SetupRuntimeInfo.fromJson(json['runtime'] as Map<String, dynamic>),
-  packages:
-      (json['packages'] as List<dynamic>)
+SetupCheckSnapshot _$SetupCheckSnapshotFromJson(Map<String, dynamic> json) =>
+    SetupCheckSnapshot(
+      runtime: SetupRuntimeInfo.fromJson(
+        json['runtime'] as Map<String, dynamic>,
+      ),
+      packages: (json['packages'] as List<dynamic>)
           .map((e) => SetupPackageStatus.fromJson(e as Map<String, dynamic>))
           .toList(),
-);
+    );
 
 Map<String, dynamic> _$SetupCheckSnapshotToJson(SetupCheckSnapshot instance) =>
     <String, dynamic>{

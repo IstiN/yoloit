@@ -19,10 +19,9 @@ ChatSessionEntry _$ChatSessionEntryFromJson(Map<String, dynamic> json) =>
               ?.map((e) => e as String)
               .toList() ??
           [],
-      lastMessageAt:
-          json['lastMessageAt'] == null
-              ? null
-              : DateTime.parse(json['lastMessageAt'] as String),
+      lastMessageAt: json['lastMessageAt'] == null
+          ? null
+          : DateTime.parse(json['lastMessageAt'] as String),
       messageCount: (json['messageCount'] as num?)?.toInt() ?? 0,
     );
 

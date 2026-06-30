@@ -10,10 +10,9 @@ ProviderCatalog _$ProviderCatalogFromJson(Map<String, dynamic> json) =>
     ProviderCatalog(
       id: json['id'] as String,
       displayName: json['displayName'] as String,
-      models:
-          (json['models'] as List<dynamic>)
-              .map((e) => ChatModelInfo.fromJson(e as Map<String, dynamic>))
-              .toList(),
+      models: (json['models'] as List<dynamic>)
+          .map((e) => ChatModelInfo.fromJson(e as Map<String, dynamic>))
+          .toList(),
     );
 
 Map<String, dynamic> _$ProviderCatalogToJson(ProviderCatalog instance) =>

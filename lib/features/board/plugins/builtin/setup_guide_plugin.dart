@@ -618,7 +618,6 @@ class _PackageTile extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 7),
       decoration: BoxDecoration(
-        color: colors.surfaceElevated,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color:
@@ -629,7 +628,10 @@ class _PackageTile extends StatelessWidget {
                   : colors.border,
         ),
       ),
-      child: CheckboxListTile(
+      clipBehavior: Clip.antiAlias,
+      child: Material(
+        color: colors.surfaceElevated,
+        child: CheckboxListTile(
         value: selected,
         onChanged:
             available || !canInstall
@@ -696,6 +698,7 @@ class _PackageTile extends StatelessWidget {
               ),
           ],
         ),
+      ),
       ),
     );
   }

@@ -32,7 +32,7 @@ Map<String, dynamic> _$CloudLlmConfigToJson(CloudLlmConfig instance) =>
 
 VoiceSettings _$VoiceSettingsFromJson(Map<String, dynamic> json) =>
     VoiceSettings(
-      useCloudAsr: json['useCloudAsr'] as bool? ?? false,
+      useCloudAsr: json['useCloudAsr'] as bool? ?? true,
       convertWavToMp3: json['convertWavToMp3'] as bool? ?? false,
       useChatModelForCloudAsr: json['useChatModelForCloudAsr'] as bool? ?? true,
       cloudAsrConfigId: json['cloudAsrConfigId'] as String?,

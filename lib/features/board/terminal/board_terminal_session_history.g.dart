@@ -18,10 +18,9 @@ BoardTerminalSessionEntry _$BoardTerminalSessionEntryFromJson(
           ?.map((e) => e as String)
           .toList() ??
       const [],
-  lastActiveAt:
-      json['lastActiveAt'] == null
-          ? null
-          : DateTime.parse(json['lastActiveAt'] as String),
+  lastActiveAt: json['lastActiveAt'] == null
+      ? null
+      : DateTime.parse(json['lastActiveAt'] as String),
 );
 
 Map<String, dynamic> _$BoardTerminalSessionEntryToJson(

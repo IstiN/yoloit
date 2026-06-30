@@ -40,14 +40,12 @@ RemoteDirectoryListing _$RemoteDirectoryListingFromJson(
 ) => RemoteDirectoryListing(
   path: json['path'] as String,
   parent: json['parent'] as String?,
-  entries:
-      (json['entries'] as List<dynamic>)
-          .map((e) => RemoteDirectoryEntry.fromJson(e as Map<String, dynamic>))
-          .toList(),
-  roots:
-      (json['roots'] as List<dynamic>)
-          .map((e) => RemoteDirectoryEntry.fromJson(e as Map<String, dynamic>))
-          .toList(),
+  entries: (json['entries'] as List<dynamic>)
+      .map((e) => RemoteDirectoryEntry.fromJson(e as Map<String, dynamic>))
+      .toList(),
+  roots: (json['roots'] as List<dynamic>)
+      .map((e) => RemoteDirectoryEntry.fromJson(e as Map<String, dynamic>))
+      .toList(),
 );
 
 Map<String, dynamic> _$RemoteDirectoryListingToJson(
@@ -78,8 +76,9 @@ Map<String, dynamic> _$RemoteDirectoryEntryToJson(
 RemoteTerminalLog _$RemoteTerminalLogFromJson(Map<String, dynamic> json) =>
     RemoteTerminalLog(
       next: (json['next'] as num).toInt(),
-      chunks:
-          (json['chunks'] as List<dynamic>).map((e) => e as String).toList(),
+      chunks: (json['chunks'] as List<dynamic>)
+          .map((e) => e as String)
+          .toList(),
       running: json['running'] as bool,
       exitCode: (json['exitCode'] as num?)?.toInt(),
     );

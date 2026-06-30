@@ -1,6 +1,5 @@
 # Dependabot keeps Dart/Flutter deps and GitHub Actions up to date.
-# SDK gates (Dart 3.10.8 today): record >=7 needs 3.12, xml >=7 needs 3.11,
-# json_serializable >=6.13 needs analyzer 10+ (conflicts with flutter_test).
+# Requires Dart >=3.12 (Flutter 3.44.4+) for record 7, xml 7, json_serializable 6.14+.
 version: 2
 updates:
   - package-ecosystem: pub
@@ -9,15 +8,6 @@ updates:
       interval: weekly
       day: monday
     open-pull-requests-limit: 10
-    ignore:
-      - dependency-name: record
-        update-types: [version-update:semver-major]
-      - dependency-name: xml
-        update-types: [version-update:semver-major]
-      - dependency-name: json_annotation
-        update-types: [version-update:semver-major]
-      - dependency-name: json_serializable
-        update-types: [version-update:semver-major]
     groups:
       flutter-runtime:
         patterns:

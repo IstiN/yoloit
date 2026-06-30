@@ -10,10 +10,9 @@ ChatMessage _$ChatMessageFromJson(Map<String, dynamic> json) => ChatMessage(
   id: json['id'] as String? ?? '',
   role: $enumDecodeNullable(_$ChatRoleEnumMap, json['role']) ?? ChatRole.system,
   content: json['content'] as String? ?? '',
-  timestamp:
-      json['timestamp'] == null
-          ? null
-          : DateTime.parse(json['timestamp'] as String),
+  timestamp: json['timestamp'] == null
+      ? null
+      : DateTime.parse(json['timestamp'] as String),
   toolCalls:
       (json['toolCalls'] as List<dynamic>?)
           ?.map((e) => ChatToolCall.fromJson(e as Map<String, dynamic>))
@@ -22,10 +21,9 @@ ChatMessage _$ChatMessageFromJson(Map<String, dynamic> json) => ChatMessage(
   toolName: json['toolName'] as String?,
   toolCallId: json['toolCallId'] as String?,
   isStreaming: json['isStreaming'] as bool? ?? false,
-  tokenUsage:
-      json['tokenUsage'] == null
-          ? null
-          : ChatTokenUsage.fromJson(json['tokenUsage'] as Map<String, dynamic>),
+  tokenUsage: json['tokenUsage'] == null
+      ? null
+      : ChatTokenUsage.fromJson(json['tokenUsage'] as Map<String, dynamic>),
   metadata: json['metadata'] as Map<String, dynamic>?,
   attachments:
       (json['attachments'] as List<dynamic>?)

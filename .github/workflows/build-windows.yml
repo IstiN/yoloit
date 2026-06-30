@@ -20,7 +20,7 @@ jobs:
   build-windows:
     name: Build Windows App
     # windows-latest currently resolves to a Windows Server 2025 / VS 2026 image
-    # that Flutter 3.35.3 does not detect correctly. Pin windows-2022 until Flutter
+    # Flutter 3.35.3 does not detect correctly. Pin windows-2022 until Flutter
     # supports the new VS 2026 runner image.
     runs-on: windows-2022
     permissions:
@@ -46,7 +46,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.35.3'
+          flutter-version: '3.44.4'
           channel: 'stable'
           cache: true
 

@@ -86,14 +86,8 @@ class _DependencyPanelsShowcaseState extends State<DependencyPanelsShowcase> {
         const SectionTitle('Major dependency panels (manual QA)'),
         const SizedBox(height: 6),
         Text(
-          'fl_chart ^1.2 • media_kit_video ^2.0 • record ^6.2 • xml ^6.6',
+          'fl_chart ^1.2 • media_kit_video ^2.0 • record ^7.1 • xml ^7.0',
           style: TextStyle(color: colors.textMuted, fontSize: 11),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Blocked until Dart SDK bump: record ≥7 (needs 3.12), xml ≥7 (needs 3.11), '
-          'json_serializable ≥6.13 (needs analyzer 10+).',
-          style: TextStyle(color: colors.textMuted, fontSize: 10, height: 1.4),
         ),
         const SizedBox(height: 20),
         const SectionTitle('Chart panel — all types (fl_chart)'),
@@ -214,7 +208,7 @@ class _MicRecordProbeState extends State<_MicRecordProbe> {
       if (!mounted) return;
       setState(() {
         _status = granted
-            ? 'Microphone permission granted. YoLo chat + assistant use record ^6.2.'
+            ? 'Microphone permission granted. YoLo chat + assistant use record ^7.1.'
             : 'Microphone permission denied — grant in System Settings → Privacy.';
       });
     } catch (e) {
@@ -281,7 +275,7 @@ class _IclsThemePreview extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Settings → Theme → Import .icls uses xml ^6.6 via IclsThemeAdapter.',
+          'Settings → Theme → Import .icls uses xml ^7.0 via IclsThemeAdapter.',
           style: TextStyle(color: colors.textMuted, fontSize: 11, height: 1.5),
         ),
         const SizedBox(height: 10),

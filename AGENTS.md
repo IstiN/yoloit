@@ -7,6 +7,7 @@ This guide outlines non-obvious developer commands, compilation pipelines, stric
 ## ⚡ Non-Obvious Commands & Local Workflows
 
 - **Interactive macOS Launch & Hot-Reload**:
+  - Requires **Flutter 3.44.4+** (Dart 3.12+) — `record` 7, `xml` 7, `json_serializable` 6.14+.
   - Run: `./run.sh` (starts Flutter with a FIFO pipe at `/tmp/yoloit_flutter_stdin`).
   - Hot Reload: `./hot_reload.sh` (triggers hot-reload on the running instance by writing `r` to the pipe).
 - **Dual Target & Web Client Compilation**:

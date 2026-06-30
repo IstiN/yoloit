@@ -65,12 +65,9 @@ BoardPanelLink _$BoardPanelLinkFromJson(Map<String, dynamic> json) =>
       behavior:
           $enumDecodeNullable(_$BoardLinkBehaviorEnumMap, json['behavior']) ??
           BoardLinkBehavior.fixed,
-      color:
-          json['color'] == null
-              ? Colors.lightBlueAccent
-              : const ColorJsonConverter().fromJson(
-                (json['color'] as num).toInt(),
-              ),
+      color: json['color'] == null
+          ? Colors.lightBlueAccent
+          : const ColorJsonConverter().fromJson((json['color'] as num).toInt()),
       geometry:
           $enumDecodeNullable(_$BoardLinkGeometryEnumMap, json['geometry']) ??
           BoardLinkGeometry.bezier,
