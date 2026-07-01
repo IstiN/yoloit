@@ -21,6 +21,7 @@ import 'package:yoloit/features/board/plugins/builtin/webpage_plugin.dart';
 import 'package:yoloit/features/board/services/board_offscreen_renderer.dart';
 import 'package:yoloit/features/board/services/board_preview_cache.dart';
 import 'package:yoloit/features/board/tools/board_tool.dart';
+import 'package:yoloit/features/board/ui/board_canvas_interaction.dart';
 import 'package:yoloit/features/board/ui/board_constants.dart';
 import 'package:yoloit/features/board/ui/board_drawing_widgets.dart';
 import 'package:yoloit/features/board/ui/board_grid_painter.dart';
@@ -64,24 +65,7 @@ class BoardView extends StatefulWidget {
   State<BoardView> createState() => _BoardViewState();
 }
 
-@visibleForTesting
-bool boardShouldRevertInteractionForCanvasLock({
-  required bool interactionStartedLocked,
-  required bool currentlyLocked,
-  bool isScaleChanging = false,
-}) {
-  return interactionStartedLocked && currentlyLocked && !isScaleChanging;
-}
-
 class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
-  static bool _isPointerOverScrollableCard(Offset position, int viewId) {
-    final result = HitTestResult();
-    WidgetsBinding.instance.hitTestInView(result, position, viewId);
-    return result.path.any(
-      (entry) => entry.target is RenderScrollableCardMarker,
-    );
-  }
-
   final FocusNode _boardFocus = FocusNode();
 
   final TransformationController _transformController =
@@ -368,7 +352,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                         behavior: HitTestBehavior.translucent,
                                         onPointerSignal: (event) {
                                           final overScrollable =
-                                              _isPointerOverScrollableCard(
+                                              isPointerOverScrollableCard(
                                                 event.position,
                                                 event.viewId,
                                               );
@@ -386,7 +370,10 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                               'pos=${fmtOffset(event.position)} '
                                               'scale=${fmtDouble(scale)}',
                                             );
-                                            if (!overScrollable) {
+                                            if (overScrollable) {
+                                              CanvasInteractionLock.instance
+                                                  .clearCanvasSignalGesture();
+                                            } else {
                                               CanvasInteractionLock.instance
                                                   .markCanvasSignalGesture();
                                             }
@@ -408,7 +395,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                         },
                                         onPointerPanZoomStart: (event) {
                                           final overScrollable =
-                                              _isPointerOverScrollableCard(
+                                              isPointerOverScrollableCard(
                                                 event.position,
                                                 event.viewId,
                                               );
@@ -506,24 +493,27 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                             final currentScale = matrixScaleOf(
                                               _transformController.value,
                                             );
-                                            if (boardShouldRevertInteractionForCanvasLock(
-                                                  interactionStartedLocked:
-                                                      _interactionStartedLocked,
-                                                  currentlyLocked:
-                                                      CanvasInteractionLock
-                                                          .instance
-                                                          .isLocked,
-                                                  isScaleChanging:
-                                                      (currentScale -
-                                                              _interactionStartScale)
-                                                          .abs() >
-                                                      0.01,
-                                                ) &&
+                                            final view = View.maybeOf(context);
+                                            final revertReason =
+                                                view == null
+                                                    ? null
+                                                    : boardViewportInteractionRevertReason(
+                                                      focalPoint:
+                                                          details.focalPoint,
+                                                      viewId: view.viewId,
+                                                      startScale:
+                                                          _interactionStartScale,
+                                                      currentScale:
+                                                          currentScale,
+                                                      interactionStartedLocked:
+                                                          _interactionStartedLocked,
+                                                    );
+                                            if (revertReason != null &&
                                                 _interactionStartMatrix !=
                                                     null) {
                                               _boardSupportLog(
                                                 'interaction.update.reverted '
-                                                'reason=canvasLock '
+                                                'reason=$revertReason '
                                                 'pointerCount=${details.pointerCount} '
                                                 'scale=${fmtDouble(matrixScaleOf(_transformController.value))}',
                                               );
@@ -1031,7 +1021,11 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                               context,
                                               activeBoard,
                                             ),
-                                        onRedo: null,
+                                        onRedo:
+                                            () => _redoLatestPanelHistory(
+                                              context,
+                                              activeBoard,
+                                            ),
                                         onShowHistory:
                                             () => setState(
                                               () =>
@@ -1334,19 +1328,14 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
 
   Future<void> _captureBoardPreviewPng(String boardId) async {
     final watch = Stopwatch()..start();
-    _boardOverviewLog('capture.start board=$boardId pixelRatio=0.28');
+    _boardOverviewLog('capture.start board=$boardId offscreen fit-all');
 
-    // Hide panel chrome (borders, accents, sidebar, minimap) so the
-    // screenshot is clean — no purple-tinted decorations.
-    setState(() => _isCapturingScreenshot = true);
-    await WidgetsBinding.instance.endOfFrame;
-
-    final bytes = await BoardScreenshotService.instance.capturePng(
-      pixelRatio: 0.28,
+    final board = context.read<BoardCubit>().state.boards.firstWhere(
+      (candidate) => candidate.id == boardId,
     );
-
-    // Restore decorations.
-    if (mounted) setState(() => _isCapturingScreenshot = false);
+    final bytes = await BoardOffscreenRenderer.instance.renderBoardOverviewPreview(
+      board,
+    );
 
     _boardOverviewLog(
       'capture.done board=$boardId '
@@ -1358,9 +1347,6 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
       );
       return;
     }
-    final board = context.read<BoardCubit>().state.boards.firstWhere(
-      (candidate) => candidate.id == boardId,
-    );
     setState(() {
       _boardPreviewPngs[boardId] = bytes;
     });
@@ -1415,10 +1401,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
         cancelToken.cancel();
         break;
       }
-      final png = await BoardOffscreenRenderer.instance.renderBoard(
+      final png = await BoardOffscreenRenderer.instance.renderBoardOverviewPreview(
         board,
-        size: const Size(480, 320),
-        pixelRatio: 1.0,
         cancelToken: cancelToken,
       );
       if (png != null) {
@@ -1469,7 +1453,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
         _boardOverviewLog(
           'bgCapture.render board=${board.id} (${board.name}) started',
         );
-        final png = await BoardOffscreenRenderer.instance.renderBoard(
+        final png = await BoardOffscreenRenderer.instance.renderBoardOverviewPreview(
           board,
           cancelToken: cancelToken,
         );
@@ -1813,10 +1797,18 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
       _gridDragAccumulatedDelta += delta;
       // In grid mode the panel follows the pointer smoothly during the drag;
       // the snap and neighbour-push happen on drag end.
-      context.read<BoardCubit>().movePanel(panelId, delta);
+      context.read<BoardCubit>().movePanel(
+        panelId,
+        delta,
+        recordHistory: false,
+      );
       return;
     }
-    context.read<BoardCubit>().movePanel(panelId, delta);
+    context.read<BoardCubit>().movePanel(
+      panelId,
+      delta,
+      recordHistory: false,
+    );
   }
 
   void _moveGroupWithEdgePan(
@@ -1845,6 +1837,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     context.read<BoardCubit>().updatePanel(
       panel.id,
       (p) => p.copyWith(bounds: next),
+      recordHistory: false,
     );
   }
 
@@ -1892,6 +1885,10 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     final board = context.read<BoardCubit>().state.activeBoard;
     final panel = board?.panels.where((p) => p.id == panelId).firstOrNull;
     _transformStartBounds = panel?.bounds;
+    context.read<BoardCubit>().beginPanelGesture(
+      panelId,
+      boardId: board?.id,
+    );
     _boardDebugLog('panelDrag.start panel=$panelId');
     _stopPanAnimation();
   }
@@ -1900,9 +1897,14 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     _boardDebugLog('panelDrag.end');
     _isPanelDragging = false;
     _lastPanelDragBoardPointer = null;
-    final board = context.read<BoardCubit>().state.activeBoard;
+    final cubit = context.read<BoardCubit>();
+    final board = cubit.state.activeBoard;
+    final panelId = _transformingPanelId;
     if (board != null && board.gridMode.enabled) {
       _commitPanelGridTransform(board);
+    }
+    if (panelId != null) {
+      unawaited(cubit.endPanelGesture(panelId, boardId: board?.id));
     }
     if (board != null) {
       _persistViewport(context, board);
@@ -1936,6 +1938,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
       board.id,
       panelId,
       targetRect: targetRect,
+      recordHistory: false,
     );
 
     _transformingPanelId = null;
@@ -2006,6 +2009,20 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No restorable panel history yet')),
+      );
+    }
+  }
+
+  Future<void> _redoLatestPanelHistory(
+    BuildContext context,
+    BoardDocument board,
+  ) async {
+    final cubit = context.read<BoardCubit>();
+    final redone = await cubit.redoLatestPanelHistory(board.id);
+    if (!redone) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No redoable panel history yet')),
       );
     }
   }
@@ -2202,8 +2219,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
 
     final local = renderObject.globalToLocal(globalPosition);
     final screenDelta = Offset(
-      _edgePanStep(local.dx, viewport.width),
-      _edgePanStep(local.dy, viewport.height),
+      boardEdgePanStep(local.dx, viewport.width),
+      boardEdgePanStep(local.dy, viewport.height),
     );
     if (screenDelta == Offset.zero) return;
 
@@ -2220,22 +2237,6 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
       'edgePan local=${fmtOffset(local)} screenDelta=${fmtOffset(screenDelta)} '
       'boardDelta=${fmtOffset(screenDelta / scale)} scale=${fmtDouble(scale)}',
     );
-  }
-
-  double _edgePanStep(double position, double extent) {
-    if (extent <= 0) return 0;
-    if (position < edgePanZone) {
-      final t = ((edgePanZone - position) / edgePanZone).clamp(0.0, 1.0);
-      return -edgePanMaxStep * Curves.easeOut.transform(t);
-    }
-    if (extent - position < edgePanZone) {
-      final t = ((edgePanZone - (extent - position)) / edgePanZone).clamp(
-        0.0,
-        1.0,
-      );
-      return edgePanMaxStep * Curves.easeOut.transform(t);
-    }
-    return 0;
   }
 
   void _scheduleCanvasExpansionIfNeeded() {

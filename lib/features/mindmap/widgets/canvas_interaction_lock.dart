@@ -72,6 +72,18 @@ class CanvasInteractionLock {
     }
   }
 
+  /// Clears a transient canvas signal gesture (e.g. mouse wheel over a panel).
+  void clearCanvasSignalGesture() {
+    _canvasSignalTimer?.cancel();
+    _canvasSignalTimer = null;
+    if (_canvasGestureCount.value == 0) return;
+    _canvasGestureCount.value = 0;
+    _notifyLockStateChanged();
+    if (kDebugMode) {
+      debugPrint('[CanvasInteractionLock] canvas signal cleared');
+    }
+  }
+
   void markCanvasSignalGesture({
     Duration hold = const Duration(milliseconds: 180),
   }) {
@@ -180,9 +192,9 @@ class _ScrollableCardRegionState extends State<ScrollableCardRegion> {
     CanvasInteractionLock.instance.exit();
   }
 
-  void _ensureEntered([Offset? globalPosition]) {
+  void _ensureEntered({Offset? globalPosition, bool force = false}) {
     _lastGlobalPosition = globalPosition ?? _lastGlobalPosition;
-    if (CanvasInteractionLock.instance.isCanvasGestureActive) return;
+    if (!force && CanvasInteractionLock.instance.isCanvasGestureActive) return;
     _exitTimer?.cancel();
     _mousePhysicallyExited = false;
     if (_entered) return;
@@ -195,8 +207,23 @@ class _ScrollableCardRegionState extends State<ScrollableCardRegion> {
     return Listener(
       behavior: HitTestBehavior.opaque,
       onPointerSignal: (event) {
-        _ensureEntered(event.position);
         if (event is PointerScrollEvent) {
+          final vertical =
+              event.scrollDelta.dy.abs() >= event.scrollDelta.dx.abs();
+          final isMouseWheel = event.kind == PointerDeviceKind.mouse;
+          if (vertical && isMouseWheel) {
+            CanvasInteractionLock.instance.clearCanvasSignalGesture();
+            _ensureEntered(globalPosition: event.position, force: true);
+            GestureBinding.instance.pointerSignalResolver.register(
+              event,
+              (_) {
+                // Physical mouse wheels must not fall through to
+                // InteractiveViewer zoom when the pointer is over a panel.
+              },
+            );
+          } else {
+            _ensureEntered(globalPosition: event.position);
+          }
           _exitTimer?.cancel(); // Cancel any pending exit during scroll!
           _scrollTimer?.cancel();
           _scrollTimer = Timer(const Duration(milliseconds: 100), () {
@@ -208,23 +235,23 @@ class _ScrollableCardRegionState extends State<ScrollableCardRegion> {
         }
       },
       onPointerDown: (event) {
-        _ensureEntered(event.position);
+        _ensureEntered(globalPosition: event.position);
         _exitTimer?.cancel(); // Cancel any pending exit on touch/click!
       },
       onPointerMove: (event) {
-        _ensureEntered(event.position);
+        _ensureEntered(globalPosition: event.position);
         _exitTimer?.cancel(); // Cancel any pending exit on movement!
       },
       onPointerHover: (event) {
-        _ensureEntered(event.position);
+        _ensureEntered(globalPosition: event.position);
         _exitTimer?.cancel(); // Cancel any pending exit on hover!
       },
       onPointerPanZoomStart: (event) {
-        _ensureEntered(event.position);
+        _ensureEntered(globalPosition: event.position);
         _exitTimer?.cancel();
       },
       onPointerPanZoomUpdate: (event) {
-        _ensureEntered(event.position);
+        _ensureEntered(globalPosition: event.position);
         _exitTimer?.cancel();
       },
       onPointerUp: (event) {

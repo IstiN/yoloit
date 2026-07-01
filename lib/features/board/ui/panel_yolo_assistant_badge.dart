@@ -215,16 +215,14 @@ class YoloEdgeBadgeMorphContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final compact = height < 96;
     final micSize = compact ? 10.0 : 12.0;
-    final micPadding = compact ? 1.5 : 3.0;
+    final micButtonSize = compact ? 18.0 : 22.0;
     final labelSize = compact ? 8.5 : 10.0;
     final verticalPadding = compact ? 2.0 : 5.0;
 
     return Padding(
-      padding: EdgeInsets.symmetric(
-        vertical: verticalPadding,
-        horizontal: 3,
-      ),
+      padding: EdgeInsets.symmetric(vertical: verticalPadding),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
         mainAxisAlignment:
             showMic || showDockedArrow
                 ? MainAxisAlignment.spaceBetween
@@ -251,26 +249,33 @@ class YoloEdgeBadgeMorphContent extends StatelessWidget {
             Material(
               color: colors.surface.withValues(alpha: 0.22),
               shape: const CircleBorder(),
+              clipBehavior: Clip.antiAlias,
               child: InkWell(
                 customBorder: const CircleBorder(),
                 onTap: onMicTap,
-                child: Padding(
-                  padding: EdgeInsets.all(micPadding),
-                  child: Icon(
-                    Icons.mic_rounded,
-                    size: micSize,
-                    color: colors.textHighlight,
+                child: SizedBox(
+                  width: micButtonSize,
+                  height: micButtonSize,
+                  child: Center(
+                    child: Icon(
+                      Icons.mic_rounded,
+                      size: micSize,
+                      color: colors.textHighlight,
+                    ),
                   ),
                 ),
               ),
             ),
           if (showDockedArrow)
-            Padding(
-              padding: EdgeInsets.all(micPadding),
-              child: Icon(
-                Icons.arrow_forward_rounded,
-                size: micSize + 2,
-                color: colors.textHighlight,
+            SizedBox(
+              width: micButtonSize,
+              height: micButtonSize,
+              child: Center(
+                child: Icon(
+                  Icons.arrow_forward_rounded,
+                  size: micSize + 2,
+                  color: colors.textHighlight,
+                ),
               ),
             ),
         ],

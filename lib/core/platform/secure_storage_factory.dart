@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:yoloit/core/platform/yoloit_credential_store.dart';
 
 /// Factory that creates a [FlutterSecureStorage] instance with correct
 /// platform-specific options for macOS, Windows, and Linux.
@@ -10,13 +11,18 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 class SecureStorageFactory {
   SecureStorageFactory._();
 
-  /// Returns a [FlutterSecureStorage] with platform-aware options.
+  /// Returns a credential store shared across debug and release desktop builds.
+  static YoloitCredentialStore create() => YoloitCredentialStore(
+    secureStorage: FlutterSecureStorageAdapter(createRaw()),
+  );
+
+  /// Returns a raw [FlutterSecureStorage] with platform-aware options.
   ///
   /// - **macOS**: Uses a fixed [MacOsOptions] subclass that works around
   ///   `flutter_secure_storage_darwin` key-name mismatch.
   /// - **Windows**: Uses [WindowsOptions] with `useBackwardCompatibility: false`.
   /// - **Linux / other**: Uses default [LinuxOptions].
-  static FlutterSecureStorage create() {
+  static FlutterSecureStorage createRaw() {
     if (Platform.isMacOS) {
       return const FlutterSecureStorage(
         mOptions: _FixedMacOsOptions(

@@ -178,6 +178,27 @@ final List<YoloitCliTool> boardTools = <YoloitCliTool>[
   ),
 
   YoloitCliTool(
+    command: 'board:redo',
+    alias: 'bredo',
+    description:
+        'Redo the latest undone panel history batch on a board. Works after board:undo until a new panel change is made.',
+    group: 'board',
+    humanVariants: const {
+      'ru': [
+        'верни отменённое изменение на борде',
+        'повтори отменённое изменение панели',
+        'redo на борде',
+      ],
+      'en': [
+        'redo latest board change',
+        'redo latest panel change',
+        'restore undone panel resize',
+      ],
+    },
+    params: <YoloitCliToolParam>[boardParam('id_or_name')],
+  ),
+
+  YoloitCliTool(
     command: 'board:use',
     alias: 'buse',
     description: 'Set default board for subsequent commands (no UI switch)',

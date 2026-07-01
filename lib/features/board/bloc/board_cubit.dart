@@ -13,6 +13,7 @@ import 'package:yoloit/features/board/chat/chat_panel_plugin.dart';
 import 'package:yoloit/features/board/events/board_event_bus.dart';
 import 'package:yoloit/features/board/history/board_history_event.dart';
 import 'package:yoloit/features/board/history/board_history_store.dart';
+import 'package:yoloit/features/board/history/board_redo_entry.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/board/model/terminal_panel_models.dart';
@@ -25,6 +26,9 @@ import 'package:yoloit/features/board/utils/board_grid_layout.dart';
 import 'package:yoloit/features/calendar/data/calendar_event_storage.dart';
 import 'package:yoloit/features/settings/data/agent_config_service.dart';
 import 'package:yoloit/features/settings/data/provider_model_catalog_service.dart';
+
+
+part 'board_cubit_panel_history.dart';
 
 class BoardCubit extends Cubit<BoardState> {
   BoardCubit({
@@ -63,6 +67,10 @@ class BoardCubit extends Cubit<BoardState> {
   bool _remoteSyncInFlight = false;
   Timer? _remoteRefreshDebounce;
   StreamSubscription<BoardEvent>? _boardEventSub;
+  final Map<String, BoardPanelInstance> _panelGestureStarts = {};
+  final Map<String, List<BoardRedoEntry>> _redoStacks = {};
+  bool _replayingHistory = false;
+
 
   Future<void> load() async {
     if (state.isLoaded) return;
@@ -283,94 +291,6 @@ class BoardCubit extends Cubit<BoardState> {
 
   Future<List<BoardHistoryEvent>> historyForBoard(String boardId) {
     return _historyStore.eventsForBoard(boardId);
-  }
-
-  Future<bool> undoLatestPanelHistory(String boardId) async {
-    if (!state.boards.any((board) => board.id == boardId)) return false;
-    final events = await _historyStore.eventsForBoard(boardId);
-
-    for (var index = events.length - 1; index >= 0; index--) {
-      final event = events[index];
-      if (event.entityType != 'panel') continue;
-      if (event.restoresOpId != null || event.type == 'panel.restored') {
-        continue;
-      }
-
-      final current = state.boards
-          .firstWhereOrNull((board) => board.id == boardId)
-          ?.panels
-          .firstWhereOrNull((panel) => panel.id == event.entityId);
-      final before =
-          event.before == null
-              ? null
-              : _panelFromHistorySnapshot(event.before!);
-      final after =
-          event.after == null ? null : _panelFromHistorySnapshot(event.after!);
-
-      if (after != null &&
-          before == null &&
-          current != null &&
-          _panelSnapshotsMatch(current, after)) {
-        await removePanel(after.id);
-        return true;
-      }
-      if (before != null &&
-          current != null &&
-          !_panelSnapshotsMatch(current, before)) {
-        final coalescedEvent = _coalescedPanelUpdateStart(events, index);
-        final coalescedBefore = coalescedEvent.before;
-        final snapshot =
-            coalescedBefore == null
-                ? before
-                : _panelFromHistorySnapshot(coalescedBefore);
-        return _restorePanelSnapshot(
-          boardId: boardId,
-          panelFromEvent: snapshot,
-          restoresOpId: event.opId,
-        );
-      }
-      if (before != null && current == null && event.type == 'panel.deleted') {
-        return restorePanelFromEvent(boardId, event.opId);
-      }
-    }
-
-    return false;
-  }
-
-  BoardHistoryEvent _coalescedPanelUpdateStart(
-    List<BoardHistoryEvent> events,
-    int latestIndex,
-  ) {
-    final latest = events[latestIndex];
-    if (latest.type != 'panel.updated') return latest;
-    var start = latestIndex;
-    final signature = _patchSignature(latest);
-    while (start > 0) {
-      final previous = events[start - 1];
-      if (previous.type != latest.type ||
-          previous.entityType != latest.entityType ||
-          previous.entityId != latest.entityId ||
-          previous.restoresOpId != null ||
-          previous.revision + 1 != events[start].revision ||
-          _patchSignature(previous) != signature) {
-        break;
-      }
-      start--;
-    }
-    return events[start];
-  }
-
-  String _patchSignature(BoardHistoryEvent event) {
-    final keys = event.patch.keys.toList()..sort();
-    return keys.join('|');
-  }
-
-  bool _panelSnapshotsMatch(
-    BoardPanelInstance current,
-    BoardPanelInstance snapshot,
-  ) {
-    return jsonEncode(_panelSnapshot(current)) ==
-        jsonEncode(_panelSnapshot(snapshot));
   }
 
   Future<bool> restorePanelFromEvent(String boardId, String opId) async {
@@ -932,6 +852,7 @@ class BoardCubit extends Cubit<BoardState> {
     String boardId,
     String panelId, {
     GridRect? targetRect,
+    bool recordHistory = true,
   }) async {
     await _updateBoard(
       boardId,
@@ -950,21 +871,24 @@ class BoardCubit extends Cubit<BoardState> {
         );
       },
       historyEvent:
-          (before, after, revision) => _historyEvent(
-            boardId: boardId,
-            type: 'panel.placedInGrid',
-            entityType: 'panel',
-            entityId: panelId,
-            revision: revision,
-            before: _panelSnapshot(
-              before.panels.firstWhere((p) => p.id == panelId),
-            ),
-            after: _panelSnapshot(
-              after.panels.firstWhere((p) => p.id == panelId),
-            ),
-          ),
+          recordHistory
+              ? (before, after, revision) => _historyEvent(
+                boardId: boardId,
+                type: 'panel.placedInGrid',
+                entityType: 'panel',
+                entityId: panelId,
+                revision: revision,
+                before: _panelSnapshot(
+                  before.panels.firstWhere((p) => p.id == panelId),
+                ),
+                after: _panelSnapshot(
+                  after.panels.firstWhere((p) => p.id == panelId),
+                ),
+              )
+              : null,
     );
   }
+
 
   // ── Panel groups ──────────────────────────────────────────────────────────
 
@@ -1825,6 +1749,7 @@ class BoardCubit extends Cubit<BoardState> {
     String panelId,
     BoardPanelInstance Function(BoardPanelInstance panel) update, {
     String? boardId,
+    bool recordHistory = true,
   }) async {
     final targetId = boardId ?? state.activeBoard?.id;
     if (targetId == null) return;
@@ -1837,29 +1762,32 @@ class BoardCubit extends Cubit<BoardState> {
                 .toList();
         return board.copyWith(panels: updatedPanels);
       },
-      historyEvent: (before, after, revision) {
-        final beforePanel = before.panels.firstWhereOrNull(
-          (panel) => panel.id == panelId,
-        );
-        final afterPanel = after.panels.firstWhereOrNull(
-          (panel) => panel.id == panelId,
-        );
-        if (beforePanel == null ||
-            afterPanel == null ||
-            beforePanel == afterPanel) {
-          return null;
-        }
-        return _historyEvent(
-          boardId: targetId,
-          type: 'panel.updated',
-          entityType: 'panel',
-          entityId: panelId,
-          revision: revision,
-          before: _panelSnapshot(beforePanel),
-          after: _panelSnapshot(afterPanel),
-          patch: _panelPatch(beforePanel, afterPanel),
-        );
-      },
+      historyEvent:
+          recordHistory
+              ? (before, after, revision) {
+                final beforePanel = before.panels.firstWhereOrNull(
+                  (panel) => panel.id == panelId,
+                );
+                final afterPanel = after.panels.firstWhereOrNull(
+                  (panel) => panel.id == panelId,
+                );
+                if (beforePanel == null ||
+                    afterPanel == null ||
+                    beforePanel == afterPanel) {
+                  return null;
+                }
+                return _historyEvent(
+                  boardId: targetId,
+                  type: 'panel.updated',
+                  entityType: 'panel',
+                  entityId: panelId,
+                  revision: revision,
+                  before: _panelSnapshot(beforePanel),
+                  after: _panelSnapshot(afterPanel),
+                  patch: _panelPatch(beforePanel, afterPanel),
+                );
+              }
+              : null,
     );
   }
 
@@ -1991,6 +1919,7 @@ class BoardCubit extends Cubit<BoardState> {
     String panelId,
     Offset delta, {
     String? boardId,
+    bool recordHistory = true,
   }) async {
     await updatePanel(
       panelId,
@@ -2001,6 +1930,7 @@ class BoardCubit extends Cubit<BoardState> {
         ),
       ),
       boardId: boardId,
+      recordHistory: recordHistory,
     );
   }
 
@@ -2067,7 +1997,11 @@ class BoardCubit extends Cubit<BoardState> {
     );
   }
 
-  Future<void> removePanel(String panelId, {String? boardId}) async {
+  Future<void> removePanel(
+    String panelId, {
+    String? boardId,
+    bool recordHistory = true,
+  }) async {
     if (state.yoloAssistantAnchorPanelId == panelId) {
       closeYoloAssistant();
     }
@@ -2098,29 +2032,33 @@ class BoardCubit extends Cubit<BoardState> {
                   : board.viewport,
         );
       },
-      historyEvent: (before, after, revision) {
-        final removedPanel = before.panels.firstWhereOrNull(
-          (panel) => panel.id == panelId,
-        );
-        if (removedPanel == null) return null;
-        final removedLinks =
-            before.links
-                .where(
-                  (link) =>
-                      link.fromPanelId == panelId || link.toPanelId == panelId,
-                )
-                .map((link) => link.toJson())
-                .toList();
-        return _historyEvent(
-          boardId: targetId,
-          type: 'panel.deleted',
-          entityType: 'panel',
-          entityId: panelId,
-          revision: revision,
-          before: _panelSnapshot(removedPanel),
-          patch: {'removedLinks': removedLinks},
-        );
-      },
+      historyEvent:
+          recordHistory
+              ? (before, after, revision) {
+                final removedPanel = before.panels.firstWhereOrNull(
+                  (panel) => panel.id == panelId,
+                );
+                if (removedPanel == null) return null;
+                final removedLinks =
+                    before.links
+                        .where(
+                          (link) =>
+                              link.fromPanelId == panelId ||
+                              link.toPanelId == panelId,
+                        )
+                        .map((link) => link.toJson())
+                        .toList();
+                return _historyEvent(
+                  boardId: targetId,
+                  type: 'panel.deleted',
+                  entityType: 'panel',
+                  entityId: panelId,
+                  revision: revision,
+                  before: _panelSnapshot(removedPanel),
+                  patch: {'removedLinks': removedLinks},
+                );
+              }
+              : null,
     );
   }
 
@@ -2332,6 +2270,9 @@ class BoardCubit extends Cubit<BoardState> {
   }
 
   Future<void> _appendHistory(BoardHistoryEvent event) async {
+    if (!_replayingHistory) {
+      _redoStacks.remove(event.boardId);
+    }
     try {
       await _historyStore.append(event);
     } catch (error, stackTrace) {
@@ -2341,6 +2282,36 @@ class BoardCubit extends Cubit<BoardState> {
       }());
       debugPrintStack(stackTrace: stackTrace);
     }
+  }
+
+  Future<void> _appendPanelUpdateHistory({
+    required String boardId,
+    required BoardPanelInstance beforePanel,
+    required BoardPanelInstance afterPanel,
+  }) async {
+    if (beforePanel == afterPanel) return;
+    final boards = [...state.boards];
+    final index = boards.indexWhere((board) => board.id == boardId);
+    if (index == -1) return;
+    final board = boards[index];
+    final revision = _historyRevision(board) + 1;
+    boards[index] = _withHistoryRevision(board, revision);
+    await _setBoards(
+      boards,
+      activeBoardId: state.activeBoardId ?? boardId,
+    );
+    await _appendHistory(
+      _historyEvent(
+        boardId: boardId,
+        type: 'panel.updated',
+        entityType: 'panel',
+        entityId: afterPanel.id,
+        revision: revision,
+        before: _panelSnapshot(beforePanel),
+        after: _panelSnapshot(afterPanel),
+        patch: _panelPatch(beforePanel, afterPanel),
+      ),
+    );
   }
 
   int _historyRevision(BoardDocument board) {

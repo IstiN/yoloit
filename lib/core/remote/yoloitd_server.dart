@@ -238,10 +238,25 @@ class YoloitdServer {
       return _json(<String, Object?>{
         'ok': undone,
         'undone': undone,
+        'redoDepth': store.redoDepthForBoard(board.id),
         'message':
             undone
                 ? 'Undid latest panel change'
                 : 'No restorable panel history yet',
+        if (updated != null) 'board': updated.summary(active: true),
+      });
+    }
+    if (sub.length == 2 && sub[1] == 'redo' && method == 'POST') {
+      final redone = await store.redoLatestPanelHistory(board.id);
+      final updated = await store.findBoard(board.id);
+      return _json(<String, Object?>{
+        'ok': redone,
+        'redone': redone,
+        'redoDepth': store.redoDepthForBoard(board.id),
+        'message':
+            redone
+                ? 'Redid latest undone panel change'
+                : 'No redoable panel history yet',
         if (updated != null) 'board': updated.summary(active: true),
       });
     }

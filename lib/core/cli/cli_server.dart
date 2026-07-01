@@ -12,6 +12,7 @@ import 'package:yaml/yaml.dart';
 import 'package:yoloit/core/cli/cli_installed_paths.dart';
 import 'package:yoloit/core/cli/cli_server_http.dart';
 import 'package:yoloit/core/cli/cli_text_argument_resolver.dart';
+import 'package:yoloit/core/cli/board_history_cli_payload.dart';
 import 'package:yoloit/core/cli/board_screenshot_service.dart';
 import 'package:yoloit/core/cli/board_svg_exporter.dart';
 import 'package:yoloit/core/cli/handlers/agents_handler.dart';
@@ -546,6 +547,7 @@ class CliServer {
       boardSnapshot: _boardSnapshot,
       applyYaml: _applyYaml,
       undoBoard: _undoBoard,
+      redoBoard: _redoBoard,
       boardScreenshot: _boardScreenshot,
       boardSvg: _boardSvg,
       listPanels: _listPanels,
@@ -958,23 +960,33 @@ class CliServer {
   Future<shelf.Response> _undoBoard(
     BoardCubit cubit,
     BoardDocument board,
-  ) async {
-    final undone = await cubit.undoLatestPanelHistory(board.id);
-    if (undone) {
-      cliScheduleRebuild();
-    }
-    final updated =
-        cubit.state.boards.where((entry) => entry.id == board.id).firstOrNull;
-    return cliJson({
-      'ok': undone,
-      'undone': undone,
-      'message':
-          undone
-              ? 'Undid latest panel change'
-              : 'No restorable panel history yet',
-      if (updated != null)
-        'board': _boardSummary(updated, activeId: cubit.state.activeBoardId),
-    });
+  ) {
+    return boardHistoryShelfResponse(
+      action: () => cubit.undoLatestPanelHistory(board.id),
+      onApplied: cliScheduleRebuild,
+      cubit: cubit,
+      board: board,
+      resultKey: 'undone',
+      successMessage: 'Undid latest panel change',
+      failureMessage: 'No restorable panel history yet',
+      summarizeBoard: _boardSummary,
+    );
+  }
+
+  Future<shelf.Response> _redoBoard(
+    BoardCubit cubit,
+    BoardDocument board,
+  ) {
+    return boardHistoryShelfResponse(
+      action: () => cubit.redoLatestPanelHistory(board.id),
+      onApplied: cliScheduleRebuild,
+      cubit: cubit,
+      board: board,
+      resultKey: 'redone',
+      successMessage: 'Redid latest undone panel change',
+      failureMessage: 'No redoable panel history yet',
+      summarizeBoard: _boardSummary,
+    );
   }
 
   // ── Panel implementations ──────────────────────────────────────────────
@@ -1854,15 +1866,13 @@ class CliServer {
       case 'board.arrange':
         return _yamlArrangeBoard(cubit, board, raw, index: index);
       case 'board.undo':
-        final undone = await cubit.undoLatestPanelHistory(board.id);
-        if (undone) cliScheduleRebuild();
-        return {
-          'ok': undone,
-          'message':
-              undone
-                  ? 'Undid latest panel change'
-                  : 'No restorable panel history yet',
-        };
+      case 'board.redo':
+        return yamlBoardHistoryOp(
+          cubit: cubit,
+          board: board,
+          op: op,
+          onApplied: cliScheduleRebuild,
+        );
       default:
         return {'ok': false, 'error': 'Unknown op "$op"'};
     }

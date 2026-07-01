@@ -57,24 +57,25 @@ graph LR
   g_board --> g_board_13["board:unarchive"]
   g_board --> g_board_14["board:focus"]
   g_board --> g_board_15["board:undo · bundo"]
-  g_board --> g_board_16["board:zoom"]
-  g_board --> g_board_17["board:fit"]
-  g_board --> g_board_18["board:arrange"]
-  g_board --> g_board_19["board:grid"]
-  g_board --> g_board_20["select"]
-  g_board --> g_board_21["board:use"]
-  g_board --> g_board_22["board:current"]
-  g_board --> g_board_23["board:translate"]
-  g_board --> g_board_24["sticky:create · sticky:new"]
-  g_board --> g_board_25["shape:create · shape:new"]
-  g_board --> g_board_26["frame:create · frame:new"]
-  g_board --> g_board_27["draw:list · drl"]
-  g_board --> g_board_28["draw:add · dra"]
-  g_board --> g_board_29["draw:remove · drr"]
-  g_board --> g_board_30["draw:clear · drc"]
-  g_board --> g_board_31["draw:svg · drsvg"]
-  g_board --> g_board_32["draw:export · drex"]
-  g_board --> g_board_33["draw:file · drf"]
+  g_board --> g_board_16["board:redo · bredo"]
+  g_board --> g_board_17["board:zoom"]
+  g_board --> g_board_18["board:fit"]
+  g_board --> g_board_19["board:arrange"]
+  g_board --> g_board_20["board:grid"]
+  g_board --> g_board_21["select"]
+  g_board --> g_board_22["board:use"]
+  g_board --> g_board_23["board:current"]
+  g_board --> g_board_24["board:translate"]
+  g_board --> g_board_25["sticky:create · sticky:new"]
+  g_board --> g_board_26["shape:create · shape:new"]
+  g_board --> g_board_27["frame:create · frame:new"]
+  g_board --> g_board_28["draw:list · drl"]
+  g_board --> g_board_29["draw:add · dra"]
+  g_board --> g_board_30["draw:remove · drr"]
+  g_board --> g_board_31["draw:clear · drc"]
+  g_board --> g_board_32["draw:svg · drsvg"]
+  g_board --> g_board_33["draw:export · drex"]
+  g_board --> g_board_34["draw:file · drf"]
   root --> g_panel(("panel"))
   g_panel --> g_panel_0["panels"]
   g_panel --> g_panel_1["panel"]
@@ -352,6 +353,9 @@ graph LR
 - **`board:undo`** *(aliases: bundo)* — Undo the latest panel history batch on a board
   - params: id|name*
   - example: `yoloit board:undo "My Board"`
+- **`board:redo`** *(aliases: bredo)* — Redo the latest undone panel history batch on a board
+  - params: id|name*
+  - example: `yoloit board:redo "My Board"`
 - **`board:zoom`** — Set board zoom/scale level. Use for "уменьши зум", "увеличь зум", "zoom in", "zoom out", "приблизь", "отдали". Pass absolute scale: 0.5 = 50%, 1.0 = 100%, 2.0 = 200%.
   - params: id|name*, scale*
   - example: `yoloit board:zoom "My Board" 0.8`

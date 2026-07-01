@@ -10,6 +10,10 @@ class YoloitdStore {
 
   final Directory rootDir;
   final String actorId;
+  final Map<String, List<_RemoteRedoEntry>> _redoStacks = {};
+  bool _replayingHistory = false;
+
+  int redoDepthForBoard(String boardId) => _redoStacks[boardId]?.length ?? 0;
 
   File get _boardsFile => File(p.join(rootDir.path, 'boards.json'));
   File get _activeFile => File(p.join(rootDir.path, 'active_board'));
@@ -117,6 +121,9 @@ class YoloitdStore {
   }
 
   Future<void> appendHistory(RemoteHistoryEvent event) async {
+    if (!_replayingHistory) {
+      _redoStacks.remove(event.boardId);
+    }
     await HistoryStoreHelpers.appendEvent(
       rootPath: p.join(rootDir.path, 'boards_history'),
       boardId: event.boardId,
@@ -143,43 +150,112 @@ class YoloitdStore {
   }
 
   Future<bool> undoLatestPanelHistory(String boardId) async {
+    return _runHistoryReplay(() async {
+      final board = await findBoard(boardId);
+      if (board == null) return false;
+      final events = await historyForBoard(board.id);
+
+      for (var index = events.length - 1; index >= 0; index--) {
+        final event = events[index];
+        if (event.entityType != 'panel') continue;
+        if (event.restoresOpId != null || event.type == 'panel.restored') {
+          continue;
+        }
+        final current =
+            board.panels.where((panel) => panel.id == event.entityId).firstOrNull;
+        final before =
+            event.before == null ? null : RemotePanel.fromJson(event.before!);
+        final after =
+            event.after == null ? null : RemotePanel.fromJson(event.after!);
+
+        if (after != null &&
+            before == null &&
+            current != null &&
+            _matchesCreateUndo(current, after)) {
+          _pushRedo(board.id, _RemoteRedoEntry.recreate(after));
+          await removePanel(board.id, after.id, recordHistory: false);
+          return true;
+        }
+        if (before != null && current != null && !_samePanel(current, before)) {
+          final start = _coalescedPanelUpdateStart(events, index);
+          final snapshot =
+              start.before == null ? before : RemotePanel.fromJson(start.before!);
+          final latestAfter =
+              event.after == null ? null : RemotePanel.fromJson(event.after!);
+          if (latestAfter != null) {
+            _pushRedo(board.id, _RemoteRedoEntry.restore(latestAfter));
+          }
+          await restorePanel(board.id, snapshot, restoresOpId: event.opId);
+          return true;
+        }
+        if (before != null && current == null && event.type == 'panel.deleted') {
+          _pushRedo(board.id, _RemoteRedoEntry.delete(event.entityId));
+          await restorePanel(board.id, before, restoresOpId: event.opId);
+          return true;
+        }
+      }
+      return false;
+    });
+  }
+
+  Future<bool> redoLatestPanelHistory(String boardId) async {
+    final stack = _redoStacks[boardId];
+    if (stack == null || stack.isEmpty) return false;
     final board = await findBoard(boardId);
     if (board == null) return false;
-    final events = await historyForBoard(board.id);
 
-    for (var index = events.length - 1; index >= 0; index--) {
-      final event = events[index];
-      if (event.entityType != 'panel') continue;
-      if (event.restoresOpId != null || event.type == 'panel.restored') {
-        continue;
-      }
-      final current =
-          board.panels.where((panel) => panel.id == event.entityId).firstOrNull;
-      final before =
-          event.before == null ? null : RemotePanel.fromJson(event.before!);
-      final after =
-          event.after == null ? null : RemotePanel.fromJson(event.after!);
-
-      if (after != null &&
-          before == null &&
-          current != null &&
-          _samePanel(current, after)) {
-        await removePanel(board.id, after.id);
-        return true;
-      }
-      if (before != null && current != null && !_samePanel(current, before)) {
-        final start = _coalescedPanelUpdateStart(events, index);
-        final snapshot =
-            start.before == null ? before : RemotePanel.fromJson(start.before!);
-        await restorePanel(board.id, snapshot, restoresOpId: event.opId);
-        return true;
-      }
-      if (before != null && current == null && event.type == 'panel.deleted') {
-        await restorePanel(board.id, before, restoresOpId: event.opId);
-        return true;
-      }
+    final entry = stack.removeLast();
+    if (stack.isEmpty) {
+      _redoStacks.remove(boardId);
     }
-    return false;
+
+    return _runHistoryReplay(() async {
+      switch (entry.kind) {
+        case _RemoteRedoKind.recreatePanel:
+          final panel = entry.panel;
+          if (panel == null) return false;
+          await addPanel(board.id, panel);
+          return true;
+        case _RemoteRedoKind.restorePanel:
+          final panel = entry.panel;
+          if (panel == null) return false;
+          return _applyPanelSnapshot(board.id, panel);
+        case _RemoteRedoKind.deletePanel:
+          final panelId = entry.panelId;
+          if (panelId == null) return false;
+          return removePanel(board.id, panelId);
+      }
+    });
+  }
+
+  Future<T> _runHistoryReplay<T>(Future<T> Function() action) async {
+    _replayingHistory = true;
+    try {
+      return await action();
+    } finally {
+      _replayingHistory = false;
+    }
+  }
+
+  void _pushRedo(String boardId, _RemoteRedoEntry entry) {
+    final stack = _redoStacks.putIfAbsent(boardId, () => <_RemoteRedoEntry>[]);
+    stack.add(entry);
+  }
+
+  Future<bool> _applyPanelSnapshot(String boardId, RemotePanel panel) async {
+    final board = await findBoard(boardId);
+    if (board == null) return false;
+    final current =
+        board.panels.where((entry) => entry.id == panel.id).firstOrNull;
+    if (current != null && _samePanel(current, panel)) {
+      return false;
+    }
+    if (current != null) {
+      await updatePanel(boardId, panel.id, (_) => panel);
+      return true;
+    }
+    await addPanel(boardId, panel);
+    return true;
   }
 
   Future<RemotePanel> addPanel(String boardId, RemotePanel panel) async {
@@ -248,7 +324,11 @@ class YoloitdStore {
     return afterPanel;
   }
 
-  Future<bool> removePanel(String boardId, String panelId) async {
+  Future<bool> removePanel(
+    String boardId,
+    String panelId, {
+    bool recordHistory = true,
+  }) async {
     RemotePanel? removed;
     await updateBoard(
       boardId,
@@ -276,13 +356,15 @@ class YoloitdStore {
         );
       },
       historyEvent:
-          (before, after, revision) => _event(
-            boardId: boardId,
-            type: 'panel.deleted',
-            entityId: panelId,
-            revision: revision,
-            before: removed?.toJson(),
-          ),
+          recordHistory
+              ? (before, after, revision) => _event(
+                boardId: boardId,
+                type: 'panel.deleted',
+                entityId: panelId,
+                revision: revision,
+                before: removed?.toJson(),
+              )
+              : null,
     );
     return removed != null;
   }
@@ -358,12 +440,23 @@ class YoloitdStore {
     return jsonEncode(a.toJson()) == jsonEncode(b.toJson());
   }
 
+  static bool _matchesCreateUndo(RemotePanel current, RemotePanel after) {
+    final currentJson = Map<String, dynamic>.from(current.toJson());
+    final afterJson = Map<String, dynamic>.from(after.toJson());
+    currentJson.remove('zIndex');
+    afterJson.remove('zIndex');
+    return jsonEncode(currentJson) == jsonEncode(afterJson);
+  }
+
   static RemoteHistoryEvent _coalescedPanelUpdateStart(
     List<RemoteHistoryEvent> events,
     int latestIndex,
   ) {
     final latest = events[latestIndex];
-    if (latest.type != 'panel.updated') return latest;
+    if (latest.type != 'panel.updated' &&
+        latest.type != 'panel.placedInGrid') {
+      return latest;
+    }
     var start = latestIndex;
     final signature = _patchSignature(latest);
     while (start > 0) {
@@ -411,4 +504,28 @@ class YoloitdStore {
     addIfChanged('state', before.state, after.state);
     return patch;
   }
+}
+
+enum _RemoteRedoKind {
+  recreatePanel,
+  restorePanel,
+  deletePanel,
+}
+
+class _RemoteRedoEntry {
+  const _RemoteRedoEntry.recreate(this.panel)
+    : kind = _RemoteRedoKind.recreatePanel,
+      panelId = null;
+
+  const _RemoteRedoEntry.restore(this.panel)
+    : kind = _RemoteRedoKind.restorePanel,
+      panelId = null;
+
+  const _RemoteRedoEntry.delete(this.panelId)
+    : kind = _RemoteRedoKind.deletePanel,
+      panel = null;
+
+  final _RemoteRedoKind kind;
+  final RemotePanel? panel;
+  final String? panelId;
 }

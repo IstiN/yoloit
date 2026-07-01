@@ -35,7 +35,7 @@ void main() {
     }
   });
 
-  test('fingerprint changes when revision or viewport changes', () {
+  test('fingerprint changes when revision or theme changes', () {
     final base = board();
     final moved = board(translation: const Offset(12, 8));
     final revised = board(revision: 2);
@@ -43,7 +43,8 @@ void main() {
 
     expect(
       BoardPreviewCache.fingerprint(base, themeKey: themeKey),
-      isNot(BoardPreviewCache.fingerprint(moved, themeKey: themeKey)),
+      BoardPreviewCache.fingerprint(moved, themeKey: themeKey),
+      reason: 'overview thumbnails fit all panels, not viewport',
     );
     expect(
       BoardPreviewCache.fingerprint(base, themeKey: themeKey),

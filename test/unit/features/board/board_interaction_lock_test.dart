@@ -1,7 +1,7 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:yoloit/features/board/ui/board_view.dart';
+import 'package:yoloit/features/board/ui/board_canvas_interaction.dart';
 import 'package:yoloit/features/mindmap/widgets/canvas_interaction_lock.dart';
 
 void main() {
@@ -43,6 +43,30 @@ void main() {
           interactionStartedLocked: true,
           currentlyLocked: true,
           isScaleChanging: true,
+        ),
+        isFalse,
+      );
+    });
+  });
+
+  group('boardShouldRevertZoomOverScrollableCard', () {
+    test('reverts mouse-wheel zoom over scrollable panel content', () {
+      expect(
+        boardShouldRevertZoomOverScrollableCard(
+          overScrollable: true,
+          startScale: 1.0,
+          currentScale: 1.1,
+        ),
+        isTrue,
+      );
+    });
+
+    test('does not revert pan-scale over empty canvas', () {
+      expect(
+        boardShouldRevertZoomOverScrollableCard(
+          overScrollable: false,
+          startScale: 1.0,
+          currentScale: 1.1,
         ),
         isFalse,
       );

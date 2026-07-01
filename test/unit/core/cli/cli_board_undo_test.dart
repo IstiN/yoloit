@@ -46,7 +46,54 @@ void main() {
         jsonDecode(result.stdout as String) as Map<String, dynamic>;
     expect(response['ok'], isTrue);
     expect(response['undone'], isTrue);
+    expect(response['redoDepth'], 1);
     expect(cubit.state.activeBoard!.panels.single.bounds.width, 120);
+  });
+
+  test('POST /api/boards/:id/redo restores undone resize', () async {
+    final cubit = await _startServerWithResizedShape();
+
+    final undoResponse = await _postJson(
+      CliServer.instance.port!,
+      '/api/boards/board/undo',
+      const {},
+    );
+    expect(undoResponse['ok'], isTrue);
+    expect(cubit.state.activeBoard!.panels.single.bounds.width, 120);
+
+    final redoResponse = await _postJson(
+      CliServer.instance.port!,
+      '/api/boards/board/redo',
+      const {},
+    );
+    expect(redoResponse['ok'], isTrue);
+    expect(redoResponse['redone'], isTrue);
+    expect(redoResponse['redoDepth'], 0);
+    expect(cubit.state.activeBoard!.panels.single.bounds.width, 260);
+  });
+
+  test('tools/yoloit board:redo calls running CLI server', () async {
+    final cubit = await _startServerWithResizedShape();
+
+    final undoResult = await Process.run(
+      'bash',
+      ['tools/yoloit', 'board:undo', 'board'],
+      environment: {'YOLOIT_CLI_PORT': '${CliServer.instance.port}'},
+    );
+    expect(undoResult.exitCode, 0);
+
+    final result = await Process.run(
+      'bash',
+      ['tools/yoloit', 'board:redo', 'board'],
+      environment: {'YOLOIT_CLI_PORT': '${CliServer.instance.port}'},
+    );
+
+    expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
+    final response =
+        jsonDecode(result.stdout as String) as Map<String, dynamic>;
+    expect(response['ok'], isTrue);
+    expect(response['redone'], isTrue);
+    expect(cubit.state.activeBoard!.panels.single.bounds.width, 260);
   });
 }
 

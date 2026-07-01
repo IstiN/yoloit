@@ -33,6 +33,23 @@ class BoardOffscreenRenderer {
   BoardOffscreenRenderer._();
   static final BoardOffscreenRenderer instance = BoardOffscreenRenderer._();
 
+  /// Logical size for boards-overview card thumbnails (matches ~1.55 card AR).
+  static const Size overviewPreviewSize = Size(620, 400);
+
+  /// Render a boards-overview thumbnail: always fits all panels, never viewport.
+  Future<Uint8List?> renderBoardOverviewPreview(
+    BoardDocument board, {
+    CancelToken? cancelToken,
+  }) {
+    return renderBoard(
+      board,
+      size: overviewPreviewSize,
+      pixelRatio: 1.0,
+      useViewport: false,
+      cancelToken: cancelToken,
+    );
+  }
+
   /// Render [board] to PNG at the given [size] and [pixelRatio].
   ///
   /// Returns null if the board has no visible panels or rendering fails.

@@ -339,7 +339,8 @@ class BoardOverviewLayerState extends State<BoardOverviewLayer>
                                       widget.previewPngs[board.id] != null
                                           ? Image.memory(
                                             widget.previewPngs[board.id]!,
-                                            fit: BoxFit.cover,
+                                            fit: BoxFit.contain,
+                                            alignment: Alignment.center,
                                             gaplessPlayback: true,
                                           )
                                           : ColoredBox(

@@ -35,7 +35,8 @@ class BoardSwitchPreviewOverlay extends StatelessWidget {
                 ? RepaintBoundary(
                   child: Image.memory(
                     previewPng!,
-                    fit: BoxFit.cover,
+                    fit: BoxFit.contain,
+                    alignment: Alignment.center,
                     gaplessPlayback: true,
                     errorBuilder:
                         (_, _, _) => ColoredBox(
@@ -442,7 +443,8 @@ class BoardOverviewPngPreview extends StatelessWidget {
         RepaintBoundary(
           child: Image.memory(
             bytes,
-            fit: BoxFit.cover,
+            fit: BoxFit.contain,
+            alignment: Alignment.center,
             gaplessPlayback: true,
             errorBuilder: (_, _, _) => fallback,
           ),

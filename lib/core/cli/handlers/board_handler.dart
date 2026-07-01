@@ -47,6 +47,7 @@ Future<shelf.Response> handleBoard(
   )
   applyYaml,
   required Future<shelf.Response> Function(BoardCubit, BoardDocument) undoBoard,
+  required Future<shelf.Response> Function(BoardCubit, BoardDocument) redoBoard,
   required Future<shelf.Response> Function(
     BoardDocument, {
     BoardCubit? cubit,
@@ -149,6 +150,10 @@ Future<shelf.Response> handleBoard(
   // POST /api/boards/:id/undo → undo latest panel history batch
   if (sub.length == 1 && sub[0] == 'undo' && method == 'POST') {
     return undoBoard(cubit, board);
+  }
+  // POST /api/boards/:id/redo → redo latest undone panel history batch
+  if (sub.length == 1 && sub[0] == 'redo' && method == 'POST') {
+    return redoBoard(cubit, board);
   }
   // GET /api/boards/:id/screenshot
   if (sub.length == 1 && sub[0] == 'screenshot' && method == 'GET') {

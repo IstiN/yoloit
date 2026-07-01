@@ -1852,11 +1852,18 @@ class TerminalWidgetState extends State<TerminalWidget> {
     return Listener(
       behavior: HitTestBehavior.opaque,
       onPointerSignal: (event) {
-        if (CanvasInteractionLock.instance.isCanvasGestureActive) {
+        final isMouseWheel =
+            event is PointerScrollEvent &&
+            event.kind == PointerDeviceKind.mouse;
+        if (CanvasInteractionLock.instance.isCanvasGestureActive &&
+            !isMouseWheel) {
           _preserveScrollForCanvasGesture();
           return;
         }
         if (event is PointerScrollEvent) {
+          if (isMouseWheel) {
+            CanvasInteractionLock.instance.clearCanvasSignalGesture();
+          }
           if (_isHorizontalTrackpadGesture(event.scrollDelta)) {
             CanvasInteractionLock.instance.markCanvasSignalGesture();
             _preserveScrollForCanvasGesture();

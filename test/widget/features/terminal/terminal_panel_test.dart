@@ -525,6 +525,57 @@ void main() {
       expect(scrollController.offset, before);
     });
 
+    testWidgets(
+      'terminal scrolls on mouse wheel even while canvas gesture is active',
+      (tester) async {
+        useXtermRenderer();
+        final session = AgentSession(
+          id: 'sess_mouse_wheel_canvas_gesture',
+          type: AgentType.terminal,
+          workspacePath: '/project',
+        );
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: SizedBox(
+                width: 600,
+                height: 140,
+                child: TerminalWidget(session: session, isActive: true),
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        for (var i = 0; i < 80; i++) {
+          session.terminal.write('line $i\r\n');
+        }
+        await tester.pump();
+
+        final terminalView = tester.widget<TerminalView>(
+          find.byType(TerminalView),
+        );
+        final scrollController = terminalView.scrollController!;
+        scrollController.jumpTo(scrollController.position.maxScrollExtent);
+        await tester.pump();
+
+        final before = scrollController.offset;
+        CanvasInteractionLock.instance.beginCanvasGesture();
+        await tester.sendEventToBinding(
+          PointerScrollEvent(
+            kind: PointerDeviceKind.mouse,
+            position: tester.getCenter(find.byType(TerminalView)),
+            scrollDelta: const Offset(0, -40),
+          ),
+        );
+        await tester.pump(const Duration(milliseconds: 220));
+        CanvasInteractionLock.instance.endCanvasGesture();
+
+        expect(scrollController.offset, lessThan(before));
+      },
+    );
+
     testWidgets('terminal widget quick actions scroll scrollback locally', (
       tester,
     ) async {

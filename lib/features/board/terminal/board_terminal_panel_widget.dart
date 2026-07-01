@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -648,7 +649,9 @@ class _BoardTerminalPanelWidgetState extends State<BoardTerminalPanelWidget> {
                 key: _terminalKey,
                 session: _session!,
                 isActive: true,
-                debugLabel: 'board:${widget.panel.id}:session:${_session!.id}',
+                debugLabel: kDebugMode
+                    ? 'board:${widget.panel.id}:session:${_session!.id}'
+                    : null,
               ),
             ),
           ),

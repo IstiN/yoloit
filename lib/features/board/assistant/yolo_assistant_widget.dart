@@ -21,6 +21,7 @@ import 'package:yoloit/features/board/assistant/assistant_voice_visualizer.dart'
 import 'package:yoloit/features/board/assistant/widgets/assistant_history_dialog.dart';
 import 'package:yoloit/features/board/assistant/widgets/assistant_thinking_indicator.dart';
 import 'package:yoloit/features/board/assistant/widgets/assistant_tool_executor.dart';
+import 'package:yoloit/features/board/assistant/yolo_assistant_tool_errors.dart';
 import 'package:yoloit/features/board/assistant/widgets/debug_logs_dialog.dart';
 import 'package:yoloit/features/board/assistant/widgets/session_bar_button.dart';
 import 'package:yoloit/features/board/assistant/widgets/tools_dialog.dart';
@@ -472,7 +473,8 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
         },
       );
       // Update per-message mutable state on the executor.
-      _wrappedExecutor!.userMessage = text;
+      _wrappedExecutor!.userMessage =
+          audioContent != null && rawText.isNotEmpty ? rawText : text;
       _wrappedExecutor!.lastTargetNotePanelId = _lastTargetNotePanelId;
       _wrappedExecutor!.onToolCompleted = (
         String toolCommand,
@@ -946,7 +948,7 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
       final decoded = jsonDecode(result);
       if (decoded is Map) {
         command = decoded['command'] as String?;
-        error = decoded['error'] as String?;
+        error = extractYoloAssistantToolError(decoded);
       }
     } catch (_) {}
     if (!success) {

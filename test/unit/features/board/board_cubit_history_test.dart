@@ -315,6 +315,76 @@ void main() {
     },
   );
 
+  test('panel gesture records one history step after drag ends', () async {
+    final historyStore = MemoryBoardHistoryStore();
+    final cubit = BoardCubit(historyStore: historyStore, actorId: 'tester');
+    addTearDown(cubit.close);
+    cubit.emit(
+      const BoardState(
+        boards: [BoardDocument(id: 'board', name: 'Board')],
+        activeBoardId: 'board',
+        isLoaded: true,
+      ),
+    );
+
+    const panel = BoardPanelInstance(
+      id: 'shape-1',
+      type: 'board.shape',
+      title: 'Rhombus',
+      bounds: BoardPanelBounds(x: 10, y: 20, width: 120, height: 120),
+      state: {'shape': 'diamond'},
+    );
+
+    await cubit.addPanel(panel);
+    cubit.beginPanelGesture('shape-1', boardId: 'board');
+    await cubit.updatePanel(
+      'shape-1',
+      (entry) => entry.copyWith(bounds: entry.bounds.copyWith(width: 180)),
+      recordHistory: false,
+    );
+    await cubit.updatePanel(
+      'shape-1',
+      (entry) => entry.copyWith(bounds: entry.bounds.copyWith(width: 240)),
+      recordHistory: false,
+    );
+    await cubit.endPanelGesture('shape-1', boardId: 'board');
+
+    final events = await cubit.historyForBoard('board');
+    expect(events.where((event) => event.type == 'panel.updated').length, 1);
+
+    final undone = await cubit.undoLatestPanelHistory('board');
+
+    expect(undone, isTrue);
+    expect(cubit.state.activeBoard!.panels.single.bounds.width, 120);
+  });
+
+  test(
+    'undoLatestPanelHistory removes panel after createGenericPanel focus',
+    () async {
+      final historyStore = MemoryBoardHistoryStore();
+      final cubit = BoardCubit(historyStore: historyStore, actorId: 'tester');
+      addTearDown(cubit.close);
+      cubit.emit(
+        const BoardState(
+          boards: [BoardDocument(id: 'board', name: 'Board')],
+          activeBoardId: 'board',
+          isLoaded: true,
+        ),
+      );
+
+      await cubit.createGenericPanel(
+        'board.shape',
+        title: 'Rhombus',
+        panelState: {'shape': 'diamond'},
+      );
+
+      final undone = await cubit.undoLatestPanelHistory('board');
+
+      expect(undone, isTrue);
+      expect(cubit.state.activeBoard!.panels, isEmpty);
+    },
+  );
+
   test('undoLatestPanelHistory removes a just-created panel', () async {
     final historyStore = MemoryBoardHistoryStore();
     final cubit = BoardCubit(historyStore: historyStore, actorId: 'tester');
@@ -362,4 +432,99 @@ void main() {
       expect(undone, isFalse);
     },
   );
+
+  test(
+    'redoLatestPanelHistory restores undone create update and delete',
+    () async {
+      final historyStore = MemoryBoardHistoryStore();
+      final cubit = BoardCubit(historyStore: historyStore, actorId: 'tester');
+      addTearDown(cubit.close);
+      cubit.emit(
+        const BoardState(
+          boards: [BoardDocument(id: 'board', name: 'Board')],
+          activeBoardId: 'board',
+          isLoaded: true,
+        ),
+      );
+
+      const panel = BoardPanelInstance(
+        id: 'panel-1',
+        type: StickyNotePlugin.kTypeId,
+        title: 'Sticky note',
+        bounds: BoardPanelBounds(x: 10, y: 20, width: 240, height: 180),
+        state: {'text': 'draft'},
+      );
+
+      await cubit.addPanel(panel);
+      expect(cubit.redoDepthForBoard('board'), 0);
+
+      final undone = await cubit.undoLatestPanelHistory('board');
+      expect(undone, isTrue);
+      expect(cubit.state.activeBoard!.panels, isEmpty);
+      expect(cubit.redoDepthForBoard('board'), 1);
+
+      final redone = await cubit.redoLatestPanelHistory('board');
+      expect(redone, isTrue);
+      expect(cubit.state.activeBoard!.panels.single.id, 'panel-1');
+      expect(cubit.redoDepthForBoard('board'), 0);
+
+      await cubit.updatePanel(
+        'panel-1',
+        (entry) => entry.copyWith(bounds: entry.bounds.copyWith(width: 320)),
+      );
+      await cubit.undoLatestPanelHistory('board');
+      expect(
+        cubit.state.activeBoard!.panels.single.bounds.width,
+        240,
+      );
+
+      final resizeRedone = await cubit.redoLatestPanelHistory('board');
+      expect(resizeRedone, isTrue);
+      expect(cubit.state.activeBoard!.panels.single.bounds.width, 320);
+
+      await cubit.removePanel('panel-1');
+      await cubit.undoLatestPanelHistory('board');
+      expect(cubit.state.activeBoard!.panels.single.id, 'panel-1');
+
+      final deleteRedone = await cubit.redoLatestPanelHistory('board');
+      expect(deleteRedone, isTrue);
+      expect(cubit.state.activeBoard!.panels, isEmpty);
+    },
+  );
+
+  test('redo stack clears after a new panel mutation', () async {
+    final historyStore = MemoryBoardHistoryStore();
+    final cubit = BoardCubit(historyStore: historyStore, actorId: 'tester');
+    addTearDown(cubit.close);
+    cubit.emit(
+      const BoardState(
+        boards: [BoardDocument(id: 'board', name: 'Board')],
+        activeBoardId: 'board',
+        isLoaded: true,
+      ),
+    );
+
+    const panel = BoardPanelInstance(
+      id: 'panel-1',
+      type: StickyNotePlugin.kTypeId,
+      title: 'Sticky note',
+      bounds: BoardPanelBounds(x: 10, y: 20, width: 240, height: 180),
+      state: {'text': 'draft'},
+    );
+
+    await cubit.addPanel(panel);
+    await cubit.updatePanel(
+      'panel-1',
+      (entry) => entry.copyWith(bounds: entry.bounds.copyWith(width: 320)),
+    );
+    await cubit.undoLatestPanelHistory('board');
+    expect(cubit.redoDepthForBoard('board'), 1);
+
+    await cubit.updatePanel(
+      'panel-1',
+      (entry) => entry.copyWith(title: 'Renamed'),
+    );
+    expect(cubit.redoDepthForBoard('board'), 0);
+    expect(await cubit.redoLatestPanelHistory('board'), isFalse);
+  });
 }

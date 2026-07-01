@@ -804,6 +804,12 @@ commands = [{'group': 'app',
   'params': [['id|name', 'Board identifier or board name', True]],
   'example': 'yoloit board:undo "My Board"'},
  {'group': 'board',
+  'name': 'board:redo',
+  'aliases': ['bredo'],
+  'description': 'Redo the latest undone panel history batch on a board',
+  'params': [['id|name', 'Board identifier or board name', True]],
+  'example': 'yoloit board:redo "My Board"'},
+ {'group': 'board',
   'name': 'board:zoom',
   'description': 'Set board zoom/scale level. Use for "уменьши зум", "увеличь зум", "zoom in", "zoom out", "приблизь", "отдали". Pass absolute scale: 0.5 = 50%, 1.0 = 100%, 2.0 = 200%.',
   'params': [['id|name', 'Board identifier or board name', True], ['scale', 'Zoom scale', True]],
@@ -3057,6 +3063,12 @@ PYEOF
     [[ -z "$bid_raw" ]] && { echo "Usage: yoloit board:undo [board]" >&2; exit 1; }
     bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
     _post "/boards/${bid}/undo" '{}' | python3 -m json.tool 2>/dev/null
+    ;;
+  board:redo|bredo)
+    bid_raw=$(_board "${1:-}")
+    [[ -z "$bid_raw" ]] && { echo "Usage: yoloit board:redo [board]" >&2; exit 1; }
+    bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
+    _post "/boards/${bid}/redo" '{}' | python3 -m json.tool 2>/dev/null
     ;;
 
   # ── selection ──

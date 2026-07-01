@@ -36,7 +36,7 @@ dependencies:
   bloc: ^9.2.1
   equatable: ^2.0.7
   flutter_pty: ^0.4.2
-  meta: ^1.16.0
+  meta: any
   xterm:
     path: packages/xterm
   window_manager: ^0.5.1
@@ -65,7 +65,7 @@ dependencies:
   web_socket_channel: ^3.0.1
   shelf_static: ^1.1.3
   crypto: ^3.0.0
-  vector_math: 2.2.0
+  vector_math: any
   cryptography: ^2.9.0
   webview_flutter: ^4.14.0
   fl_chart: ^1.2.0
@@ -90,7 +90,8 @@ dev_dependencies:
     sdk: flutter
 
   flutter_lints: ^6.0.0
-  test: ^1.25.15
+  test: ^1.31.2
+  fake_async: ^1.3.1
   bloc_test: ^10.0.0
   mocktail: ^1.0.4
   golden_toolkit: ^0.15.0
@@ -100,7 +101,17 @@ dev_dependencies:
 dependency_overrides:
   volume_controller:
     path: third_party/volume_controller
-  xml: ^7.0.1
+  # Flutter SDK pins below pub latest — override to stay current.
+  meta: ^1.18.3
+  vector_math: ^2.4.0
+  test: ^1.31.2
+  test_api: ^0.7.13
+  test_core: ^0.6.19
+  matcher: ^0.12.20
+  flutter_secure_storage_darwin: ^0.4.0
+  package_config: ^3.0.0
+  _fe_analyzer_shared: ^104.0.0
+  analyzer: ^14.0.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

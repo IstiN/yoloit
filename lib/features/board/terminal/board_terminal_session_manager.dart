@@ -22,6 +22,15 @@ class BoardTerminalSessionManager extends ChangeNotifier {
   final Map<String, StreamSubscription<String>> _outputSubs = {};
   final Map<String, List<String>> _envGroupIdsBySession = {};
 
+  // Batched output buffer per session to avoid flooding the xterm
+  // [notifyListeners] bridge on every PTY chunk. When a runner dumps
+  // thousands of lines per second, each [Terminal.write] triggers a full
+  // UI rebuild; batching reduces that to ~20 rebuilds/sec.
+  final Map<String, StringBuffer> _batchedOutput = {};
+  final Map<String, Timer> _batchFlushTimers = {};
+  static const _batchFlushIntervalMs = 50;
+  static const _batchMaxBytes = 16384;
+
   AgentSession? sessionFor(String id) => _sessions[id];
   bool isLive(String id) => _sessions.containsKey(id);
 
@@ -97,6 +106,8 @@ class BoardTerminalSessionManager extends ChangeNotifier {
 
   Future<void> killSession(String sessionId) async {
     _outputSubs.remove(sessionId)?.cancel();
+    _batchFlushTimers.remove(sessionId)?.cancel();
+    _batchedOutput.remove(sessionId);
     await _backendService.kill(sessionId);
     final session = _sessions.remove(sessionId);
     if (session != null) {
@@ -132,6 +143,8 @@ class BoardTerminalSessionManager extends ChangeNotifier {
     ResourceSessionMetadata? metadata,
   }) async {
     _outputSubs.remove(sessionId)?.cancel();
+    _batchFlushTimers.remove(sessionId)?.cancel();
+    _batchedOutput.remove(sessionId);
     _envGroupIdsBySession[sessionId] = List<String>.from(envGroupIds);
     final session = AgentSession(
       id: sessionId,
@@ -170,19 +183,73 @@ class BoardTerminalSessionManager extends ChangeNotifier {
   }
 
   void _attachProcess(TerminalProcess process, AgentSession session) {
-    _outputSubs[session.id] = process.output.listen(
+    final sessionId = session.id;
+
+    void flushBatch() {
+      final buf = _batchedOutput.remove(sessionId);
+      if (buf == null || buf.isEmpty) return;
+      final data = buf.toString();
+      session.terminal.write(data);
+      session.appendOutput(data);
+    }
+
+    void scheduleFlush() {
+      _batchFlushTimers[sessionId]?.cancel();
+      _batchFlushTimers[sessionId] = Timer(
+        const Duration(milliseconds: _batchFlushIntervalMs),
+        () {
+          _batchFlushTimers.remove(sessionId);
+          flushBatch();
+        },
+      );
+    }
+
+    _outputSubs[sessionId] = process.output.listen(
       (data) {
-        session.terminal.write(data);
-        session.appendOutput(data);
+        // Accumulate into batch buffer.
+        final buf = _batchedOutput.putIfAbsent(sessionId, StringBuffer.new);
+        buf.write(data);
+
+        // Flush immediately if the batch is large, otherwise schedule.
+        if (buf.length >= _batchMaxBytes) {
+          _batchFlushTimers[sessionId]?.cancel();
+          _batchFlushTimers.remove(sessionId);
+          flushBatch();
+        } else {
+          scheduleFlush();
+        }
       },
-      onDone: () => _onSessionEnded(session.id),
-      onError: (_) => _onSessionEnded(session.id),
+      onDone: () {
+        _batchFlushTimers[sessionId]?.cancel();
+        _batchFlushTimers.remove(sessionId);
+        flushBatch();
+        _onSessionEnded(sessionId);
+      },
+      // ignore: avoid_types_on_closure_parameters
+      onError: (Object e) {
+        _batchFlushTimers[sessionId]?.cancel();
+        _batchFlushTimers.remove(sessionId);
+        flushBatch();
+        _onSessionEnded(sessionId);
+      },
     );
   }
 
   void _onSessionEnded(String sessionId) {
     _outputSubs.remove(sessionId);
+    _batchFlushTimers.remove(sessionId)?.cancel();
+    _batchedOutput.remove(sessionId);
     _sessions.remove(sessionId);
     notifyListeners();
+  }
+
+  /// Attaches a [process] to an existing [session] for testing purposes.
+  ///
+  /// This bypasses [_spawn] so tests can drive output batching without a real
+  /// backend. The manager still owns cleanup (killSession/onDone/onError).
+  @visibleForTesting
+  void attachProcessForTesting(TerminalProcess process, AgentSession session) {
+    _sessions[session.id] = session;
+    _attachProcess(process, session);
   }
 }

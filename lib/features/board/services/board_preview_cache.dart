@@ -7,7 +7,7 @@ import 'package:yoloit/features/board/model/board_models.dart';
 /// Disk cache for board overview thumbnails with revision-based invalidation.
 ///
 /// A cached preview is considered fresh when its sidecar fingerprint matches the
-/// board's current [historyRevision], viewport, and theme key.
+/// board's current [historyRevision] and theme key.
 class BoardPreviewCache {
   BoardPreviewCache({Directory? rootDir})
     : _rootDir =
@@ -23,13 +23,13 @@ class BoardPreviewCache {
   }
 
   /// Stable fingerprint for whether a cached PNG still matches board content.
+  ///
+  /// Overview thumbnails always fit all panels (not viewport), so viewport is
+  /// intentionally excluded. Bump [_renderMode] when capture logic changes.
+  static const _renderMode = 'fit-all-v2';
+
   static String fingerprint(BoardDocument board, {String themeKey = ''}) {
-    final viewport = board.viewport;
-    return '${historyRevisionOf(board)}:'
-        '${viewport.scale.toStringAsFixed(4)}:'
-        '${viewport.translation.dx.toStringAsFixed(2)}:'
-        '${viewport.translation.dy.toStringAsFixed(2)}:'
-        '$themeKey';
+    return '$_renderMode:${historyRevisionOf(board)}:$themeKey';
   }
 
   File pngFile(String boardId) => File('${_rootDir.path}/$boardId.png');
