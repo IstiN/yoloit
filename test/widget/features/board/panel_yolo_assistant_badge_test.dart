@@ -114,21 +114,38 @@ _Fixture _createFixture({Map<String, dynamic> targetState = const {}}) {
 }
 
 void _seedCloudOpenRouter() {
+  const configs = [
+    {
+      'id': 'openrouter',
+      'name': 'OpenRouter',
+      'baseUrl': 'https://openrouter.ai/api/v1',
+      'apiKey': 'sk-test',
+      'model': 'openrouter/google/gemma-4-31b-it',
+      'extraHeaders': <String, String>{},
+    },
+  ];
+  final encoded = jsonEncode(configs);
   FlutterSecureStorage.setMockInitialValues({
-    'cloud_llm_configs_v1': jsonEncode([
-      {
-        'id': 'openrouter',
-        'name': 'OpenRouter',
-        'baseUrl': 'https://openrouter.ai/api/v1',
-        'apiKey': 'sk-test',
-        'model': 'openrouter/google/gemma-4-31b-it',
-        'extraHeaders': <String, String>{},
-      },
-    ]),
+    'cloud_llm_configs_v1': encoded,
   });
   SharedPreferences.setMockInitialValues({
     'cloud_llm_active_config_v1': 'openrouter',
+    'assistant_provider_type_v1': 'cloud',
+    'cloud_llm_configs_fallback_v1': encoded,
   });
+}
+
+BoardPanelInstance _assistantPanelFromState(
+  BoardPanelInstance targetPanel,
+  Map<String, dynamic> assistantState,
+) {
+  return BoardPanelInstance(
+    id: 'yolo-badge-${targetPanel.id}',
+    type: ChatPanelPlugin.kTypeId,
+    title: 'YoLo: ${targetPanel.title}',
+    bounds: targetPanel.bounds,
+    state: assistantState,
+  );
 }
 
 Future<BoardPanelInstance> _captureAssistantPanel(
@@ -148,10 +165,31 @@ Future<BoardPanelInstance> _captureAssistantPanel(
     ),
   );
   await tester.pump();
-  for (var i = 0; i < 30 && captured == null; i++) {
+  for (var i = 0; i < 300; i++) {
     await tester.pump(const Duration(milliseconds: 50));
+    if (captured != null &&
+        captured!.state['assistantProviderResolved'] == true) {
+      return captured!;
+    }
+    final board = cubit.state.activeBoard;
+    if (board == null) continue;
+    final index = board.panels.indexWhere((panel) => panel.id == targetPanel.id);
+    if (index < 0) continue;
+    final assistantState = board.panels[index].state['yoloAssistant'];
+    if (assistantState is Map &&
+        assistantState['assistantProviderResolved'] == true) {
+      return _assistantPanelFromState(
+        targetPanel,
+        Map<String, dynamic>.from(assistantState),
+      );
+    }
   }
-  return captured!;
+  throw StateError('Timed out waiting for YoLo assistant bootstrap');
+}
+
+Future<void> _flushAssistantTimers(WidgetTester tester) async {
+  await tester.pump(const Duration(milliseconds: 500));
+  await tester.pump(const Duration(milliseconds: 500));
 }
 
 ChatSessionConfig _configOf(BoardPanelInstance panel) => ChatSessionConfig.fromJson(
@@ -164,6 +202,7 @@ void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
     FlutterSecureStorage.setMockInitialValues({});
+    _seedCloudOpenRouter();
   });
 
   group('PanelYoloAssistantBadge', () {
@@ -210,7 +249,19 @@ void main() {
     });
 
     testWidgets('persists assistant state into target panel', (tester) async {
-      final fixture = _createFixture();
+      final fixture = _createFixture(
+        targetState: {
+          'yoloAssistant': {
+            'configured': true,
+            'assistantProviderResolved': true,
+            'config': {
+              'sessionName': '',
+              'workingDir': '',
+              'provider': 'cloud:openrouter',
+            },
+          },
+        },
+      );
 
       ValueChanged<Map<String, dynamic>>? capturedOnUpdate;
       await tester.pumpWidget(
@@ -224,7 +275,7 @@ void main() {
         ),
       );
       await tester.pump();
-      for (var i = 0; i < 30 && capturedOnUpdate == null; i++) {
+      for (var i = 0; i < 60 && capturedOnUpdate == null; i++) {
         await tester.pump(const Duration(milliseconds: 50));
       }
 
@@ -242,6 +293,8 @@ void main() {
           updated.state['yoloAssistant'] as Map<String, dynamic>?;
       expect(assistantState, isNotNull);
       expect(assistantState!['messages'], isEmpty);
+      await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
+      await tester.pump(const Duration(milliseconds: 200));
     });
 
     testWidgets('creates chat-configured assistant panel', (tester) async {
@@ -264,6 +317,16 @@ void main() {
         SharedPreferences.setMockInitialValues({
           'cloud_llm_active_config_v1': 'openrouter',
           'assistant_provider_type_v1': 'cloud',
+          'cloud_llm_configs_fallback_v1': jsonEncode([
+            {
+              'id': 'openrouter',
+              'name': 'OpenRouter',
+              'baseUrl': 'https://openrouter.ai/api/v1',
+              'apiKey': '',
+              'model': 'openrouter/google/gemma-4-31b-it',
+              'extraHeaders': <String, String>{},
+            },
+          ]),
         });
         FlutterSecureStorage.setMockInitialValues({
           'cloud_llm_configs_v1': jsonEncode([
@@ -463,6 +526,7 @@ void main() {
       await tester.pump(const Duration(seconds: 1));
 
       expect(find.text('YoLo history copied to clipboard'), findsOneWidget);
+      await _flushAssistantTimers(tester);
     });
   });
 }

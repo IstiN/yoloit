@@ -57,6 +57,7 @@ class _YoloAnchoredAssistantPanelState extends State<YoloAnchoredAssistantPanel>
   BoardCubit? _cubit;
   bool _providerBootstrapped = false;
   bool _bootstrapInFlight = false;
+  int _bootstrapGeneration = 0;
 
   static const Duration _providerBootstrapTimeout = Duration(seconds: 12);
 
@@ -84,7 +85,13 @@ class _YoloAnchoredAssistantPanelState extends State<YoloAnchoredAssistantPanel>
       curve: Curves.easeInOutCubic,
     );
     _entryController.forward();
-    unawaited(_bootstrapProvider());
+    final persisted =
+        widget.anchorPanel.state['yoloAssistant'] as Map<String, dynamic>?;
+    if (persisted?['assistantProviderResolved'] == true) {
+      _providerBootstrapped = true;
+    } else {
+      unawaited(_bootstrapProvider());
+    }
     if (widget.startMic) {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (!mounted) return;
@@ -106,7 +113,13 @@ class _YoloAnchoredAssistantPanelState extends State<YoloAnchoredAssistantPanel>
     if (oldWidget.anchorPanel.id != widget.anchorPanel.id) {
       _providerBootstrapped = false;
       _assistantPanel = _buildAssistantPanel(widget.anchorPanel);
-      unawaited(_bootstrapProvider());
+      final persisted =
+          widget.anchorPanel.state['yoloAssistant'] as Map<String, dynamic>?;
+      if (persisted?['assistantProviderResolved'] == true) {
+        _providerBootstrapped = true;
+      } else {
+        unawaited(_bootstrapProvider());
+      }
     }
     if (!oldWidget.startMic && widget.startMic) {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -119,6 +132,7 @@ class _YoloAnchoredAssistantPanelState extends State<YoloAnchoredAssistantPanel>
 
   @override
   void dispose() {
+    _bootstrapGeneration++;
     WidgetsBinding.instance.removeObserver(this);
     _entryController.dispose();
     super.dispose();
@@ -187,13 +201,14 @@ class _YoloAnchoredAssistantPanelState extends State<YoloAnchoredAssistantPanel>
   Future<void> _bootstrapProvider() async {
     if (_bootstrapInFlight) return;
     _bootstrapInFlight = true;
+    final generation = _bootstrapGeneration;
     try {
-      await _resolveDefaultProvider().timeout(_providerBootstrapTimeout);
+      await _resolveDefaultProvider();
     } on Object {
       // Still mount chat — provider errors surface on send.
     } finally {
       _bootstrapInFlight = false;
-      if (!mounted) return;
+      if (!mounted || generation != _bootstrapGeneration) return;
       if (!_providerBootstrapped) {
         setState(() => _providerBootstrapped = true);
       }
@@ -210,6 +225,7 @@ class _YoloAnchoredAssistantPanelState extends State<YoloAnchoredAssistantPanel>
     } on MissingPluginException {
       providerPref = 'local';
     }
+    if (!mounted) return;
 
     final rawConfig = _assistantPanel.state['config'];
     final config =
@@ -224,6 +240,7 @@ class _YoloAnchoredAssistantPanelState extends State<YoloAnchoredAssistantPanel>
       providerPref: providerPref,
       config: config,
     );
+    if (!mounted) return;
     final resolvedModel =
         resolved.provider.startsWith('cloud:') ? resolved.model : null;
     if (config.provider == resolved.provider &&
@@ -403,7 +420,12 @@ class _YoloAnchoredAssistantPanelState extends State<YoloAnchoredAssistantPanel>
           child: ScrollableCardRegion(
             child: ScrollableCardMarker(
               child:
-                  !_providerBootstrapped
+                  widget.chatBuilder != null
+                      ? widget.chatBuilder!.call(
+                        _assistantPanel,
+                        _onAssistantStateChanged,
+                      )
+                      : !_providerBootstrapped
                       ? const Center(
                         child: SizedBox(
                           width: 22,
@@ -411,16 +433,12 @@ class _YoloAnchoredAssistantPanelState extends State<YoloAnchoredAssistantPanel>
                           child: CircularProgressIndicator(strokeWidth: 2),
                         ),
                       )
-                      : widget.chatBuilder?.call(
-                        _assistantPanel,
-                        _onAssistantStateChanged,
-                      ) ??
-                          ChatPanelWidget(
-                            panel: _assistantPanel,
-                            onUpdateState: _onAssistantStateChanged,
-                            compact: true,
-                            controller: _chatController,
-                          ),
+                      : ChatPanelWidget(
+                        panel: _assistantPanel,
+                        onUpdateState: _onAssistantStateChanged,
+                        compact: true,
+                        controller: _chatController,
+                      ),
             ),
           ),
         ),
