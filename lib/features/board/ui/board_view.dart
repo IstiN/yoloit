@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -8,6 +8,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yoloit/core/cli/board_screenshot_service.dart';
+import 'package:yoloit/core/platform/platform_info.dart';
 import 'package:yoloit/core/remote/board_share_server.dart';
 import 'package:yoloit/core/remote/yoloit_remote_client.dart';
 import 'package:yoloit/core/services/support_log_service.dart';
@@ -111,12 +112,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
 
   String get _currentPanelPlatform {
     if (kIsWeb) return 'web';
-    if (Platform.isIOS) return 'ios';
-    if (Platform.isMacOS) return 'macos';
-    if (Platform.isLinux) return 'linux';
-    if (Platform.isWindows) return 'windows';
-    if (Platform.isAndroid) return 'android';
-    return 'unknown';
+    return currentPlatformName;
   }
 
   /// Suppresses focused-panel auto-centering for one rebuild cycle after

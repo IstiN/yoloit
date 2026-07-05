@@ -7,7 +7,7 @@ void main() {
 
   test('typeId is board.run_configs', () {
     expect(plugin.typeId, 'board.run_configs');
-    expect(RunConfigsPlugin.kTypeId, 'board.run_configs');
+    expect(RunConfigsPluginBase.kTypeId, 'board.run_configs');
   });
 
   test('displayName is Run Configs', () {

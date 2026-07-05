@@ -26,6 +26,18 @@ class _TempPlatformDirs extends PlatformDirs {
 
   @override
   String get skillsDir => '$_tmpDir/skills';
+
+  @override
+  String get yoloitTempDir => '$_tmpDir/tmp';
+}
+
+void _cleanupScopedFiles() {
+  try {
+    final meta = File('env_groups.json');
+    if (meta.existsSync()) meta.deleteSync();
+    final valuesDir = Directory('env_groups_values');
+    if (valuesDir.existsSync()) valuesDir.deleteSync(recursive: true);
+  } catch (_) {}
 }
 
 void main() {
@@ -38,9 +50,13 @@ void main() {
     FlutterSecureStorage.setMockInitialValues({});
     tmpDir = Directory.systemTemp.createTempSync('env_groups_test_');
     PlatformDirs.setInstance(_TempPlatformDirs(tmpDir.path));
+    // The service now uses scoped paths via [FileStorageAdapter]; remove any
+    // leftovers from earlier test runs.
+    _cleanupScopedFiles();
   });
 
   tearDown(() {
+    _cleanupScopedFiles();
     PlatformDirs.setInstance(const MacosPlatformDirs());
     tmpDir.deleteSync(recursive: true);
   });
@@ -105,7 +121,7 @@ void main() {
 
       await GlobalEnvGroupsService.instance.saveAll(data);
 
-      final file = File('${tmpDir.path}/env_groups.json');
+      final file = File('env_groups.json');
       expect(file.existsSync(), isTrue);
       final content = file.readAsStringSync();
       // JSON must NOT contain the secret value.
@@ -189,7 +205,7 @@ void main() {
           'values': {'OLD_KEY': 'old_value'},
         },
       ]);
-      final file = File('${tmpDir.path}/env_groups.json');
+      final file = File('env_groups.json');
       file.writeAsStringSync(oldJson);
 
       // Load should migrate automatically.
@@ -230,7 +246,7 @@ void main() {
         'env_group_env_group_legacy': encoded,
       });
 
-      final file = File('${tmpDir.path}/env_groups.json');
+      final file = File('env_groups.json');
       file.writeAsStringSync(
         jsonEncode([
           {

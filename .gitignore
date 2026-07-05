@@ -140,3 +140,6 @@ assets/command_catalog/adapters/*/0*_adapters.safetensors
 # Repomix generated snapshots
 snapshots/
 repomix-analysis.xml
+
+# Local GitHub Pages test build
+_site/

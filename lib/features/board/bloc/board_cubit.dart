@@ -9,7 +9,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yoloit/core/remote/yoloit_remote_client.dart';
 import 'package:yoloit/core/utils/clipboard_utils.dart';
 import 'package:yoloit/features/board/bloc/board_state.dart';
-import 'package:yoloit/features/board/chat/chat_panel_plugin.dart';
 import 'package:yoloit/features/board/events/board_event_bus.dart';
 import 'package:yoloit/features/board/history/board_history_event.dart';
 import 'package:yoloit/features/board/history/board_history_store.dart';
@@ -18,10 +17,10 @@ import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/board/model/terminal_panel_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
-import 'package:yoloit/features/board/plugins/builtin/playlist_plugin.dart';
+import 'package:yoloit/features/board/plugins/builtin/plugin_type_ids.dart';
+import 'package:yoloit/features/board/plugins/builtin/playlist_player_registry.dart';
 import 'package:yoloit/features/board/plugins/builtin/webview_manager.dart';
 import 'package:yoloit/features/board/services/board_operation_applier.dart';
-import 'package:yoloit/features/board/terminal/board_terminal_panel_plugin.dart';
 import 'package:yoloit/features/board/utils/board_grid_layout.dart';
 import 'package:yoloit/features/calendar/data/calendar_event_storage.dart';
 import 'package:yoloit/features/settings/data/agent_config_service.dart';
@@ -1629,7 +1628,7 @@ class BoardCubit extends Cubit<BoardState> {
     }
     final panel = BoardPanelInstance(
       id: _nextId('panel'),
-      type: ChatPanelPlugin.kTypeId,
+      type: kChatPluginTypeId,
       title: title?.trim().isNotEmpty == true ? title!.trim() : 'AI Chat',
       bounds: bounds,
       state: panelState,
@@ -1667,7 +1666,7 @@ class BoardCubit extends Cubit<BoardState> {
     );
     final panel = BoardPanelInstance(
       id: _nextId('panel'),
-      type: BoardTerminalPanelPlugin.kTypeId,
+      type: kTerminalPluginTypeId,
       title:
           title?.trim().isNotEmpty == true
               ? title!.trim()
@@ -2561,7 +2560,7 @@ class BoardCubit extends Cubit<BoardState> {
     if (typeId == 'board.filetree') {
       return {...initialState, 'rootPath': defaultFolder};
     }
-    if (typeId == ChatPanelPlugin.kTypeId) {
+    if (typeId == kChatPluginTypeId) {
       final rawConfig = initialState['config'];
       final config = ChatSessionConfig.fromJson(
         Map<String, dynamic>.from(rawConfig is Map ? rawConfig : const {}),
@@ -2572,7 +2571,7 @@ class BoardCubit extends Cubit<BoardState> {
         'configured': true,
       };
     }
-    if (typeId == BoardTerminalPanelPlugin.kTypeId) {
+    if (typeId == kTerminalPluginTypeId) {
       final rawConfig = initialState['config'];
       final config = BoardTerminalConfig.fromJson(
         Map<String, dynamic>.from(rawConfig is Map ? rawConfig : const {}),

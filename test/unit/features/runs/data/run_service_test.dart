@@ -22,6 +22,9 @@ class _TempPlatformDirs extends PlatformDirs {
 
   @override
   String get skillsDir => '$_tmpDir/skills';
+
+  @override
+  String get yoloitTempDir => '$_tmpDir/tmp';
 }
 
 void main() {

@@ -1,9 +1,9 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:json_annotation/json_annotation.dart';
 import 'package:path/path.dart' as p;
+import 'package:yoloit/core/platform/file_storage_adapter.dart';
 import 'package:yoloit/core/platform/platform_dirs.dart';
 import 'package:yoloit/features/terminal/models/agent_type.dart';
 import 'package:yoloit/features/terminal/models/terminal_backend_mode.dart';
@@ -180,12 +180,13 @@ class AgentConfigService {
   }
 
   Future<List<AgentConfig>> load() async {
+    final storage = FileStorageAdapter.instance;
     try {
-      final file = File(_configPath);
-      if (!await file.exists()) {
+      if (!await storage.exists(_configPath)) {
         _cached = _defaults;
       } else {
-        final data = jsonDecode(await file.readAsString()) as List;
+        final raw = await storage.readString(_configPath);
+        final data = jsonDecode(raw ?? '[]') as List;
         final saved =
             data
                 .map((e) => AgentConfig.fromJson(e as Map<String, dynamic>))
@@ -218,10 +219,10 @@ class AgentConfigService {
     }
 
     try {
-      final prefsFile = File(_prefsPath);
-      if (await prefsFile.exists()) {
+      if (await storage.exists(_prefsPath)) {
+        final raw = await storage.readString(_prefsPath);
         final prefs =
-            jsonDecode(await prefsFile.readAsString()) as Map<String, dynamic>;
+            jsonDecode(raw ?? '{}') as Map<String, dynamic>;
         _defaultAgentId = prefs['defaultAgentId'] as String?;
         final savedAsrMode = prefs['defaultAsrMode'] as String?;
         _defaultAsrMode = savedAsrMode == 'local' ? 'cloud' : (savedAsrMode ?? 'cloud');
@@ -244,9 +245,8 @@ class AgentConfigService {
 
   Future<void> save(List<AgentConfig> configs) async {
     _cached = _dedupeById(configs);
-    final file = File(_configPath);
-    await file.parent.create(recursive: true);
-    await file.writeAsString(
+    await FileStorageAdapter.instance.writeString(
+      _configPath,
       jsonEncode(_cached.map((c) => c.toJson()).toList()),
     );
   }
@@ -292,9 +292,8 @@ class AgentConfigService {
   }
 
   Future<void> _savePrefs() async {
-    final prefsFile = File(_prefsPath);
-    await prefsFile.parent.create(recursive: true);
-    await prefsFile.writeAsString(
+    await FileStorageAdapter.instance.writeString(
+      _prefsPath,
       jsonEncode({
         'defaultAgentId': _defaultAgentId,
         if (_defaultAsrMode != 'local') 'defaultAsrMode': _defaultAsrMode,

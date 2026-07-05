@@ -5,6 +5,7 @@ import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/builtin/ui_view_bindings.dart';
 import 'package:yoloit/features/board/plugins/builtin/ui_view_tree_normalizer.dart';
 import 'package:yoloit/features/board/plugins/builtin/ui_view_plugin.dart';
+import 'package:yoloit/features/board/plugins/builtin/ui_view_plugin_base.dart';
 import 'package:yoloit/features/board/widgets/app_cli_utils.dart';
 
 /// CLI handler for declarative UI panels (`board.ui`).
@@ -12,7 +13,7 @@ class UiViewCliHandler extends PanelCliHandler {
   const UiViewCliHandler();
 
   @override
-  String get typeId => UiViewPlugin.kTypeId;
+  String get typeId => UiViewPluginBase.kTypeId;
 
   @override
   List<String> get supportedActions =>
@@ -123,7 +124,8 @@ class UiViewCliHandler extends PanelCliHandler {
 
   Map<String, dynamic> _panelPayload(BoardPanelInstance panel) {
     final tree =
-        UiViewPlugin.treeFromState(panel.state) ?? UiViewPlugin.defaultTree();
+        UiViewPluginBase.treeFromState(panel.state) ??
+        UiViewPluginBase.defaultTree();
     final storage = UiViewBindings.storageFromState(panel.state);
     final resolved = UiViewBindings.applyTree(tree, storage);
     return <String, dynamic>{

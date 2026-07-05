@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:yoloit/core/platform/platform_capabilities.dart';
 import 'package:yoloit/core/remote/yoloit_remote_client.dart';
 import 'package:yoloit/features/board/history/board_panel_history_adapter.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
@@ -128,7 +129,17 @@ abstract class BoardPanelPlugin {
   /// input bar that should sit flush against the panel edges).
   EdgeInsets get contentPadding => const EdgeInsets.all(12);
 
-  /// Whether this plugin can be safely rendered in a headless offscreen context
+  /// Capabilities this plugin requires to run its full interactive content.
+  ///
+  /// Empty means the plugin works on every platform (web, desktop, mobile).
+  /// If the current runtime is missing a required capability, the registry will
+  /// still load the plugin (so existing boards deserialize) but its content is
+  /// rendered with a generic placeholder explaining the missing feature.
+  Set<PlatformCapability> get requiredCapabilities => const {};
+
+  /// True when the current runtime has every capability this plugin needs.
+  bool get isSupportedOnCurrentPlatform =>
+      requiredCapabilities.every(PlatformCapabilities.current.has);
   /// (no GPU, no platform views, no native video decoders).
   ///
   /// Override to `false` for plugins that call native code in their widget

@@ -1,8 +1,6 @@
 import 'dart:convert';
-import 'dart:io';
 
-import 'package:path/path.dart' as p;
-import 'package:yoloit/core/platform/platform_dirs.dart';
+import 'package:yoloit/core/platform/file_storage_adapter.dart';
 import 'package:yoloit/core/remote/history_store_helpers.dart';
 import 'package:yoloit/features/calendar/model/calendar_event.dart';
 
@@ -11,26 +9,27 @@ import 'package:yoloit/features/calendar/model/calendar_event.dart';
 /// Events are stored per panel so that large event payloads do not bloat the
 /// board document. The board only keeps lightweight metadata (view, focused
 /// date, cached event count) in the panel state.
+///
+/// On desktop this is backed by real files under `PlatformDirs.instance.dataDir`;
+/// on web it is backed by [FileStorageAdapter] using browser storage.
 class CalendarEventStorage {
   const CalendarEventStorage();
 
-  String get _baseDir => p.join(
-    PlatformDirs.instance.dataDir,
-    'calendar_events',
-  );
+  static const _baseDir = 'calendar_events';
 
   String _filePath(String panelId) {
     final safeId = HistoryStoreHelpers.safeSegment(panelId);
-    return p.join(_baseDir, '$safeId.json');
+    return '$_baseDir/$safeId.json';
   }
 
   /// Loads all events for a panel.
   Future<List<CalendarEvent>> loadEvents(String panelId) async {
-    final file = File(_filePath(panelId));
-    if (!await file.exists()) return const [];
+    final path = _filePath(panelId);
+    final storage = FileStorageAdapter.instance;
+    if (!await storage.exists(path)) return const [];
     try {
-      final text = await file.readAsString();
-      final decoded = jsonDecode(text);
+      final text = await storage.readString(path);
+      final decoded = jsonDecode(text ?? '[]');
       if (decoded is! List) return const [];
       return decoded
           .whereType<Map<String, dynamic>>()
@@ -43,9 +42,12 @@ class CalendarEventStorage {
 
   /// Saves the complete event list for a panel.
   Future<void> saveEvents(String panelId, List<CalendarEvent> events) async {
-    final file = File(_filePath(panelId));
+    final path = _filePath(panelId);
     final payload = events.map((e) => e.toJson()).toList();
-    await HistoryStoreHelpers.writeJsonAtomic(file, payload);
+    await FileStorageAdapter.instance.writeString(
+      path,
+      const JsonEncoder.withIndent('  ').convert(payload),
+    );
   }
 
   /// Adds or updates a single event.
@@ -78,28 +80,27 @@ class CalendarEventStorage {
 
   /// Copies all events from one panel to another.
   Future<void> copyEvents(String sourcePanelId, String targetPanelId) async {
-    final sourceFile = File(_filePath(sourcePanelId));
-    if (!await sourceFile.exists()) return;
-    final targetFile = File(_filePath(targetPanelId));
-    await targetFile.parent.create(recursive: true);
-    await sourceFile.copy(targetFile.path);
+    final sourcePath = _filePath(sourcePanelId);
+    final storage = FileStorageAdapter.instance;
+    if (!await storage.exists(sourcePath)) return;
+    final text = await storage.readString(sourcePath);
+    if (text == null || text.isEmpty) return;
+    await storage.writeString(_filePath(targetPanelId), text);
   }
 
   /// Deletes all stored events for a panel.
   Future<void> clearEvents(String panelId) async {
-    final file = File(_filePath(panelId));
-    if (await file.exists()) {
-      await file.delete();
-    }
+    await FileStorageAdapter.instance.delete(_filePath(panelId));
   }
 
   /// Counts events for a panel without building the full list.
   Future<int> countEvents(String panelId) async {
-    final file = File(_filePath(panelId));
-    if (!await file.exists()) return 0;
+    final path = _filePath(panelId);
+    final storage = FileStorageAdapter.instance;
+    if (!await storage.exists(path)) return 0;
     try {
-      final text = await file.readAsString();
-      final decoded = jsonDecode(text);
+      final text = await storage.readString(path);
+      final decoded = jsonDecode(text ?? '[]');
       if (decoded is List) return decoded.length;
     } on FormatException {
       // fall through

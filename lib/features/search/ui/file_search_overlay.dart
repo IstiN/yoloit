@@ -1,11 +1,11 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:path/path.dart' as p;
+import 'package:yoloit/core/platform/platform_capabilities.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
@@ -14,7 +14,7 @@ import 'package:yoloit/features/board/ui/board_overview_preview.dart';
 import 'package:yoloit/features/board/utils/panel_placement.dart';
 import 'package:yoloit/features/editor/bloc/file_editor_cubit.dart';
 import 'package:yoloit/features/review/bloc/review_cubit.dart';
-import 'package:yoloit/features/search/data/file_search_service.dart';
+import 'package:yoloit/features/search/ui/file_search_overlay_files.dart' as file_search;
 import 'package:yoloit/features/search/utils/fuzzy_matcher.dart';
 import 'package:yoloit/features/search/utils/quick_open_search.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_cubit.dart';
@@ -182,7 +182,28 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
     final results = <_QuickResult>[];
 
     // 0. If the query looks like an existing file path, surface it first.
-    await _tryAddPathResult(rawQuery, results, appColors);
+    if (PlatformCapabilities.current.platform != RuntimePlatform.web) {
+      final pathInfo = await file_search.tryResolveExistingPath(rawQuery);
+      if (pathInfo != null &&
+          !results.any((r) => r.filePath == pathInfo.filePath)) {
+        final ext =
+            pathInfo.name.contains('.')
+                ? pathInfo.name.split('.').last.toLowerCase()
+                : '';
+        final (icon, color) = _iconForExtension(ext, appColors);
+        results.insert(
+          0,
+          _QuickResult(
+            kind: _QuickResultKind.file,
+            title: pathInfo.name,
+            subtitle: pathInfo.filePath,
+            icon: icon,
+            iconColor: color,
+            filePath: pathInfo.filePath,
+          ),
+        );
+      }
+    }
 
     final boardState = context.read<BoardCubit>().state;
 
@@ -240,23 +261,37 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
       }
     }
 
-    // 3. Search files inside file-tree directories
-    for (final root in _fileTreeRoots) {
-      if (generation != _searchGeneration) return;
-      final dir = Directory(root);
-      if (!await dir.exists()) continue;
-      await _collectMatchingFiles(
-        dir,
-        root,
+    // 3. Search files inside file-tree directories (no-op on web).
+    if (PlatformCapabilities.current.platform != RuntimePlatform.web) {
+      final fileInfos = await file_search.collectMatchingFiles(
+        _fileTreeRoots,
         queries,
-        results,
-        appColors: appColors,
         maxResults: 100,
       );
+      for (final info in fileInfos) {
+        if (generation != _searchGeneration) return;
+        if (results.length >= 150) break;
+        final ext =
+            info.name.contains('.') ? info.name.split('.').last.toLowerCase() : '';
+        final (icon, color) = _iconForExtension(ext, appColors);
+        if (!results.any((r) => r.filePath == info.filePath)) {
+          results.add(
+            _QuickResult(
+              kind: _QuickResultKind.file,
+              title: info.name,
+              subtitle: info.relativePath,
+              icon: icon,
+              iconColor: color,
+              filePath: info.filePath,
+            ),
+          );
+        }
+      }
     }
 
-    // 4. Also search workspace files via existing service
-    if (wsState is WorkspaceLoaded) {
+    // 4. Also search workspace files via existing service (no-op on web).
+    if (wsState is WorkspaceLoaded &&
+        PlatformCapabilities.current.platform != RuntimePlatform.web) {
       if (generation != _searchGeneration) return;
       final active =
           wsState.workspaces
@@ -265,23 +300,22 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
           wsState.workspaces.firstOrNull;
       if (active != null) {
         // Only add workspace files that aren't already covered by file tree roots
-        final wsResults = await FileSearchService.instance.searchFiles(
-          query: _controller.text.trim(),
-          workspaces: [(name: active.name, path: active.path)],
+        final wsResults = await file_search.searchWorkspaceFiles(
+          _controller.text.trim(),
+          (name: active.name, path: active.path),
+          maxResults: 50,
         );
         for (final r in wsResults) {
           // Skip if already in results from file tree
           if (results.any((q) => q.filePath == r.filePath)) continue;
           if (results.length >= 150) break;
           final ext =
-              r.fileName.contains('.')
-                  ? r.fileName.split('.').last.toLowerCase()
-                  : '';
+              r.name.contains('.') ? r.name.split('.').last.toLowerCase() : '';
           final (icon, color) = _iconForExtension(ext, appColors);
           results.add(
             _QuickResult(
               kind: _QuickResultKind.file,
-              title: r.fileName,
+              title: r.name,
               subtitle: r.relativePath,
               icon: icon,
               iconColor: color,
@@ -301,88 +335,6 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
       _loading = false;
       _selectedIndex = 0;
     });
-  }
-
-  Future<void> _collectMatchingFiles(
-    Directory dir,
-    String root,
-    List<String> queries,
-    List<_QuickResult> results, {
-    required AppColorScheme appColors,
-    int maxResults = 100,
-  }) async {
-    if (results.length >= maxResults) return;
-    var visited = 0;
-    try {
-      await for (final entity in dir.list(
-        recursive: true,
-        followLinks: false,
-      )) {
-        if (results.length >= maxResults) return;
-        if (++visited % 80 == 0) {
-          await Future<void>.delayed(Duration.zero);
-        }
-        final name = p.basename(entity.path);
-        if (name.startsWith('.')) continue;
-        if (entity is File && FuzzyMatcher.bestScore(name, queries) != null) {
-          final relPath = p.relative(entity.path, from: root);
-          final ext =
-              name.contains('.') ? name.split('.').last.toLowerCase() : '';
-          final (icon, color) = _iconForExtension(ext, appColors);
-          // Avoid duplicates
-          if (!results.any((r) => r.filePath == entity.path)) {
-            results.add(
-              _QuickResult(
-                kind: _QuickResultKind.file,
-                title: name,
-                subtitle: relPath,
-                icon: icon,
-                iconColor: color,
-                filePath: entity.path,
-              ),
-            );
-          }
-        }
-      }
-    } on FileSystemException {
-      // skip inaccessible
-    }
-  }
-
-  String _resolveFilePath(String input) {
-    if (input.startsWith('~/')) {
-      final home = Platform.environment['HOME'];
-      if (home != null && home.isNotEmpty) {
-        return p.join(home, input.substring(2));
-      }
-    }
-    return input;
-  }
-
-  Future<void> _tryAddPathResult(
-    String rawQuery,
-    List<_QuickResult> results,
-    AppColorScheme appColors,
-  ) async {
-    if (rawQuery.isEmpty) return;
-    final resolved = _resolveFilePath(rawQuery);
-    final file = File(resolved);
-    if (!await file.exists()) return;
-    if (results.any((r) => r.filePath == resolved)) return;
-    final name = p.basename(resolved);
-    final ext = name.contains('.') ? name.split('.').last.toLowerCase() : '';
-    final (icon, color) = _iconForExtension(ext, appColors);
-    results.insert(
-      0,
-      _QuickResult(
-        kind: _QuickResultKind.file,
-        title: name,
-        subtitle: resolved,
-        icon: icon,
-        iconColor: color,
-        filePath: resolved,
-      ),
-    );
   }
 
   List<String> _collectSearchStrings(dynamic value, {int depth = 0}) {
@@ -427,11 +379,13 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
     final rawQuery = _controller.text.trim();
     if (_results.isEmpty) {
       // Fallback: if the typed text is an existing file path, open it directly.
-      final resolved = _resolveFilePath(rawQuery);
-      final file = File(resolved);
-      if (file.existsSync()) {
-        Navigator.of(context).pop();
-        await _openFilePath(resolved);
+      if (PlatformCapabilities.current.platform != RuntimePlatform.web) {
+        final pathInfo = await file_search.tryResolveExistingPath(rawQuery);
+        if (pathInfo != null) {
+          Navigator.of(context).pop();
+          await _openFilePath(pathInfo.filePath);
+          return;
+        }
       }
       return;
     }
@@ -644,13 +598,19 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
   Widget _buildResults() {
     final colors = context.appColors;
     if (_results.isEmpty && _controller.text.isEmpty) {
+      final isWeb = PlatformCapabilities.current.platform == RuntimePlatform.web;
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.search, size: 36, color: colors.textMuted.withAlpha(80)),
             const SizedBox(height: 8),
-            const Caption('Type to search boards, panels & files…', fontSize: 13),
+            Caption(
+              isWeb
+                  ? 'File search is available in YoLoIT for macOS'
+                  : 'Type to search boards, panels & files…',
+              fontSize: 13,
+            ),
             const SizedBox(height: 4),
             Text(
               '↑↓ navigate  ↵ open  esc close',

@@ -1,6 +1,6 @@
-import 'dart:io';
-
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:path/path.dart' as p;
 import 'package:yoloit/core/remote/yoloit_remote_client.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
@@ -113,7 +113,9 @@ class BoardToolbar extends StatelessWidget {
                               ),
                               const SizedBox(width: 10),
                               Text(
-                                Platform.isMacOS ? '⌘O' : 'Ctrl+O',
+                                defaultTargetPlatform == TargetPlatform.macOS
+                                    ? '⌘O'
+                                    : 'Ctrl+O',
                                 style: TextStyle(
                                   color: context.appColors.textMuted.withAlpha(
                                     120,
@@ -269,8 +271,8 @@ class BoardToolbar extends StatelessWidget {
   static String _shortToolbarPath(String path) {
     final normalized = path.trim();
     if (normalized.length <= 28) return normalized;
-    final parts = normalized.split(Platform.pathSeparator);
-    if (parts.length >= 2) return '…${Platform.pathSeparator}${parts.last}';
+    final parts = normalized.split(p.context.separator);
+    if (parts.length >= 2) return '…${p.context.separator}${parts.last}';
     return '…${normalized.substring(normalized.length - 27)}';
   }
 }

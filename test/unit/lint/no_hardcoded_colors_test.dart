@@ -15,6 +15,11 @@ void main() {
   // Generated from current codebase.  When you migrate a file to use
   // theme colors, lower its count here.  Remove the entry once it hits 0.
   const baseline = <String, int>{
+    'lib/features/board/terminal/board_terminal_panel_plugin_base.dart': 1,
+    'lib/features/board/plugins/builtin/files_plugin_base.dart': 1,
+    'lib/features/board/plugins/builtin/run_configs_plugin_base.dart': 2,
+    'lib/features/board/plugins/builtin/yolo_assistant_plugin_base.dart': 1,
+    'lib/features/board/plugins/builtin/ui_view_plugin_base.dart': 1,
     'lib/features/board/assistant/yolo_voice_overlay.dart': 87,
     'lib/features/settings/ui/settings_page.dart': 0,
     'lib/features/settings/ui/sections/prompts_section.dart': 3,
@@ -29,6 +34,8 @@ void main() {
     'lib/features/board/chat/chat_panel_widget.dart': 55,
     'lib/features/collaboration/ui/web_mindmap_canvas.dart': 49,
     'lib/features/board/plugins/builtin/filetree_plugin.dart': 47,
+    'lib/features/board/plugins/builtin/filetree_plugin_vm.dart': 1,
+    'lib/features/board/plugins/builtin/filetree_plugin_stub.dart': 1,
     'lib/features/editor/utils/file_type_utils.dart': 47,
     'lib/features/terminal/ui/terminal_panel.dart': 46,
     'lib/features/mindmap/sidebar/show_hide_sidebar.dart': 45,

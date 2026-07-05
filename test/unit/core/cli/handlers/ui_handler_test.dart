@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:yoloit/core/cli/handlers/ui_handler.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/builtin/ui_view_plugin.dart';
+import 'package:yoloit/features/board/plugins/builtin/ui_view_plugin_base.dart';
 
 void main() {
   const handler = UiViewCliHandler();
@@ -10,7 +11,7 @@ void main() {
   BoardPanelInstance newPanel({Map<String, dynamic> state = const {}}) =>
       BoardPanelInstance(
         id: 'panel-ui',
-        type: UiViewPlugin.kTypeId,
+        type: UiViewPluginBase.kTypeId,
         title: 'Card',
         bounds: const BoardPanelBounds(x: 0, y: 0, width: 420, height: 320),
         state: state,
@@ -18,7 +19,7 @@ void main() {
 
   group('UiViewCliHandler', () {
     test('typeId is board.ui', () {
-      expect(handler.typeId, UiViewPlugin.kTypeId);
+      expect(handler.typeId, UiViewPluginBase.kTypeId);
     });
 
     test('get returns tree and text', () async {

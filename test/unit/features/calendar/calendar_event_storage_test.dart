@@ -11,13 +11,26 @@ void main() {
   late Directory tmpDir;
   late CalendarEventStorage storage;
 
-  setUp(() {
+  setUp(() async {
     tmpDir = Directory.systemTemp.createTempSync('calendar_storage_test');
     PlatformDirs.setInstance(MacosPlatformDirs(homeOverride: tmpDir.path));
     storage = const CalendarEventStorage();
+    // The service now uses scoped paths via [FileStorageAdapter]; remove any
+    // leftovers from earlier test runs.
+    final fallback = Directory('calendar_events');
+    if (fallback.existsSync()) {
+      fallback.deleteSync(recursive: true);
+    }
   });
 
-  tearDown(() {
+  tearDown(() async {
+    // Clean up the scoped path used by [FileStorageAdapter] on the VM.
+    try {
+      final fallback = Directory('calendar_events');
+      if (fallback.existsSync()) {
+        fallback.deleteSync(recursive: true);
+      }
+    } catch (_) {}
     if (tmpDir.existsSync()) {
       tmpDir.deleteSync(recursive: true);
     }

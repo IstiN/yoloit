@@ -1,9 +1,17 @@
-import 'dart:io';
+import 'package:flutter/foundation.dart' show visibleForTesting;
+
+import 'package:yoloit/core/platform/platform_dirs_factory.dart' as impl;
+
+export 'package:yoloit/core/platform/platform_dirs_vm.dart'
+  if (dart.library.html) 'package:yoloit/core/platform/platform_dirs_web.dart';
 
 /// Platform-aware directory paths for YoLoIT config, data, logs and temp.
 ///
 /// All paths are consistent with platform conventions and match the values
 /// that were previously hardcoded across the codebase.
+///
+/// The implementation is selected via conditional export, so the web build
+/// receives a stub that does not depend on `dart:io`.
 ///
 /// Usage:
 /// ```dart
@@ -13,10 +21,10 @@ import 'dart:io';
 abstract class PlatformDirs {
   const PlatformDirs();
 
-  /// Singleton — picks the right implementation based on the current OS.
+  /// Singleton — picks the right implementation based on the current runtime.
   static PlatformDirs? _instance;
   static PlatformDirs get instance {
-    _instance ??= _create();
+    _instance ??= impl.createPlatformDirs();
     return _instance!;
   }
 
@@ -24,14 +32,9 @@ abstract class PlatformDirs {
   // ignore: use_setters_to_change_properties
   static void setInstance(PlatformDirs instance) => _instance = instance;
 
-  static PlatformDirs _create() {
-    if (Platform.isIOS) return const IosPlatformDirs();
-    if (Platform.isMacOS) return const MacosPlatformDirs();
-    if (Platform.isLinux) return const LinuxPlatformDirs();
-    if (Platform.isWindows) return const WindowsPlatformDirs();
-    // Fallback — treat like Linux.
-    return const LinuxPlatformDirs();
-  }
+  /// Resets the cached instance so the next [instance] call re-evaluates.
+  @visibleForTesting
+  static void reset() => _instance = null;
 
   /// Directory for persistent configuration files (e.g. agent_configs.json).
   String get configDir;
@@ -49,139 +52,5 @@ abstract class PlatformDirs {
   String get skillsDir;
 
   /// Convenience: a dedicated YoLoIT temp sub-directory.
-  String get yoloitTempDir => '${Directory.systemTemp.path}/yoloit_tmp';
-}
-
-// ── macOS ────────────────────────────────────────────────────────────────────
-
-/// macOS paths — matches the values previously hardcoded across the codebase.
-///
-/// Config:  `~/.config/yoloit/`   (matches legacy hardcoded value)
-/// Logs:    `~/Library/Logs/yoloit/`
-/// Data:    `~/Library/Application Support/yoloit/`
-class MacosPlatformDirs extends PlatformDirs {
-  const MacosPlatformDirs({String? homeOverride})
-    : _homeOverride = homeOverride;
-
-  final String? _homeOverride;
-
-  String get _home => _homeOverride ?? Platform.environment['HOME'] ?? '/tmp';
-
-  @override
-  String get configDir => '$_home/.config/yoloit';
-
-  @override
-  String get dataDir => '$_home/Library/Application Support/yoloit';
-
-  @override
-  String get logsDir => '$_home/Library/Logs/yoloit';
-
-  @override
-  String get tempDir => Directory.systemTemp.path;
-
-  @override
-  String get skillsDir => '$_home/.config/yoloit/skills';
-}
-
-// ── iOS ──────────────────────────────────────────────────────────────────────
-
-/// iOS paths — all persistent files live inside the app sandbox.
-///
-/// Config/Data: `<sandbox>/Documents/yoloit/`
-/// Logs:        `<sandbox>/Documents/yoloit/logs/`
-class IosPlatformDirs extends PlatformDirs {
-  const IosPlatformDirs({String? homeOverride}) : _homeOverride = homeOverride;
-
-  final String? _homeOverride;
-
-  String get _home => _homeOverride ?? Platform.environment['HOME'] ?? '/tmp';
-
-  String get _root => '$_home/Documents/yoloit';
-
-  @override
-  String get configDir => _root;
-
-  @override
-  String get dataDir => _root;
-
-  @override
-  String get logsDir => '$_root/logs';
-
-  @override
-  String get tempDir => Directory.systemTemp.path;
-
-  @override
-  String get skillsDir => '$_root/skills';
-}
-
-// ── Linux ────────────────────────────────────────────────────────────────────
-
-/// Linux paths — follows XDG Base Directory conventions.
-///
-/// Config:  `~/.config/yoloit/`
-/// Data:    `~/.local/share/yoloit/`
-/// Logs:    `~/.local/share/yoloit/logs/`
-class LinuxPlatformDirs extends PlatformDirs {
-  const LinuxPlatformDirs({String? homeOverride})
-    : _homeOverride = homeOverride;
-
-  final String? _homeOverride;
-
-  String get _home => _homeOverride ?? Platform.environment['HOME'] ?? '/tmp';
-
-  @override
-  String get configDir => '$_home/.config/yoloit';
-
-  @override
-  String get dataDir => '$_home/.local/share/yoloit';
-
-  @override
-  String get logsDir => '$_home/.local/share/yoloit/logs';
-
-  @override
-  String get tempDir => Directory.systemTemp.path;
-
-  @override
-  String get skillsDir => '$_home/.config/yoloit/skills';
-}
-
-// ── Windows ──────────────────────────────────────────────────────────────────
-
-/// Windows paths — follows AppData conventions.
-///
-/// Config:  `%APPDATA%\yoloit\`
-/// Data:    `%APPDATA%\yoloit\`
-/// Logs:    `%APPDATA%\yoloit\logs\`
-class WindowsPlatformDirs extends PlatformDirs {
-  const WindowsPlatformDirs({String? appDataOverride})
-    : _appDataOverride = appDataOverride;
-
-  final String? _appDataOverride;
-
-  String get _appData =>
-      _appDataOverride ??
-      Platform.environment['APPDATA'] ??
-      Platform.environment['USERPROFILE'] ??
-      'C:\\Users\\Default\\AppData\\Roaming';
-
-  @override
-  String get configDir => '$_appData\\yoloit';
-
-  @override
-  String get dataDir => '$_appData\\yoloit';
-
-  @override
-  String get logsDir => '$_appData\\yoloit\\logs';
-
-  @override
-  String get tempDir =>
-      Platform.environment['TEMP'] ??
-      Platform.environment['TMP'] ??
-      'C:\\Windows\\Temp';
-
-  @override
-  String get skillsDir => '$_appData\\yoloit\\skills';
-
-  @override
-  String get yoloitTempDir => '${Directory.systemTemp.path}\\yoloit_tmp';
+  String get yoloitTempDir;
 }

@@ -41,6 +41,7 @@ import 'package:yoloit/features/board/plugins/builtin/timer_manager.dart';
 import 'package:yoloit/features/board/services/board_offscreen_renderer.dart';
 import 'package:yoloit/features/board/services/board_preview_cache.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_panel_plugin.dart';
+import 'package:yoloit/features/board/terminal/board_terminal_panel_plugin_base.dart';
 import 'package:yoloit/features/board/widgets/widget_engine_manager.dart';
 import 'package:yoloit/features/templates/data/template_service.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_cubit.dart';
@@ -1083,7 +1084,7 @@ class CliServer {
         'configured': true,
       };
     }
-    if (typeId == BoardTerminalPanelPlugin.kTypeId) {
+    if (typeId == BoardTerminalPanelPluginBase.kTypeId) {
       final rawConfig = initialState['config'];
       final config = BoardTerminalConfig.fromJson(
         Map<String, dynamic>.from(rawConfig is Map ? rawConfig : const {}),

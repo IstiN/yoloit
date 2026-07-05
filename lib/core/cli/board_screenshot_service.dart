@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
@@ -8,7 +7,8 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 import 'package:path/path.dart' as p;
-import 'package:yoloit/core/platform/platform_dirs.dart';
+import 'package:yoloit/core/platform/file_storage_adapter.dart';
+import 'package:yoloit/core/platform/platform_capabilities.dart';
 
 /// Singleton service for capturing board screenshots.
 ///
@@ -35,7 +35,7 @@ class BoardScreenshotService {
   ///
   /// Saves to a temp file and returns the path.
   /// Uses low pixel ratio (0.5) for small file size.
-  /// Returns null if capture fails.
+  /// Returns null if capture fails or the runtime cannot write files (web).
   Future<String?> captureJpegFile({double pixelRatio = 0.5}) async {
     final bytes = await _capture(
       pixelRatio: pixelRatio,
@@ -54,16 +54,15 @@ class BoardScreenshotService {
 
       if (jpegData == null) return null;
 
-      // Save PNG (already compressed enough at low pixelRatio) as the file
-      // dart:ui doesn't have native JPEG encoding, so we use PNG at low res
-      final tempDir = PlatformDirs.instance.tempDir;
-      final dir = Directory(p.join(tempDir, 'board_snapshots'));
-      if (!dir.existsSync()) dir.createSync(recursive: true);
-      final filePath = p.join(
-        dir.path,
-        'board_snapshot_${DateTime.now().millisecondsSinceEpoch}.png',
-      );
-      await File(filePath).writeAsBytes(bytes);
+      // Web cannot produce a meaningful local file path, so return null there.
+      if (PlatformCapabilities.current.platform == RuntimePlatform.web) {
+        return null;
+      }
+
+      // Save PNG (already compressed enough at low pixelRatio) as the file.
+      // dart:ui doesn't have native JPEG encoding, so we use PNG at low res.
+      final filePath = _snapshotPath();
+      await FileStorageAdapter.instance.writeBytes(filePath, bytes);
       return filePath;
     } catch (e) {
       assert(() { debugPrint('[BoardScreenshot] JPEG save failed: $e'); return true; }());
@@ -129,19 +128,35 @@ class BoardScreenshotService {
     return null;
   }
 
+  static String _snapshotPath() {
+    final ts = DateTime.now().millisecondsSinceEpoch;
+    return 'board_snapshots/board_snapshot_$ts.png';
+  }
+
   /// Clean up old snapshot files (older than 1 hour).
   Future<void> cleanupOldSnapshots() async {
     try {
-      final dir = Directory(
-        p.join(PlatformDirs.instance.tempDir, 'board_snapshots'),
-      );
-      if (!dir.existsSync()) return;
+      const dirPath = 'board_snapshots';
+      final paths = await FileStorageAdapter.instance.list(dirPath);
       final cutoff = DateTime.now().subtract(const Duration(hours: 1));
-      for (final f in dir.listSync()) {
-        if (f is File && f.lastModifiedSync().isBefore(cutoff)) {
-          f.deleteSync();
+      for (final path in paths) {
+        final ts = _snapshotTimestamp(path);
+        if (ts != null && ts.isBefore(cutoff)) {
+          await FileStorageAdapter.instance.delete(path);
         }
       }
     } catch (_) {}
+  }
+
+  static DateTime? _snapshotTimestamp(String path) {
+    final name = p.basename(path);
+    const prefix = 'board_snapshot_';
+    const suffix = '.png';
+    if (!name.startsWith(prefix) || !name.endsWith(suffix)) return null;
+    final ts = int.tryParse(
+      name.substring(prefix.length, name.length - suffix.length),
+    );
+    if (ts == null) return null;
+    return DateTime.fromMillisecondsSinceEpoch(ts);
   }
 }

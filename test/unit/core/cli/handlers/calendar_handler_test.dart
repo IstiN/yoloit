@@ -14,13 +14,22 @@ void main() {
   late Directory tmpDir;
   late CalendarCliHandler handler;
 
-  setUp(() {
+  setUp(() async {
     tmpDir = Directory.systemTemp.createTempSync('calendar_handler_test');
     PlatformDirs.setInstance(MacosPlatformDirs(homeOverride: tmpDir.path));
     handler = const CalendarCliHandler();
+    // Clean up scoped fallback used by [FileStorageAdapter].
+    final fallback = Directory('calendar_events');
+    if (fallback.existsSync()) {
+      fallback.deleteSync(recursive: true);
+    }
   });
 
-  tearDown(() {
+  tearDown(() async {
+    final fallback = Directory('calendar_events');
+    if (fallback.existsSync()) {
+      fallback.deleteSync(recursive: true);
+    }
     if (tmpDir.existsSync()) {
       tmpDir.deleteSync(recursive: true);
     }

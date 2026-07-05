@@ -1,0 +1,74 @@
+name: Deploy demo to GitHub Pages
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'site/**'
+      - 'web/**'
+      - 'lib/**'
+      - 'pubspec.yaml'
+      - '.github/workflows/deploy_demo.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze --no-pub --no-fatal-infos
+
+      - name: Build Flutter demo
+        run: |
+          BASE_HREF="/${{ github.event.repository.name }}/app/"
+          flutter build web --release --target lib/main_web_full.dart --base-href "$BASE_HREF" --pwa-strategy none
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Assemble Pages artifact
+        run: |
+          mkdir -p _site/app
+          cp -r site/* _site/
+          cp -r build/web/* _site/app/
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+          retention-days: 1
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+        with:
+          artifact_name: github-pages
+          timeout: 120000

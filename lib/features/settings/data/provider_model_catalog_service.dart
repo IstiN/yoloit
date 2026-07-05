@@ -1,15 +1,19 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
+import 'dart:io' if (dart.library.html) 'provider_model_catalog_service_io_stub.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:json_annotation/json_annotation.dart';
 import 'package:path/path.dart' as p;
+import 'package:yoloit/core/platform/file_storage_adapter.dart';
 import 'package:yoloit/core/platform/platform_dirs.dart';
-import 'package:yoloit/core/utils/http_utils.dart';
-import 'package:yoloit/core/platform/platform_shell.dart';
-import 'package:yoloit/features/board/chat/cursor_agent_provider.dart';
+import 'package:yoloit/core/platform/platform_shell.dart'
+    if (dart.library.html) 'provider_model_catalog_service_shell_stub.dart';
+import 'package:yoloit/core/utils/http_utils.dart'
+    if (dart.library.html) 'provider_model_catalog_service_http_stub.dart';
+import 'package:yoloit/features/board/chat/cursor_agent_provider.dart'
+    if (dart.library.html) 'provider_model_catalog_service_cursor_stub.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
 
@@ -180,7 +184,8 @@ class ProviderModelCatalogService {
 
   /// Discovers models by querying installed CLI tools (e.g. `cursor-agent
   /// --list-models`). Runs in background — results silently update
-  /// [modelsForProvider] once available.
+  /// [modelsForProvider] once available. No-op on web where process spawning
+  /// is unavailable.
   Future<void> _discoverCliModels() async {
     await Future.wait([discoverCursorModels(), discoverCodexModels()]);
   }
@@ -298,18 +303,19 @@ class ProviderModelCatalogService {
 
   Future<void> _saveCache(Map<String, dynamic> json) async {
     try {
-      final file = File(_cachePath);
-      await file.parent.create(recursive: true);
-      await file.writeAsString(jsonEncode(json));
+      await FileStorageAdapter.instance.writeString(
+        _cachePath,
+        jsonEncode(json),
+      );
     } catch (_) {}
   }
 
   Future<Map<String, dynamic>?> _loadCache() async {
     try {
-      final file = File(_cachePath);
-      if (!await file.exists()) return null;
-      final body = await file.readAsString();
-      return jsonDecode(body) as Map<String, dynamic>;
+      final storage = FileStorageAdapter.instance;
+      if (!await storage.exists(_cachePath)) return null;
+      final body = await storage.readString(_cachePath);
+      return jsonDecode(body ?? '{}') as Map<String, dynamic>;
     } catch (_) {
       return null;
     }
@@ -328,26 +334,30 @@ class ProviderModelCatalogService {
 
   // ── Custom models persistence ───────────────────────────────────────────────
 
-  Future<void> _writeModelsMap(File file, Map<String, List<ChatModelInfo>> models) async {
+  Future<void> _writeModelsMap(
+    String path,
+    Map<String, List<ChatModelInfo>> models,
+  ) async {
     try {
-      await file.parent.create(recursive: true);
       final data = models.map(
         (providerId, models) =>
             MapEntry(providerId, models.map((m) => m.toJson()).toList()),
       );
-      await file.writeAsString(jsonEncode(data));
+      await FileStorageAdapter.instance.writeString(path, jsonEncode(data));
     } catch (_) {}
   }
 
   Future<void> _saveCustomModels() async {
-    await _writeModelsMap(File(_customModelsPath), _customModels);
+    await _writeModelsMap(_customModelsPath, _customModels);
   }
 
   Future<void> _loadCustomModels() async {
     try {
-      final file = File(_customModelsPath);
-      if (!await file.exists()) return;
-      final raw = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+      final storage = FileStorageAdapter.instance;
+      if (!await storage.exists(_customModelsPath)) return;
+      final raw = jsonDecode(
+        await storage.readString(_customModelsPath) ?? '{}',
+      ) as Map<String, dynamic>;
       _customModels.clear();
       raw.forEach((providerId, models) {
         _customModels[providerId] =
@@ -363,14 +373,16 @@ class ProviderModelCatalogService {
   Future<void> _saveCliModelsCache() async {
     final cacheableModels = Map<String, List<ChatModelInfo>>.from(_cliModels)
       ..remove('codex');
-    await _writeModelsMap(File(_cliModelsPath), cacheableModels);
+    await _writeModelsMap(_cliModelsPath, cacheableModels);
   }
 
   Future<void> _loadCliModelsCache() async {
     try {
-      final file = File(_cliModelsPath);
-      if (!await file.exists()) return;
-      final raw = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+      final storage = FileStorageAdapter.instance;
+      if (!await storage.exists(_cliModelsPath)) return;
+      final raw = jsonDecode(
+        await storage.readString(_cliModelsPath) ?? '{}',
+      ) as Map<String, dynamic>;
       raw.forEach((providerId, models) {
         if (providerId == 'codex') return;
         _cliModels[providerId] =

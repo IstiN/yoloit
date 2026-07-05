@@ -6,6 +6,7 @@ import 'package:yoloit/features/board/chat/chat_panel_plugin.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/builtin/filetree_plugin.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_panel_plugin.dart';
+import 'package:yoloit/features/board/terminal/board_terminal_panel_plugin_base.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -42,7 +43,7 @@ void main() {
     final panels = cubit.state.activeBoard!.panels;
     final chat = panels.singleWhere((p) => p.type == ChatPanelPlugin.kTypeId);
     final terminal = panels.singleWhere(
-      (p) => p.type == BoardTerminalPanelPlugin.kTypeId,
+      (p) => p.type == BoardTerminalPanelPluginBase.kTypeId,
     );
 
     expect(chat.state['configured'], isTrue);

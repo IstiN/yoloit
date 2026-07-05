@@ -3,6 +3,7 @@ import 'package:yoloit/features/board/plugins/builtin/ui_view_bindings.dart';
 import 'package:yoloit/core/remote/yoloitd_models.dart';
 import 'package:yoloit/core/remote/yoloitd_panel_catalog.dart';
 import 'package:yoloit/features/board/plugins/builtin/ui_view_plugin.dart';
+import 'package:yoloit/features/board/plugins/builtin/ui_view_plugin_base.dart';
 import 'package:yoloit/features/board/widgets/app_cli_utils.dart';
 
 class RemotePanelActionResult {
@@ -140,7 +141,8 @@ Map<String, dynamic> _content(RemotePanel panel) {
     },
     'board.ui' => () {
       final tree =
-          UiViewPlugin.treeFromState(panel.state) ?? UiViewPlugin.defaultTree();
+          UiViewPluginBase.treeFromState(panel.state) ??
+          UiViewPluginBase.defaultTree();
       final storage = UiViewBindings.storageFromState(panel.state);
       final resolved = UiViewBindings.applyTree(tree, storage);
       return <String, dynamic>{
@@ -1171,7 +1173,8 @@ RemotePanelActionResult _uiView(
   switch (action) {
     case 'get':
       final tree =
-          UiViewPlugin.treeFromState(panel.state) ?? UiViewPlugin.defaultTree();
+          UiViewPluginBase.treeFromState(panel.state) ??
+          UiViewPluginBase.defaultTree();
       final storage = UiViewBindings.storageFromState(panel.state);
       final resolved = UiViewBindings.applyTree(tree, storage);
       return RemotePanelActionResult(

@@ -1,9 +1,9 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:yoloit/core/platform/file_storage_adapter.dart';
 import 'package:yoloit/core/platform/platform_dirs.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/theme/app_colors.dart';
@@ -359,14 +359,20 @@ class ThemeManager extends ChangeNotifier {
 
   // ── Custom theme management ──────────────────────────────────────────────────
 
-  Directory get _themesDir =>
-      Directory(p.join(PlatformDirs.instance.configDir, 'themes'));
+  String get _themesDir => p.join(PlatformDirs.instance.configDir, 'themes');
 
   /// Imports a theme file (`.json` or `.icls`/`.xml`) and persists it.
   /// Returns the imported theme's id.
+  ///
+  /// On desktop the file is read directly from [filePath]. On web the path is
+  /// treated as a scoped storage key by [FileStorageAdapter], so importing
+  /// arbitrary local files is not supported there.
   Future<String> importThemeFile(String filePath) async {
-    final file = File(filePath);
-    final content = await file.readAsString();
+    final storage = FileStorageAdapter.instance;
+    final content = await storage.readString(filePath);
+    if (content == null || content.isEmpty) {
+      throw StateError('Unable to read theme file: $filePath');
+    }
     final ext = p.extension(filePath).toLowerCase();
 
     late CustomTheme custom;
@@ -395,7 +401,7 @@ class ThemeManager extends ChangeNotifier {
       );
     }
 
-    // Persist to disk
+    // Persist to storage
     await _saveCustomTheme(custom);
     _customThemes.add(custom);
     notifyListeners();
@@ -409,8 +415,9 @@ class ThemeManager extends ChangeNotifier {
       _activeCustomThemeId = null;
       await setTheme(AppThemePreset.neonPurple);
     }
-    final file = File(p.join(_themesDir.path, '$id.json'));
-    if (await file.exists()) await file.delete();
+    final themePath = p.join(_themesDir, '$id.json');
+    final storage = FileStorageAdapter.instance;
+    if (await storage.exists(themePath)) await storage.delete(themePath);
     notifyListeners();
   }
 
@@ -491,13 +498,17 @@ class ThemeManager extends ChangeNotifier {
   Future<void> _loadCustomThemes() async {
     _customThemes = [];
     final dir = _themesDir;
-    if (!dir.existsSync()) return;
-    for (final file in dir.listSync().whereType<File>()) {
-      if (!file.path.endsWith('.json')) continue;
+    final storage = FileStorageAdapter.instance;
+    if (!await storage.exists(dir)) return;
+    final paths = await storage.list(dir);
+    for (final filePath in paths) {
+      if (!filePath.endsWith('.json')) continue;
       try {
-        final json = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+        final raw = await storage.readString(filePath);
+        if (raw == null || raw.isEmpty) continue;
+        final json = jsonDecode(raw) as Map<String, dynamic>;
         final id = json['id'] as String? ??
-            p.basenameWithoutExtension(file.path);
+            p.basenameWithoutExtension(filePath);
         final name = json['name'] as String? ?? id;
         final brightStr = json['brightness'] as String? ?? 'dark';
         final brightness =
@@ -516,18 +527,16 @@ class ThemeManager extends ChangeNotifier {
   }
 
   Future<void> _saveCustomTheme(CustomTheme theme) async {
-    final dir = _themesDir;
-    if (!dir.existsSync()) await dir.create(recursive: true);
-    final file = File(p.join(dir.path, '${theme.id}.json'));
+    final filePath = p.join(_themesDir, '${theme.id}.json');
     final json = {
       'id': theme.id,
       'name': theme.name,
       'brightness': theme.brightness == Brightness.light ? 'light' : 'dark',
       'colors': theme.scheme.toJson(),
     };
-    await file.writeAsString(
+    await FileStorageAdapter.instance.writeString(
+      filePath,
       const JsonEncoder.withIndent('  ').convert(json),
-      flush: true,
     );
   }
 }

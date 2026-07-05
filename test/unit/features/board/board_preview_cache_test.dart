@@ -85,7 +85,10 @@ void main() {
 
   test('png without meta sidecar is treated as stale', () {
     final doc = board();
-    if (!tempDir.existsSync()) tempDir.createSync(recursive: true);
+    final previewDir = Directory('${tempDir.path}/board_previews');
+    if (!previewDir.existsSync()) {
+      previewDir.createSync(recursive: true);
+    }
     cache.pngFile(doc.id).writeAsBytesSync(Uint8List.fromList([7]));
 
     expect(cache.isFresh(doc), isFalse);

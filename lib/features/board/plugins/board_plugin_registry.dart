@@ -40,7 +40,8 @@ class BoardPluginRegistry {
     _registerBuiltins();
   }
 
-  static final BoardPluginRegistry instance = BoardPluginRegistry._();
+  static final BoardPluginRegistry _instance = BoardPluginRegistry._();
+  static BoardPluginRegistry get instance => _instance;
 
   final Map<String, BoardPanelPlugin> _plugins = {};
 
@@ -66,6 +67,14 @@ class BoardPluginRegistry {
   /// (i.e. those that are visible to the user when adding a new panel).
   List<BoardPanelPlugin> get catalogPlugins =>
       all.where((plugin) => plugin.showInCatalog).toList();
+
+  /// Catalog plugins that are actually supported on the current runtime.
+  ///
+  /// Unsupported plugins are still registered (so existing boards load them as
+  /// placeholders) but are hidden from the Add Panel catalog.
+  List<BoardPanelPlugin> get catalogPluginsForCurrentPlatform => catalogPlugins
+      .where((plugin) => plugin.isSupportedOnCurrentPlatform)
+      .toList();
 
   // ── Internals ──────────────────────────────────────────────────────────────
 

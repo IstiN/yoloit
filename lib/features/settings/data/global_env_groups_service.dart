@@ -3,9 +3,9 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:json_annotation/json_annotation.dart';
-import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:yoloit/core/platform/platform_dirs.dart';
+import 'package:yoloit/core/platform/file_storage_adapter.dart';
+import 'package:yoloit/core/platform/platform_capabilities.dart';
 import 'package:yoloit/core/platform/secure_storage_factory.dart';
 
 part 'global_env_groups_service.g.dart';
@@ -48,10 +48,18 @@ class GlobalEnvGroupsService {
   Future<List<GlobalEnvGroup>>? _loadAllInFlight;
   String? _loadAllCacheSignature;
 
-  File get _storageFile {
-    final dir = PlatformDirs.instance.configDir;
-    return File(p.join(dir, 'env_groups.json'));
-  }
+  static const _metaPath = 'env_groups.json';
+
+  /// True when the runtime can use a real OS secure credential store.
+  /// Web uses plain adapter entries for the demo because browser storage is
+  /// not a hardware-backed enclave and `FlutterSecureStorage` is not wired up
+  /// for the web target.
+  bool get _useSecureStorage =>
+      PlatformCapabilities.current.has(PlatformCapability.processes) &&
+      PlatformCapabilities.current.has(PlatformCapability.secureStorage);
+
+  String _valuesPath(String groupId) =>
+      'env_groups_values/${_canonicalGroupId(groupId)}.json';
 
   /// Loads all env groups.  Values come from secure storage; only metadata
   /// (id, name, keys) lives in the JSON file.
@@ -59,14 +67,14 @@ class GlobalEnvGroupsService {
   /// Returns a mutable deep copy so callers can edit groups in UI without
   /// mutating the internal cache.
   Future<List<GlobalEnvGroup>> loadAll() async {
-    final signature = _storageFileSignature();
+    final signature = await _storageFileSignature();
     final cached = _loadAllCache;
     if (cached != null && _loadAllCacheSignature == signature) {
       return _cloneGroups(cached);
     }
     return _loadAllInFlight ??= _loadAllUncached().then(
-      (groups) {
-        _loadAllCacheSignature = _storageFileSignature();
+      (groups) async {
+        _loadAllCacheSignature = await _storageFileSignature();
         _loadAllCache = List<GlobalEnvGroup>.unmodifiable(groups);
         _loadAllInFlight = null;
         return _cloneGroups(groups);
@@ -81,14 +89,14 @@ class GlobalEnvGroupsService {
   Future<List<GlobalEnvGroup>> _loadAllUncached() async {
     try {
       List<_GroupMeta> metas;
-      final file = _storageFile;
-      if (!file.existsSync()) {
+      final storage = FileStorageAdapter.instance;
+      if (!await storage.exists(_metaPath)) {
         final migrated = await _migrateFromPrefs();
         if (migrated != null) return migrated;
         return [];
       }
-      final raw = await file.readAsString();
-      if (raw.trim().isEmpty) return [];
+      final raw = await storage.readString(_metaPath);
+      if (raw == null || raw.trim().isEmpty) return [];
       final decoded = jsonDecode(raw) as List;
       metas =
           decoded.map((e) {
@@ -192,7 +200,7 @@ class GlobalEnvGroupsService {
     // Write metadata (no values) to JSON.
     await _writeMetaFile(persistedGroups);
     _loadAllCache = List<GlobalEnvGroup>.unmodifiable(persistedGroups);
-    _loadAllCacheSignature = _storageFileSignature();
+    _loadAllCacheSignature = await _storageFileSignature();
     _loadAllInFlight = null;
   }
 
@@ -200,9 +208,12 @@ class GlobalEnvGroupsService {
   Future<void> deleteGroupSecrets(String groupId) async {
     try {
       final key = _secureStorageKey(groupId);
-      await _storage.delete(key: key);
+      if (_useSecureStorage) {
+        await _storage.delete(key: key);
+      }
+      await FileStorageAdapter.instance.delete(_valuesPath(groupId));
       final legacyKey = _legacySecureStorageKey(groupId);
-      if (legacyKey != null && legacyKey != key) {
+      if (legacyKey != null && legacyKey != key && _useSecureStorage) {
         await _storage.delete(key: legacyKey);
       }
       _loadAllCache = null;
@@ -251,9 +262,18 @@ class GlobalEnvGroupsService {
   }
 
   Future<GlobalEnvGroup> importEnvFileAsGroup(String filePath) async {
+    if (!PlatformCapabilities.current.has(PlatformCapability.processes)) {
+      // Web cannot read arbitrary file paths; return a placeholder group.
+      return GlobalEnvGroup(
+        id: 'group_${DateTime.now().millisecondsSinceEpoch}',
+        name: 'Imported Group',
+        values: const {},
+      );
+    }
     final file = File(filePath);
     final content = await file.readAsString();
-    final name = p.basenameWithoutExtension(filePath).replaceAll('.env', '');
+    final name = filePath.split(RegExp(r'[\\/]')).last
+        .replaceAll('.env', '');
     return GlobalEnvGroup(
       id: 'group_${DateTime.now().millisecondsSinceEpoch}',
       name: name.isEmpty ? 'Imported Group' : name,
@@ -319,19 +339,14 @@ class GlobalEnvGroupsService {
             )
             .toList();
     final encoded = const JsonEncoder.withIndent('  ').convert(metas);
-    final file = _storageFile;
-    final dir = file.parent;
-    if (!dir.existsSync()) {
-      await dir.create(recursive: true);
-    }
-    await file.writeAsString(encoded, flush: true);
+    await FileStorageAdapter.instance.writeString(_metaPath, encoded);
   }
 
-  String _storageFileSignature() {
-    final file = _storageFile;
-    if (!file.existsSync()) return '${file.path}:missing';
-    final stat = file.statSync();
-    return '${file.path}:${stat.modified.microsecondsSinceEpoch}:${stat.size}';
+  Future<String> _storageFileSignature() async {
+    final storage = FileStorageAdapter.instance;
+    if (!await storage.exists(_metaPath)) return '$_metaPath:missing';
+    final raw = await storage.readString(_metaPath);
+    return '$_metaPath:${raw?.length ?? 0}:${raw.hashCode}';
   }
 
   /// Returns `true` if the write succeeded.
@@ -367,7 +382,14 @@ class GlobalEnvGroupsService {
         '[EnvGroups] _writeSecureValues $groupId: '
         '${values.length} keys, ${encoded.length} bytes',
       );
-      await _storage.write(key: key, value: encoded);
+      if (_useSecureStorage) {
+        await _storage.write(key: key, value: encoded);
+      } else {
+        // Web demo fallback: values are stored as plain JSON in the adapter.
+        // This is not suitable for production secrets but is acceptable for
+        // the web demo where no hardware-backed keystore is available.
+        await FileStorageAdapter.instance.writeString(_valuesPath(groupId), encoded);
+      }
       final legacyKey = _legacySecureStorageKey(groupId);
       if (legacyKey != null && legacyKey != key) {
         await _storage.delete(key: legacyKey);
@@ -385,11 +407,17 @@ class GlobalEnvGroupsService {
   ) async {
     try {
       final key = _secureStorageKey(groupId);
-      var raw = await _storage.read(key: key);
+      String? raw;
+      if (_useSecureStorage) {
+        raw = await _storage.read(key: key);
+      } else {
+        raw = await FileStorageAdapter.instance.readString(_valuesPath(groupId));
+      }
       final legacyKey = _legacySecureStorageKey(groupId);
       if ((raw == null || raw.isEmpty) &&
           legacyKey != null &&
-          legacyKey != key) {
+          legacyKey != key &&
+          _useSecureStorage) {
         raw = await _storage.read(key: legacyKey);
         if (raw != null && raw.isNotEmpty) {
           await _storage.write(key: key, value: raw);

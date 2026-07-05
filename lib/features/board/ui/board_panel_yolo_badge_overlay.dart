@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/builtin/yolo_assistant_plugin.dart';
+import 'package:yoloit/features/board/plugins/builtin/yolo_assistant_plugin_base.dart';
 import 'package:yoloit/features/board/ui/panel_yolo_assistant_badge.dart';
 import 'package:yoloit/features/board/ui/yolo_anchored_assistant_layout.dart';
 
@@ -27,7 +28,7 @@ class BoardPanelYoloBadgeOverlay extends StatelessWidget {
   Widget build(BuildContext context) {
     if (capturingScreenshot ||
         connectMode ||
-        panel.type == YoloAssistantPlugin.kTypeId) {
+        panel.type == YoloAssistantPluginBase.kTypeId) {
       return const SizedBox.shrink();
     }
 

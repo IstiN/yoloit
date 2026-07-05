@@ -7,7 +7,7 @@ void main() {
 
   test('typeId is board.yolo_assistant', () {
     expect(plugin.typeId, 'board.yolo_assistant');
-    expect(YoloAssistantPlugin.kTypeId, 'board.yolo_assistant');
+    expect(YoloAssistantPluginBase.kTypeId, 'board.yolo_assistant');
   });
 
   test('displayName is YoLo Assistant', () {

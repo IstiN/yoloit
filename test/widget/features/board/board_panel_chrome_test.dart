@@ -10,6 +10,7 @@ import 'package:yoloit/features/board/history/board_history_store.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/builtin/markdown_note_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/yolo_assistant_plugin.dart';
+import 'package:yoloit/features/board/plugins/builtin/yolo_assistant_plugin_base.dart';
 import 'package:yoloit/features/board/ui/board_view.dart';
 
 void main() {
@@ -349,7 +350,7 @@ void main() {
       expect(cubit.state.yoloAssistantAnchorPanelId, 'target');
       final panels = cubit.state.activeBoard!.panels;
       expect(
-        panels.where((p) => p.type == YoloAssistantPlugin.kTypeId),
+        panels.where((p) => p.type == YoloAssistantPluginBase.kTypeId),
         isEmpty,
       );
       expect(find.text('YOLO'), findsWidgets);
