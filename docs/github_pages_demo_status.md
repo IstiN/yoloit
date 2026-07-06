@@ -49,7 +49,7 @@
 ## 2. What is still broken / blocking deployment
 
 ### 2.1 GitHub Actions workflow fails at `flutter pub get`
-Workflow `.github/workflows/deploy_demo.yml` fails because `actions/checkout@v4` does **not** fetch git submodules by default, and `pubspec.yaml` depends on:
+Workflow `.github/workflows/deploy_demo.yml` failed because `actions/checkout@v4` does **not** fetch git submodules by default, and `pubspec.yaml` depends on:
 
 ```yaml
 local_models_flutter:
@@ -64,14 +64,27 @@ Because yoloit depends on local_models_flutter from path which doesn't exist
 version solving failed.
 ```
 
-### 2.2 Required fix (not yet committed/pushed)
-Add `submodules: recursive` to the checkout step in `.github/workflows/deploy_demo.yml`:
+### 2.2 Second failure after submodules fix — `flutter_code_editor` is missing
+`third_party/flutter_code_editor/` is listed in `.gitignore` and is **not** a registered submodule; the other platform build workflows clone it explicitly. After adding `submodules: recursive`, the next failure was:
+
+```
+Because yoloit depends on flutter_code_editor from path which doesn't exist
+(could not find package flutter_code_editor at "third_party/flutter_code_editor"),
+version solving failed.
+```
+
+### 2.3 Required fixes (not yet committed/pushed)
+1. Add `submodules: recursive` to the checkout step in `.github/workflows/deploy_demo.yml`.
+2. Add a `Clone flutter_code_editor` step (matching `build-linux.yml` / `build-macos.yml` / `build-windows.yml`) before `flutter pub get`:
 
 ```yaml
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
+      - name: Clone flutter_code_editor
+        run: |
+          rm -rf third_party/flutter_code_editor
+          git clone --branch v0.3.5 --depth=1 \
+            https://github.com/akvelon/flutter-code-editor.git \
+            third_party/flutter_code_editor
+          git -C third_party/flutter_code_editor log -1 --oneline
 ```
 
 Then commit, push, and re-run the workflow.
@@ -96,23 +109,31 @@ rm -f .git/index.lock
    rm -f .git/index.lock
    ```
 
-2. Verify the workflow file is correct (only one `submodules: recursive` block):
+2. Verify the workflow file is correct (only one `submodules: recursive` block and the `Clone flutter_code_editor` step is present):
    ```bash
-   cat .github/workflows/deploy_demo.yml | head -35
+   cat .github/workflows/deploy_demo.yml | head -45
    ```
 
-3. If the fix is missing or duplicated, edit `.github/workflows/deploy_demo.yml` so the checkout step looks exactly like:
+3. If either fix is missing or duplicated, edit `.github/workflows/deploy_demo.yml` so the checkout + clone steps look exactly like:
    ```yaml
        - name: Checkout
          uses: actions/checkout@v4
          with:
            submodules: recursive
+
+       - name: Clone flutter_code_editor
+         run: |
+           rm -rf third_party/flutter_code_editor
+           git clone --branch v0.3.5 --depth=1 \
+             https://github.com/akvelon/flutter-code-editor.git \
+             third_party/flutter_code_editor
+           git -C third_party/flutter_code_editor log -1 --oneline
    ```
 
 4. Commit and push:
    ```bash
    git add .github/workflows/deploy_demo.yml
-   git commit -m "ci: checkout submodules in deploy_demo workflow"
+   git commit -m "ci: checkout submodules and clone flutter_code_editor in deploy_demo workflow"
    git push
    ```
 
@@ -177,7 +198,7 @@ New:
 - Conditional export web stubs for terminal, chat, preview, search, JS engine, widget registry, history store, etc.
 
 Modified:
-- `.github/workflows/deploy_demo.yml` — needs `submodules: recursive` fix
+- `.github/workflows/deploy_demo.yml` — needs `submodules: recursive` fix and explicit `flutter_code_editor` clone step
 - `lib/core/platform/platform_dirs.dart`
 - `lib/features/board/bloc/board_cubit.dart`
 - `lib/features/calendar/data/calendar_event_storage.dart`
@@ -191,4 +212,5 @@ Modified:
 
 - The pre-commit hook enforces `jscpd < 1 %`, hardcoded-color ratchet, panel write coverage, CLI integration coverage, and full test suite. The web refactor required extracting plugin base classes to stay under the duplication threshold.
 - `actions/checkout@v4` defaults to `submodules: false`; the demo workflow must explicitly enable recursive submodules.
+- `third_party/flutter_code_editor/` is gitignored and not a submodule; CI must clone it explicitly (same as the desktop build workflows).
 - `calendar_events/` may be left behind by test runs; clean it before commits.
