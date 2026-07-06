@@ -81,7 +81,7 @@ class ChecklistCliHandler extends PanelCliHandler {
         final index =
             _indexArg(args) ??
             _indexById(items, args['id']?.toString()) ??
-            _indexByText(items, args['text'] ?? args['old']);
+            _indexByText(items, (args['text'] ?? args['old']) as String?);
         if (index == null || newText == null) {
           return const CliActionResult(
             ok: false,

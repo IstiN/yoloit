@@ -178,7 +178,7 @@ class CalendarCliHandler extends PanelCliHandler {
         message: 'Event not found: ${eventId.value}',
       );
     }
-    final ok = await _storage.deleteEvent(panel.id, existing.id);
+    await _storage.deleteEvent(panel.id, existing.id);
     final count = await _storage.countEvents(panel.id);
     return CliActionResult(
       message: 'Deleted event: ${existing.title}',
