@@ -108,6 +108,22 @@ Verified live URLs:
 
 The landing page shows the YoLoIT brand and the demo iframe loads the Flutter app.
 
+### 3.1 Interactive web demo board
+First-time visitors now see a pre-populated demo board (`YoLoIT Web Demo`) with panels that run fully in the browser using web storage (`SharedPreferences` / `localStorage` via `FileStorageAdapter`):
+
+- **Markdown Note** — editable welcome note.
+- **Sticky Note** — editable colored sticky.
+- **Shape / Frame** — rectangle shape with text.
+- **Kanban Board** — draggable columns and cards.
+- **Checklist** — add / toggle / delete items.
+- **Timer** — editable countdown timer.
+- **Calendar** — month/week/day views with sample events stored in browser.
+- **Table** — editable `pluto_grid` table.
+- **Chart** — `fl_chart` line chart.
+- **Webpage** — URL preview that opens in a new tab.
+
+Desktop-only panels (terminal, files, AI chat, runners, media, etc.) still render the `UnsupportedCapabilityPanel` placeholder.
+
 ---
 
 ## 4. Important architectural notes
@@ -149,6 +165,7 @@ jscpd --min-tokens 50 --min-lines 5 lib/
 New:
 - `site/*`
 - `lib/main_web_full.dart`, `lib/app_web.dart`
+- `lib/features/board/demo/web_demo_board.dart`
 - `lib/core/platform/{platform_capabilities,file_storage_adapter,platform_dirs,platform_info}*.dart`
 - `lib/features/board/plugins/board_panel_plugin_base.dart`
 - `lib/features/board/plugins/builtin/*_base.dart`, `*_stub.dart`, `*_vm.dart`
@@ -159,6 +176,8 @@ New:
 
 Modified:
 - `.github/workflows/deploy_demo.yml` — needs `submodules: recursive` fix, explicit `flutter_code_editor` clone step, and `lib web` analyze scope
+- `lib/app_web.dart` — seed demo board on first web launch
+- `lib/features/board/demo/web_demo_board.dart` — new demo board builder
 - `lib/core/cli/handlers/calendar_handler.dart` — removed unused `ok` local
 - `lib/core/cli/handlers/checklist_handler.dart` — added `String?` cast for text argument
 - `lib/features/board/chat/chat_panel_widget_web.dart` — removed unused import
