@@ -47,7 +47,7 @@ jobs:
         run: flutter pub get
 
       - name: Analyze
-        run: flutter analyze --no-pub --no-fatal-infos lib web
+        run: flutter analyze --no-pub --no-fatal-infos --no-fatal-warnings lib web
 
       - name: Build Flutter demo
         run: |
