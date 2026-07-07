@@ -551,19 +551,15 @@ When the **Download** button was added unconditionally to `BoardToolbar`, the ri
 
 ## 3. Deployment status
 
-The demo has **not been deployed yet**. The user asked to finish local debugging before pushing to GitHub Pages.
+The demo has been deployed automatically from the `main` branch push.
 
-When you are ready to deploy, run:
+- **Git commit:** `943d872`
+- **GitHub Actions run:** `28861336070` — `Deploy demo to GitHub Pages` — **success**
+- **Live URLs:**
+  - Landing page: `https://istin.github.io/yoloit/` (HTTP 200)
+  - Flutter web demo: `https://istin.github.io/yoloit/app/index.html` (HTTP 200)
 
-```bash
-gh workflow run deploy_demo.yml
-```
-
-or push the latest `main`. The workflow already contains the submodule, `flutter_code_editor`, and analyze-scope fixes.
-
-After deploy, the expected live URLs will be:
-- Landing page: `https://istin.github.io/yoloit/`
-- Flutter web demo: `https://istin.github.io/yoloit/app/`
+> The `workflow_dispatch` trigger requires admin rights, so `gh workflow run` failed with 403. However, the push itself triggered the workflow because the commit touched `lib/**`, `web/**`, `pubspec.yaml`, and `site/**`.
 
 ### 3.1 Local verification URLs
 - Landing page: `http://127.0.0.1:8097/` (currently served by `python3 -m http.server 8097 --bind 127.0.0.1 --directory site`)
