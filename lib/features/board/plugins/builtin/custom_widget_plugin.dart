@@ -1,2 +1,4 @@
+export 'custom_widget_plugin_base.dart' show CustomWidgetPluginBase;
+export 'custom_widget_plugin_content.dart' show CustomWidgetCliHandler;
 export 'custom_widget_plugin_vm.dart'
-    if (dart.library.html) 'custom_widget_plugin_stub.dart';
+    if (dart.library.html) 'custom_widget_plugin_web.dart';

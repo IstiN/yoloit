@@ -7,7 +7,7 @@ final _customWidgetDarkFallbackColors = AppColorScheme.fromAccent(
   Colors.indigo,
 );
 
-/// Shared metadata for the custom widget panel on VM and web stub.
+/// Shared metadata for the custom widget panel on VM and web.
 abstract class CustomWidgetPluginBase extends BoardPanelPlugin {
   const CustomWidgetPluginBase();
 
@@ -40,7 +40,6 @@ abstract class CustomWidgetPluginBase extends BoardPanelPlugin {
   @override
   Set<PlatformCapability> get requiredCapabilities => const {
         PlatformCapability.filesystem,
-        PlatformCapability.processes,
         PlatformCapability.secureStorage,
       };
 }

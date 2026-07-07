@@ -1,11 +1,12 @@
 import 'dart:convert';
-import 'dart:io';
 
-/// Describes a custom JS widget installed in ~/.config/yoloit/widgets/.
+import 'package:yoloit/core/platform/file_storage_adapter.dart';
+
+/// Describes a custom JS widget stored under a base path.
 ///
-/// A widget is either:
-///   - A **directory** with a `manifest.json` + `widget.js`
-///   - A **single .js file** (manifest fields inferred from filename)
+/// On VM the base path is a directory path; on web it is a virtual prefix
+/// (e.g. `widgets/<id>`) managed by [FileStorageAdapter]. All internal paths
+/// use forward slashes.
 class WidgetManifest {
   const WidgetManifest({
     required this.id,
@@ -41,7 +42,8 @@ class WidgetManifest {
   /// Currently informational — enforced by Content Security Policy.
   final bool networkEnabled;
 
-  /// Absolute path to the widget directory (or the .js file if single-file).
+  /// Base path to the widget directory (or the .js file if single-file).
+  /// Uses forward slashes on both VM and web.
   final String widgetPath;
 
   /// True when the widget is a single .js file without a directory.
@@ -54,13 +56,18 @@ class WidgetManifest {
   /// Optional CLI help for agents: events, examples, read-state hints.
   final Map<String, dynamic>? cli;
 
-  /// Absolute path to the main widget.js entry point.
-  String get mainJsPath =>
-      isSingleFile ? widgetPath : '$widgetPath${Platform.pathSeparator}widget.js';
+  /// Virtual path to the main widget.js entry point.
+  String get mainJsPath => isSingleFile ? widgetPath : '$widgetPath/widget.js';
 
-  /// App directory (parent directory of the entry point for single-file apps).
-  String get appDir =>
-      isSingleFile ? File(widgetPath).parent.path : widgetPath;
+  /// Parent directory of the entry point.
+  String get appDir {
+    if (isSingleFile) {
+      final idx = widgetPath.lastIndexOf('/');
+      if (idx <= 0) return widgetPath;
+      return widgetPath.substring(0, idx);
+    }
+    return widgetPath;
+  }
 
   /// Reads and returns the JS source code.
   ///
@@ -68,28 +75,30 @@ class WidgetManifest {
   /// Otherwise falls back to reading widget.js.
   /// After assembling, runs the [_preprocessIncludes] pass which inlines
   /// `yoloit.include('path')` calls with the referenced file contents.
-  Future<String?> readJs() async {
-    String js;
+  Future<String?> readJs({FileStorageAdapter? adapter}) async {
+    final storage = adapter ?? FileStorageAdapter.instance;
+    final base = widgetPath;
+    late final String js;
 
     if (files != null && files!.isNotEmpty) {
       final parts = <String>[];
       for (final filename in files!) {
-        final path = '$widgetPath${Platform.pathSeparator}${filename.replaceAll('/', Platform.pathSeparator)}';
-        final file = File(path);
-        if (await file.exists()) {
-          parts.add(await file.readAsString());
+        final path = '$base/$filename';
+        final content = await storage.readString(path);
+        if (content != null) {
+          parts.add(content);
         } else {
           parts.add('/* yoloit.include: file not found: $filename */');
         }
       }
       js = parts.join('\n');
     } else {
-      final file = File(mainJsPath);
-      if (!await file.exists()) return null;
-      js = await file.readAsString();
+      final content = await storage.readString(mainJsPath);
+      if (content == null) return null;
+      js = content;
     }
 
-    return _preprocessIncludes(js, widgetPath, 0);
+    return _preprocessIncludes(js, appDir, 0, storage);
   }
 
   /// Recursively inlines `yoloit.include('path')` calls (up to [_maxIncludeDepth]).
@@ -102,21 +111,23 @@ class WidgetManifest {
     String source,
     String baseDir,
     int depth,
+    FileStorageAdapter storage,
   ) async {
     if (depth >= _maxIncludeDepth) return source;
     if (!_includeRegex.hasMatch(source)) return source;
 
     final buffer = StringBuffer();
-    int last = 0;
+    var last = 0;
     for (final match in _includeRegex.allMatches(source)) {
       buffer.write(source.substring(last, match.start));
       final relPath = match.group(1)!;
-      final absPath = '$baseDir${Platform.pathSeparator}${relPath.replaceAll('/', Platform.pathSeparator)}';
-      final file = File(absPath);
-      if (await file.exists()) {
-        final included = await file.readAsString();
-        final subDir = File(absPath).parent.path;
-        buffer.write(await _preprocessIncludes(included, subDir, depth + 1));
+      final absPath = '$baseDir/$relPath';
+      final content = await storage.readString(absPath);
+      if (content != null) {
+        final subDir = _parentOf(absPath);
+        buffer.write(
+          await _preprocessIncludes(content, subDir, depth + 1, storage),
+        );
       } else {
         buffer.write('/* yoloit.include: file not found: $relPath */');
       }
@@ -126,19 +137,36 @@ class WidgetManifest {
     return buffer.toString();
   }
 
-  /// Creates a manifest from a directory (reads manifest.json if present).
-  static Future<WidgetManifest?> fromDirectory(Directory dir) async {
-    final jsFile = File('${dir.path}${Platform.pathSeparator}widget.js');
-    if (!await jsFile.exists()) return null;
+  static String _parentOf(String path) {
+    final idx = path.lastIndexOf('/');
+    if (idx <= 0) return path;
+    return path.substring(0, idx);
+  }
 
-    final id = dir.path.split(Platform.pathSeparator).last;
-    final manifestFile = File(
-      '${dir.path}${Platform.pathSeparator}manifest.json',
-    );
+  static String _normalizePath(String path) => path.replaceAll('\\', '/');
 
-    if (await manifestFile.exists()) {
+  static String _lastSegment(String path) {
+    final normalized = _normalizePath(path);
+    final parts = normalized.split('/');
+    return parts.isEmpty ? normalized : parts.last;
+  }
+
+  /// Creates a manifest from a storage base path (directory).
+  static Future<WidgetManifest?> fromStorage(
+    String basePath, {
+    FileStorageAdapter? adapter,
+  }) async {
+    final storage = adapter ?? FileStorageAdapter.instance;
+    final normalized = _normalizePath(basePath);
+    final jsPath = '$normalized/widget.js';
+    if (!await storage.exists(jsPath)) return null;
+
+    final id = _lastSegment(normalized);
+    final manifestPath = '$normalized/manifest.json';
+    final manifestRaw = await storage.readString(manifestPath);
+    if (manifestRaw != null) {
       try {
-        final raw = jsonDecode(await manifestFile.readAsString()) as Map<String, dynamic>;
+        final raw = jsonDecode(manifestRaw) as Map<String, dynamic>;
         final filesList = raw['files'] as List?;
         final cliRaw = raw['cli'];
         return WidgetManifest(
@@ -147,9 +175,11 @@ class WidgetManifest {
           description: raw['description'] as String? ?? '',
           version: raw['version'] as String? ?? '1.0.0',
           icon: raw['icon'] as String? ?? '🔧',
-          allowedCommands: List<String>.from(raw['allowedCommands'] as List? ?? []),
+          allowedCommands: List<String>.from(
+            raw['allowedCommands'] as List? ?? [],
+          ),
           networkEnabled: raw['network'] as bool? ?? true,
-          widgetPath: dir.path,
+          widgetPath: normalized,
           isSingleFile: false,
           files: filesList != null ? List<String>.from(filesList) : null,
           cli:
@@ -169,17 +199,18 @@ class WidgetManifest {
       icon: '🔧',
       allowedCommands: const [],
       networkEnabled: true,
-      widgetPath: dir.path,
+      widgetPath: normalized,
       isSingleFile: false,
     );
   }
 
-  /// Creates a manifest from a single .js file.
-  static WidgetManifest fromJsFile(File file) {
-    final stem = file.path
-        .split(Platform.pathSeparator)
-        .last
-        .replaceAll('.js', '');
+  /// Creates a manifest from a single .js file path.
+  static WidgetManifest fromJsFilePath(
+    String filePath, {
+    FileStorageAdapter? adapter,
+  }) {
+    final normalized = _normalizePath(filePath);
+    final stem = _lastSegment(normalized).replaceAll('.js', '');
     return WidgetManifest(
       id: stem,
       name: _titleCase(stem),
@@ -188,7 +219,7 @@ class WidgetManifest {
       icon: '🔧',
       allowedCommands: const [],
       networkEnabled: true,
-      widgetPath: file.path,
+      widgetPath: normalized,
       isSingleFile: true,
     );
   }

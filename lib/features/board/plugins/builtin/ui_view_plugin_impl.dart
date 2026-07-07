@@ -281,17 +281,20 @@ class _UiViewEditorDialogState extends State<_UiViewEditorDialog> {
               final id = ids[index];
               final ref = refs.firstWhere((item) => item.actionId == id);
               final selected = id == _selectedActionId;
-              return ListTile(
-                dense: true,
-                selected: selected,
-                title: Text(id, style: const TextStyle(fontSize: 12)),
-                subtitle: Text(
-                  ref.label.isEmpty ? ref.nodeType : ref.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 11),
+              return Material(
+                color: Colors.transparent,
+                child: ListTile(
+                  dense: true,
+                  selected: selected,
+                  title: Text(id, style: const TextStyle(fontSize: 12)),
+                  subtitle: Text(
+                    ref.label.isEmpty ? ref.nodeType : ref.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 11),
+                  ),
+                  onTap: () => _selectAction(id),
                 ),
-                onTap: () => _selectAction(id),
               );
             },
           ),

@@ -4,7 +4,7 @@ import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/custom_widget_plugin_base.dart';
 import 'package:yoloit/features/board/plugins/builtin/custom_widget_plugin_content.dart';
 
-/// Custom JS widget panel — VM implementation.
+/// Custom JS widget panel — web implementation.
 class CustomWidgetPlugin extends CustomWidgetPluginBase {
   const CustomWidgetPlugin();
 

@@ -3,6 +3,12 @@ import 'package:yoloit/features/board/widgets/app_cli_utils.dart';
 import 'package:yoloit/features/board/widgets/widget_manifest.dart';
 
 void main() {
+  test('basename normalizes paths with forward slashes', () {
+    expect(AppCliUtils.basename('weather'), 'weather');
+    expect(AppCliUtils.basename('widgets/weather'), 'weather');
+    expect(AppCliUtils.basename('/a/b/cool.js'), 'cool.js');
+  });
+
   test('extractTextLines collects text and label nodes', () {
     final lines = AppCliUtils.extractTextLines({
       'type': 'column',

@@ -20,7 +20,6 @@ class WidgetRegistryService {
   }
 
   /// Backward-compat alias.
-  /// Backward-compat alias.
   String get widgetsDir => appsDir;
 
   /// Returns all installed widgets, scanning the widgets directory.
@@ -43,7 +42,7 @@ class WidgetRegistryService {
           : id;
       final dir = Directory(resolved);
       if (await dir.exists()) {
-        final m = await WidgetManifest.fromDirectory(dir);
+        final m = await WidgetManifest.fromStorage(_normalize(dir.path));
         if (m != null) return m;
       }
       return null;
@@ -72,12 +71,12 @@ class WidgetRegistryService {
       // If source is already inside appsDir (same path), skip copy — already installed.
       if (dest.path == dir.path || dest.path == dir.path.trimRight()) {
         invalidate();
-        return WidgetManifest.fromDirectory(dest);
+        return WidgetManifest.fromStorage(_normalize(dest.path));
       }
       if (dest.existsSync()) dest.deleteSync(recursive: true);
       await _copyDir(dir, dest);
       invalidate();
-      return WidgetManifest.fromDirectory(dest);
+      return WidgetManifest.fromStorage(_normalize(dest.path));
     } else if (source == FileSystemEntityType.file &&
         sourcePath.endsWith('.js')) {
       final file = File(sourcePath);
@@ -85,10 +84,16 @@ class WidgetRegistryService {
       final dest = File('${destDir.path}${Platform.pathSeparator}$name');
       if (dest.path != file.path) await file.copy(dest.path);
       invalidate();
-      return WidgetManifest.fromJsFile(dest);
+      return WidgetManifest.fromJsFilePath(_normalize(dest.path));
     }
     return null;
   }
+
+  /// Web-only file installation; unsupported on VM.
+  Future<WidgetManifest?> installFromFiles({
+    required String id,
+    required Map<String, String> files,
+  }) async => null;
 
   /// Remove a widget by id.
   Future<bool> remove(String id) async {
@@ -105,6 +110,8 @@ class WidgetRegistryService {
 
   // ── Internals ─────────────────────────────────────────────────────────────
 
+  static String _normalize(String path) => path.replaceAll('\\', '/');
+
   Future<List<WidgetManifest>> _scan() async {
     final dir = Directory(appsDir);
     if (!await dir.exists()) return [];
@@ -112,10 +119,10 @@ class WidgetRegistryService {
     final results = <WidgetManifest>[];
     await for (final entity in dir.list()) {
       if (entity is Directory) {
-        final m = await WidgetManifest.fromDirectory(entity);
+        final m = await WidgetManifest.fromStorage(_normalize(entity.path));
         if (m != null) results.add(m);
       } else if (entity is File && entity.path.endsWith('.js')) {
-        results.add(WidgetManifest.fromJsFile(entity));
+        results.add(WidgetManifest.fromJsFilePath(_normalize(entity.path)));
       }
     }
     results.sort((a, b) => a.name.compareTo(b.name));
@@ -130,7 +137,14 @@ class WidgetRegistryService {
     }
 
     // Always overwrite bundled example widgets so updates ship with the app.
-    const examples = ['weather', 'crypto', 'stocks', 'calculator', 'yolo-hello', 'animation-showcase'];
+    const examples = [
+      'weather',
+      'crypto',
+      'stocks',
+      'calculator',
+      'yolo-hello',
+      'animation-showcase',
+    ];
     for (final name in examples) {
       final dest = Directory(
         '${destDir.path}${Platform.pathSeparator}$name',

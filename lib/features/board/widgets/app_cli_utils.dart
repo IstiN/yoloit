@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:yoloit/features/board/widgets/widget_manifest.dart';
 
 /// Shared helpers for YoLoIT app CLI (`app:help`, `app:state`, `app:snapshot`).
@@ -19,8 +17,8 @@ class AppCliUtils {
 
   /// Normalize an app id, absolute path, or directory basename.
   static String basename(String idOrPath) {
-    if (!idOrPath.contains(Platform.pathSeparator)) return idOrPath;
-    return idOrPath.split(Platform.pathSeparator).last;
+    if (!idOrPath.contains('/')) return idOrPath;
+    return idOrPath.split('/').last;
   }
 
   /// Collect human-readable text from a declarative render tree.
@@ -85,7 +83,7 @@ class AppCliUtils {
       'running': running,
       'network': manifest.networkEnabled,
       'globalCommands': globalCommands,
-      if (cli != null) ...cli,
+      ...? cli,
       'examples': _examplesFor(manifest.id, cli),
     };
   }
