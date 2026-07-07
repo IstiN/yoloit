@@ -1,7 +1,7 @@
 # YoLoIT GitHub Pages Demo — Current Status
 
 > Hand-off document created: 2026-07-05  
-> Last updated: 2026-07-07 (deployed from commit `5f0e0b7`)  
+> Last updated: 2026-07-07 (deployed from commit `adf96ff`)  
 > Goal: deploy a static landing page + Flutter web demo to GitHub Pages, with all native-only features rendered as "Available in YoLoIT for macOS" placeholders.  
 >
 > **Deployment is live.** The web demo is auto-deployed from every `main` branch push via `.github/workflows/deploy_demo.yml`. Each deploy appends a unique `github.run_id` query parameter to `flutter_bootstrap.js` and `main.dart.js` so GitHub Pages / Fastly cannot serve a stale cached build. A **Clear page cache** button is also available in Settings → Support on the web for manual cache reset.
@@ -624,8 +624,8 @@ The first web implementation copied bundled example widgets from Flutter assets 
 
 The demo has been deployed automatically from the `main` branch push.
 
-- **Git commit:** `5f0e0b7`
-- **GitHub Actions run:** `28896699084` — `Deploy demo to GitHub Pages` — **success**
+- **Git commit:** `adf96ff`
+- **GitHub Actions run:** `28899467181` — `Deploy demo to GitHub Pages` — **success**
 - **Live URLs:**
   - Landing page: `https://istin.github.io/yoloit/` (HTTP 200)
   - Flutter web demo: `https://istin.github.io/yoloit/app/index.html` (HTTP 200)
@@ -892,21 +892,22 @@ Modified:
 
 This section records the state after the final push and deployment.
 
-- **Commit:** `5f0e0b7` — `feat(web): enable custom widgets and UI View in browser`
+- **Commit:** `adf96ff` — `feat(web): fetch built-in widgets from GitHub raw content`
 - **Pre-commit quality gates:**
   - File-size guard: ✅ pass (max 2800 lines)
-  - Code duplication (`jscpd --min-tokens 50 --min-lines 5 lib/`): ✅ **0.998%** (< 1.0%)
+  - Code duplication (`jscpd --min-tokens 50 --min-lines 5 lib/`): ✅ **0.996%** (< 1.0%)
   - Coverage ratchet: ✅ **43.8%** (>= 43.5% baseline)
   - CLI registry validation: ✅ pass
   - CLI integration-test coverage: ✅ 258/258 commands covered or exempt
   - Panel write-coverage: ✅ 11/11 panel types covered
   - Full test suite (`flutter test --concurrency=4 --exclude-tags=flaky test/unit test/widget test/core test/features`): ✅ **+2638 tests, ~7 skipped, EXIT_CODE=0**
 - **CI/CD:**
-  - GitHub Actions run `28896699084` completed successfully.
-  - Build job: 2 m 29 s.
-  - Deploy job: 11 s.
+  - GitHub Actions run `28899467181` completed successfully.
+  - Build job: 2 m 9 s.
+  - Deploy job: 9 s.
   - Demo URL: `https://istin.github.io/yoloit/`
 - **Deployment artifacts:**
-  - Cache-busted `flutter_bootstrap.js` and `main.dart.js` via `github.run_id` query parameter (`?v=28896699084`).
+  - Cache-busted `flutter_bootstrap.js` and `main.dart.js` via `github.run_id` query parameter (`?v=28899467181`).
   - Web-only **Clear page cache** button available in Settings → Support.
-  - Custom Widget / JS App panels now run in the browser via sandboxed iframe + `postMessage`.
+  - Custom Widget / JS App panels run in the browser via sandboxed iframe + `postMessage`.
+  - Built-in example widgets are fetched from GitHub raw content on first load.
