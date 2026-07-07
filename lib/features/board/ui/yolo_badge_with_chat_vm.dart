@@ -5,9 +5,10 @@ import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/assistant/yolo_assistant_widget.dart';
 import 'package:yoloit/features/board/assistant/yolo_voice_overlay.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
+import 'package:yoloit/features/board/ui/widgets/yolo_badge_chat_shell.dart';
 
 class YoloBadgeWithChat extends StatefulWidget {
-  const YoloBadgeWithChat();
+  const YoloBadgeWithChat({super.key});
 
   @override
   State<YoloBadgeWithChat> createState() => YoloBadgeWithChatState();
@@ -18,9 +19,6 @@ class YoloBadgeWithChatState extends State<YoloBadgeWithChat>
   late final AnimationController _entranceController;
   late final Animation<double> _entranceSlide;
   late final Animation<double> _entranceFade;
-
-  late final AnimationController _chatController;
-  late final Animation<double> _chatSlide;
 
   bool _chatOpen = false;
   Timer? _entranceDelayTimer;
@@ -55,15 +53,6 @@ class YoloBadgeWithChatState extends State<YoloBadgeWithChat>
     _entranceDelayTimer = Timer(const Duration(milliseconds: 300), () {
       if (mounted) _entranceController.forward();
     });
-
-    // Chat panel slide animation
-    _chatController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 350),
-    );
-    _chatSlide = Tween<double>(begin: 380, end: 0).animate(
-      CurvedAnimation(parent: _chatController, curve: Curves.easeOutCubic),
-    );
   }
 
   @override
@@ -71,17 +60,11 @@ class YoloBadgeWithChatState extends State<YoloBadgeWithChat>
     _entranceDelayTimer?.cancel();
     _voiceOverlayFocusNode.dispose();
     _entranceController.dispose();
-    _chatController.dispose();
     super.dispose();
   }
 
   void toggleChat() {
     setState(() => _chatOpen = !_chatOpen);
-    if (_chatOpen) {
-      _chatController.forward();
-    } else {
-      _chatController.reverse();
-    }
   }
 
   Future<void> activateVoiceOverlay() async {
@@ -188,7 +171,7 @@ class YoloBadgeWithChatState extends State<YoloBadgeWithChat>
   String get _lastUserMessage {
     final messages =
         (_badgePanel.state['messages'] as List<dynamic>? ?? const <dynamic>[])
-            .whereType<Map>()
+            .whereType<Map<String, dynamic>>()
             .map((entry) => Map<String, dynamic>.from(entry))
             .toList()
             .reversed;
@@ -225,113 +208,20 @@ class YoloBadgeWithChatState extends State<YoloBadgeWithChat>
               ),
             ),
             // Chat tab + panel (bottom-right, on top of overlay)
-            Align(
-              alignment: Alignment.bottomRight,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 48),
-                    child: _buildChatTab(context),
-                  ),
-                  AnimatedBuilder(
-                    animation: _chatController,
-                    builder: (context, child) {
-                      final progress = 1.0 - (_chatSlide.value / 380);
-                      return DecoratedBox(
-                        decoration: BoxDecoration(
-                          borderRadius: const BorderRadius.only(
-                            topLeft: Radius.circular(14),
-                            topRight: Radius.circular(14),
-                            bottomRight: Radius.circular(14),
-                          ),
-                          boxShadow:
-                              progress > 0.05
-                                  ? [
-                                    BoxShadow(
-                                      color: context.appColors.background
-                                          .withValues(alpha: 0.14 * progress),
-                                      blurRadius: 20,
-                                      spreadRadius: -4,
-                                      offset: const Offset(-8, 8),
-                                    ),
-                                  ]
-                                  : [],
-                        ),
-                        child: ClipRect(
-                          child: Align(
-                            alignment: Alignment.centerLeft,
-                            widthFactor: progress,
-                            child: child,
-                          ),
-                        ),
-                      );
-                    },
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final availableWidth =
-                            MediaQuery.sizeOf(context).width - 44;
-                        return SizedBox(
-                          width: availableWidth.clamp(260.0, 380.0),
-                          height: 480,
-                          child: _buildChatPanel(),
-                        );
-                      },
-                    ),
-                  ),
-                ],
+            YoloBadgeChatShell(
+              isOpen: _chatOpen,
+              onToggle: toggleChat,
+              panelContent: YoloAssistantWidget(
+                panel: _badgePanel,
+                controller: _assistantController,
+                onUpdateState: (newState) {
+                  setState(() {
+                    _badgePanel = _badgePanel.copyWith(state: newState);
+                  });
+                },
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildChatTab(BuildContext context) {
-    final colors = context.appColors;
-    return GestureDetector(
-      onTap: toggleChat,
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: Container(
-          width: 28,
-          height: 56,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [colors.primary, colors.primaryLight],
-            ),
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(10),
-              bottomLeft: Radius.circular(10),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: colors.primary.withValues(alpha: 0.3),
-                blurRadius: 8,
-                offset: const Offset(-2, 2),
-              ),
-            ],
-          ),
-          child: RotatedBox(
-            quarterTurns: 3,
-            child:
-                _chatOpen
-                    ? Icon(Icons.close, size: 14, color: colors.textPrimary)
-                    : Text(
-                      'YOLO',
-                      style: TextStyle(
-                        color: colors.textPrimary,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 2,
-                      ),
-                    ),
-          ),
         ),
       ),
     );
@@ -379,30 +269,6 @@ class YoloBadgeWithChatState extends State<YoloBadgeWithChat>
       orbAlignY: 0.62,
       responseOrbAlignY: 0.66,
       micAmplitudeStream: _assistantController.micAmplitudeStream,
-    );
-  }
-
-  Widget _buildChatPanel() {
-    final colors = AppColorScheme.of(context);
-    return Container(
-      decoration: BoxDecoration(
-        color: colors.surfaceElevated,
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(14),
-          topRight: Radius.circular(14),
-          bottomRight: Radius.circular(14),
-        ),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: YoloAssistantWidget(
-        panel: _badgePanel,
-        controller: _assistantController,
-        onUpdateState: (newState) {
-          setState(() {
-            _badgePanel = _badgePanel.copyWith(state: newState);
-          });
-        },
-      ),
     );
   }
 }
