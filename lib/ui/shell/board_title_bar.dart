@@ -51,6 +51,43 @@ class BoardTitleBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
+    final content = Row(
+      children: [
+        SizedBox(width: _hasMacOSTrafficLights ? 82 : 12),
+        if (leading != null) leading!,
+        const Spacer(),
+        if (trailing != null) ...[
+          trailing!,
+          const SizedBox(width: 8),
+        ],
+        _PanelToggleButton(
+          icon: Icons.settings_outlined,
+          tooltip: 'Settings (⌘,)',
+          semanticsLabel: 'Open settings',
+          active: false,
+          onTap: onSettings,
+        ),
+        if (afterSettings != null) ...[
+          const SizedBox(width: 8),
+          afterSettings!,
+        ] else
+          const SizedBox(width: 12),
+      ],
+    );
+
+    if (kIsWeb) {
+      return Container(
+        height: 44,
+        decoration: BoxDecoration(
+          color: colors.surface,
+          border: Border(
+            bottom: BorderSide(color: colors.border),
+          ),
+        ),
+        child: content,
+      );
+    }
+
     return GestureDetector(
       onPanStart: onDragStart == null ? null : (_) => onDragStart!(),
       behavior: HitTestBehavior.translucent,
@@ -79,29 +116,7 @@ class BoardTitleBar extends StatelessWidget {
                 ),
               ],
             ),
-            child: Row(
-              children: [
-                SizedBox(width: _hasMacOSTrafficLights ? 82 : 12),
-                if (leading != null) leading!,
-                const Spacer(),
-                if (trailing != null) ...[
-                  trailing!,
-                  const SizedBox(width: 8),
-                ],
-                _PanelToggleButton(
-                  icon: Icons.settings_outlined,
-                  tooltip: 'Settings (⌘,)',
-                  semanticsLabel: 'Open settings',
-                  active: false,
-                  onTap: onSettings,
-                ),
-                if (afterSettings != null) ...[
-                  const SizedBox(width: 8),
-                  afterSettings!,
-                ] else
-                  const SizedBox(width: 12),
-              ],
-            ),
+            child: content,
           ),
         ),
       ),

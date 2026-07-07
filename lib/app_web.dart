@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:yoloit/core/platform/url_opener.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/theme/theme_manager.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
@@ -68,32 +71,78 @@ class _WebAppRootState extends State<_WebAppRoot> {
 
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: ThemeManager.instance,
+      builder: (context, child) {
+        return MaterialApp(
+          title: 'YoLoIT',
+          debugShowCheckedModeBanner: false,
+          theme: ThemeManager.instance.theme,
+          localizationsDelegates: const [
+            DefaultMaterialLocalizations.delegate,
+            DefaultWidgetsLocalizations.delegate,
+          ],
+          supportedLocales: const [Locale('en', 'US')],
+          home: Scaffold(
+            body: BlocListener<BoardCubit, BoardState>(
+              listener: (context, state) {
+                _maybeSeedDemoBoard(context.read<BoardCubit>());
+              },
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Builder(
+                    builder: (barContext) => BoardTitleBar(
+                      onSettings: () => _showSettings(barContext),
+                      trailing: const _DownloadReleasesButton(),
+                    ),
+                  ),
+                  const Expanded(child: BoardView()),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+const String _downloadReleasesUrl =
+    'https://github.com/IstiN/yoloit/releases/latest';
+
+class _DownloadReleasesButton extends StatelessWidget {
+  const _DownloadReleasesButton();
+
+  @override
+  Widget build(BuildContext context) {
     final colors = context.appColors;
-    return MaterialApp(
-      title: 'YoLoIT',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeManager.instance.theme.copyWith(
-        scaffoldBackgroundColor: colors.background,
-      ),
-      localizationsDelegates: const [
-        DefaultMaterialLocalizations.delegate,
-        DefaultWidgetsLocalizations.delegate,
-      ],
-      supportedLocales: const [Locale('en', 'US')],
-      home: Scaffold(
-        body: BlocListener<BoardCubit, BoardState>(
-          listener: (context, state) {
-            _maybeSeedDemoBoard(context.read<BoardCubit>());
-          },
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+    return Tooltip(
+      message: 'Download YoLoIT for desktop',
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: () => unawaited(launchExternalUrl(_downloadReleasesUrl)),
+        child: Container(
+          height: 28,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            color: colors.surfaceHighlight,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: colors.border),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Builder(
-                builder: (barContext) => BoardTitleBar(
-                  onSettings: () => _showSettings(barContext),
+              Icon(Icons.download_outlined, size: 14, color: colors.textSecondary),
+              const SizedBox(width: 6),
+              Text(
+                'Install',
+                style: TextStyle(
+                  color: colors.textSecondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-              const Expanded(child: BoardView()),
             ],
           ),
         ),
