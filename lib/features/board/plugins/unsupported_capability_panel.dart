@@ -32,6 +32,38 @@ class UnsupportedCapabilityPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return _UnsupportedPanelContent(
+      displayName: plugin.displayName,
+      capabilityLabel: _capabilityLabel,
+    );
+  }
+
+  static String _formatCapability(PlatformCapability capability) {
+    return switch (capability) {
+      PlatformCapability.filesystem => 'local file system access',
+      PlatformCapability.processes => 'native process execution',
+      PlatformCapability.nativeTerminal => 'a terminal shell',
+      PlatformCapability.nativeMediaPlayback => 'native media playback',
+      PlatformCapability.secureStorage => 'secure credential storage',
+      PlatformCapability.networkServer => 'a local network server',
+      PlatformCapability.windowManagement => 'window management',
+      PlatformCapability.clipboardFiles => 'clipboard file access',
+    };
+  }
+}
+
+/// Shared layout for unsupported-panel placeholders.
+class _UnsupportedPanelContent extends StatelessWidget {
+  const _UnsupportedPanelContent({
+    required this.displayName,
+    required this.capabilityLabel,
+  });
+
+  final String displayName;
+  final String capabilityLabel;
+
+  @override
+  Widget build(BuildContext context) {
     final colors = context.appColors;
     return Container(
       padding: const EdgeInsets.all(16),
@@ -52,7 +84,7 @@ class UnsupportedCapabilityPanel extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            '${plugin.displayName} requires $_capabilityLabel and is not available in the browser.',
+            '$displayName requires $capabilityLabel and is not available in the browser.',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: colors.textSecondary,
@@ -62,19 +94,6 @@ class UnsupportedCapabilityPanel extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  static String _formatCapability(PlatformCapability capability) {
-    return switch (capability) {
-      PlatformCapability.filesystem => 'local file system access',
-      PlatformCapability.processes => 'native process execution',
-      PlatformCapability.nativeTerminal => 'a terminal shell',
-      PlatformCapability.nativeMediaPlayback => 'native media playback',
-      PlatformCapability.secureStorage => 'secure credential storage',
-      PlatformCapability.networkServer => 'a local network server',
-      PlatformCapability.windowManagement => 'window management',
-      PlatformCapability.clipboardFiles => 'clipboard file access',
-    };
   }
 }
 
@@ -99,35 +118,9 @@ class UnsupportedCapabilityPanelByMetadata extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.appColors;
-    return Container(
-      padding: const EdgeInsets.all(16),
-      color: colors.surface,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.desktop_mac_outlined, size: 40, color: colors.textMuted),
-          const SizedBox(height: 12),
-          Text(
-            'Available in YoLoIT for macOS',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: colors.textPrimary,
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '$displayName requires native desktop features and is not available in the browser.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: colors.textSecondary,
-              fontSize: 12,
-            ),
-          ),
-        ],
-      ),
+    return _UnsupportedPanelContent(
+      displayName: displayName,
+      capabilityLabel: 'native desktop features',
     );
   }
 }

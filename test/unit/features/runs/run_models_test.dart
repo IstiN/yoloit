@@ -106,6 +106,19 @@ void main() {
         final c = RunConfig.flutterBuildMacos();
         expect(c.command, contains('flutter build'));
       });
+
+      test('flutterRunWeb preset has chrome command and hot-reload actions', () {
+        final c = RunConfig.flutterRunWeb('/ws');
+        expect(c.command, 'flutter run -d chrome --debug --target lib/main_web_full.dart');
+        expect(c.isFlutterRun, true);
+        expect(c.id, 'preset_flutter_run_web');
+        expect(c.quickActions.length, 2);
+      });
+
+      test('flutterBuildWeb preset', () {
+        final c = RunConfig.flutterBuildWeb();
+        expect(c.command, 'flutter build web');
+      });
     });
 
     group('Equatable', () {

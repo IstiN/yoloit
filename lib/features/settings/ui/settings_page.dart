@@ -27,7 +27,7 @@ import 'package:yoloit/features/templates/ui/template_sources_section.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_cubit.dart';
 
 
-const _kCategories = [
+const _kDesktopCategories = [
   'Appearance',
   'AI & Models',
   'Prompts',
@@ -44,10 +44,50 @@ const _kCategories = [
   'Templates',
 ];
 
-const _kDebugCategories = [..._kCategories, 'Debug UI'];
+const _kWebCategories = [
+  'Appearance',
+  'AI & Models',
+  'Environment',
+  'Notifications',
+  'Shortcuts',
+  'Skills',
+  'Sync',
+  'Support',
+  'Templates',
+];
 
-const _kSkillsCategoryIndex = 7;
-const _kTemplatesCategoryIndex = 13;
+List<String> get _kCategories =>
+    kIsWeb ? _kWebCategories : _kDesktopCategories;
+
+List<String> get _kDebugCategories =>
+    kIsWeb ? [..._kWebCategories, 'Debug UI'] : [..._kDesktopCategories, 'Debug UI'];
+
+class _SettingsDialogChild extends StatelessWidget {
+  const _SettingsDialogChild({
+    required this.dialogContext,
+    this.initialCategory,
+  });
+
+  final BuildContext dialogContext;
+  final String? initialCategory;
+
+  @override
+  Widget build(BuildContext context) {
+    final child = SettingsPage(initialCategory: initialCategory);
+    return ScaffoldMessenger(
+      child: useFullscreenDialogs(dialogContext)
+          ? Dialog.fullscreen(child: child)
+          : Dialog(
+              backgroundColor: Colors.transparent,
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: 60,
+                vertical: 40,
+              ),
+              child: child,
+            ),
+    );
+  }
+}
 
 /// Settings overlay shown as a modal dialog with sidebar navigation.
 class SettingsPage extends StatefulWidget {
@@ -61,23 +101,14 @@ class SettingsPage extends StatefulWidget {
       context: context,
       barrierColor: Colors.black.withAlpha(160),
       builder:
-          (_) => BlocProvider(
+          (dialogContext) => BlocProvider(
             create: (_) => SkillsCubit(),
             child: BlocProvider.value(
               value: wsCubit,
-              child:
-                  useFullscreenDialogs(context)
-                      ? Dialog.fullscreen(
-                        child: SettingsPage(initialCategory: initialCategory),
-                      )
-                      : Dialog(
-                        backgroundColor: Colors.transparent,
-                        insetPadding: const EdgeInsets.symmetric(
-                          horizontal: 60,
-                          vertical: 40,
-                        ),
-                        child: SettingsPage(initialCategory: initialCategory),
-                      ),
+              child: _SettingsDialogChild(
+                initialCategory: initialCategory,
+                dialogContext: dialogContext,
+              ),
             ),
           ),
     );
@@ -218,121 +249,127 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Widget _buildContent() {
+    final categories = _categories;
+    final category = categories[_selectedCategory];
+
     // Skills panel needs full height, not scrollable wrapper
-    if (_selectedCategory == _kSkillsCategoryIndex) {
+    if (category == 'Skills') {
       return const SkillsPanel();
     }
+
+    final content = switch (category) {
+      'Appearance' => const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionHeader(title: 'Appearance'),
+          SizedBox(height: 12),
+          ThemeSelector(),
+        ],
+      ),
+      'AI \u0026 Models' => const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionHeader(title: 'Cloud Providers'),
+          SizedBox(height: 12),
+          CloudProvidersSection(),
+          SizedBox(height: 24),
+          SectionHeader(title: 'AI Agents'),
+          SizedBox(height: 12),
+          AgentSettingsSection(),
+          SizedBox(height: 20),
+          SectionHeader(title: 'Ignored Tool Calls'),
+          SizedBox(height: 12),
+          IgnoredToolCallsSection(),
+          SizedBox(height: 20),
+          SectionHeader(title: 'Chat Context'),
+          SizedBox(height: 12),
+          ChatContextSection(),
+        ],
+      ),
+      'Prompts' => const PromptsSection(),
+      'Environment' => const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionHeader(title: 'Environment'),
+          SizedBox(height: 12),
+          GlobalEnvGroupsSection(),
+        ],
+      ),
+      'Notifications' => const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionHeader(title: 'Notifications'),
+          SizedBox(height: 12),
+          NotificationsSection(),
+        ],
+      ),
+      'Sessions' => const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionHeader(title: 'Sessions'),
+          SizedBox(height: 12),
+          SessionSettings(),
+        ],
+      ),
+      'Shortcuts' => const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionHeader(title: 'Keyboard Shortcuts'),
+          SizedBox(height: 12),
+          ShortcutsTable(),
+        ],
+      ),
+      'Sync' => const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionHeader(title: 'Sync'),
+          SizedBox(height: 12),
+          SyncSection(),
+        ],
+      ),
+      'Setup Guide' => const SetupGuideEmbedded(),
+      'Apps \u0026 Widgets' => const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionHeader(title: 'Terminal'),
+          SizedBox(height: 12),
+          TerminalRendererSettings(),
+          SizedBox(height: 24),
+          SectionHeader(title: 'Widget API Permissions'),
+          SizedBox(height: 12),
+          WidgetPermissionsSection(),
+        ],
+      ),
+      'Support' => const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionHeader(title: 'Support'),
+          SizedBox(height: 12),
+          SupportSection(),
+        ],
+      ),
+      'About' => const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionHeader(title: 'About'),
+          SizedBox(height: 12),
+          AboutSection(),
+        ],
+      ),
+      'Templates' => const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionHeader(title: 'Templates'),
+          SizedBox(height: 12),
+          TemplateSourcesSection(),
+        ],
+      ),
+      _ => kDebugMode ? const DebugUIShell() : const SizedBox.shrink(),
+    };
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
-      child: switch (_selectedCategory) {
-        0 => const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SectionHeader(title: 'Appearance'),
-            SizedBox(height: 12),
-            ThemeSelector(),
-          ],
-        ),
-        1 => const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SectionHeader(title: 'Cloud Providers'),
-            SizedBox(height: 12),
-            CloudProvidersSection(),
-            SizedBox(height: 24),
-            SectionHeader(title: 'AI Agents'),
-            SizedBox(height: 12),
-            AgentSettingsSection(),
-            SizedBox(height: 20),
-            SectionHeader(title: 'Ignored Tool Calls'),
-            SizedBox(height: 12),
-            IgnoredToolCallsSection(),
-            SizedBox(height: 20),
-            SectionHeader(title: 'Chat Context'),
-            SizedBox(height: 12),
-            ChatContextSection(),
-          ],
-        ),
-        2 => const PromptsSection(),
-        3 => const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SectionHeader(title: 'Environment'),
-            SizedBox(height: 12),
-            GlobalEnvGroupsSection(),
-          ],
-        ),
-        4 => const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SectionHeader(title: 'Notifications'),
-            SizedBox(height: 12),
-            NotificationsSection(),
-          ],
-        ),
-        5 => const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SectionHeader(title: 'Sessions'),
-            SizedBox(height: 12),
-            SessionSettings(),
-          ],
-        ),
-        6 => const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SectionHeader(title: 'Keyboard Shortcuts'),
-            SizedBox(height: 12),
-            ShortcutsTable(),
-          ],
-        ),
-        8 => const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SectionHeader(title: 'Sync'),
-            SizedBox(height: 12),
-            SyncSection(),
-          ],
-        ),
-        9 => const SetupGuideEmbedded(),
-        10 => const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SectionHeader(title: 'Terminal'),
-            SizedBox(height: 12),
-            TerminalRendererSettings(),
-            SizedBox(height: 24),
-            SectionHeader(title: 'Widget API Permissions'),
-            SizedBox(height: 12),
-            WidgetPermissionsSection(),
-          ],
-        ),
-        11 => const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SectionHeader(title: 'Support'),
-            SizedBox(height: 12),
-            SupportSection(),
-          ],
-        ),
-        12 => const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SectionHeader(title: 'About'),
-            SizedBox(height: 12),
-            AboutSection(),
-          ],
-        ),
-        _kTemplatesCategoryIndex => const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SectionHeader(title: 'Templates'),
-            SizedBox(height: 12),
-            TemplateSourcesSection(),
-          ],
-        ),
-        _ => kDebugMode ? const DebugUIShell() : const SizedBox.shrink(),
-      },
+      child: content,
     );
   }
 }

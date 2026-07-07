@@ -1,5 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:yoloit/core/platform/platform_capabilities.dart';
+import 'package:yoloit/core/platform/platform_capabilities_web.dart';
 import 'package:yoloit/core/theme/app_theme.dart';
 import 'package:yoloit/features/board/ui/dialogs/board_settings_dialog.dart';
 
@@ -8,6 +11,7 @@ void main() {
     Widget buildDialog({
       String initialName = 'My Board',
       String initialDefaultFolder = '/tmp',
+      AsyncValueGetter<String?>? onPickFolder,
     }) {
       return MaterialApp(
         theme: AppThemePreset.neonPurple.theme,
@@ -24,6 +28,7 @@ void main() {
                             initialName: initialName,
                             initialDefaultFolder: initialDefaultFolder,
                             remoteInfo: null,
+                            onPickFolder: onPickFolder,
                           ),
                     );
                   },
@@ -47,7 +52,9 @@ void main() {
     });
 
     testWidgets('shows Choose folder and Clear buttons', (tester) async {
-      await tester.pumpWidget(buildDialog());
+      await tester.pumpWidget(
+        buildDialog(onPickFolder: () async => '/chosen'),
+      );
       await tester.tap(find.text('Open'));
       await tester.pumpAndSettle();
 
@@ -55,8 +62,28 @@ void main() {
       expect(find.text('Clear'), findsOneWidget);
     });
 
-    testWidgets('Clear button empties folder field', (tester) async {
+    testWidgets('hides folder picker on web', (tester) async {
+      PlatformCapabilities.current = const WebPlatformCapabilities();
+      addTearDown(PlatformCapabilities.reset);
+
       await tester.pumpWidget(buildDialog());
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Choose folder'), findsNothing);
+      expect(find.text('Clear'), findsNothing);
+      expect(
+        find.text(
+          'Not used in the browser; board state is kept in web storage.',
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('Clear button empties folder field', (tester) async {
+      await tester.pumpWidget(
+        buildDialog(onPickFolder: () async => '/chosen'),
+      );
       await tester.tap(find.text('Open'));
       await tester.pumpAndSettle();
 

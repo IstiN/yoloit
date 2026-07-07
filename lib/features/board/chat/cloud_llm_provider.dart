@@ -1,10 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
+import 'package:yoloit/core/utils/http_client.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
 import 'package:yoloit/features/board/chat/cli_guidance_service.dart';
-import 'package:yoloit/features/board/chat/yoloit_cli_tools.dart';
+import 'package:yoloit/features/board/chat/yoloit_tool_catalog.dart';
+import 'package:yoloit/features/board/chat/yoloit_tool_executor.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/settings/data/cloud_llm_settings_service.dart';
 
@@ -19,7 +20,7 @@ class CloudLlmProvider extends ChatProvider {
     YoloitToolExecutor? toolExecutor,
   }) : _config = config,
        _deferredConfigId = null,
-       _toolExecutor = toolExecutor ?? YoloitCliToolExecutor();
+       _toolExecutor = toolExecutor ?? createYoloitToolExecutor();
 
   /// Creates a provider that loads its config lazily on first use.
   CloudLlmProvider.deferred({
@@ -27,7 +28,7 @@ class CloudLlmProvider extends ChatProvider {
     YoloitToolExecutor? toolExecutor,
   }) : _config = null,
        _deferredConfigId = configId,
-       _toolExecutor = toolExecutor ?? YoloitCliToolExecutor();
+       _toolExecutor = toolExecutor ?? createYoloitToolExecutor();
 
   CloudLlmConfig? _config;
   final String? _deferredConfigId;
@@ -588,58 +589,52 @@ class CloudLlmProvider extends ChatProvider {
       'temperature': 0.1,
     });
 
-    final request = await HttpClient().postUrl(Uri.parse(url));
-    request.headers.set('Authorization', 'Bearer ${config.apiKey}');
-    request.headers.set('Content-Type', 'application/json; charset=utf-8');
-    for (final entry in config.extraHeaders.entries) {
-      request.headers.set(entry.key, entry.value);
-    }
-    request.add(utf8.encode(body));
-
-    final response = await request.close();
-
-    if (response.statusCode != 200) {
-      final errorBody = await response.transform(utf8.decoder).join();
-      throw StateError(
-        '${config.name} API error (${response.statusCode}): $errorBody',
+    final client = YoloitHttpClientImpl();
+    try {
+      final response = await client.postJsonStream(
+        url,
+        body: jsonDecode(body),
+        headers: {
+          'Authorization': 'Bearer ${config.apiKey}',
+          ...config.extraHeaders,
+        },
       );
-    }
 
-    // Parse SSE stream.
-    var content = '';
-    final toolCalls = <_ToolCallAccumulator>{};
+      // Parse SSE stream.
+      var content = '';
+      final toolCalls = <_ToolCallAccumulator>{};
 
-    var sseBuffer = '';
-    await for (final chunk in response.transform(utf8.decoder)) {
-      sseBuffer += chunk;
-      final lines = sseBuffer.split('\n');
-      sseBuffer = lines.removeLast();
-      for (final line in lines) {
-        if (!line.startsWith('data: ')) continue;
-        final data = line.substring(6).trim();
-        if (data == '[DONE]') continue;
+      var sseBuffer = '';
+      await for (final chunk in response.transform(utf8.decoder)) {
+        sseBuffer += chunk;
+        final lines = sseBuffer.split('\n');
+        sseBuffer = lines.removeLast();
+        for (final line in lines) {
+          if (!line.startsWith('data: ')) continue;
+          final data = line.substring(6).trim();
+          if (data == '[DONE]') continue;
 
-        try {
-          final json = jsonDecode(data) as Map<String, dynamic>;
-          final choices = json['choices'] as List?;
-          if (choices == null || choices.isEmpty) continue;
+          try {
+            final json = jsonDecode(data) as Map<String, dynamic>;
+            final choices = json['choices'] as List?;
+            if (choices == null || choices.isEmpty) continue;
 
-          final choice = choices[0] as Map<String, dynamic>;
-          final delta = choice['delta'] as Map<String, dynamic>?;
-          final message = choice['message'] as Map<String, dynamic>?;
-          if (delta == null && message == null) continue;
+            final choice = choices[0] as Map<String, dynamic>;
+            final delta = choice['delta'] as Map<String, dynamic>?;
+            final message = choice['message'] as Map<String, dynamic>?;
+            if (delta == null && message == null) continue;
 
-          final textDelta =
-              (delta?['content'] as String?) ??
-              (message?['content'] as String?);
-          if (textDelta != null && textDelta.isNotEmpty) {
-            content += textDelta;
-            onDelta(textDelta);
-          }
+            final textDelta =
+                (delta?['content'] as String?) ??
+                (message?['content'] as String?);
+            if (textDelta != null && textDelta.isNotEmpty) {
+              content += textDelta;
+              onDelta(textDelta);
+            }
 
-          final tcList =
-              (delta?['tool_calls'] as List?) ??
-              (message?['tool_calls'] as List?);
+            final tcList =
+                (delta?['tool_calls'] as List?) ??
+                (message?['tool_calls'] as List?);
           if (tcList != null) {
             for (var i = 0; i < tcList.length; i++) {
               final tc = tcList[i];
@@ -740,6 +735,9 @@ class CloudLlmProvider extends ChatProvider {
       content: content.isNotEmpty ? content : null,
       toolCalls: parsedToolCalls,
     );
+    } finally {
+      client.close();
+    }
   }
 
   static final _thinkTagRe = RegExp(

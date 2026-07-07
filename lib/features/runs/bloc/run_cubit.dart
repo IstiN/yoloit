@@ -27,8 +27,10 @@ class RunCubit extends Cubit<RunState> {
         configs.isEmpty && await _isFlutterProject(workspacePath)
             ? [
               RunConfig.flutterRunMacos(workspacePath),
+              RunConfig.flutterRunWeb(workspacePath),
               RunConfig.flutterTest(),
               RunConfig.flutterBuildMacos(),
+              RunConfig.flutterBuildWeb(),
             ]
             : configs;
     final effectiveConfigs = _dedupeConfigs(seededConfigs);
@@ -257,11 +259,18 @@ class RunCubit extends Cubit<RunState> {
         workspacePath,
         group: normalizedGroup,
       ).copyWith(id: 'preset_flutter_run_macos_$suffix'),
+      RunConfig.flutterRunWeb(
+        workspacePath,
+        group: normalizedGroup,
+      ).copyWith(id: 'preset_flutter_run_web_$suffix'),
       RunConfig.flutterTest(group: normalizedGroup).copyWith(
         id: 'preset_flutter_test_$suffix',
       ),
       RunConfig.flutterBuildMacos(group: normalizedGroup).copyWith(
         id: 'preset_flutter_build_macos_$suffix',
+      ),
+      RunConfig.flutterBuildWeb(group: normalizedGroup).copyWith(
+        id: 'preset_flutter_build_web_$suffix',
       ),
     ];
 

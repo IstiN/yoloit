@@ -69,7 +69,10 @@ void main() {
   group('Golden tests — CalendarPanelContent', () {
     testGoldens('month view empty', (tester) async {
       await tester.pumpWidgetBuilder(
-        _calendarShell(_panel(), today: DateTime(2026, 6, 19)),
+        _calendarShell(
+          _panel(state: {'focusedDate': '2026-06-19T00:00:00.000'}),
+          today: DateTime(2026, 6, 19),
+        ),
         surfaceSize: const Size(900, 600),
       );
       await tester.pump();

@@ -176,7 +176,6 @@ void main() {
 
     test('serves multiple sequential requests correctly', () async {
       final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
-      final port = server.port;
       int requestCount = 0;
 
       server.listen((socket) async {

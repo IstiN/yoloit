@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:yoloit/core/cli/cli_server.dart';
@@ -93,6 +94,7 @@ class CliGuidanceService {
   }
 
   Future<String?> _fetchHelpFormat(String format) async {
+    if (kIsWeb) return null;
     final bin = _resolveYoloitBin();
     if (bin == null) return null;
     try {
@@ -112,6 +114,7 @@ class CliGuidanceService {
   }
 
   String? _resolveYoloitBin() {
+    if (kIsWeb) return null;
     final explicit = Platform.environment['YOLOIT_CLI_PATH'];
     if (explicit != null && explicit.trim().isNotEmpty) {
       return explicit.trim();

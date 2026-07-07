@@ -12,6 +12,7 @@ import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/builtin/markdown_note_plugin.dart';
 import 'package:yoloit/features/board/ui/panel_yolo_assistant_badge.dart';
 import 'package:yoloit/features/board/ui/yolo_anchored_assistant_panel.dart';
+import 'package:yoloit/features/settings/data/cloud_llm_settings_service.dart';
 
 const _kSurface = Size(420, 460);
 
@@ -105,9 +106,17 @@ Widget _anchoredShell({
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  late Duration originalTimeout;
+
   setUp(() {
+    originalTimeout = CloudLlmSettingsService.secureReadTimeout;
+    CloudLlmSettingsService.secureReadTimeout = Duration.zero;
     SharedPreferences.setMockInitialValues({});
     FlutterSecureStorage.setMockInitialValues({});
+  });
+
+  tearDown(() {
+    CloudLlmSettingsService.secureReadTimeout = originalTimeout;
   });
 
   group('Golden tests — panel YoLo assistant badge', () {

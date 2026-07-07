@@ -333,6 +333,7 @@ class RealLlmToolTestRunner {
         boardName: context['boardName'] as String?,
         panelId: context['panelId'] as String?,
         panelTitle: context['panelTitle'] as String?,
+        boardCubit: null,
       ),
       cases: (decoded['cases'] as List)
           .map((item) => _RealToolCase.fromJson(item as Map<String, Object?>))

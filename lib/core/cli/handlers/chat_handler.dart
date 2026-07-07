@@ -151,6 +151,7 @@ class ChatCliHandler extends PanelCliHandler {
         availableBoardsSummary: args['_availableBoardsSummary'] as String?,
         currentBoardPanelsSummary:
             args['_currentBoardPanelsSummary'] as String?,
+        boardCubit: null,
       ),
     );
 

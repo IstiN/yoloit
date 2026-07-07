@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:yoloit/core/platform/platform_capabilities.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_panel_plugin_base.dart';
 import 'package:yoloit/features/board/plugins/builtin/panel_editor_dialog_mixin.dart';
@@ -16,7 +15,6 @@ abstract class UiViewPluginBase extends BoardPanelPluginBase
         initialState: const {'tree': _defaultTree},
         hasEditor: true,
         contentPadding: const EdgeInsets.all(8),
-        requiredCapabilities: const {PlatformCapability.processes},
       );
 
   static const String kTypeId = 'board.ui';

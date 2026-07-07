@@ -361,29 +361,49 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
               style: textStyle?.copyWith(fontWeight: FontWeight.w600),
             ),
             const Spacer(),
-            IconButton(
-              icon: const Icon(Icons.add, size: 20),
-              tooltip: 'Add provider',
-              onPressed: _showAddPresetDialog,
+            Tooltip(
+              message: 'Add provider',
+              child: InkWell(
+                onTap: _showAddPresetDialog,
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: colors.primary.withAlpha(20),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(Icons.add, size: 20, color: colors.primary),
+                ),
+              ),
             ),
           ],
         ),
         const SizedBox(height: 8),
 
         if (_configs.isEmpty)
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: colors.surface,
+          Material(
+            color: colors.surface,
+            borderRadius: BorderRadius.circular(8),
+            child: InkWell(
+              onTap: _showAddPresetDialog,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: colors.outline.withAlpha(40)),
-            ),
-            child: Text(
-              'No cloud providers configured.\n'
-              'Tap + to add OpenRouter, Google Gemini, OpenAI, or a custom endpoint.',
-              style: textStyle?.copyWith(
-                fontSize: 12,
-                color: colors.onSurface.withAlpha(160),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: colors.outline.withAlpha(40)),
+                ),
+                child: Text(
+                  'No cloud providers configured.\n'
+                  'Tap + to add OpenRouter, Google Gemini, OpenAI, or a custom endpoint.',
+                  style: textStyle?.copyWith(
+                    fontSize: 12,
+                    color: colors.onSurface.withAlpha(160),
+                  ),
+                ),
               ),
             ),
           )
@@ -391,45 +411,52 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
           ...List.generate(_configs.length, (i) {
             final config = _configs[i];
             final isActive = config.id == _activeConfigId;
-            return Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              decoration: BoxDecoration(
-                color: isActive ? colors.primary.withAlpha(16) : colors.surface,
+            return Material(
+              color: isActive ? colors.primary.withAlpha(16) : colors.surface,
+              borderRadius: BorderRadius.circular(8),
+              child: InkWell(
+                onTap: () => _showEditConfigDialog(config),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color:
-                      isActive
-                          ? colors.primary.withAlpha(100)
-                          : colors.outline.withAlpha(40),
-                ),
-              ),
-              child: ListTile(
-                dense: true,
-                title: Text(
-                  config.name,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-                subtitle: Text(
-                  '${config.model} • ${config.apiKey.isNotEmpty ? "key ✓" : "no key"}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: colors.onSurface.withAlpha(160),
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color:
+                          isActive
+                              ? colors.primary.withAlpha(100)
+                              : colors.outline.withAlpha(40),
+                    ),
                   ),
-                ),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.settings_outlined, size: 16),
-                      tooltip: 'Provider settings',
-                      onPressed: () => _showEditConfigDialog(config),
+                  child: ListTile(
+                    dense: true,
+                    title: Text(
+                      config.name,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
-                    IconButton(
-                      icon: Icon(Icons.delete, size: 16, color: colors.error),
-                      tooltip: 'Remove',
-                      onPressed: () => _deleteConfig(config.id),
+                    subtitle: Text(
+                      '${config.model} • ${config.apiKey.isNotEmpty ? "key ✓" : "no key"}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: colors.onSurface.withAlpha(160),
+                      ),
                     ),
-                  ],
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.settings_outlined, size: 16),
+                          tooltip: 'Provider settings',
+                          onPressed: () => _showEditConfigDialog(config),
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.delete, size: 16, color: colors.error),
+                          tooltip: 'Remove',
+                          onPressed: () => _deleteConfig(config.id),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             );

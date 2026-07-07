@@ -177,6 +177,117 @@ void main() {
         findsOneWidget,
       );
     });
+
+    group('on web', () {
+      Widget buildWebPanel({
+        bool visible = true,
+        BoardToolId activeTool = BoardToolId.select,
+        DrawSettings drawSettings = const DrawSettings(),
+        ConnectSettings connectSettings = const ConnectSettings(),
+        bool historyPanelVisible = false,
+        VoidCallback? onAddNote,
+        VoidCallback? onAddChat,
+        VoidCallback? onAddTerminal,
+        ValueChanged<String>? onAddGeneric,
+      }) {
+        return MaterialApp(
+          theme: AppThemePreset.neonPurple.theme,
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: BoardToolsPanel(
+                board: board,
+                platform: 'web',
+                visible: visible,
+                activeTool: activeTool,
+                drawSettings: drawSettings,
+                connectSettings: connectSettings,
+                onToolChanged: (_) {},
+                onDrawSettingsChanged: (_) {},
+                onConnectSettingsChanged: (_) {},
+                historyPanelVisible: historyPanelVisible,
+                onToggle: () {},
+                onShowHistory: () {},
+                onUndo: null,
+                onRedo: null,
+                onAddNote: onAddNote,
+                onAddChat: onAddChat,
+                onAddTerminal: onAddTerminal,
+                onAddGeneric: onAddGeneric,
+              ),
+            ),
+          ),
+        );
+      }
+
+      testWidgets('basics category offers markdown, sticky, and shape', (
+        tester,
+      ) async {
+        await tester.pumpWidget(
+          buildWebPanel(onAddNote: () {}, onAddGeneric: (_) {}),
+        );
+        await tester.tap(find.byTooltip('Miro basics'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Markdown Note'), findsOneWidget);
+        expect(find.text('Sticky Note'), findsOneWidget);
+        expect(find.text('Shape / Frame'), findsOneWidget);
+      });
+
+      testWidgets('planning category offers kanban, checklist, timer, calendar, table, chart', (
+        tester,
+      ) async {
+        await tester.pumpWidget(buildWebPanel(onAddGeneric: (_) {}));
+        await tester.tap(find.byTooltip('Planning'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Kanban Board'), findsOneWidget);
+        expect(find.text('Checklist'), findsOneWidget);
+        expect(find.text('Timer'), findsOneWidget);
+        expect(find.text('Calendar'), findsOneWidget);
+        expect(find.text('Table'), findsOneWidget);
+        expect(find.text('Chart'), findsOneWidget);
+      });
+
+      testWidgets('AI category offers AI Chat but not terminal or YoLo assistant', (
+        tester,
+      ) async {
+        await tester.pumpWidget(
+          buildWebPanel(onAddChat: () {}, onAddGeneric: (_) {}),
+        );
+        await tester.tap(find.byTooltip('AI and terminal'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('AI Chat'), findsOneWidget);
+        expect(find.text('Terminal'), findsNothing);
+        expect(find.text('YoLo Assistant'), findsNothing);
+      });
+
+      testWidgets('files category offers webpage but not file-backed panels', (
+        tester,
+      ) async {
+        await tester.pumpWidget(buildWebPanel(onAddGeneric: (_) {}));
+        await tester.tap(find.byTooltip('Files and web'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Webpage'), findsOneWidget);
+        expect(find.text('File Tree'), findsNothing);
+        expect(find.text('Files'), findsNothing);
+        expect(find.text('File Preview'), findsNothing);
+      });
+
+      testWidgets('advanced category offers web-safe plugins only', (
+        tester,
+      ) async {
+        await tester.pumpWidget(buildWebPanel(onAddGeneric: (_) {}));
+        await tester.tap(find.byTooltip('Advanced'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Custom Widget'), findsOneWidget);
+        expect(find.text('UI View'), findsOneWidget);
+        expect(find.text('Setup Guide'), findsNothing);
+        expect(find.text('Playlist'), findsNothing);
+      });
+    });
   });
 
   group('MiroLeftToolbarButton', () {

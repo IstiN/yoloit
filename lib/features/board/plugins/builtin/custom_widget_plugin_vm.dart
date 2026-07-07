@@ -2,11 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:yoloit/core/cli/panel_cli_handler.dart';
-import 'package:yoloit/core/platform/platform_capabilities.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/theme/theme_manager.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
+import 'package:yoloit/features/board/plugins/builtin/custom_widget_plugin_base.dart';
 import 'package:yoloit/features/board/services/board_offscreen_renderer.dart';
 import 'package:yoloit/features/board/widgets/js_widget_engine.dart';
 import 'package:yoloit/features/board/widgets/json_widget_renderer.dart';
@@ -17,41 +17,10 @@ import 'package:yoloit/features/board/widgets/widget_registry_service.dart';
 import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
 import 'package:yoloit/features/settings/ui/env_group_picker.dart';
 
-class CustomWidgetPlugin extends BoardPanelPlugin {
+class CustomWidgetPlugin extends CustomWidgetPluginBase {
   const CustomWidgetPlugin();
 
-  static const String kTypeId = 'board.widget.custom';
-
-  @override
-  String get typeId => kTypeId;
-
-  @override
-  String get displayName => 'Custom Widget';
-
-  @override
-  IconData get icon => Icons.widgets_outlined;
-
-  @override
-  Color get accentColor => _customWidgetDarkFallbackColors.primary;
-
-  @override
-  Size get defaultSize => const Size(360, 420);
-
-  @override
-  Map<String, dynamic> get initialState => {
-    'widgetId': '',
-    'config': <String, dynamic>{},
-  };
-
-  @override
-  bool get supportsHeadlessRender => false; // JSC VM — crashes on rapid mount/dispose
-
-  @override
-  Set<PlatformCapability> get requiredCapabilities => const {
-        PlatformCapability.filesystem,
-        PlatformCapability.processes,
-        PlatformCapability.secureStorage,
-      };
+  static const String kTypeId = CustomWidgetPluginBase.kTypeId;
 
   @override
   Widget buildContent(

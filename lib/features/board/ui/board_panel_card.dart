@@ -261,9 +261,13 @@ class BoardPanelCardState extends State<BoardPanelCard>
                               }());
                             }
                           }
-                          // Release ALL Flutter keyboard focus so the native WKWebView
-                          // can become firstResponder and receive keyboard input.
-                          FocusManager.instance.primaryFocus?.unfocus();
+                          // On the web the panel renders inline, so Flutter
+                          // widgets (URL text field, etc.) must keep focus.
+                          // Only release first responder for the native desktop
+                          // overlay webview.
+                          if (!kIsWeb) {
+                            FocusManager.instance.primaryFocus?.unfocus();
+                          }
                           return;
                         }
                         if (!isFocused) {

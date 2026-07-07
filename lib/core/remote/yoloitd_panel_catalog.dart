@@ -5,6 +5,14 @@ const List<String> _portableLocalPlatforms = <String>[
   'ios',
 ];
 
+const List<String> _webPortableLocalPlatforms = <String>[
+  'web',
+  'macos',
+  'linux',
+  'windows',
+  'ios',
+];
+
 const List<String> _hostLocalPlatforms = <String>['macos', 'linux', 'windows'];
 
 class RemotePanelTypeDescriptor {
@@ -77,6 +85,7 @@ yoloitdPanelDescriptors = <RemotePanelTypeDescriptor>[
     defaultWidth: 360,
     defaultHeight: 220,
     actions: <String>['get', 'set', 'append', 'wrap', 'nowrap'],
+    localPlatforms: _webPortableLocalPlatforms,
   ),
   RemotePanelTypeDescriptor(
     type: 'board.sticky',
@@ -84,6 +93,7 @@ yoloitdPanelDescriptors = <RemotePanelTypeDescriptor>[
     defaultWidth: 260,
     defaultHeight: 220,
     actions: <String>['get', 'set', 'append', 'color'],
+    localPlatforms: _webPortableLocalPlatforms,
   ),
   RemotePanelTypeDescriptor(
     type: 'board.shape',
@@ -91,6 +101,7 @@ yoloitdPanelDescriptors = <RemotePanelTypeDescriptor>[
     defaultWidth: 300,
     defaultHeight: 220,
     actions: <String>['get', 'set'],
+    localPlatforms: _webPortableLocalPlatforms,
   ),
   RemotePanelTypeDescriptor(
     type: 'board.kanban',
@@ -108,6 +119,7 @@ yoloitdPanelDescriptors = <RemotePanelTypeDescriptor>[
       'remove-card',
       'update-card',
     ],
+    localPlatforms: _webPortableLocalPlatforms,
   ),
   RemotePanelTypeDescriptor(
     type: 'board.webpage',
@@ -115,7 +127,7 @@ yoloitdPanelDescriptors = <RemotePanelTypeDescriptor>[
     defaultWidth: 700,
     defaultHeight: 500,
     actions: <String>['get', 'open'],
-    requiresNativeHost: true,
+    localPlatforms: _webPortableLocalPlatforms,
     supportsHeadlessPreview: false,
   ),
   RemotePanelTypeDescriptor(
@@ -124,6 +136,7 @@ yoloitdPanelDescriptors = <RemotePanelTypeDescriptor>[
     defaultWidth: 480,
     defaultHeight: 300,
     actions: <String>['get', 'set'],
+    localPlatforms: _webPortableLocalPlatforms,
   ),
   RemotePanelTypeDescriptor(
     type: 'board.checklist',
@@ -131,6 +144,7 @@ yoloitdPanelDescriptors = <RemotePanelTypeDescriptor>[
     defaultWidth: 320,
     defaultHeight: 320,
     actions: <String>['items', 'add', 'check', 'uncheck', 'remove', 'rename'],
+    localPlatforms: _webPortableLocalPlatforms,
   ),
   RemotePanelTypeDescriptor(
     type: 'board.files',
@@ -198,7 +212,7 @@ yoloitdPanelDescriptors = <RemotePanelTypeDescriptor>[
     defaultWidth: 420,
     defaultHeight: 500,
     actions: <String>['messages', 'send', 'config', 'clear', 'status'],
-    requiresNativeHost: true,
+    localPlatforms: _webPortableLocalPlatforms,
   ),
   RemotePanelTypeDescriptor(
     type: 'board.terminal',
@@ -246,6 +260,7 @@ yoloitdPanelDescriptors = <RemotePanelTypeDescriptor>[
     defaultWidth: 360,
     defaultHeight: 420,
     actions: <String>['get', 'set-widget', 'set-config', 'set'],
+    localPlatforms: _webPortableLocalPlatforms,
   ),
   RemotePanelTypeDescriptor(
     type: 'board.timer',
@@ -253,6 +268,7 @@ yoloitdPanelDescriptors = <RemotePanelTypeDescriptor>[
     defaultWidth: 300,
     defaultHeight: 360,
     actions: <String>['status', 'set', 'start', 'pause', 'resume', 'reset'],
+    localPlatforms: _webPortableLocalPlatforms,
   ),
   RemotePanelTypeDescriptor(
     type: 'board.calendar',
@@ -266,6 +282,7 @@ yoloitdPanelDescriptors = <RemotePanelTypeDescriptor>[
       'delete-event',
       'set-view',
     ],
+    localPlatforms: _webPortableLocalPlatforms,
   ),
   RemotePanelTypeDescriptor(
     type: 'board.table',
@@ -283,6 +300,7 @@ yoloitdPanelDescriptors = <RemotePanelTypeDescriptor>[
       'remove-row',
       'clear',
     ],
+    localPlatforms: _webPortableLocalPlatforms,
   ),
   RemotePanelTypeDescriptor(
     type: 'board.chart',
@@ -297,6 +315,7 @@ yoloitdPanelDescriptors = <RemotePanelTypeDescriptor>[
       'link-table',
       'refresh',
     ],
+    localPlatforms: _webPortableLocalPlatforms,
   ),
   RemotePanelTypeDescriptor(
     type: 'board.ui',
@@ -304,6 +323,7 @@ yoloitdPanelDescriptors = <RemotePanelTypeDescriptor>[
     defaultWidth: 420,
     defaultHeight: 320,
     actions: <String>['get', 'render', 'set-state', 'set-scripts'],
+    localPlatforms: _webPortableLocalPlatforms,
   ),
 ];
 

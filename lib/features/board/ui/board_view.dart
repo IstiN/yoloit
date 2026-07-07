@@ -35,6 +35,7 @@ import 'package:yoloit/features/board/ui/board_overview_layer.dart';
 import 'package:yoloit/features/board/ui/board_overview_widgets.dart';
 import 'package:yoloit/features/board/ui/board_panel_actions.dart';
 import 'package:yoloit/features/board/ui/board_panel_layer.dart';
+import 'package:yoloit/features/board/ui/board_file_picker.dart';
 import 'package:yoloit/features/board/ui/board_panel_resize_chrome.dart';
 import 'package:yoloit/features/board/ui/board_toolbar.dart';
 import 'package:yoloit/features/board/ui/board_tools_panel.dart';
@@ -554,19 +555,20 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                             });
                                             _boardDebugLog('interaction.end');
                                             // pageZoom is updated by Swift frame observer; just dispatch resize.
-                                            for (final panel
-                                                in activeBoard.panels) {
-                                              if (panel.type !=
-                                                  WebpagePlugin.kTypeId) {
-                                                continue;
+                                            if (!kIsWeb) {
+                                              for (final panel
+                                                  in activeBoard.panels) {
+                                                if (panel.type !=
+                                                    WebpagePlugin.kTypeId) {
+                                                  continue;
+                                                }
+                                                final ctrl = WebpagePlugin
+                                                    .controllers[panel.id];
+                                                if (ctrl == null) continue;
+                                                ctrl.runJavaScript(
+                                                  "window.dispatchEvent(new Event('resize'));",
+                                                );
                                               }
-                                              final ctrl =
-                                                  WebpagePlugin
-                                                      .controllers[panel.id];
-                                              if (ctrl == null) continue;
-                                              ctrl.runJavaScript(
-                                                "window.dispatchEvent(new Event('resize'));",
-                                              );
                                             }
                                             _persistViewport(
                                               context,
@@ -2647,6 +2649,18 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                 initialDefaultFolder: board.defaultFolder,
                 initialArchived: board.archived,
                 remoteInfo: remote,
+                onPickFolder:
+                    kIsWeb
+                        ? null
+                        : () async => BoardFilePicker.pickDirectory(
+                          context,
+                          remoteInfo: remote,
+                          initialPath: board.defaultFolder,
+                          title:
+                              remote == null
+                                  ? 'Choose folder'
+                                  : 'Choose remote folder',
+                        ),
               ),
         );
     if (!context.mounted || result == null) return;

@@ -6,26 +6,13 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf/shelf_io.dart' as shelf_io;
+import 'package:yoloit/core/remote/board_share_server_base.dart';
 import 'package:yoloit/core/setup/setup_catalog.dart';
 import 'package:yoloit/core/utils/directory_utils.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 
-class BoardShareServerInfo {
-  const BoardShareServerInfo({
-    required this.url,
-    required this.token,
-    required this.host,
-    required this.port,
-  });
-
-  final String url;
-  final String token;
-  final String host;
-  final int port;
-}
-
-class BoardShareServer {
+class BoardShareServer extends BoardShareServerBase {
   BoardShareServer._();
 
   static final BoardShareServer instance = BoardShareServer._();
@@ -43,7 +30,10 @@ class BoardShareServer {
   final Map<String, List<String>> _terminalChunks = <String, List<String>>{};
   final Map<String, int> _terminalExitCodes = <String, int>{};
 
+  @override
   bool get isRunning => _server != null;
+
+  @override
   BoardShareServerInfo? get info {
     final server = _server;
     final token = _token;
@@ -57,6 +47,7 @@ class BoardShareServer {
     );
   }
 
+  @override
   Future<BoardShareServerInfo> start(
     BoardCubit cubit, {
     String host = '0.0.0.0',
@@ -86,6 +77,7 @@ class BoardShareServer {
     return info!;
   }
 
+  @override
   Future<void> stop() async {
     for (final process in _runs.values) {
       process.kill();

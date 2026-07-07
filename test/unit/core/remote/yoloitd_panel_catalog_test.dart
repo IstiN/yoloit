@@ -7,11 +7,9 @@ void main() {
     () {
       for (final type in <String>[
         'board.terminal',
-        'board.webpage',
         'board.files',
         'board.file.preview',
         'board.filetree',
-        'board.chat',
         'board.setup_guide',
         'board.run',
         'board.run_configs',
@@ -30,7 +28,7 @@ void main() {
     },
   );
 
-  test('portable widgets remain available locally on ios', () {
+  test('portable widgets remain available locally on ios and web', () {
     for (final type in <String>[
       'board.note.markdown',
       'board.sticky',
@@ -40,9 +38,20 @@ void main() {
       'board.code.snippet',
       'board.widget.custom',
       'board.timer',
+      'board.calendar',
+      'board.table',
+      'board.chart',
+      'board.webpage',
+      'board.ui',
+      'board.chat',
     ]) {
       expect(
         yoloitdPanelTypeAvailableOn(type, platform: 'ios', remote: false),
+        isTrue,
+        reason: type,
+      );
+      expect(
+        yoloitdPanelTypeAvailableOn(type, platform: 'web', remote: false),
         isTrue,
         reason: type,
       );

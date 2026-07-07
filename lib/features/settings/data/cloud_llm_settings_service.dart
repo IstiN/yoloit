@@ -1,8 +1,10 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:json_annotation/json_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yoloit/core/platform/secure_storage_factory.dart';
+import 'package:yoloit/core/platform/yoloit_credential_store.dart';
 
 part 'cloud_llm_settings_service.g.dart';
 
@@ -246,9 +248,21 @@ class CloudLlmSettingsService {
 
   /// macOS Keychain prompts can block [FlutterSecureStorage.read] until the
   /// user approves — and occasionally never resume. Never wait forever.
-  static const Duration secureReadTimeout = Duration(seconds: 8);
+  /// Tests can set this to [Duration.zero] to avoid pending timers.
+  @visibleForTesting
+  static Duration secureReadTimeout = const Duration(seconds: 8);
 
-  final _storage = SecureStorageFactory.create();
+  YoloitCredentialStore? _secureStorage;
+
+  YoloitCredentialStore get _storage =>
+      _secureStorage ??= SecureStorageFactory.create();
+
+  /// Clears the cached secure storage instance so tests can swap
+  /// [PlatformDirs] between runs.
+  @visibleForTesting
+  void resetForTests() {
+    _secureStorage = null;
+  }
 
   Future<String?> _readSecureConfigsRaw() async {
     try {
@@ -262,10 +276,16 @@ class CloudLlmSettingsService {
 
   /// Load all saved cloud provider configs.
   Future<List<CloudLlmConfig>> loadConfigs() async {
-    var raw = await _readSecureConfigsRaw();
-    if (raw == null || raw.isEmpty) {
+    String? raw;
+    if (kIsWeb) {
       final prefs = await SharedPreferences.getInstance();
       raw = prefs.getString(_prefsFallbackKey);
+    } else {
+      raw = await _readSecureConfigsRaw();
+      if (raw == null || raw.isEmpty) {
+        final prefs = await SharedPreferences.getInstance();
+        raw = prefs.getString(_prefsFallbackKey);
+      }
     }
     if (raw == null || raw.isEmpty) return [];
     try {
@@ -284,6 +304,11 @@ class CloudLlmSettingsService {
   /// Save all cloud provider configs.
   Future<void> saveConfigs(List<CloudLlmConfig> configs) async {
     final encoded = jsonEncode(configs.map((c) => c.toJson()).toList());
+    if (kIsWeb) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_prefsFallbackKey, encoded);
+      return;
+    }
     try {
       await _storage.write(key: _storageKey, value: encoded);
       final prefs = await SharedPreferences.getInstance();

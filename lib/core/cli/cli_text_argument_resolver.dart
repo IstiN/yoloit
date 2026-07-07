@@ -1,7 +1,7 @@
 import 'dart:convert';
-import 'dart:io';
+import 'dart:io' if (dart.library.html) 'package:yoloit/core/platform/io_stub.dart';
 
-import 'package:yoloit/features/terminal/data/clipboard_file_service.dart';
+import 'package:yoloit/core/utils/text_normalize.dart' as text_normalize;
 
 /// Resolves YoLoIT clip temp-file paths to inline text for CLI arguments.
 ///
@@ -9,6 +9,10 @@ import 'package:yoloit/features/terminal/data/clipboard_file_service.dart';
 /// `…/yoloit_clip/clip_<ts>.txt` and the chat UI shows that path. Models often
 /// pass the path to `--text` instead of the file contents — this helper reads
 /// those files before the CLI command is built or executed.
+///
+/// On the web `dart:io` is replaced by a stub [File] that always reports the
+/// file as missing, so clip-file resolution becomes a no-op while all text
+/// normalization helpers keep working.
 class CliTextArgumentResolver {
   CliTextArgumentResolver._();
 
@@ -79,7 +83,7 @@ class CliTextArgumentResolver {
   /// When a clip file contains a YoLoIT chat session export, keep only the
   /// latest USER message instead of dumping the whole transcript into panel text.
   static String extractUsableClipText(String raw) {
-    final normalized = ClipboardFileService.instance.normalizeText(raw);
+    final normalized = text_normalize.normalizeText(raw);
     final trimmed = normalized.trim();
     if (trimmed.isEmpty || !_chatSessionExport.hasMatch(trimmed)) {
       return normalized;
@@ -92,7 +96,7 @@ class CliTextArgumentResolver {
   }
 
   static String? _materializeClipContent(String raw) {
-    final normalized = ClipboardFileService.instance.normalizeText(raw);
+    final normalized = text_normalize.normalizeText(raw);
     final trimmed = normalized.trim();
     if (trimmed.isEmpty) return null;
     if (looksLikeTerminalOrLogDump(trimmed)) return null;

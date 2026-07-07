@@ -6,6 +6,7 @@ import 'package:local_models_flutter/local_models_flutter.dart' as flm;
 import 'package:yoloit/features/board/chat/chat_provider.dart';
 import 'package:yoloit/features/board/chat/local_llm_provider.dart';
 import 'package:yoloit/features/board/chat/yoloit_cli_tools.dart';
+import 'package:yoloit/features/board/chat/yoloit_tool_catalog_local.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 
 const _manifest = flm.LocalModelManifest(
@@ -72,7 +73,7 @@ const _qwenTinyManifest = flm.LocalModelManifest(
 
 void main() {
   test('catalog exposes CLI tools as local-model function tools', () {
-    final names = YoloitCliToolCatalog.localTools.map((t) => t.name).toList();
+    final names = YoloitCliToolCatalogLocal.localTools.map((t) => t.name).toList();
     expect(YoloitCliToolCatalog.tools.length, greaterThanOrEqualTo(65));
     expect(
       names,
@@ -112,7 +113,7 @@ void main() {
   });
 
   test('catalog can expose a filtered local-model tool set', () {
-    final tools = YoloitCliToolCatalog.localToolsFor(
+    final tools = YoloitCliToolCatalogLocal.localToolsFor(
       disabledFunctionNames: const <String>{'yoloit_board_delete'},
     );
     final names = tools.map((tool) => tool.name).toSet();

@@ -7,7 +7,9 @@ import 'package:yoloit/core/utils/json_utils.dart';
 import 'package:yoloit/core/utils/string_utils.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
 import 'package:yoloit/features/board/chat/yolo_chat_prompt.dart';
-import 'package:yoloit/features/board/chat/yoloit_cli_tools.dart';
+import 'package:yoloit/features/board/chat/yoloit_tool_catalog.dart';
+import 'package:yoloit/features/board/chat/yoloit_tool_catalog_local.dart';
+import 'package:yoloit/features/board/chat/yoloit_tool_executor.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/settings/data/local_ai_models_service.dart';
 
@@ -167,7 +169,7 @@ class LocalLlmProvider extends ChatProvider {
       final tools =
           isRouter
               ? const <flm.LocalTool>[]
-              : YoloitCliToolCatalog.localToolsFor(
+              : YoloitCliToolCatalogLocal.localToolsFor(
                 disabledFunctionNames:
                     config.disabledLocalToolNames
                         .map((name) => name.trim())

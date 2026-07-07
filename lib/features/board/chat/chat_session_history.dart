@@ -1,8 +1,8 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:json_annotation/json_annotation.dart';
-import 'package:path_provider/path_provider.dart';
+import 'package:yoloit/core/platform/file_storage_adapter.dart';
+import 'package:yoloit/core/platform/platform_dirs.dart';
 import 'package:yoloit/features/board/common/session_history_store.dart';
 
 part 'chat_session_history.g.dart';
@@ -11,7 +11,7 @@ part 'chat_session_history.g.dart';
 ///
 /// Metadata is kept in SharedPreferences for fast access.
 /// Full message history is stored as JSON files on disk under
-/// `<appSupportDir>/chat_sessions/<id>.json`.
+/// `<PlatformDirs.instance.dataDir>/chat_sessions/<id>.json`.
 class ChatSessionHistory extends SessionHistoryStore<ChatSessionEntry> {
   ChatSessionHistory._();
   static final instance = ChatSessionHistory._();
@@ -62,10 +62,11 @@ class ChatSessionHistory extends SessionHistoryStore<ChatSessionEntry> {
 
   /// Load messages for a specific session.
   Future<List<Map<String, dynamic>>> loadMessages(String id) async {
-    final file = await _messageFile(id);
-    if (!file.existsSync()) return [];
+    final path = await _messagePath(id);
+    if (!await FileStorageAdapter.instance.exists(path)) return [];
     try {
-      final raw = await file.readAsString();
+      final raw = await FileStorageAdapter.instance.readString(path);
+      if (raw == null || raw.isEmpty) return [];
       final list = jsonDecode(raw) as List;
       return list.cast<Map<String, dynamic>>();
     } catch (_) {
@@ -75,31 +76,24 @@ class ChatSessionHistory extends SessionHistoryStore<ChatSessionEntry> {
 
   // ── File helpers ──────────────────────────────────────────────────────────
 
-  Future<Directory> _sessionsDir() async {
-    final appDir = await getApplicationSupportDirectory();
-    final dir = Directory('${appDir.path}/chat_sessions');
-    if (!dir.existsSync()) await dir.create(recursive: true);
-    return dir;
-  }
-
-  Future<File> _messageFile(String id) async {
-    final dir = await _sessionsDir();
-    // Sanitize id for filename
+  Future<String> _messagePath(String id) async {
     final safe = id.replaceAll(RegExp(r'[^a-zA-Z0-9_\-]'), '_');
-    return File('${dir.path}/$safe.json');
+    return '${PlatformDirs.instance.dataDir}/chat_sessions/$safe.json';
   }
 
   Future<void> _saveMessages(
     String id,
     List<Map<String, dynamic>> messages,
   ) async {
-    final file = await _messageFile(id);
-    await file.writeAsString(jsonEncode(messages));
+    final path = await _messagePath(id);
+    await FileStorageAdapter.instance.writeString(path, jsonEncode(messages));
   }
 
   Future<void> _deleteMessageFile(String id) async {
-    final file = await _messageFile(id);
-    if (file.existsSync()) await file.delete();
+    final path = await _messagePath(id);
+    if (await FileStorageAdapter.instance.exists(path)) {
+      await FileStorageAdapter.instance.delete(path);
+    }
   }
 }
 

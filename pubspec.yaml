@@ -83,6 +83,7 @@ dependencies:
   path_provider: any
   flutter_highlight: any
   json_annotation: ^4.12.0
+  http: ^1.3.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -147,6 +148,23 @@ flutter:
     - docs/app-development-skill.md
     - assets/skills/yoloit/SKILL.md
     - third_party/flutter_local_models/registry/models/
+    - yoloit/templates/
+    - yoloit/templates/brainstorm/template.yaml
+    - yoloit/templates/customer_journey_map/template.yaml
+    - yoloit/templates/fitness_progress/template.yaml
+    - yoloit/templates/flutter_project/template.yaml
+    - yoloit/templates/habit_tracker/template.yaml
+    - yoloit/templates/home_notes/template.yaml
+    - yoloit/templates/impact_effort_matrix/template.yaml
+    - yoloit/templates/okr_planning/template.yaml
+    - yoloit/templates/personal_expenses/template.yaml
+    - yoloit/templates/product_roadmap/template.yaml
+    - yoloit/templates/retrospective/template.yaml
+    - yoloit/templates/sales_dashboard/template.yaml
+    - yoloit/templates/sprint_planning/template.yaml
+    - yoloit/templates/trip_planner/template.yaml
+    - yoloit/templates/user_story_map/template.yaml
+    - yoloit/templates/weekly_review/template.yaml
 
   fonts:
     - family: JetBrainsMono

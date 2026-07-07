@@ -19,8 +19,10 @@ class WebDemoBoardBuilder {
   ///
   /// Returns the created board id.
   static Future<String> build(BoardCubit cubit) async {
-    final board = await cubit.createBoard(name: 'YoLoIT Web Demo') ??
-        (throw StateError('Could not create demo board'));
+    final board = await cubit.createBoard(name: 'YoLoIT Web Demo');
+    if (board == null) {
+      throw StateError('Could not create demo board');
+    }
 
     final panels = _buildPanels();
     for (final panel in panels) {
@@ -218,7 +220,13 @@ class WebDemoBoardBuilder {
   }
 
   static Future<void> _seedCalendarEvents(List<BoardPanelInstance> panels) async {
-    final calendar = panels.firstWhere((p) => p.type == kCalendarPluginTypeId);
+    final calendar = panels
+        .where((p) => p.type == kCalendarPluginTypeId)
+        .firstOrNull;
+    if (calendar == null) {
+      debugPrint('[WebDemoBoardBuilder] no calendar panel found, skipping events');
+      return;
+    }
     const storage = CalendarEventStorage();
     final today = DateTime.now();
     await storage.upsertEvent(

@@ -1,7 +1,6 @@
-import 'dart:io';
-
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:yoloit/core/platform/platform_capabilities.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
 import 'package:yoloit/ui/components/cards/settings_card.dart';
@@ -39,7 +38,7 @@ class _GlobalEnvGroupsSectionState extends State<GlobalEnvGroupsSection> {
     } catch (error) {
       if (!mounted) return;
       setState(() => _loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
         SnackBar(content: Text('Failed to load env groups: $error')),
       );
     }
@@ -50,12 +49,12 @@ class _GlobalEnvGroupsSectionState extends State<GlobalEnvGroupsSection> {
     try {
       await _service.saveAll(_normalizedGroups());
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
         const SnackBar(content: Text('Env groups saved.')),
       );
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
         SnackBar(content: Text('Failed to save env groups: $error')),
       );
     } finally {
@@ -115,6 +114,7 @@ class _GlobalEnvGroupsSectionState extends State<GlobalEnvGroupsSection> {
   }
 
   Future<void> _importIntoGroup(int groupIndex) async {
+    if (!PlatformCapabilities.current.has(PlatformCapability.processes)) return;
     final result = await FilePicker.pickFiles(
       dialogTitle: 'Import .env file',
       allowMultiple: false,
@@ -122,12 +122,11 @@ class _GlobalEnvGroupsSectionState extends State<GlobalEnvGroupsSection> {
     );
     final filePath = result?.files.single.path;
     if (filePath == null) return;
-    final content = await File(filePath).readAsString();
-    final parsed = _service.parseEnvContent(content);
+    final group = await _service.importEnvFileAsGroup(filePath);
     if (!mounted) return;
     setState(() {
       _groups[groupIndex] = _groups[groupIndex].copyWith(
-        values: {..._groups[groupIndex].values, ...parsed},
+        values: {..._groups[groupIndex].values, ...group.values},
       );
     });
   }

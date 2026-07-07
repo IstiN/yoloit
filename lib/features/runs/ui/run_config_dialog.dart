@@ -8,7 +8,7 @@ import 'package:yoloit/features/runs/models/run_config.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_cubit.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_state.dart';
 
-enum _RunPreset { custom, flutterApp }
+enum _RunPreset { custom, flutterApp, flutterAppWeb }
 
 class RunConfigDialog extends StatefulWidget {
   const RunConfigDialog({super.key, this.initial});
@@ -56,7 +56,11 @@ class _RunConfigDialogState extends State<RunConfigDialog> {
     _commandCtrl = TextEditingController(text: c?.command ?? '');
     _workingDirCtrl = TextEditingController(text: c?.workingDir ?? '');
     _isFlutterRun = c?.isFlutterRun ?? false;
-    _preset = _isFlutterRun ? _RunPreset.flutterApp : _RunPreset.custom;
+    _preset = _isFlutterRun
+        ? (c?.command.contains('chrome') ?? false
+            ? _RunPreset.flutterAppWeb
+            : _RunPreset.flutterApp)
+        : _RunPreset.custom;
     _selectedColor = c?.color;
     _quickActions =
         (c?.quickActions ?? const [])
@@ -76,6 +80,15 @@ class _RunConfigDialogState extends State<RunConfigDialog> {
       }
       if (_commandCtrl.text.trim().isEmpty) {
         _commandCtrl.text = 'flutter run -d macos --debug';
+      }
+      _ensureFlutterQuickActions();
+    } else if (preset == _RunPreset.flutterAppWeb) {
+      _isFlutterRun = true;
+      if (_nameCtrl.text.trim().isEmpty) {
+        _nameCtrl.text = 'Flutter Run (Web)';
+      }
+      if (_commandCtrl.text.trim().isEmpty) {
+        _commandCtrl.text = 'flutter run -d chrome --debug';
       }
       _ensureFlutterQuickActions();
     } else {
@@ -249,7 +262,11 @@ class _RunConfigDialogState extends State<RunConfigDialog> {
                     ),
                     DropdownMenuItem(
                       value: _RunPreset.flutterApp,
-                      child: Text('Flutter App (Hot Reload / Restart preset)'),
+                      child: Text('Flutter App — macOS'),
+                    ),
+                    DropdownMenuItem(
+                      value: _RunPreset.flutterAppWeb,
+                      child: Text('Flutter App — Web'),
                     ),
                   ],
                   onChanged: (value) {

@@ -34,6 +34,7 @@ import 'package:yoloit/features/board/chat/local_llm_provider.dart';
 import 'package:yoloit/features/board/chat/panel_context_builder.dart';
 import 'package:yoloit/features/board/chat/yolo_chat_prompt.dart';
 import 'package:yoloit/features/board/chat/yoloit_cli_tools.dart';
+import 'package:yoloit/features/board/chat/yoloit_tool_catalog_local.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
@@ -872,6 +873,7 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
               typeName: BoardPluginRegistry.instance.pluginFor(target.type)?.displayName,
             )
           : null,
+      boardCubit: context.read<BoardCubit>(),
     );
   }
 
@@ -1100,7 +1102,7 @@ Use this list when user asks to show/focus/play an existing panel on the current
     }
     final messages = await _buildMessagesForRequest(previewMessages);
     final disabled = _disabledLocalTools();
-    final tools = YoloitCliToolCatalog.localToolsFor(
+    final tools = YoloitCliToolCatalogLocal.localToolsFor(
       disabledFunctionNames: disabled,
     );
     final toolSchemas = const JsonEncoder.withIndent(

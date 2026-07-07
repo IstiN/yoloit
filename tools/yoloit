@@ -5656,7 +5656,7 @@ PY
         *) shift ;;
       esac
     done
-    json=$(python3 -c "import json,sys; print(json.dumps({'name': name, 'command': command, 'workingDir': working_dir, 'isFlutterRun': is_flutter}))")
+    json=$(python3 -c "import json,sys; print(json.dumps({'name': sys.argv[1], 'command': sys.argv[2], 'workingDir': sys.argv[3] or None, 'isFlutterRun': sys.argv[4] == 'true'}))" "$name" "$command" "$working_dir" "$is_flutter")
     "$0" do "$board" "$panel" add "$json"
     ;;
   run:update)
@@ -5678,7 +5678,7 @@ PY
         *) shift ;;
       esac
     done
-    json=$(python3 -c "import json,sys; print(json.dumps({'id': id, 'newName': new_name, 'command': command, 'workingDir': working_dir, 'isFlutterRun': is_flutter}))")
+    json=$(python3 -c "import json,sys; print(json.dumps({'id': sys.argv[1], 'newName': None if sys.argv[2] == 'None' else sys.argv[2], 'command': None if sys.argv[3] == 'None' else sys.argv[3], 'workingDir': None if sys.argv[4] == 'None' else sys.argv[4], 'isFlutterRun': None if sys.argv[5] == 'None' else sys.argv[5] == 'true'}))" "$id" "$new_name" "$command" "$working_dir" "$is_flutter")
     "$0" do "$board" "$panel" update "$json"
     ;;
   run:remove)

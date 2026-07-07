@@ -3,9 +3,13 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/theme/theme_manager.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
+import 'package:yoloit/features/board/bloc/board_state.dart';
 import 'package:yoloit/features/board/demo/web_demo_board.dart';
 import 'package:yoloit/features/board/history/board_history_store.dart';
 import 'package:yoloit/features/board/ui/board_view.dart';
+import 'package:yoloit/features/settings/ui/settings_page.dart';
+import 'package:yoloit/features/workspaces/bloc/workspace_cubit.dart';
+import 'package:yoloit/ui/shell/board_title_bar.dart';
 
 /// Minimal web app that hosts only the board.
 ///
@@ -17,8 +21,13 @@ class WebApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (_) => BoardCubit(historyStore: const AdapterBoardHistoryStore()),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(
+          create: (_) => BoardCubit(historyStore: const AdapterBoardHistoryStore()),
+        ),
+        BlocProvider(create: (_) => WorkspaceCubit()),
+      ],
       child: const _WebAppRoot(),
     );
   }
@@ -32,24 +41,29 @@ class _WebAppRoot extends StatefulWidget {
 }
 
 class _WebAppRootState extends State<_WebAppRoot> {
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        final cubit = context.read<BoardCubit>();
-        cubit.load().then((_) async {
-          if (!mounted) return;
-          final activeBoard = cubit.state.activeBoard;
-          final boards = cubit.state.boards;
-          // Seed a demo board only the very first time the web app launches.
-          if (boards.isEmpty ||
-              (activeBoard != null && activeBoard.panels.isEmpty)) {
-            await WebDemoBoardBuilder.build(cubit);
-          }
-        });
-      }
-    });
+  var _seeded = false;
+
+  Future<void> _maybeSeedDemoBoard(BoardCubit cubit) async {
+    if (_seeded) return;
+    final state = cubit.state;
+    if (!state.isLoaded) return;
+    final activeBoard = state.activeBoard;
+    final boards = state.boards;
+    if (boards.isNotEmpty && activeBoard != null && activeBoard.panels.isNotEmpty) {
+      _seeded = true;
+      return;
+    }
+    _seeded = true;
+    try {
+      await WebDemoBoardBuilder.build(cubit);
+    } catch (e, st) {
+      debugPrint('[WebApp] failed to seed demo board: $e');
+      debugPrint(st.toString());
+    }
+  }
+
+  Future<void> _showSettings(BuildContext context) async {
+    await SettingsPage.show(context);
   }
 
   @override
@@ -61,8 +75,28 @@ class _WebAppRootState extends State<_WebAppRoot> {
       theme: ThemeManager.instance.theme.copyWith(
         scaffoldBackgroundColor: colors.background,
       ),
-      home: const Scaffold(
-        body: BoardView(),
+      localizationsDelegates: const [
+        DefaultMaterialLocalizations.delegate,
+        DefaultWidgetsLocalizations.delegate,
+      ],
+      supportedLocales: const [Locale('en', 'US')],
+      home: Scaffold(
+        body: BlocListener<BoardCubit, BoardState>(
+          listener: (context, state) {
+            _maybeSeedDemoBoard(context.read<BoardCubit>());
+          },
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Builder(
+                builder: (barContext) => BoardTitleBar(
+                  onSettings: () => _showSettings(barContext),
+                ),
+              ),
+              const Expanded(child: BoardView()),
+            ],
+          ),
+        ),
       ),
     );
   }

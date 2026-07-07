@@ -28,13 +28,6 @@ void main() {
     commitHash: 'abc1234',
   );
 
-  const editorNode = EditorNodeData(
-    id: 'editor1',
-    filePath: '/tmp/w1/lib/main.dart',
-    content: '',
-    language: 'dart',
-  );
-
   group('MindMapLayoutEngine.compute', () {
     test('places new nodes at their column x offsets', () {
       final engine = MindMapLayoutEngine();

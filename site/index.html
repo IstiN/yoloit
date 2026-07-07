@@ -7,6 +7,93 @@
   <meta name="description" content="YoLoIT is a CLI-first AI orchestrator: boards, panels, terminal sessions, runners, and agents — all in one native macOS app.">
   <link rel="icon" type="image/svg+xml" href="yoloit_mark.svg">
   <link rel="stylesheet" href="style.css">
+  <style>
+    /* Disable horizontal swipe navigation everywhere we can. */
+    html, body {
+      overscroll-behavior-x: none;
+      overscroll-behavior-y: auto;
+      touch-action: pan-y;
+    }
+    body {
+      overflow-x: hidden;
+    }
+  </style>
+  <script>
+    // Neutralise the back/forward history swipe on macOS Safari / Chrome.
+    history.pushState(null, document.title, location.href);
+    window.addEventListener('popstate', function(event) {
+      history.pushState(null, document.title, location.href);
+    });
+
+    // Smooth scroll for in-page navigation without adding history entries.
+    document.querySelectorAll('a[href^="#"]').forEach(function(link) {
+      link.addEventListener('click', function(e) {
+        const targetId = link.getAttribute('href').slice(1);
+        const target = document.getElementById(targetId);
+        if (target) {
+          e.preventDefault();
+          target.scrollIntoView({ behavior: 'smooth' });
+          history.replaceState(null, document.title, location.pathname + location.search);
+        }
+      });
+    });
+
+    // Prevent two-finger horizontal swipe from triggering browser back/forward.
+    (function() {
+      function isHorizontalWheel(e) {
+        if (e.deltaX != null && e.deltaX !== 0) {
+          return Math.abs(e.deltaX) > Math.abs(e.deltaY || 0);
+        }
+        if (e.wheelDeltaX != null && e.wheelDeltaX !== 0) {
+          return Math.abs(e.wheelDeltaX) > Math.abs(e.wheelDeltaY || 0);
+        }
+        return false;
+      }
+      function blockHorizontalWheel(e) {
+        if (isHorizontalWheel(e)) e.preventDefault();
+      }
+      window.addEventListener('wheel', blockHorizontalWheel, { passive: false, capture: true });
+      window.addEventListener('mousewheel', blockHorizontalWheel, { passive: false, capture: true });
+      document.addEventListener('wheel', blockHorizontalWheel, { passive: false, capture: true });
+      document.addEventListener('mousewheel', blockHorizontalWheel, { passive: false, capture: true });
+
+      // Block mouse back/forward buttons (some trackpads/mice map to buttons 3/4).
+      function blockHistoryMouseButton(e) {
+        if (e.button === 3 || e.button === 4) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      }
+      window.addEventListener('mousedown', blockHistoryMouseButton, { capture: true });
+      window.addEventListener('mouseup', blockHistoryMouseButton, { capture: true });
+
+      // Block Alt/Option + Arrow and Cmd + [ / ] history navigation.
+      window.addEventListener('keydown', function(e) {
+        if (
+          (e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) ||
+          ((e.metaKey || e.ctrlKey) && (e.key === '[' || e.key === ']'))
+        ) {
+          e.preventDefault();
+        }
+      }, { capture: true });
+
+      let startX = 0;
+      let startY = 0;
+      window.addEventListener('touchstart', function(e) {
+        if (e.touches.length !== 2) return;
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+      }, { passive: true, capture: true });
+      window.addEventListener('touchmove', function(e) {
+        if (e.touches.length !== 2) return;
+        const dx = e.touches[0].clientX - startX;
+        const dy = e.touches[0].clientY - startY;
+        if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 10) {
+          e.preventDefault();
+        }
+      }, { passive: false, capture: true });
+    })();
+  </script>
 </head>
 <body>
   <nav class="navbar">

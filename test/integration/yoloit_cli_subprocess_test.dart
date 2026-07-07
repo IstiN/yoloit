@@ -16,7 +16,8 @@ Future<int> _findFreePort() async {
 void main() {
   group('real yoloit CLI against yoloitd subprocess', () {
     late Directory tempDir;
-    late String binaryPath;
+    String? binaryPath;
+    String? skipReason;
     late Process serverProcess;
     late YoloitCliHarness cli;
     late String baseUrl;
@@ -24,17 +25,25 @@ void main() {
 
     setUpAll(() async {
       tempDir = Directory.systemTemp.createTempSync('yoloit_cli_subprocess_test');
-      binaryPath = '${tempDir.path}/yoloitd';
+      final candidatePath = '${tempDir.path}/yoloitd';
       final compile = await Process.run(
         'dart',
-        ['compile', 'exe', 'bin/yoloitd.dart', '-o', binaryPath],
+        ['compile', 'exe', 'bin/yoloitd.dart', '-o', candidatePath],
         workingDirectory: Directory.current.path,
       );
       if (compile.exitCode != 0) {
+        final stderr = compile.stderr.toString();
+        if (stderr.contains('does not support build hooks') ||
+            stderr.contains('build hooks')) {
+          skipReason = 'dart compile exe does not support build hooks in this SDK.';
+          // Leave [binaryPath] null so the per-test guards below skip the suite.
+          return;
+        }
         fail(
           'Failed to compile yoloitd\nstdout: ${compile.stdout}\nstderr: ${compile.stderr}',
         );
       }
+      binaryPath = candidatePath;
     });
 
     tearDownAll(() async {
@@ -44,13 +53,14 @@ void main() {
     });
 
     setUp(() async {
+      if (binaryPath == null) return;
       final port = await _findFreePort();
       final dataDir = Directory('${tempDir.path}/data_$port');
       await dataDir.create(recursive: true);
       baseUrl = 'http://127.0.0.1:$port';
 
       serverProcess = await Process.start(
-        binaryPath,
+        binaryPath!,
         [
           '--host',
           '127.0.0.1',
@@ -87,6 +97,7 @@ void main() {
     });
 
     tearDown(() async {
+      if (binaryPath == null) return;
       await cli.dispose();
       serverProcess.kill();
       await serverProcess.exitCode.timeout(
@@ -98,8 +109,14 @@ void main() {
       );
     });
 
-    test('board and panel lifecycle', () async {
-      final status = await cli.json(['remote:status']);
+    test(
+      'board and panel lifecycle',
+      () async {
+        if (binaryPath == null) {
+          markTestSkipped(skipReason ?? 'dart compile exe is unavailable.');
+          return;
+        }
+        final status = await cli.json(['remote:status']);
       expect(status['ok'], isTrue);
       expect(status['mode'], 'remote');
 

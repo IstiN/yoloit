@@ -1,7 +1,6 @@
 import 'dart:async';
-import 'dart:io';
-import 'dart:ui' show ImageFilter;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -37,6 +36,7 @@ import 'package:yoloit/features/updates/ui/update_banner.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_cubit.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_state.dart';
 import 'package:yoloit/features/workspaces/ui/workspace_panel.dart';
+import 'package:yoloit/ui/shell/board_title_bar.dart';
 import 'package:yoloit/ui/widgets/activity_rail.dart';
 import 'package:yoloit/ui/widgets/panel_shell.dart';
 import 'package:yoloit/ui/widgets/panel_visibility.dart';
@@ -314,7 +314,16 @@ class _MainShellState extends State<MainShell> with WindowListener {
                     body: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        _TitleBar(onSettings: () => SettingsPage.show(context)),
+                        BoardTitleBar(
+                          onSettings: () => SettingsPage.show(context),
+                          onDragStart: () => windowManager.startDragging(),
+                          trailing: const _ResourceChip(),
+                          afterSettings:
+                              defaultTargetPlatform == TargetPlatform.windows ||
+                                      defaultTargetPlatform == TargetPlatform.linux
+                                  ? const _WindowControls()
+                                  : null,
+                        ),
                         if (_updatePhase != null && _updateInfo != null)
                           AutoUpdateBanner(
                             info: _updateInfo!,
@@ -969,142 +978,6 @@ class _HorizontalDividerState extends State<_HorizontalDivider> {
   }
 }
 
-class _TitleBar extends StatelessWidget {
-  const _TitleBar({required this.onSettings});
-  final VoidCallback onSettings;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.appColors;
-    final isWindows = Platform.isWindows;
-    final isLinux = Platform.isLinux;
-    return GestureDetector(
-      onPanStart: (_) => windowManager.startDragging(),
-      child: ClipRRect(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-          child: Container(
-            height: 44,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  colors.surface.withAlpha(31),
-                  colors.surface.withAlpha(82),
-                ],
-              ),
-              border: Border(
-                bottom: BorderSide(color: colors.border.withAlpha(166)),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withAlpha(46),
-                  blurRadius: 12,
-                  offset: const Offset(0, 3),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                // macOS: reserve space for native traffic lights (close/min/max)
-                // Windows/Linux: small left margin only
-                SizedBox(width: isWindows || isLinux ? 12 : 82),
-                const Spacer(),
-                const _ResourceChip(),
-                const SizedBox(width: 8),
-                _PanelToggleButton(
-                  icon: Icons.settings_outlined,
-                  tooltip: 'Settings (⌘,)',
-                  semanticsLabel: 'Open settings',
-                  active: false,
-                  onTap: onSettings,
-                ),
-                // Windows / Linux: show custom minimize/maximize/close buttons
-                // because TitleBarStyle.hidden removes native window controls.
-                if (isWindows || isLinux) ...[
-                  const SizedBox(width: 8),
-                  const _WindowControls(),
-                ] else
-                  const SizedBox(width: 12),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PanelToggleButton extends StatefulWidget {
-  const _PanelToggleButton({
-    required this.icon,
-    required this.tooltip,
-    required this.active,
-    required this.onTap,
-    this.semanticsLabel,
-  });
-
-  final IconData icon;
-  final String tooltip;
-  final bool active;
-  final VoidCallback onTap;
-  final String? semanticsLabel;
-
-  @override
-  State<_PanelToggleButton> createState() => _PanelToggleButtonState();
-}
-
-class _PanelToggleButtonState extends State<_PanelToggleButton> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.appColors;
-    return Tooltip(
-      message: widget.tooltip,
-      child: Semantics(
-        label: widget.semanticsLabel ?? widget.tooltip,
-        button: true,
-        toggled: widget.active,
-        child: MouseRegion(
-          onEnter: (_) => setState(() => _hovered = true),
-          onExit: (_) => setState(() => _hovered = false),
-          child: GestureDetector(
-            onTap: widget.onTap,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 120),
-              curve: Curves.easeOut,
-              width: 32,
-              height: 28,
-              decoration: BoxDecoration(
-                color: widget.active
-                    ? colors.primary.withAlpha(46)
-                    : _hovered
-                        ? colors.surfaceHighlight.withAlpha(153)
-                        : Colors.transparent,
-                borderRadius: BorderRadius.circular(8),
-                border: widget.active
-                    ? Border.all(color: colors.primary.withAlpha(64))
-                    : null,
-              ),
-              child: Icon(
-                widget.icon,
-                size: 16,
-                color: widget.active
-                    ? colors.primary
-                    : context.appColors.textMuted,
-                semanticLabel: widget.tooltip,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Windows / Linux window controls ──────────────────────────────────────────
 
 /// Custom minimize / maximize / close buttons for platforms where
 /// [TitleBarStyle.hidden] removes the native window chrome (Windows, Linux).

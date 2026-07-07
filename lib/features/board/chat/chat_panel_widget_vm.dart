@@ -1,14 +1,10 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:record/record.dart';
 import 'package:yoloit/core/cli/board_screenshot_service.dart';
-import 'package:yoloit/core/platform/microphone_permission_service.dart';
-import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/core/remote/yoloit_remote_client.dart';
 import 'package:yoloit/core/session/session_prefs.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
@@ -19,7 +15,12 @@ import 'package:yoloit/features/board/chat/chat_provider.dart';
 import 'package:yoloit/features/board/chat/chat_session_history.dart';
 import 'package:yoloit/features/board/chat/chat_session_manager.dart';
 import 'package:yoloit/features/board/chat/cli_guidance_service.dart';
-import 'package:yoloit/features/board/chat/cloud_asr_service.dart';
+import 'package:yoloit/features/board/chat/helpers/chat_clipboard_helper.dart';
+import 'package:yoloit/features/board/chat/helpers/chat_file_opener_helper.dart';
+import 'package:yoloit/features/board/chat/helpers/chat_link_helper.dart';
+import 'package:yoloit/features/board/chat/helpers/chat_mic_helper.dart';
+import 'package:yoloit/features/board/chat/helpers/chat_sound_helper.dart';
+import 'package:yoloit/features/board/chat/helpers/chat_subagent_note_helper.dart';
 import 'package:yoloit/features/board/chat/opencode_provider.dart';
 import 'package:yoloit/features/board/chat/panel_context_builder.dart';
 import 'package:yoloit/features/board/chat/widgets/chat_action_button.dart';
@@ -39,11 +40,7 @@ import 'package:yoloit/features/board/events/board_event_bus.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/board/utils/panel_scroll_memory.dart';
-import 'package:yoloit/features/settings/data/agent_config_service.dart';
-import 'package:yoloit/features/settings/data/cloud_llm_settings_service.dart';
 import 'package:yoloit/features/settings/data/tool_call_settings_service.dart';
-import 'package:yoloit/features/settings/ui/settings_page.dart';
-import 'package:yoloit/features/terminal/data/smart_clipboard_paste_service.dart';
 
 
 /// The chat UI rendered inside a board panel.
@@ -153,7 +150,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   // appear above the assistant text in providers that emit tools before final
   // assistant.message.
   int? _assistantInsertIndex;
-  final AudioRecorder _micRecorder = AudioRecorder();
+  final ChatMicHandler _micHandler = createChatMicHandler();
   bool _isRecordingMic = false;
   bool _isTranscribingMic = false;
 
@@ -657,7 +654,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     _inputFocusNode.dispose();
     _modelScrollCtrl.dispose();
     _glowCtrl.dispose();
-    unawaited(_micRecorder.dispose());
+    unawaited(_micHandler.dispose());
     ChatPanelWidget.processingNotifiers.remove(widget.panel.id);
     processingNotifier.dispose();
     super.dispose();
@@ -899,21 +896,13 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     final cwd = _config.workingDir.isNotEmpty ? _config.workingDir : null;
 
     try {
-      await Process.run(
-        'yoloit',
-        ['note:create', board.name, title, noteContent],
-        workingDirectory: cwd,
-        runInShell: true,
+      await createAgentNotePanel(
+        context: context,
+        boardName: board.name,
+        title: title,
+        content: noteContent,
+        workingDir: cwd,
       );
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('📋 Agent output → panel "$title"'),
-            duration: const Duration(seconds: 3),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
     } catch (_) {
       // Silently ignore — panel creation is best-effort
     }
@@ -952,29 +941,21 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       final title = uri?.host ?? href;
       createPanel('board.webpage', {'url': href}, title);
     } else {
-      PlatformLauncher.instance.openUrl(href);
+      unawaited(openChatLink(href));
     }
   }
 
   /// Open a local file path: board preview for supported types, system open otherwise.
   void _handleOpenFile(String path) {
-    if (path.isEmpty) return;
-    final ext = path.split('.').last.toLowerCase();
-    const boardPreviewable = {
-      // images
-      'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg',
-      // video
-      'mp4', 'mov', 'avi', 'mkv', 'webm', 'm4v', 'wmv', 'flv',
-      // audio
-      'mp3', 'aac', 'wav', 'ogg', 'flac', 'm4a', 'opus', 'wma',
-    };
-    final createPanel = widget.onCreateLinkedPanel;
-    if (createPanel != null && boardPreviewable.contains(ext)) {
-      final title = path.split('/').last;
-      createPanel('board.file.preview', {'path': path, 'title': title}, title);
-    } else {
-      Process.run('open', [path]);
-    }
+    unawaited(
+      openChatFile(
+        path,
+        createPreviewPanel:
+            widget.onCreateLinkedPanel != null
+                ? (typeId, state, title) => widget.onCreateLinkedPanel!(typeId, state, title)
+                : null,
+      ),
+    );
   }
 
   void _openInPreviewPanel(String path) {
@@ -1184,6 +1165,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         boardSnapshotPath: snapshotPath,
         boardSnapshotBase64: snapshotBase64,
         targetPanelSummary: focusPanelSummary,
+        boardCubit: context.read<BoardCubit>(),
       ),
       onEvent: _handleEvent,
       onError: (Object error) {
@@ -1270,9 +1252,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   }
 
   void _playCompletionSound() {
-    try {
-      Process.run('afplay', ['/System/Library/Sounds/Glass.aiff']);
-    } catch (_) {}
+    unawaited(playChatCompletionSound());
   }
 
   void _handleEvent(ChatEvent event) {
@@ -2027,22 +2007,24 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                   ),
                 ),
               ),
-              const SizedBox(width: 6),
-              ChatActionButton(
-                icon:
-                    _isRecordingMic
-                        ? Icons.mic_rounded
-                        : (_isTranscribingMic
-                            ? Icons.hourglass_top_rounded
-                            : Icons.mic_none),
-                onTap: _isTranscribingMic ? null : _handleMicInput,
-                backgroundColor: colors.surfaceElevated,
-                iconColor:
-                    _isRecordingMic
-                        ? Theme.of(context).colorScheme.error
-                        : colors.terminalPrompt,
-                iconSize: 15,
-              ),
+              if (_micHandler.isAvailable) ...[
+                const SizedBox(width: 6),
+                ChatActionButton(
+                  icon:
+                      _isRecordingMic
+                          ? Icons.mic_rounded
+                          : (_isTranscribingMic
+                              ? Icons.hourglass_top_rounded
+                              : Icons.mic_none),
+                  onTap: _isTranscribingMic ? null : _handleMicInput,
+                  backgroundColor: colors.surfaceElevated,
+                  iconColor:
+                      _isRecordingMic
+                          ? Theme.of(context).colorScheme.error
+                          : colors.terminalPrompt,
+                  iconSize: 15,
+                ),
+              ],
               const SizedBox(width: 6),
               ChatActionButton(
                 icon: _isSending ? Icons.stop_rounded : Icons.arrow_upward,
@@ -2064,14 +2046,15 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   /// Smart paste: images → file ref, safe short text → inline, otherwise temp file ref.
   Future<void> _handleSmartPaste() async {
     try {
-      final pasted =
-          await SmartClipboardPasteService.instance
-              .readInlineTextOrSavedFilePath(allowInlineText: true);
+      final pasted = await readChatClipboardInlineText();
       if (pasted != null && mounted) {
         _insertTextAtCursor(pasted);
       }
     } catch (e) {
-      assert(() { debugPrint('[ChatPanel] Smart paste error: $e'); return true; }());
+      assert(() {
+        debugPrint('[ChatPanel] Smart paste error: $e');
+        return true;
+      }());
     }
   }
 
@@ -2087,150 +2070,40 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   }
 
   Future<void> _handleMicInput() async {
-    final effectiveAsr = AgentConfigService.instance.effectiveAsr(
-      _config.provider,
-    );
-    final useCloudAsr =
-        effectiveAsr.mode == 'cloud' &&
-        effectiveAsr.configId != null &&
-        effectiveAsr.configId!.isNotEmpty;
-    if (!useCloudAsr) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Configure a cloud ASR provider in Settings → AI Models.',
-          ),
-          duration: Duration(seconds: 2),
-        ),
-      );
-      await SettingsPage.show(context, initialCategory: 'AI Models');
-      return;
-    }
-
     if (_isRecordingMic) {
       await _stopRecordingAndTranscribe();
       return;
     }
-
-    final nativeGranted =
-        await MicrophonePermissionService.instance.ensureGranted();
-    if (!nativeGranted) {
-      if (!mounted) return;
-      await _showMicrophonePermissionHint();
-      return;
-    }
-
-    final granted = await _micRecorder.hasPermission();
-    if (!granted) {
-      if (!mounted) return;
-      await _showMicrophonePermissionHint();
-      return;
-    }
-
-    final outputPath =
-        '${Directory.systemTemp.path}/yoloit_asr_${DateTime.now().millisecondsSinceEpoch}.wav';
-    try {
-      await _micRecorder.start(
-        const RecordConfig(
-          encoder: AudioEncoder.wav,
-          sampleRate: 16000,
-          numChannels: 1,
-        ),
-        path: outputPath,
-      );
-    } on Exception catch (e) {
-      if (!mounted) return;
-      final stillNoPermission = !await _micRecorder.hasPermission();
-      if (!mounted) return;
-      if (stillNoPermission) {
-        await _showMicrophonePermissionHint();
-        return;
-      }
-      await _showCopyableErrorDialog(
-        title: 'Microphone error',
-        message: 'Failed to start microphone:\n$e',
-      );
-      return;
-    }
-    if (!mounted) return;
-    setState(() => _isRecordingMic = true);
+    await _micHandler.start(
+      context,
+      config: _config,
+      updateState: ({required bool recording, required bool transcribing}) {
+        setState(() {
+          _isRecordingMic = recording;
+          _isTranscribingMic = transcribing;
+        });
+      },
+      showError: (title, message) => _showCopyableErrorDialog(
+        title: title,
+        message: message,
+      ),
+    );
   }
 
   Future<void> _stopRecordingAndTranscribe() async {
-    final path = await _micRecorder.stop();
-    if (!mounted) return;
     setState(() {
       _isRecordingMic = false;
       _isTranscribingMic = true;
     });
-
-    try {
-      if (path == null || path.isEmpty) return;
-
-      // Check if this agent has a cloud ASR configured (including global default).
-      final effectiveAsr = AgentConfigService.instance.effectiveAsr(
-        _config.provider,
-      );
-      final useCloud =
-          effectiveAsr.mode == 'cloud' &&
-          effectiveAsr.configId != null &&
-          effectiveAsr.configId!.isNotEmpty;
-
-      String transcript = '';
-      if (useCloud) {
-        final cloudCfg = await CloudLlmSettingsService.instance.loadConfigById(
-          effectiveAsr.configId!,
-        );
-        if (cloudCfg == null) {
-          throw StateError(
-            'Cloud ASR provider "${effectiveAsr.configId}" not found. '
-            'Please check your AI Agents settings.',
-          );
+    await _micHandler.stop(
+      config: _config,
+      onTranscript: _insertTextAtCursor,
+      onFinished: () {
+        if (mounted) {
+          setState(() => _isTranscribingMic = false);
         }
-        final voiceSettings = VoiceSettings(
-          useCloudAsr: true,
-          useChatModelForCloudAsr: false,
-          cloudAsrConfigId: cloudCfg.id,
-          cloudAsrModel:
-              effectiveAsr.model?.trim().isNotEmpty == true
-                  ? effectiveAsr.model
-                  : cloudCfg.model.trim().isNotEmpty
-                  ? cloudCfg.model
-                  : 'whisper-1',
-        );
-        transcript = await CloudAsrService().transcribeFromFile(
-          audioPath: path,
-          voiceSettings: voiceSettings,
-        );
-      }
-
-      if (!mounted) return;
-      final text = transcript.trim();
-      if (text.isNotEmpty) {
-        _insertTextAtCursor(text);
-      }
-    } catch (e) {
-      if (!mounted) return;
-      await _showCopyableErrorDialog(
-        title: 'ASR error',
-        message: 'ASR failed:\n$e',
-      );
-    } finally {
-      if (path != null && path.isNotEmpty) {
-        final f = File(path);
-        if (f.existsSync()) {
-          try {
-            await f.delete();
-          } on FileSystemException {
-            // ignore cleanup failure for temp recording
-          }
-        }
-      }
-      if (mounted) {
-        setState(() => _isTranscribingMic = false);
-      }
-    }
+      },
+    );
   }
 
   String _shortPath(String path) {
@@ -2316,90 +2189,6 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                 },
                 icon: const Icon(Icons.copy_outlined, size: 18),
                 label: const Text('Copy'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(),
-                child: const Text('Close'),
-              ),
-            ],
-          ),
-    );
-  }
-
-  Future<void> _showMicrophonePermissionHint() async {
-    if (!mounted) return;
-    final appName = await MicrophonePermissionService.instance.displayName();
-    final bundleId =
-        await MicrophonePermissionService.instance.bundleIdentifier();
-    final resetCommand = 'tccutil reset Microphone $bundleId';
-    final status = await MicrophonePermissionService.instance.status();
-    if (!mounted) return;
-    await showDialog<void>(
-      context: context,
-      builder:
-          (dialogContext) => AlertDialog(
-            title: const Text('Microphone access required'),
-            content: SizedBox(
-              width: 560,
-              child: SelectableText(
-                'YoLoIT needs microphone access to record audio for local ASR.\n\n'
-                'App shown to macOS: $appName\n'
-                'Bundle id: $bundleId\n'
-                'macOS status: $status\n\n'
-                'If the system prompt does not appear, macOS has already saved a decision for this exact debug bundle. '
-                'Open Privacy & Security → Microphone and enable $appName. If it is missing from the list, reset the saved decision and press Request again:\n\n'
-                '$resetCommand',
-              ),
-            ),
-            actions: [
-              TextButton.icon(
-                onPressed: () async {
-                  final granted =
-                      await MicrophonePermissionService.instance
-                          .ensureGranted();
-                  if (!mounted) return;
-                  if (granted) {
-                    Navigator.of(dialogContext).pop();
-                    return;
-                  }
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Microphone is still not allowed by macOS'),
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.mic_outlined, size: 18),
-                label: const Text('Request again'),
-              ),
-              TextButton.icon(
-                onPressed: () async {
-                  await copyToClipboard(resetCommand);
-                  if (!mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Copied reset command'),
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.copy_outlined, size: 18),
-                label: const Text('Copy reset command'),
-              ),
-              TextButton.icon(
-                onPressed:
-                    () => unawaited(() async {
-                      final opened =
-                          await MicrophonePermissionService.instance
-                              .openSettings();
-                      if (!opened) {
-                        await PlatformLauncher.instance.openUrl(
-                          'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone',
-                        );
-                      }
-                    }()),
-                icon: const Icon(Icons.settings_outlined, size: 18),
-                label: const Text('Open Settings'),
               ),
               TextButton(
                 onPressed: () => Navigator.of(dialogContext).pop(),

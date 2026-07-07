@@ -1,28 +1,18 @@
+import 'package:yoloit/core/remote/board_share_server_base.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 
-class BoardShareServerInfo {
-  const BoardShareServerInfo({
-    required this.url,
-    required this.token,
-    required this.host,
-    required this.port,
-  });
-
-  final String url;
-  final String token;
-  final String host;
-  final int port;
-}
-
-class BoardShareServer {
+class BoardShareServer extends BoardShareServerBase {
   BoardShareServer._();
 
   static final BoardShareServer instance = BoardShareServer._();
 
+  @override
   bool get isRunning => false;
 
+  @override
   BoardShareServerInfo? get info => null;
 
+  @override
   Future<BoardShareServerInfo> start(
     BoardCubit cubit, {
     String host = '0.0.0.0',
@@ -33,6 +23,7 @@ class BoardShareServer {
     );
   }
 
+  @override
   Future<void> stop() async {
     throw UnsupportedError(
       'BoardShareServer is not supported on the web target.',

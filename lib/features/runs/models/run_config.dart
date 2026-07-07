@@ -131,6 +131,41 @@ class RunConfig extends Equatable {
     color: const Color(0xFFFFD700),
   );
 
+  static RunConfig flutterRunWeb(
+    String workspacePath, {
+    String group = 'default',
+  }) => RunConfig(
+    id: 'preset_flutter_run_web',
+    name: 'Flutter Run (Web)',
+    command: 'flutter run -d chrome --debug --target lib/main_web_full.dart',
+    group: group,
+    workingDir: workspacePath,
+    color: const Color(0xFF54C5F8),
+    isFlutterRun: true,
+    quickActions: const [
+      RunQuickAction(
+        id: 'flutter_hot_reload',
+        label: 'Hot Reload',
+        icon: 'local_fire_department',
+        command: 'r',
+      ),
+      RunQuickAction(
+        id: 'flutter_hot_restart',
+        label: 'Hot Restart',
+        icon: 'restart_alt',
+        command: 'R',
+      ),
+    ],
+  );
+
+  static RunConfig flutterBuildWeb({String group = 'default'}) => RunConfig(
+    id: 'preset_flutter_build_web',
+    name: 'Flutter Build (Web)',
+    command: 'flutter build web',
+    group: group,
+    color: const Color(0xFFFFD700),
+  );
+
   @override
   List<Object?> get props => [
     id,

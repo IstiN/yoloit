@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 
 /// How images should be passed to the provider.
@@ -25,6 +26,7 @@ class ChatRuntimeContext {
     this.boardSnapshotPath,
     this.boardSnapshotBase64,
     this.targetPanelSummary,
+    this.boardCubit,
   });
 
   final String? boardId;
@@ -42,6 +44,8 @@ class ChatRuntimeContext {
   final String? boardSnapshotBase64;
   /// Markdown summary of the panel this assistant was invoked for, if any.
   final String? targetPanelSummary;
+  /// Cubit used to mutate the current board in web builds.
+  final BoardCubit? boardCubit;
 }
 
 /// Abstract interface for chat backends.
