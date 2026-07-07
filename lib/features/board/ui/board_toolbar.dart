@@ -52,9 +52,7 @@ class BoardToolbar extends StatelessWidget {
         final gap = phone ? 6.0 : 12.0;
         return Container(
           decoration: BoxDecoration(
-            color: kIsWeb
-                ? colors.surfaceElevated.withAlpha(180)
-                : colors.surface.withAlpha(31),
+            color: kIsWeb ? colors.surface : colors.surface.withAlpha(31),
             border: Border(
               bottom: BorderSide(color: colors.border.withAlpha(128)),
             ),
