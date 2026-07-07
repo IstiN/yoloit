@@ -1,7 +1,7 @@
 # YoLoIT GitHub Pages Demo — Current Status
 
 > Hand-off document created: 2026-07-05  
-> Last updated: 2026-07-07 (deployed)  
+> Last updated: 2026-07-07 (deployed from commit `c38157e`)  
 > Goal: deploy a static landing page + Flutter web demo to GitHub Pages, with all native-only features rendered as "Available in YoLoIT for macOS" placeholders.  
 >
 > **Deployment is live.** The web demo is auto-deployed from every `main` branch push via `.github/workflows/deploy_demo.yml`. Each deploy appends a unique `github.run_id` query parameter to `flutter_bootstrap.js` and `main.dart.js` so GitHub Pages / Fastly cannot serve a stale cached build. A **Clear page cache** button is also available in Settings → Support on the web for manual cache reset.
@@ -841,3 +841,27 @@ Modified:
 - AI Chat on web is limited to cloud LLM providers. Local on-device models (and any feature that needs `local_models_flutter` / `dart:ffi`) are hidden because browsers cannot load the native model runtime.
 - `dart compile exe bin/yoloitd.dart` is currently blocked by the transitive `objective_c` build hook (pulled in by desktop-only local-model packages). The integration test that exercised the compiled yoloitd subprocess now skips itself on SDKs where this happens; the same CLI commands are still covered in-process by `test/integration/yoloit_cli_local_test.dart`.
 - GitHub Pages / Fastly edge caches can serve an old `main.dart.js` for several minutes after a deploy. The demo workflow now appends `github.run_id` query parameters to `flutter_bootstrap.js` and `main.dart.js` on every deploy. If a user still sees an old build, the **Clear page cache** button in Settings → Support (web only) deletes CacheStorage and reloads.
+
+---
+
+## 8. Final verification (2026-07-07)
+
+This section records the state after the final push and deployment.
+
+- **Commit:** `c38157e` — `fix(web): enable web board panels, settings, AI chat; reduce jscpd below 1%`
+- **Pre-commit quality gates:**
+  - File-size guard: ✅ pass (max 2800 lines)
+  - Code duplication (`jscpd --min-tokens 50 --min-lines 5 lib/`): ✅ **0.91%** (< 1.0%)
+  - Coverage ratchet: ✅ **46.3%** (>= 44.0% baseline)
+  - CLI registry validation: ✅ pass
+  - CLI integration-test coverage: ✅ 258/258 commands covered or exempt
+  - Panel write-coverage: ✅ 11/11 panel types covered
+  - Full test suite (`flutter test --concurrency=4`): ✅ pass
+- **CI/CD:**
+  - GitHub Actions run `28884830284` completed successfully.
+  - Build job: 2 m 15 s.
+  - Deploy job: 8 s.
+  - Demo URL: `https://istin.github.io/yoloit/`
+- **Deployment artifacts:**
+  - Cache-busted `flutter_bootstrap.js` and `main.dart.js` via `github.run_id` query parameter.
+  - Web-only **Clear page cache** button available in Settings → Support.
