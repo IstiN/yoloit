@@ -1,10 +1,10 @@
 # YoLoIT GitHub Pages Demo — Current Status
 
 > Hand-off document created: 2026-07-05  
-> Last updated: 2026-07-07  
+> Last updated: 2026-07-07 (deployed)  
 > Goal: deploy a static landing page + Flutter web demo to GitHub Pages, with all native-only features rendered as "Available in YoLoIT for macOS" placeholders.  
 >
-> **Deployment is intentionally paused** while the web demo is debugged locally. All fixes described below are verified on the local machine; the next step is a user-triggered deploy.
+> **Deployment is live.** The web demo is auto-deployed from every `main` branch push via `.github/workflows/deploy_demo.yml`. Each deploy appends a unique `github.run_id` query parameter to `flutter_bootstrap.js` and `main.dart.js` so GitHub Pages / Fastly cannot serve a stale cached build. A **Clear page cache** button is also available in Settings → Support on the web for manual cache reset.
 
 ---
 
@@ -93,6 +93,15 @@
 - A **Download** button was added to the web toolbar (between **Share** and **Settings**), gated to `kIsWeb` so the desktop toolbar layout is unchanged. It opens `https://github.com/IstiN/yoloit/releases/latest` so web visitors can grab the macOS, Windows, or Linux build.
 - Added a small cross-platform URL opener (`lib/core/platform/url_opener.dart`) so the same button works on desktop and web without adding a new package dependency.
 - Regenerated `test/golden/goldens/board_overview_remote_group.png` after making the download button web-only.
+
+### 1.9 Automatic cache busting on every deploy
+GitHub Pages serves assets with a 10-minute `max-age` and Fastly edge caches can keep an old `main.dart.js` alive even after a successful deploy. To guarantee users always load the freshly built Flutter web app:
+- `web/index.html` loads `flutter_bootstrap.js` with a query parameter (`?v=4`).
+- `.github/workflows/deploy_demo.yml` now runs a post-build step that rewrites both `build/web/index.html` and `build/web/flutter_bootstrap.js`, appending `${{ github.run_id }}` as a query parameter to every `flutter_bootstrap.js` and `main.dart.js` reference.
+- Because the query string changes on every workflow run, browsers and CDNs treat each deploy as a brand-new asset, eliminating stale-build issues without manual version bumping.
+
+### 1.10 Manual "Clear page cache" button on web
+A **Clear page cache** button was added to Settings → Support (visible only on the web). It deletes all `CacheStorage` entries and reloads the page, forcing a fetch of the latest deployed files. Board data stored in browser storage (`SharedPreferences` / `localStorage`) is preserved.
 
 ---
 
@@ -547,19 +556,45 @@ When the **Download** button was added unconditionally to `BoardToolbar`, the ri
 - `flutter test --no-pub test/widget/features/board/board_panel_chrome_test.dart test/widget/features/board/board_panel_resize_chrome_test.dart test/golden/remote_board_overview_goldens_test.dart` passes.
 - Full `flutter test --no-pub --concurrency=1` passes with **+2721 tests, 12 skipped, EXIT_CODE=0**.
 
+### 2.36 Deployed web build still showed the old toolbar/header
+After pushing the toolbar background/header fixes, the live GitHub Pages site continued to show the previous transparent header. The browser network tab showed `main.dart.js` was being served from cache, and the generated `flutter_bootstrap.js` loaded `main.dart.js` without any cache-busting query string.
+
+**Fix:**
+- Bumped `web/index.html` to load `flutter_bootstrap.js?v=4`.
+- Added a `Cache-bust generated web assets` step to `.github/workflows/deploy_demo.yml` that runs after `flutter build web` and appends `${{ github.run_id }}` to every `flutter_bootstrap.js` and `main.dart.js` URL in the generated files.
+- This makes each deploy unique, so GitHub Pages / Fastly cannot return a stale `main.dart.js`.
+
+**Verification:**
+- `curl -s https://istin.github.io/yoloit/app/index.html | grep flutter_bootstrap.js` returns `flutter_bootstrap.js?v=28871848804` (or the current run id).
+- `curl -s https://istin.github.io/yoloit/app/flutter_bootstrap.js | grep main.dart.js` returns `main.dart.js?v=28871848804`.
+- `curl -s https://istin.github.io/yoloit/app/main.dart.js | wc -c` matches the freshly built artifact size.
+
+### 2.37 No manual way to clear a stale page cache
+The user asked for a way to clear the page cache from inside the web app without deleting board data.
+
+**Fix:**
+- Added `lib/core/platform/web_cache_clearer.dart` with conditional `web_cache_clearer_vm.dart` / `web_cache_clearer_web.dart` exports.
+- Added a **Clear page cache** button in Settings → Support, visible only on the web.
+- The button calls `caches.delete()` for every CacheStorage key and then `location.reload()`, preserving `SharedPreferences` / `localStorage` board data.
+
+**Verification:**
+- `flutter analyze --no-pub --no-fatal-infos --no-fatal-warnings lib/core/platform/web_cache_clearer*.dart lib/features/settings/ui/sections/support_section.dart` reports no issues.
+- `flutter test test/widget/features/settings/settings_page_test.dart test/widget/features/settings/settings_web_stubs_test.dart` passes.
+- Full `flutter test --no-pub --concurrency=1` passes: **+2721 tests, 12 skipped, EXIT_CODE=0**.
+
 ---
 
 ## 3. Deployment status
 
 The demo has been deployed automatically from the `main` branch push.
 
-- **Git commit:** `943d872`
-- **GitHub Actions run:** `28861336070` — `Deploy demo to GitHub Pages` — **success**
+- **Git commit:** `48ab378`
+- **GitHub Actions run:** `28871848804` — `Deploy demo to GitHub Pages` — **success**
 - **Live URLs:**
   - Landing page: `https://istin.github.io/yoloit/` (HTTP 200)
   - Flutter web demo: `https://istin.github.io/yoloit/app/index.html` (HTTP 200)
 
-> The `workflow_dispatch` trigger requires admin rights, so `gh workflow run` failed with 403. However, the push itself triggered the workflow because the commit touched `lib/**`, `web/**`, `pubspec.yaml`, and `site/**`.
+> The `workflow_dispatch` trigger requires admin rights, so `gh workflow run` failed with 403. However, the push itself triggered the workflow because the commit touched `lib/**`, `web/**`, `.github/workflows/deploy_demo.yml`, and `site/**`.
 
 ### 3.1 Local verification URLs
 - Landing page: `http://127.0.0.1:8097/` (currently served by `python3 -m http.server 8097 --bind 127.0.0.1 --directory site`)
@@ -784,7 +819,10 @@ Modified:
 - `test/integration/yoloit_cli_subprocess_test.dart` — skips when `dart compile exe` is blocked by build hooks
 - `lib/features/board/ui/board_toolbar.dart` — web header background, muted button colors, and **Download** button
 - `lib/core/platform/url_opener.dart`, `url_opener_vm.dart`, `url_opener_web.dart` — cross-platform URL opener
-- `lib/features/board/chat/yoloit_tool_executor_web.dart` — added missing `createPlatformToolExecutor()` factory
+- `lib/core/platform/web_cache_clearer.dart`, `web_cache_clearer_vm.dart`, `web_cache_clearer_web.dart` — web page cache clearer
+- `lib/features/settings/ui/sections/support_section.dart` — added web-only **Clear page cache** button
+- `.github/workflows/deploy_demo.yml` — added post-build cache-bust step
+- `web/index.html` — bumped `flutter_bootstrap.js` query param to `?v=4`
 - Various test files (platform dirs fakes, plugin tests, color ratchet, calendar tests)
 
 ---
@@ -802,3 +840,4 @@ Modified:
 - The local `python3 -m http.server` process must be restarted if the terminal session is killed. It is bound to `127.0.0.1` so it is reachable via both `http://127.0.0.1:8097/` and `http://localhost:8097/`.
 - AI Chat on web is limited to cloud LLM providers. Local on-device models (and any feature that needs `local_models_flutter` / `dart:ffi`) are hidden because browsers cannot load the native model runtime.
 - `dart compile exe bin/yoloitd.dart` is currently blocked by the transitive `objective_c` build hook (pulled in by desktop-only local-model packages). The integration test that exercised the compiled yoloitd subprocess now skips itself on SDKs where this happens; the same CLI commands are still covered in-process by `test/integration/yoloit_cli_local_test.dart`.
+- GitHub Pages / Fastly edge caches can serve an old `main.dart.js` for several minutes after a deploy. The demo workflow now appends `github.run_id` query parameters to `flutter_bootstrap.js` and `main.dart.js` on every deploy. If a user still sees an old build, the **Clear page cache** button in Settings → Support (web only) deletes CacheStorage and reloads.
