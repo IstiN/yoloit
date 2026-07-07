@@ -21,6 +21,7 @@ import 'package:yoloit/features/board/plugins/builtin/plugin_type_ids.dart';
 import 'package:yoloit/features/board/plugins/builtin/playlist_player_registry.dart';
 import 'package:yoloit/features/board/plugins/builtin/webview_manager.dart';
 import 'package:yoloit/features/board/services/board_operation_applier.dart';
+import 'package:yoloit/features/board/services/board_panel_placement_utils.dart';
 import 'package:yoloit/features/board/utils/board_grid_layout.dart';
 import 'package:yoloit/features/calendar/data/calendar_event_storage.dart';
 import 'package:yoloit/features/settings/data/agent_config_service.dart';
@@ -600,6 +601,24 @@ class BoardCubit extends Cubit<BoardState> {
     return {for (final panel in panels) panel.id: panel.bounds.toJson()};
   }
 
+  BoardHistoryEvent _gridModeHistoryEvent(
+    String boardId,
+    String type,
+    BoardDocument before,
+    BoardDocument after,
+    int revision,
+  ) {
+    return _historyEvent(
+      boardId: boardId,
+      type: type,
+      entityType: 'board',
+      entityId: boardId,
+      revision: revision,
+      before: before.gridMode.toJson(),
+      after: after.gridMode.toJson(),
+    );
+  }
+
   Future<void> setGridMode(String boardId, {required bool enabled}) async {
     await _updateBoard(
       boardId,
@@ -635,14 +654,12 @@ class BoardCubit extends Cubit<BoardState> {
         return next;
       },
       historyEvent:
-          (before, after, revision) => _historyEvent(
-            boardId: boardId,
-            type: 'board.gridModeChanged',
-            entityType: 'board',
-            entityId: boardId,
-            revision: revision,
-            before: before.gridMode.toJson(),
-            after: after.gridMode.toJson(),
+          (before, after, revision) => _gridModeHistoryEvent(
+            boardId,
+            'board.gridModeChanged',
+            before,
+            after,
+            revision,
           ),
     );
   }
@@ -660,14 +677,12 @@ class BoardCubit extends Cubit<BoardState> {
         return board.copyWithGridMode(nextMode).copyWith(panels: snapped);
       },
       historyEvent:
-          (before, after, revision) => _historyEvent(
-            boardId: boardId,
-            type: 'board.gridCellSizeChanged',
-            entityType: 'board',
-            entityId: boardId,
-            revision: revision,
-            before: before.gridMode.toJson(),
-            after: after.gridMode.toJson(),
+          (before, after, revision) => _gridModeHistoryEvent(
+            boardId,
+            'board.gridCellSizeChanged',
+            before,
+            after,
+            revision,
           ),
     );
   }
@@ -685,14 +700,12 @@ class BoardCubit extends Cubit<BoardState> {
         return board.copyWithGridMode(nextMode).copyWith(panels: snapped);
       },
       historyEvent:
-          (before, after, revision) => _historyEvent(
-            boardId: boardId,
-            type: 'board.gridSpacingChanged',
-            entityType: 'board',
-            entityId: boardId,
-            revision: revision,
-            before: before.gridMode.toJson(),
-            after: after.gridMode.toJson(),
+          (before, after, revision) => _gridModeHistoryEvent(
+            boardId,
+            'board.gridSpacingChanged',
+            before,
+            after,
+            revision,
           ),
     );
   }
@@ -772,14 +785,12 @@ class BoardCubit extends Cubit<BoardState> {
         return next;
       },
       historyEvent:
-          (before, after, revision) => _historyEvent(
-            boardId: boardId,
-            type: 'board.gridReset',
-            entityType: 'board',
-            entityId: boardId,
-            revision: revision,
-            before: before.gridMode.toJson(),
-            after: after.gridMode.toJson(),
+          (before, after, revision) => _gridModeHistoryEvent(
+            boardId,
+            'board.gridReset',
+            before,
+            after,
+            revision,
           ),
     );
   }
@@ -904,6 +915,61 @@ class BoardCubit extends Cubit<BoardState> {
       return BoardPanelBounds.fromJson(raw);
     }
     return null;
+  }
+
+  Map<String, dynamic>? _groupJson(
+    List<BoardPanelGroup> groups,
+    String groupId,
+  ) => groups.firstWhereOrNull((g) => g.id == groupId)?.toJson();
+
+  BoardPanelInstance _restorePanelBounds(BoardPanelInstance panel) {
+    final original = _originalBounds(panel);
+    final nextState = Map<String, dynamic>.from(panel.state)
+      ..remove('_originalBounds');
+    return panel.copyWith(
+      hidden: false,
+      bounds: original ?? panel.bounds,
+      state: nextState,
+    );
+  }
+
+  BoardPanelInstance _savePanelOriginalBounds(BoardPanelInstance panel) {
+    final original = _originalBounds(panel) ?? panel.bounds;
+    final nextState = Map<String, dynamic>.from(panel.state)
+      ..['_originalBounds'] = original.toJson();
+    return panel.copyWith(state: nextState);
+  }
+
+  List<BoardPanelInstance> _layoutCollapsedPanels(
+    BoardDocument board,
+    BoardPanelGroup group,
+    List<String> visibleIds,
+    Rect stackBounds, {
+    required bool saveOriginalBounds,
+  }) {
+    final maxZ = board.panels.fold<int>(
+      0,
+      (value, panel) => panel.zIndex > value ? panel.zIndex : value,
+    );
+    return board.panels.map((panel) {
+      if (!group.panelIds.contains(panel.id)) return panel;
+      final visibleIndex = visibleIds.indexOf(panel.id);
+      final isVisible = visibleIndex != -1;
+      final basePanel = saveOriginalBounds ? _savePanelOriginalBounds(panel) : panel;
+      if (!isVisible) {
+        return basePanel.copyWith(hidden: true);
+      }
+      final stackedBounds = _stackedCardBounds(
+        stackBounds,
+        visibleIndex,
+        visibleIds.length,
+      );
+      return basePanel.copyWith(
+        hidden: false,
+        bounds: stackedBounds,
+        zIndex: maxZ + 1 + visibleIndex,
+      );
+    }).toList();
   }
 
   Rect _groupExpandedBounds(BoardDocument board, BoardPanelGroup group) {
@@ -1039,14 +1105,7 @@ class BoardCubit extends Cubit<BoardState> {
         if (removed.collapsed) {
           panels = panels.map((panel) {
             if (removed.panelIds.contains(panel.id)) {
-              final original = _originalBounds(panel);
-              final nextState = Map<String, dynamic>.from(panel.state)
-                ..remove('_originalBounds');
-              return panel.copyWith(
-                hidden: false,
-                bounds: original ?? panel.bounds,
-                state: nextState,
-              );
+              return _restorePanelBounds(panel);
             }
             return panel;
           }).toList();
@@ -1090,12 +1149,8 @@ class BoardCubit extends Cubit<BoardState> {
             entityType: 'group',
             entityId: groupId,
             revision: revision,
-            before: before.groups
-                .firstWhereOrNull((g) => g.id == groupId)
-                ?.toJson(),
-            after: after.groups
-                .firstWhereOrNull((g) => g.id == groupId)
-                ?.toJson(),
+            before: _groupJson(before.groups, groupId),
+            after: _groupJson(after.groups, groupId),
           ),
     );
   }
@@ -1124,12 +1179,8 @@ class BoardCubit extends Cubit<BoardState> {
             entityType: 'group',
             entityId: groupId,
             revision: revision,
-            before: before.groups
-                .firstWhereOrNull((g) => g.id == groupId)
-                ?.toJson(),
-            after: after.groups
-                .firstWhereOrNull((g) => g.id == groupId)
-                ?.toJson(),
+            before: _groupJson(before.groups, groupId),
+            after: _groupJson(after.groups, groupId),
           ),
     );
   }
@@ -1163,12 +1214,8 @@ class BoardCubit extends Cubit<BoardState> {
             entityType: 'group',
             entityId: groupId,
             revision: revision,
-            before: before.groups
-                .firstWhereOrNull((g) => g.id == groupId)
-                ?.toJson(),
-            after: after.groups
-                .firstWhereOrNull((g) => g.id == groupId)
-                ?.toJson(),
+            before: _groupJson(before.groups, groupId),
+            after: _groupJson(after.groups, groupId),
           ),
     );
   }
@@ -1197,14 +1244,7 @@ class BoardCubit extends Cubit<BoardState> {
         if (targetGroup.collapsed) {
           panels = panels.map((panel) {
             if (panelIds.contains(panel.id)) {
-              final original = _originalBounds(panel);
-              final nextState = Map<String, dynamic>.from(panel.state)
-                ..remove('_originalBounds');
-              return panel.copyWith(
-                hidden: false,
-                bounds: original ?? panel.bounds,
-                state: nextState,
-              );
+              return _restorePanelBounds(panel);
             }
             return panel;
           }).toList();
@@ -1218,12 +1258,8 @@ class BoardCubit extends Cubit<BoardState> {
             entityType: 'group',
             entityId: groupId,
             revision: revision,
-            before: before.groups
-                .firstWhereOrNull((g) => g.id == groupId)
-                ?.toJson(),
-            after: after.groups
-                .firstWhereOrNull((g) => g.id == groupId)
-                ?.toJson(),
+            before: _groupJson(before.groups, groupId),
+            after: _groupJson(after.groups, groupId),
           ),
     );
   }
@@ -1254,14 +1290,7 @@ class BoardCubit extends Cubit<BoardState> {
           // Expand: restore original bounds and visibility.
           final nextPanels = board.panels.map((panel) {
             if (!group.panelIds.contains(panel.id)) return panel;
-            final original = _originalBounds(panel);
-            final nextState = Map<String, dynamic>.from(panel.state)
-              ..remove('_originalBounds');
-            return panel.copyWith(
-              hidden: false,
-              bounds: original ?? panel.bounds,
-              state: nextState,
-            );
+            return _restorePanelBounds(panel);
           }).toList();
           return board.copyWith(groups: nextGroups, panels: nextPanels);
         }
@@ -1289,32 +1318,13 @@ class BoardCubit extends Cubit<BoardState> {
               )
               : g;
         }).toList();
-        final maxZ = board.panels.fold<int>(
-          0,
-          (value, panel) => panel.zIndex > value ? panel.zIndex : value,
+        final nextPanels = _layoutCollapsedPanels(
+          board,
+          group,
+          visibleIds,
+          stackBounds,
+          saveOriginalBounds: true,
         );
-        final nextPanels = board.panels.map((panel) {
-          if (!group.panelIds.contains(panel.id)) return panel;
-          final visibleIndex = visibleIds.indexOf(panel.id);
-          final isVisible = visibleIndex != -1;
-          final original = _originalBounds(panel) ?? panel.bounds;
-          final state = Map<String, dynamic>.from(panel.state)
-            ..['_originalBounds'] = original.toJson();
-          if (!isVisible) {
-            return panel.copyWith(hidden: true, state: state);
-          }
-          final stackedBounds = _stackedCardBounds(
-            stackBounds,
-            visibleIndex,
-            visibleIds.length,
-          );
-          return panel.copyWith(
-            hidden: false,
-            bounds: stackedBounds,
-            zIndex: maxZ + 1 + visibleIndex,
-            state: state,
-          );
-        }).toList();
         final focusedId = board.viewport.focusedPanelId;
         final clearFocus =
             focusedId != null && group.panelIds.contains(focusedId);
@@ -1334,12 +1344,8 @@ class BoardCubit extends Cubit<BoardState> {
             entityType: 'group',
             entityId: groupId,
             revision: revision,
-            before: before.groups
-                .firstWhereOrNull((g) => g.id == groupId)
-                ?.toJson(),
-            after: after.groups
-                .firstWhereOrNull((g) => g.id == groupId)
-                ?.toJson(),
+            before: _groupJson(before.groups, groupId),
+            after: _groupJson(after.groups, groupId),
           ),
     );
   }
@@ -1409,26 +1415,13 @@ class BoardCubit extends Cubit<BoardState> {
           newBounds.height,
         );
         final visibleIds = _orderedVisiblePanelIds(group);
-        final maxZ = board.panels.fold<int>(
-          0,
-          (value, panel) => panel.zIndex > value ? panel.zIndex : value,
+        final nextPanels = _layoutCollapsedPanels(
+          board,
+          group,
+          visibleIds,
+          stackBounds,
+          saveOriginalBounds: false,
         );
-        final nextPanels = board.panels.map((panel) {
-          if (!group.panelIds.contains(panel.id)) return panel;
-          final visibleIndex = visibleIds.indexOf(panel.id);
-          final isVisible = visibleIndex != -1;
-          if (!isVisible) return panel.copyWith(hidden: true);
-          final stackedBounds = _stackedCardBounds(
-            stackBounds,
-            visibleIndex,
-            visibleIds.length,
-          );
-          return panel.copyWith(
-            hidden: false,
-            bounds: stackedBounds,
-            zIndex: maxZ + 1 + visibleIndex,
-          );
-        }).toList();
         final nextGroups = board.groups.map((g) {
           if (g.id != groupId) return g;
           return g.copyWith(collapsedBounds: newBounds);
@@ -1470,26 +1463,13 @@ class BoardCubit extends Cubit<BoardState> {
           nextGroup,
           visibleIds.length,
         );
-        final maxZ = board.panels.fold<int>(
-          0,
-          (value, panel) => panel.zIndex > value ? panel.zIndex : value,
+        final nextPanels = _layoutCollapsedPanels(
+          board,
+          group,
+          visibleIds,
+          stackBounds,
+          saveOriginalBounds: false,
         );
-        final nextPanels = board.panels.map((panel) {
-          if (!group.panelIds.contains(panel.id)) return panel;
-          final visibleIndex = visibleIds.indexOf(panel.id);
-          final isVisible = visibleIndex != -1;
-          if (!isVisible) return panel.copyWith(hidden: true);
-          final stackedBounds = _stackedCardBounds(
-            stackBounds,
-            visibleIndex,
-            visibleIds.length,
-          );
-          return panel.copyWith(
-            hidden: false,
-            bounds: stackedBounds,
-            zIndex: maxZ + 1 + visibleIndex,
-          );
-        }).toList();
         final nextGroups = board.groups.map((g) {
           if (g.id != groupId) return g;
           return nextGroup;
@@ -2555,33 +2535,7 @@ class BoardCubit extends Cubit<BoardState> {
     String typeId,
     BoardDocument board,
   ) {
-    final defaultFolder = board.defaultFolder;
-    if (defaultFolder.isEmpty) return initialState;
-    if (typeId == 'board.filetree') {
-      return {...initialState, 'rootPath': defaultFolder};
-    }
-    if (typeId == kChatPluginTypeId) {
-      final rawConfig = initialState['config'];
-      final config = ChatSessionConfig.fromJson(
-        Map<String, dynamic>.from(rawConfig is Map ? rawConfig : const {}),
-      );
-      return {
-        ...initialState,
-        'config': config.copyWith(workingDir: defaultFolder).toJson(),
-        'configured': true,
-      };
-    }
-    if (typeId == kTerminalPluginTypeId) {
-      final rawConfig = initialState['config'];
-      final config = BoardTerminalConfig.fromJson(
-        Map<String, dynamic>.from(rawConfig is Map ? rawConfig : const {}),
-      );
-      return {
-        ...initialState,
-        'config': config.copyWith(workingDir: defaultFolder).toJson(),
-      };
-    }
-    return initialState;
+    return initialPanelStateForBoard(initialState, typeId, board);
   }
 
   /// Resolves the effective model for a new chat session.
@@ -2641,44 +2595,10 @@ class BoardCubit extends Cubit<BoardState> {
       );
     }
 
-    const startX = 120.0;
-    const startY = 120.0;
-    const gap = 24.0;
-    const stepX = 56.0;
-    const stepY = 42.0;
-    const maxColumns = 8;
-
-    final occupiedRects =
-        board.panels
-            .where((panel) => !panel.hidden)
-            .map((panel) => panel.bounds.rect.inflate(gap))
-            .toList();
-
-    for (var row = 0; row < 40; row++) {
-      for (var column = 0; column < maxColumns; column++) {
-        final candidate = Rect.fromLTWH(
-          startX + (column * (preferredWidth + stepX)),
-          startY + (row * (preferredHeight + stepY)),
-          preferredWidth,
-          preferredHeight,
-        );
-        final overlaps = occupiedRects.any(candidate.overlaps);
-        if (!overlaps) {
-          return BoardPanelBounds(
-            x: candidate.left,
-            y: candidate.top,
-            width: preferredWidth,
-            height: preferredHeight,
-          );
-        }
-      }
-    }
-
-    return BoardPanelBounds(
-      x: startX,
-      y: startY + (occupiedRects.length * (preferredHeight + stepY) * 0.35),
-      width: preferredWidth,
-      height: preferredHeight,
+    return nextAvailableFreeformBounds(
+      board,
+      preferredWidth: preferredWidth,
+      preferredHeight: preferredHeight,
     );
   }
 

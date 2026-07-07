@@ -7,6 +7,7 @@ import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
+import 'package:yoloit/features/board/ui/widgets/board_panel_chrome.dart';
 
 class BoardOverviewPreview extends StatelessWidget {
   const BoardOverviewPreview({super.key, required this.board});
@@ -1029,82 +1030,13 @@ class _OffscreenPanelCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    final theme = Theme.of(context);
-    
-    final accent = panel.color;
-    final panelFill =
-        accent == null
-            ? colors.surface
-            : Color.lerp(colors.surface, accent, 0.12) ?? colors.surface;
-    final panelHeaderFill =
-        accent == null
-            ? colors.surfaceElevated
-            : Color.lerp(colors.surfaceElevated, accent, 0.18) ??
-                colors.surfaceElevated;
-    final borderColor =
-        accent == null
-            ? colors.border
-            : Color.lerp(colors.border, accent, 0.65) ?? colors.border;
-
-    final plugin = BoardPluginRegistry.instance.pluginFor(panel.type) ??
-        BoardPluginRegistry.instance.fallback;
-
-    return Material(
-      type: MaterialType.transparency,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: panelFill,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: borderColor, width: 1.0),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Container(
-                height: 44,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: BoxDecoration(
-                  color: panelHeaderFill,
-                  border: Border(
-                    bottom: BorderSide(color: colors.divider, width: 1.0),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      plugin.icon,
-                      size: 16,
-                      color: theme.colorScheme.onSurface.withAlpha(180),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        panel.title,
-                        overflow: TextOverflow.ellipsis,
-                        maxLines: 1,
-                        style: TextStyle(
-                          color: theme.colorScheme.onSurface,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: ClipRect(
-                  child: BoardOverviewPanelContent(
-                    panel: panel,
-                    headerHeight: 44.0,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+    return BoardPanelChrome(
+      panel: panel,
+      colors: colors,
+      clipContent: true,
+      content: BoardOverviewPanelContent(
+        panel: panel,
+        headerHeight: 44.0,
       ),
     );
   }

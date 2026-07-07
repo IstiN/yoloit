@@ -542,24 +542,9 @@ class ChatSetupViewState extends State<ChatSetupView> {
           // Session name
           Text('Session Name', style: styles.labelStyle),
           const SizedBox(height: 4),
-          TextField(
+          ChatSetupSessionNameField(
             controller: _sessionCtrl,
-            style: styles.inputTextStyle,
-            decoration: InputDecoration(
-              hintText: 'auto-generated if empty',
-              hintStyle: styles.hintStyle,
-              filled: true,
-              fillColor: inputFill,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide.none,
-              ),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 10,
-              ),
-              isDense: true,
-            ),
+            styles: styles,
           ),
           const SizedBox(height: 14),
 

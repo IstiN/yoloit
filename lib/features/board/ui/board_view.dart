@@ -107,8 +107,6 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   final Map<String, Uint8List> _boardPreviewPngs = {};
   final BoardPreviewCache _previewCache = BoardPreviewCache.instance;
 
-  /// When true, panel chrome (borders, accents, sidebar, minimap) is hidden
-  /// to produce a clean screenshot without purple-tinted decorations.
   bool _isCapturingScreenshot = false;
 
   String get _currentPanelPlatform {
@@ -116,8 +114,6 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     return currentPlatformName;
   }
 
-  /// Suppresses focused-panel auto-centering for one rebuild cycle after
-  /// switching boards so the restored viewport position is preserved.
   bool _suppressFocusVisibility = false;
   late final AnimationController _panController;
   Animation<Matrix4>? _panAnimation;
@@ -135,15 +131,10 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   String? _multiSelectStartPanelId;
   bool _multiSelectHasDragged = false;
 
-  /// Link id currently hovered (for showing delete badge).
-
-  /// Points accumulated for the active stroke (board-space).
   final List<Offset> _activeStroke = [];
 
-  /// Active pointer id for drawing (null when not drawing).
   int? _drawPointer;
 
-  /// Pending connection source panel id.
   String? _connectSourceId;
   Offset? _connectPreviewPointer; // board-space pointer for preview line
 
@@ -559,11 +550,10 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                               for (final panel
                                                   in activeBoard.panels) {
                                                 if (panel.type !=
-                                                    WebpagePlugin.kTypeId) {
+                                                    WebpagePluginBase.kTypeId) {
                                                   continue;
                                                 }
-                                                final ctrl = WebpagePlugin
-                                                    .controllers[panel.id];
+                                                final ctrl = WebpagePluginBase.controllers[panel.id];
                                                 if (ctrl == null) continue;
                                                 ctrl.runJavaScript(
                                                   "window.dispatchEvent(new Event('resize'));",
@@ -1847,7 +1837,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     const minWidth = 220.0;
     const minHeight = 140.0;
     final maxWidth =
-        panel.type == WebpagePlugin.kTypeId ? 1440.0 : double.infinity;
+        panel.type == WebpagePluginBase.kTypeId ? 1440.0 : double.infinity;
 
     var x = panel.bounds.x;
     var y = panel.bounds.y;

@@ -7,60 +7,15 @@ import 'package:yoloit/core/services/webview_zoom_service.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
+import 'package:yoloit/features/board/plugins/builtin/webpage_plugin_base.dart';
 import 'package:yoloit/features/board/plugins/builtin/webview_manager.dart';
 
-final _webpageDefaultColors = AppColorScheme.fromAccent(Colors.lightBlue);
-
-class WebpagePlugin extends BoardPanelPlugin {
+class WebpagePlugin extends WebpagePluginBase {
   const WebpagePlugin();
 
-  static const String kTypeId = 'board.webpage';
-
-  /// Shared controller cache so the board view can render WebViews
-  /// outside the InteractiveViewer transform to avoid coordinate offset.
-  static final Map<String, WebViewController> controllers = {};
-
-  /// Last known CSS zoom per panel (= board scale at gesture-end).
-  /// Read by [onPageFinished] to re-inject after navigation.
-  /// Formula: zoom = boardScale → CSS layout width = panel.logicalWidth.
-  static final Map<String, double> pendingCssZoom = {};
-
-  /// Target JS viewport width per panel (375/768/1280). Used when a page
-  /// reloads to restore the correct pageZoom via setFixedViewportWidth.
-  static final Map<String, double> viewportTargets = {};
-
-  /// Loading state per panel.  Set to true on page start, false on
-  /// page finish.  The overlay shows a white cover during loading to
-  /// hide the flash of unstyled content.
-  static final Map<String, ValueNotifier<bool>> pageLoading = {};
 
   @override
   bool get supportsHeadlessRender => false; // native WebView platform view
-
-  @override
-  String get typeId => kTypeId;
-
-  @override
-  String get displayName => 'Webpage';
-
-  @override
-  IconData get icon => Icons.language_outlined;
-
-  @override
-  Color get accentColor => _webpageDefaultColors.accentBlue;
-
-  @override
-  Size get defaultSize => const Size(700, 500);
-
-  @override
-  Map<String, dynamic> get initialState => {
-    'url': '',
-    'title': '',
-    'favicon': '',
-  };
-
-  @override
-  bool get hasEditor => false;
 
   @override
   Widget buildContent(
@@ -123,9 +78,9 @@ class _WebpageContentState extends State<_WebpageContent> {
   @override
   void dispose() {
     WebViewManager.instance.detach(widget.panel.id);
-    WebpagePlugin.pendingCssZoom.remove(widget.panel.id);
-    WebpagePlugin.viewportTargets.remove(widget.panel.id);
-    WebpagePlugin.pageLoading.remove(widget.panel.id)?.dispose();
+    WebpagePluginBase.pendingCssZoom.remove(widget.panel.id);
+    WebpagePluginBase.viewportTargets.remove(widget.panel.id);
+    WebpagePluginBase.pageLoading.remove(widget.panel.id)?.dispose();
     _urlCtrl.dispose();
     _urlFocus.dispose();
     super.dispose();
@@ -133,7 +88,7 @@ class _WebpageContentState extends State<_WebpageContent> {
 
   void _initController(String url) {
     final panelId = widget.panel.id;
-    final loading = WebpagePlugin.pageLoading.putIfAbsent(
+    final loading = WebpagePluginBase.pageLoading.putIfAbsent(
       panelId,
       () => ValueNotifier<bool>(false),
     );
@@ -143,7 +98,7 @@ class _WebpageContentState extends State<_WebpageContent> {
       _controller = existing;
       WebViewManager.instance.register(panelId, existing);
       _configureController(existing, loading);
-      WebpagePlugin.controllers[panelId] = existing;
+      WebpagePluginBase.controllers[panelId] = existing;
       _syncControllerState(existing);
       if (mounted) setState(() {});
       return;
@@ -157,7 +112,7 @@ class _WebpageContentState extends State<_WebpageContent> {
 
     // Expose controller so the board view can render the WebView
     // outside the InteractiveViewer transform.
-    WebpagePlugin.controllers[panelId] = controller;
+    WebpagePluginBase.controllers[panelId] = controller;
     if (mounted) setState(() {});
   }
 
@@ -170,7 +125,7 @@ class _WebpageContentState extends State<_WebpageContent> {
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageStarted: (_) {
-            final activeLoading = WebpagePlugin.pageLoading[widget.panel.id];
+            final activeLoading = WebpagePluginBase.pageLoading[widget.panel.id];
             if (activeLoading == loading) {
               activeLoading?.value = true;
             }
@@ -196,10 +151,10 @@ class _WebpageContentState extends State<_WebpageContent> {
   },true);
 })();
 ''');
-            final target = WebpagePlugin.viewportTargets[panelId] ?? 1280.0;
+            final target = WebpagePluginBase.viewportTargets[panelId] ?? 1280.0;
             WebViewZoomService.setFixedViewportWidth(target);
             Future.delayed(const Duration(milliseconds: 150), () {
-              final activeLoading = WebpagePlugin.pageLoading[panelId];
+              final activeLoading = WebpagePluginBase.pageLoading[panelId];
               if (activeLoading == loading) {
                 activeLoading?.value = false;
               }
@@ -231,7 +186,7 @@ class _WebpageContentState extends State<_WebpageContent> {
           if (tabUrl.isEmpty) return;
           final createLinked = widget.renderContext.onCreateLinkedPanel;
           if (createLinked != null) {
-            createLinked(WebpagePlugin.kTypeId, {
+            createLinked(WebpagePluginBase.kTypeId, {
               'url': tabUrl,
               'title': _hostname(tabUrl),
               'favicon': '',
@@ -299,179 +254,6 @@ class _WebpageContentState extends State<_WebpageContent> {
         _controller!.loadRequest(Uri.parse(url));
       }
     }
-  }
-
-  Future<void> _runExperiment(String id) async {
-    final ctrl = _controller;
-    if (ctrl == null) return;
-    assert(() { debugPrint('[WebExp] ══════════════════════════════════════════'); return true; }());
-    assert(() { debugPrint('[WebExp] Running experiment: $id'); return true; }());
-
-    switch (id) {
-      // ── 📊 Info ────────────────────────────────────────────────────────
-      case 'info':
-        final info = await ctrl.runJavaScriptReturningResult('''
-(function(){
-  return JSON.stringify({
-    innerWidth: window.innerWidth,
-    innerHeight: window.innerHeight,
-    devicePixelRatio: window.devicePixelRatio,
-    outerWidth: window.outerWidth,
-    bodyClientWidth: document.body ? document.body.clientWidth : null,
-    bodyScrollWidth: document.body ? document.body.scrollWidth : null,
-    htmlZoom: document.documentElement.style.zoom || 'none',
-    htmlTransform: document.documentElement.style.transform || 'none',
-    userAgent: navigator.userAgent,
-    viewport: (()=>{var vp=document.querySelector("meta[name=viewport]");return vp?vp.content:"none";})()
-  });
-})()
-''');
-        assert(() { debugPrint('[WebExp] INFO: $info'); return true; }());
-
-      // ── A: User Agent ──────────────────────────────────────────────────
-      case 'ua_desktop':
-        await ctrl.setUserAgent(
-          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) '
-          'AppleWebKit/537.36 (KHTML, like Gecko) '
-          'Chrome/124.0.0.0 Safari/537.36',
-        );
-        await ctrl.reload();
-        assert(() { debugPrint('[WebExp] A: Set desktop Chrome UA, reloading...'); return true; }());
-
-      case 'ua_reset':
-        await ctrl.setUserAgent(null);
-        await ctrl.reload();
-        assert(() { debugPrint('[WebExp] A: Reset UA to default, reloading...'); return true; }());
-
-      // ── B: CSS zoom on <html> ──────────────────────────────────────────
-      case 'zoom_0_5':
-        await ctrl.runJavaScript(
-          "document.documentElement.style.zoom='0.5';"
-          "window.dispatchEvent(new Event('resize'));"
-          "console.log('[WebExp] B: zoom=0.5, innerWidth='+window.innerWidth);",
-        );
-        assert(() { debugPrint('[WebExp] B: Set html zoom=0.5'); return true; }());
-
-      case 'zoom_0_75':
-        await ctrl.runJavaScript(
-          "document.documentElement.style.zoom='0.75';"
-          "window.dispatchEvent(new Event('resize'));"
-          "console.log('[WebExp] B: zoom=0.75, innerWidth='+window.innerWidth);",
-        );
-        assert(() { debugPrint('[WebExp] B: Set html zoom=0.75'); return true; }());
-
-      case 'zoom_1':
-        await ctrl.runJavaScript(
-          "document.documentElement.style.zoom='';"
-          "window.dispatchEvent(new Event('resize'));"
-          "console.log('[WebExp] B: zoom reset, innerWidth='+window.innerWidth);",
-        );
-        assert(() { debugPrint('[WebExp] B: Reset html zoom'); return true; }());
-
-      // ── C: CSS transform scale on <body> ───────────────────────────────
-      case 'scale_body':
-        await ctrl.runJavaScript('''
-(function(){
-  var b=document.body;
-  b.style.transform='scale(0.5)';
-  b.style.transformOrigin='top left';
-  b.style.width='200%';
-  window.dispatchEvent(new Event('resize'));
-  console.log('[WebExp] C: body scale(0.5), bodyClientWidth='+b.clientWidth);
-})();
-''');
-        assert(() { debugPrint('[WebExp] C: body transform scale(0.5) + width=200%'); return true; }());
-
-      case 'scale_reset':
-        await ctrl.runJavaScript('''
-(function(){
-  var b=document.body;
-  b.style.transform='';
-  b.style.transformOrigin='';
-  b.style.width='';
-  window.dispatchEvent(new Event('resize'));
-  console.log('[WebExp] C: body transform reset');
-})();
-''');
-        assert(() { debugPrint('[WebExp] C: body transform reset'); return true; }());
-
-      // ── D: Force minWidth on body ──────────────────────────────────────
-      case 'min_width':
-        await ctrl.runJavaScript('''
-(function(){
-  document.body.style.minWidth='1280px';
-  window.dispatchEvent(new Event('resize'));
-  console.log('[WebExp] D: minWidth=1280px set, scrollWidth='+document.body.scrollWidth);
-})();
-''');
-        assert(() { debugPrint('[WebExp] D: Set body minWidth=1280px'); return true; }());
-
-      case 'min_width_reset':
-        await ctrl.runJavaScript('''
-(function(){
-  document.body.style.minWidth='';
-  window.dispatchEvent(new Event('resize'));
-  console.log('[WebExp] D: minWidth reset');
-})();
-''');
-        assert(() { debugPrint('[WebExp] D: Reset body minWidth'); return true; }());
-
-      // ── E: Override window.innerWidth ─────────────────────────────────
-      case 'override_inner_width':
-        await ctrl.runJavaScript(r'''
-(function(){
-  const target = 1278;
-  try {
-    Object.defineProperty(window, 'innerWidth', {get: function(){ return target; }, configurable: true});
-    Object.defineProperty(window, 'outerWidth', {get: function(){ return target; }, configurable: true});
-    window.dispatchEvent(new Event('resize'));
-    console.log('[WebExp] E: override innerWidth=' + window.innerWidth);
-  } catch(e) {
-    console.log('[WebExp] E: failed: ' + e);
-  }
-})();
-''');
-        assert(() { debugPrint('[WebExp] E: override window.innerWidth=1278'); return true; }());
-
-      case 'override_inner_width_zoom':
-        await ctrl.runJavaScript(r'''
-(function(){
-  const target = 1278;
-  try {
-    Object.defineProperty(window, 'innerWidth', {get: function(){ return target; }, configurable: true});
-    Object.defineProperty(window, 'outerWidth', {get: function(){ return target; }, configurable: true});
-    document.documentElement.style.zoom = '0.5';
-    window.dispatchEvent(new Event('resize'));
-    console.log('[WebExp] E+B: innerWidth=' + window.innerWidth + ' zoom=0.5 bodyW=' + document.body.clientWidth);
-  } catch(e) {
-    console.log('[WebExp] E+B: failed: ' + e);
-  }
-})();
-''');
-        assert(() { debugPrint('[WebExp] E+B: override innerWidth=1278 + zoom=0.5'); return true; }());
-
-      case 'override_inner_width_reset':
-        await ctrl.runJavaScript(r'''
-(function(){
-  try {
-    Object.defineProperty(window, 'innerWidth', {get: undefined, configurable: true});
-    Object.defineProperty(window, 'outerWidth', {get: undefined, configurable: true});
-  } catch(e) {}
-  document.documentElement.style.zoom = '';
-  window.dispatchEvent(new Event('resize'));
-  console.log('[WebExp] E: reset, innerWidth=' + window.innerWidth);
-})();
-''');
-        assert(() { debugPrint('[WebExp] E: reset innerWidth override'); return true; }());
-    }
-
-    // Log state after experiment
-    await Future<void>.delayed(const Duration(milliseconds: 300));
-    final after = await ctrl.runJavaScriptReturningResult(
-      'JSON.stringify({innerWidth:window.innerWidth,zoom:document.documentElement.style.zoom||"none",bodyW:document.body?document.body.clientWidth:null})',
-    );
-    assert(() { debugPrint('[WebExp] After state: $after'); return true; }());
-    assert(() { debugPrint('[WebExp] ══════════════════════════════════════════'); return true; }());
   }
 
   void _showViewportLab(BuildContext context) {
@@ -587,7 +369,7 @@ class _WebpageContentState extends State<_WebpageContent> {
                     }
                     // Update native WKWebView pageZoom so viewport = targetViewportWidth.
                     // Also persist per-panel so page reloads restore the same target.
-                    WebpagePlugin.viewportTargets[widget.panel.id] =
+                    WebpagePluginBase.viewportTargets[widget.panel.id] =
                         targetViewportWidth;
                     WebViewZoomService.setFixedViewportWidth(
                       targetViewportWidth,

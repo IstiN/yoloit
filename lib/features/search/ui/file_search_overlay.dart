@@ -9,7 +9,7 @@ import 'package:yoloit/core/platform/platform_capabilities.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
-import 'package:yoloit/features/board/plugins/builtin/file_preview_plugin.dart';
+import 'package:yoloit/features/board/plugins/builtin/file_preview_plugin_base.dart';
 import 'package:yoloit/features/board/ui/board_overview_preview.dart';
 import 'package:yoloit/features/board/utils/panel_placement.dart';
 import 'package:yoloit/features/editor/bloc/file_editor_cubit.dart';
@@ -457,7 +457,7 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
     final fileName = p.basename(filePath);
     final panel = BoardPanelInstance(
       id: 'panel-${DateTime.now().microsecondsSinceEpoch}',
-      type: FilePreviewPlugin.kTypeId,
+      type: FilePreviewPluginBase.kTypeId,
       title: fileName,
       bounds: placement.bounds,
       state: {'path': filePath, 'title': fileName},

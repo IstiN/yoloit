@@ -3,47 +3,19 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
-import 'package:yoloit/core/platform/platform_capabilities.dart';
 import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/utils/clipboard_utils.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
+import 'package:yoloit/features/board/plugins/builtin/filetree_plugin_base.dart';
 import 'package:yoloit/features/board/ui/board_file_picker.dart';
 import 'package:yoloit/ui/components/typography/caption.dart';
 
-class FileTreePlugin extends BoardPanelPlugin {
+class FileTreePlugin extends FileTreePluginBase {
   const FileTreePlugin();
 
-  static const String kTypeId = 'board.filetree';
-
-  @override
-  String get typeId => kTypeId;
-
-  @override
-  String get displayName => 'File Tree';
-
-  @override
-  IconData get icon => Icons.account_tree_outlined;
-
-  @override
-  Color get accentColor => const Color(0xFF64748B);
-
-  @override
-  Size get defaultSize => const Size(320, 500);
-
-  @override
-  Map<String, dynamic> get initialState => {
-    'rootPath': '',
-    'expandedDirs': <String>[],
-    'selectedFile': '',
-  };
-
-  @override
-  Set<PlatformCapability> get requiredCapabilities => const {
-        PlatformCapability.filesystem,
-        PlatformCapability.processes,
-      };
+  static const String kTypeId = FileTreePluginBase.kTypeId;
 
   @override
   Widget buildContent(

@@ -67,7 +67,41 @@ class ChatSetupDropdown<T> extends StatelessWidget {
   }
 }
 
-/// The primary "Start Chat" action button used by both VM and web setup.
+/// A styled session-name text field shared by VM and web chat setup views.
+class ChatSetupSessionNameField extends StatelessWidget {
+  const ChatSetupSessionNameField({
+    required this.controller,
+    required this.styles,
+    super.key,
+  });
+
+  final TextEditingController controller;
+  final ChatSetupStyles styles;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      style: styles.inputTextStyle,
+      decoration: InputDecoration(
+        hintText: 'auto-generated if empty',
+        hintStyle: styles.hintStyle,
+        filled: true,
+        fillColor: styles.colors.surfaceElevated,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide.none,
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 10,
+        ),
+        isDense: true,
+      ),
+    );
+  }
+}
+
 class ChatSetupStartButton extends StatelessWidget {
   const ChatSetupStartButton({
     required this.onPressed,

@@ -8,6 +8,7 @@ import 'package:yoloit/core/cli/board_screenshot_service.dart';
 import 'package:yoloit/core/remote/yoloit_remote_client.dart';
 import 'package:yoloit/core/session/session_prefs.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/core/ui/copyable_error_dialog.dart';
 import 'package:yoloit/core/utils/clipboard_utils.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/chat/chat_panel_models.dart';
@@ -2166,36 +2167,10 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     required String message,
   }) async {
     if (!mounted) return;
-    await showDialog<void>(
+    await showCopyableErrorDialog(
       context: context,
-      builder:
-          (dialogContext) => AlertDialog(
-            title: Text(title),
-            content: SizedBox(
-              width: 560,
-              child: SingleChildScrollView(child: SelectableText(message)),
-            ),
-            actions: [
-              TextButton.icon(
-                onPressed: () async {
-                  await copyToClipboard(message);
-                  if (!mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Copied error text'),
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.copy_outlined, size: 18),
-                label: const Text('Copy'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(),
-                child: const Text('Close'),
-              ),
-            ],
-          ),
+      title: title,
+      message: message,
     );
   }
 

@@ -30,18 +30,14 @@ import 'package:yoloit/core/cli/handlers/yolo_chat_handler.dart';
 import 'package:yoloit/core/cli/panel_cli_handler.dart';
 import 'package:yoloit/core/theme/theme_manager.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
-import 'package:yoloit/features/board/chat/chat_panel_plugin.dart';
 import 'package:yoloit/features/board/chat/yoloit_cli_tools.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
-import 'package:yoloit/features/board/model/chat_models.dart';
-import 'package:yoloit/features/board/model/terminal_panel_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
 import 'package:yoloit/features/board/plugins/builtin/playlist_player_registry.dart';
 import 'package:yoloit/features/board/plugins/builtin/timer_manager.dart';
 import 'package:yoloit/features/board/services/board_offscreen_renderer.dart';
+import 'package:yoloit/features/board/services/board_panel_placement_utils.dart';
 import 'package:yoloit/features/board/services/board_preview_cache.dart';
-import 'package:yoloit/features/board/terminal/board_terminal_panel_plugin.dart';
-import 'package:yoloit/features/board/terminal/board_terminal_panel_plugin_base.dart';
 import 'package:yoloit/features/board/widgets/widget_engine_manager.dart';
 import 'package:yoloit/features/templates/data/template_service.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_cubit.dart';
@@ -911,49 +907,13 @@ class CliServer {
     if (body.containsKey('scale') ||
         body.containsKey('x') ||
         body.containsKey('y')) {
-      final scale = (body['scale'] as num?)?.toDouble() ?? board.viewport.scale;
-      final tx =
-          (body['x'] as num?)?.toDouble() ?? board.viewport.translation.dx;
-      final ty =
-          (body['y'] as num?)?.toDouble() ?? board.viewport.translation.dy;
-      final vp = board.viewport.copyWith(
-        scale: scale.clamp(0.1, 4.0),
-        translation: Offset(tx, ty),
-      );
-      await cubit.updateViewport(vp, boardId: board.id);
-      cliScheduleRebuild();
+      await _updateBoardViewport(cubit, board, body);
     }
     // Fit all panels: fit=true auto-calculates scale+translation
     if (body['fit'] == true) {
-      final panels = board.panels.where((p) => !p.hidden).toList();
-      if (panels.isNotEmpty) {
-        final minX = panels
-            .map((p) => p.bounds.x)
-            .reduce((a, b) => a < b ? a : b);
-        final minY = panels
-            .map((p) => p.bounds.y)
-            .reduce((a, b) => a < b ? a : b);
-        final maxX = panels
-            .map((p) => p.bounds.x + p.bounds.width)
-            .reduce((a, b) => a > b ? a : b);
-        final maxY = panels
-            .map((p) => p.bounds.y + p.bounds.height)
-            .reduce((a, b) => a > b ? a : b);
-        const pad = 80.0;
-        final vpW = (body['viewportWidth'] as num?)?.toDouble() ?? 1280.0;
-        final vpH = (body['viewportHeight'] as num?)?.toDouble() ?? 800.0;
-        final scaleX = (vpW - pad * 2) / (maxX - minX);
-        final scaleY = (vpH - pad * 2) / (maxY - minY);
-        final s = (scaleX < scaleY ? scaleX : scaleY).clamp(0.1, 2.0);
-        final tx = (vpW - (maxX - minX) * s) / 2 - minX * s;
-        final ty = (vpH - (maxY - minY) * s) / 2 - minY * s;
-        final vp = board.viewport.copyWith(
-          scale: s,
-          translation: Offset(tx, ty),
-        );
-        await cubit.updateViewport(vp, boardId: board.id);
-        cliScheduleRebuild();
-      }
+      final vp = _fitBoardViewportFromBody(board, body);
+      await cubit.updateViewport(vp, boardId: board.id);
+      cliScheduleRebuild();
     }
     return cliJson({'ok': true});
   }
@@ -1051,12 +1011,7 @@ class CliServer {
       title: title,
       bounds: bounds,
       state: state,
-      zIndex:
-          board.panels.fold<int>(
-            0,
-            (value, p) => p.zIndex > value ? p.zIndex : value,
-          ) +
-          1,
+      zIndex: _nextZIndexForBoard(board),
     );
     await cubit.addPanel(panel, boardId: board.id);
     cliScheduleRebuild();
@@ -1068,33 +1023,7 @@ class CliServer {
     String typeId,
     BoardDocument board,
   ) {
-    final defaultFolder = board.defaultFolder;
-    if (defaultFolder.isEmpty) return initialState;
-    if (typeId == 'board.filetree') {
-      return {...initialState, 'rootPath': defaultFolder};
-    }
-    if (typeId == ChatPanelPlugin.kTypeId) {
-      final rawConfig = initialState['config'];
-      final config = ChatSessionConfig.fromJson(
-        Map<String, dynamic>.from(rawConfig is Map ? rawConfig : const {}),
-      );
-      return {
-        ...initialState,
-        'config': config.copyWith(workingDir: defaultFolder).toJson(),
-        'configured': true,
-      };
-    }
-    if (typeId == BoardTerminalPanelPluginBase.kTypeId) {
-      final rawConfig = initialState['config'];
-      final config = BoardTerminalConfig.fromJson(
-        Map<String, dynamic>.from(rawConfig is Map ? rawConfig : const {}),
-      );
-      return {
-        ...initialState,
-        'config': config.copyWith(workingDir: defaultFolder).toJson(),
-      };
-    }
-    return initialState;
+    return initialPanelStateForBoard(initialState, typeId, board);
   }
 
   BoardPanelBounds _nextAvailableBoundsFor(
@@ -1102,44 +1031,10 @@ class CliServer {
     required double preferredWidth,
     required double preferredHeight,
   }) {
-    const startX = 120.0;
-    const startY = 120.0;
-    const gap = 24.0;
-    const stepX = 56.0;
-    const stepY = 42.0;
-    const maxColumns = 8;
-
-    final occupiedRects =
-        board.panels
-            .where((panel) => !panel.hidden)
-            .map((panel) => panel.bounds.rect.inflate(gap))
-            .toList();
-
-    for (var row = 0; row < 40; row++) {
-      for (var column = 0; column < maxColumns; column++) {
-        final candidate = Rect.fromLTWH(
-          startX + (column * (preferredWidth + stepX)),
-          startY + (row * (preferredHeight + stepY)),
-          preferredWidth,
-          preferredHeight,
-        );
-        final overlaps = occupiedRects.any(candidate.overlaps);
-        if (!overlaps) {
-          return BoardPanelBounds(
-            x: candidate.left,
-            y: candidate.top,
-            width: preferredWidth,
-            height: preferredHeight,
-          );
-        }
-      }
-    }
-
-    return BoardPanelBounds(
-      x: startX,
-      y: startY + (occupiedRects.length * (preferredHeight + stepY) * 0.35),
-      width: preferredWidth,
-      height: preferredHeight,
+    return nextAvailableFreeformBounds(
+      board,
+      preferredWidth: preferredWidth,
+      preferredHeight: preferredHeight,
     );
   }
 
@@ -1290,49 +1185,12 @@ class CliServer {
 
     // Apply state update if provided
     if (result.stateUpdate != null && result.ok) {
-      final mergedState = {
-        ...panel.state,
-        ...CliTextArgumentResolver.resolvePanelState(result.stateUpdate!),
-      };
-      await cubit.updatePanel(
-        panel.id,
-        (p) => p.copyWith(state: mergedState),
-        boardId: board.id,
+      await _applyPanelActionStateUpdate(
+        cubit,
+        board,
+        panel,
+        result.stateUpdate!,
       );
-      // Start/stop TimerManager when timer state changes via CLI
-      if (panel.type == 'board.timer') {
-        if (mergedState['isRunning'] == true) {
-          TimerManager.instance.start(
-            panelId: panel.id,
-            boardId: board.id,
-            remaining: mergedState['remaining'] as int? ?? 300,
-          );
-        } else {
-          TimerManager.instance.stop(panel.id);
-        }
-      }
-      // Directly control playlist player via registry — needed when the widget
-      // is not mounted (user is on a different board) and didUpdateWidget won't fire.
-      if (panel.type == 'board.playlist') {
-        await PlaylistPlayerRegistry.instance.applyPlaybackCommand(
-          panel.id,
-          mergedState,
-        );
-      }
-      if (panel.type == 'board.note.markdown' &&
-          mergedState['autoHeight'] == true) {
-        final markdown = mergedState['markdown'] as String? ?? '';
-        final targetHeight = _estimateMarkdownNoteHeight(
-          markdown,
-          panel.bounds.width,
-        );
-        await cubit.resizePanel(
-          panel.id,
-          width: panel.bounds.width,
-          height: targetHeight,
-          boardId: board.id,
-        );
-      }
       cliScheduleRebuild();
     }
 
@@ -1372,6 +1230,79 @@ class CliServer {
     return (painter.height + 100).clamp(140.0, 2000.0);
   }
 
+  Future<void> _applyPanelActionStateUpdate(
+    BoardCubit cubit,
+    BoardDocument board,
+    BoardPanelInstance panel,
+    Map<String, dynamic> stateUpdate, {
+    bool manageTimer = true,
+  }) async {
+    final mergedState = {
+      ...panel.state,
+      ...CliTextArgumentResolver.resolvePanelState(stateUpdate),
+    };
+    await cubit.updatePanel(
+      panel.id,
+      (p) => p.copyWith(state: mergedState),
+      boardId: board.id,
+    );
+    // Start/stop TimerManager when timer state changes via CLI.
+    if (manageTimer && panel.type == 'board.timer') {
+      if (mergedState['isRunning'] == true) {
+        TimerManager.instance.start(
+          panelId: panel.id,
+          boardId: board.id,
+          remaining: mergedState['remaining'] as int? ?? 300,
+        );
+      } else {
+        TimerManager.instance.stop(panel.id);
+      }
+    }
+    // Directly control playlist player via registry — needed when the widget
+    // is not mounted (user is on a different board) and didUpdateWidget won't fire.
+    if (panel.type == 'board.playlist') {
+      await PlaylistPlayerRegistry.instance.applyPlaybackCommand(
+        panel.id,
+        mergedState,
+      );
+    }
+    await _maybeAutoSizeMarkdownNote(
+      cubit,
+      board,
+      panel,
+      state: mergedState,
+    );
+  }
+
+  Future<void> _maybeAutoSizeMarkdownNote(
+    BoardCubit cubit,
+    BoardDocument board,
+    BoardPanelInstance panel, {
+    Map<String, dynamic>? state,
+    String? markdown,
+  }) async {
+    final effectiveState = state ?? panel.state;
+    if (panel.type != 'board.note.markdown' ||
+        effectiveState['autoHeight'] != true) {
+      return;
+    }
+    final effectiveMarkdown =
+        markdown ??
+        (effectiveState['markdown'] as String?) ??
+        (panel.state['markdown'] as String?) ??
+        '';
+    final targetHeight = _estimateMarkdownNoteHeight(
+      effectiveMarkdown,
+      panel.bounds.width,
+    );
+    await cubit.resizePanel(
+      panel.id,
+      width: panel.bounds.width,
+      height: targetHeight,
+      boardId: board.id,
+    );
+  }
+
   // ── Viewport implementations ───────────────────────────────────────────
 
   Future<shelf.Response> _updateViewport(
@@ -1379,23 +1310,8 @@ class CliServer {
     BoardDocument board,
     Map<String, dynamic> body,
   ) async {
-    final scale = (body['scale'] as num?)?.toDouble() ?? board.viewport.scale;
-    final tx = (body['x'] as num?)?.toDouble() ?? board.viewport.translation.dx;
-    final ty = (body['y'] as num?)?.toDouble() ?? board.viewport.translation.dy;
-    final vp = board.viewport.copyWith(
-      scale: scale.clamp(0.1, 4.0),
-      translation: Offset(tx, ty),
-    );
-    await cubit.updateViewport(vp, boardId: board.id);
-    cliScheduleRebuild();
-    return cliJson({
-      'ok': true,
-      'viewport': {
-        'scale': vp.scale,
-        'x': vp.translation.dx,
-        'y': vp.translation.dy,
-      },
-    });
+    final vp = await _updateBoardViewport(cubit, board, body);
+    return _viewportJson(vp);
   }
 
   Future<shelf.Response> _fitViewport(
@@ -1406,48 +1322,17 @@ class CliServer {
     final panels = board.panels.where((p) => !p.hidden).toList();
     if (panels.isEmpty) return cliError('No panels to fit');
 
-    // Bounding box of all panels
-    final minX = panels.map((p) => p.bounds.x).reduce((a, b) => a < b ? a : b);
-    final minY = panels.map((p) => p.bounds.y).reduce((a, b) => a < b ? a : b);
-    final maxX = panels
-        .map((p) => p.bounds.x + p.bounds.width)
-        .reduce((a, b) => a > b ? a : b);
-    final maxY = panels
-        .map((p) => p.bounds.y + p.bounds.height)
-        .reduce((a, b) => a > b ? a : b);
-
-    final contentW = maxX - minX;
-    final contentH = maxY - minY;
-    const padding = 80.0;
-
-    // Viewport size hint from body (fallback to 1280×800 typical window)
-    final vpW = (body['viewportWidth'] as num?)?.toDouble() ?? 1280.0;
-    final vpH = (body['viewportHeight'] as num?)?.toDouble() ?? 800.0;
-
-    final scaleX = (vpW - padding * 2) / contentW;
-    final scaleY = (vpH - padding * 2) / contentH;
-    final scale = (scaleX < scaleY ? scaleX : scaleY).clamp(0.1, 2.0);
-
-    // Center content in viewport
-    final scaledW = contentW * scale;
-    final scaledH = contentH * scale;
-    final tx = (vpW - scaledW) / 2 - minX * scale;
-    final ty = (vpH - scaledH) / 2 - minY * scale;
-
-    final vp = board.viewport.copyWith(
-      scale: scale,
-      translation: Offset(tx, ty),
-    );
+    final vp = _fitBoardViewportFromBody(board, body);
     await cubit.updateViewport(vp, boardId: board.id);
     cliScheduleRebuild();
-    return cliJson({
-      'ok': true,
-      'viewport': {
-        'scale': vp.scale,
-        'x': vp.translation.dx,
-        'y': vp.translation.dy,
+    final bounds = boundingBoxOfPanels(panels);
+    return _viewportJson(vp, extra: {
+      'bounds': {
+        'minX': bounds.minX,
+        'minY': bounds.minY,
+        'maxX': bounds.maxX,
+        'maxY': bounds.maxY,
       },
-      'bounds': {'minX': minX, 'minY': minY, 'maxX': maxX, 'maxY': maxY},
     });
   }
 
@@ -1889,71 +1774,28 @@ class CliServer {
   }) async {
     final typeId = _string(raw['type'] ?? raw['typeId']);
     if (typeId == null) return {'ok': false, 'error': 'Missing "type"'};
-
-    final plugin = BoardPluginRegistry.instance.pluginFor(typeId);
-    if (plugin == null) {
+    if (BoardPluginRegistry.instance.pluginFor(typeId) == null) {
       return {'ok': false, 'error': 'Unknown panel type: $typeId'};
     }
 
-    final title = _string(raw['title']) ?? plugin.displayName;
-    final x = _double(raw['x']) ?? 100.0;
-    final y = _double(raw['y']) ?? 100.0;
-    final width = _double(raw['width']) ?? plugin.defaultSize.width;
-    final height = _double(raw['height']) ?? plugin.defaultSize.height;
-    final state = _map(raw['state']);
-    final params = _map(raw['params']);
-    final ref = _string(raw['ref']);
-    final color = _color(raw['color']);
-    final hidden = _bool(raw['hidden']) ?? false;
-    final locked = _bool(raw['locked']) ?? false;
-    final pinned = _bool(raw['pinned']) ?? false;
-    final panelId = _string(raw['id'] ?? raw['panelId']) ?? _nextBulkId('p');
-    final zIndex =
-        _int(raw['zIndex']) ??
-        board.panels.fold<int>(
-              0,
-              (value, panel) => panel.zIndex > value ? panel.zIndex : value,
-            ) +
-            1;
-
-    final panel = BoardPanelInstance(
-      id: panelId,
-      type: typeId,
-      title: title.trim().isEmpty ? plugin.displayName : title.trim(),
-      bounds: BoardPanelBounds(x: x, y: y, width: width, height: height),
-      color: color,
-      params: {...?params, if (ref != null && ref.isNotEmpty) 'yamlRef': ref},
-      state: {
-        ...plugin.initialState,
-        if (state != null) ...CliTextArgumentResolver.resolvePanelState(state),
-      },
-      zIndex: zIndex,
-      hidden: hidden,
-      locked: locked,
-      pinned: pinned,
+    final panel = buildPanelFromRaw(
+      raw,
+      board,
+      nextId: () => _nextBulkId('p'),
+      colorParser: _color,
+      resolveState: CliTextArgumentResolver.resolvePanelState,
     );
+    if (panel == null) {
+      return {'ok': false, 'error': 'Unknown panel type: $typeId'};
+    }
 
     await cubit.addPanel(panel, boardId: board.id);
     pendingPanels[panel.id] = panel;
     if (_bool(raw['focus']) == true) {
-      if (cubit.state.activeBoardId != board.id) {
-        await cubit.setActiveBoard(board.id);
-      }
-      await cubit.focusPanel(panel.id, boardId: board.id, zoomOnFocus: true);
+      await _focusPanelOnBoard(cubit, board, panel.id);
     }
-    if ((panel.type == 'board.note.markdown') &&
-        (panel.state['autoHeight'] == true)) {
-      final targetHeight = _estimateMarkdownNoteHeight(
-        panel.state['markdown'] as String? ?? '',
-        panel.bounds.width,
-      );
-      await cubit.resizePanel(
-        panel.id,
-        width: panel.bounds.width,
-        height: targetHeight,
-        boardId: board.id,
-      );
-    }
+    await _maybeAutoSizeMarkdownNote(cubit, board, panel);
+    final ref = panel.params['yamlRef'] as String?;
     if (ref != null && ref.isNotEmpty) {
       refs[ref] = panel.id;
       pendingPanels[ref] = panel;
@@ -1971,16 +1813,7 @@ class CliServer {
   }) async {
     final panel = _resolveYamlPanel(cubit, board, refs, pendingPanels, raw);
     if (panel == null) {
-      return {
-        'ok': false,
-        'error': 'Panel not found',
-        'rawPanel': raw['panel']?.toString(),
-        'rawPanelId': raw['panelId']?.toString(),
-        'rawPanelRef': raw['panelRef']?.toString(),
-        'rawRef': raw['ref']?.toString(),
-        'refs': refs,
-        'pending': pendingPanels.keys.toList(),
-      };
+      return _yamlPanelNotFoundError(raw, refs, pendingPanels);
     }
 
     final updates = <String, dynamic>{};
@@ -2026,10 +1859,7 @@ class CliServer {
       await _applyYamlPanelUpdates(cubit, board, panel, updates);
     }
     if (_bool(raw['focus']) == true) {
-      if (cubit.state.activeBoardId != board.id) {
-        await cubit.setActiveBoard(board.id);
-      }
-      await cubit.focusPanel(panel.id, boardId: board.id, zoomOnFocus: true);
+      await _focusPanelOnBoard(cubit, board, panel.id);
     }
     return {'ok': true, 'panelId': panel.id};
   }
@@ -2093,24 +1923,12 @@ class CliServer {
       );
     }
 
-    if (panel.type == 'board.note.markdown' &&
-        ((updates['state'] as Map<String, dynamic>?)?['autoHeight'] == true)) {
-      final markdown =
-          ((updates['state'] as Map<String, dynamic>?)?['markdown']
-              as String?) ??
-          panel.state['markdown'] as String? ??
-          '';
-      final targetHeight = _estimateMarkdownNoteHeight(
-        markdown,
-        panel.bounds.width,
-      );
-      await cubit.resizePanel(
-        panel.id,
-        width: panel.bounds.width,
-        height: targetHeight,
-        boardId: board.id,
-      );
-    }
+    await _maybeAutoSizeMarkdownNote(
+      cubit,
+      board,
+      panel,
+      state: updates['state'] as Map<String, dynamic>?,
+    );
   }
 
   Future<Map<String, dynamic>> _yamlMovePanel(
@@ -2123,16 +1941,7 @@ class CliServer {
   }) async {
     final panel = _resolveYamlPanel(cubit, board, refs, pendingPanels, raw);
     if (panel == null) {
-      return {
-        'ok': false,
-        'error': 'Panel not found',
-        'rawPanel': raw['panel']?.toString(),
-        'rawPanelId': raw['panelId']?.toString(),
-        'rawPanelRef': raw['panelRef']?.toString(),
-        'rawRef': raw['ref']?.toString(),
-        'refs': refs,
-        'pending': pendingPanels.keys.toList(),
-      };
+      return _yamlPanelNotFoundError(raw, refs, pendingPanels);
     }
     final x = _double(raw['x']);
     final y = _double(raw['y']);
@@ -2159,7 +1968,7 @@ class CliServer {
     required int index,
   }) async {
     final panel = _resolveYamlPanel(cubit, board, refs, pendingPanels, raw);
-    if (panel == null) return {'ok': false, 'error': 'Panel not found'};
+    if (panel == null) return _simplePanelNotFoundResult();
     final width = _double(raw['width']);
     final height = _double(raw['height']);
     if (width == null && height == null) {
@@ -2183,7 +1992,7 @@ class CliServer {
     required int index,
   }) async {
     final panel = _resolveYamlPanel(cubit, board, refs, pendingPanels, raw);
-    if (panel == null) return {'ok': false, 'error': 'Panel not found'};
+    if (panel == null) return _simplePanelNotFoundResult();
     if (panel.type == 'board.widget.custom') {
       WidgetEngineManager.instance.remove(panel.id);
     }
@@ -2200,12 +2009,8 @@ class CliServer {
     required int index,
   }) async {
     final panel = _resolveYamlPanel(cubit, board, refs, pendingPanels, raw);
-    if (panel == null) return {'ok': false, 'error': 'Panel not found'};
-    // Switch to the target board first so the panel is actually visible.
-    if (cubit.state.activeBoardId != board.id) {
-      await cubit.setActiveBoard(board.id);
-    }
-    await cubit.focusPanel(panel.id, boardId: board.id, zoomOnFocus: true);
+    if (panel == null) return _simplePanelNotFoundResult();
+    await _focusPanelOnBoard(cubit, board, panel.id);
     return {'ok': true, 'panelId': panel.id};
   }
 
@@ -2218,7 +2023,7 @@ class CliServer {
     required int index,
   }) async {
     final panel = _resolveYamlPanel(cubit, board, refs, pendingPanels, raw);
-    if (panel == null) return {'ok': false, 'error': 'Panel not found'};
+    if (panel == null) return _simplePanelNotFoundResult();
     final colorStr = _string(raw['color']);
     await cubit.updatePanelColor(
       panel.id,
@@ -2238,7 +2043,7 @@ class CliServer {
     required int index,
   }) async {
     final panel = _resolveYamlPanel(cubit, board, refs, pendingPanels, raw);
-    if (panel == null) return {'ok': false, 'error': 'Panel not found'};
+    if (panel == null) return _simplePanelNotFoundResult();
     await cubit.updatePanel(
       panel.id,
       (p) => p.copyWith(hidden: hidden),
@@ -2256,7 +2061,7 @@ class CliServer {
     required int index,
   }) async {
     final panel = _resolveYamlPanel(cubit, board, refs, pendingPanels, raw);
-    if (panel == null) return {'ok': false, 'error': 'Panel not found'};
+    if (panel == null) return _simplePanelNotFoundResult();
     final action = _string(raw['action']);
     if (action == null) return {'ok': false, 'error': 'Missing "action"'};
 
@@ -2293,35 +2098,13 @@ class CliServer {
     });
     final result = await handler.handleAction(action, actionArgs, panel);
     if (result.stateUpdate != null && result.ok) {
-      final mergedState = {
-        ...panel.state,
-        ...CliTextArgumentResolver.resolvePanelState(result.stateUpdate!),
-      };
-      await cubit.updatePanel(
-        panel.id,
-        (p) => p.copyWith(state: mergedState),
-        boardId: board.id,
+      await _applyPanelActionStateUpdate(
+        cubit,
+        board,
+        panel,
+        result.stateUpdate!,
+        manageTimer: false,
       );
-      if (panel.type == 'board.playlist') {
-        await PlaylistPlayerRegistry.instance.applyPlaybackCommand(
-          panel.id,
-          mergedState,
-        );
-      }
-      if (panel.type == 'board.note.markdown' &&
-          mergedState['autoHeight'] == true) {
-        final markdown = mergedState['markdown'] as String? ?? '';
-        final targetHeight = _estimateMarkdownNoteHeight(
-          markdown,
-          panel.bounds.width,
-        );
-        await cubit.resizePanel(
-          panel.id,
-          width: panel.bounds.width,
-          height: targetHeight,
-          boardId: board.id,
-        );
-      }
     }
     return {'ok': true, 'panelId': panel.id, ...result.toJson()};
   }
@@ -2349,14 +2132,8 @@ class CliServer {
       id: _nextBulkId('link'),
       fromPanelId: from.id,
       toPanelId: to.id,
-      style: BoardLinkStyle.values.firstWhere(
-        (s) => s.name == style,
-        orElse: () => BoardLinkStyle.arrow,
-      ),
-      geometry: BoardLinkGeometry.values.firstWhere(
-        (g) => g.name == geometry,
-        orElse: () => BoardLinkGeometry.bezier,
-      ),
+      style: _linkStyleFromString(style, BoardLinkStyle.arrow),
+      geometry: _linkGeometryFromString(geometry, BoardLinkGeometry.bezier),
       color: _color(raw['color']) ?? const Color(0xFF60A5FA),
     );
     await cubit.upsertLink(link, boardId: board.id);
@@ -2405,22 +2182,9 @@ class CliServer {
     final geometryStr = _string(raw['geometry']);
     final colorStr = _string(raw['color']);
 
-    final style =
-        styleStr == null
-            ? link.style
-            : BoardLinkStyle.values.firstWhere(
-              (s) => s.name == styleStr,
-              orElse: () => link.style,
-            );
-    final geometry =
-        geometryStr == null
-            ? link.geometry
-            : BoardLinkGeometry.values.firstWhere(
-              (g) => g.name == geometryStr,
-              orElse: () => link.geometry,
-            );
-    final color =
-        colorStr == null ? link.color : parseColor(colorStr) ?? link.color;
+    final style = _linkStyleFromString(styleStr, link.style);
+    final geometry = _linkGeometryFromString(geometryStr, link.geometry);
+    final color = _parseLinkColor(colorStr, link.color);
 
     await cubit.upsertLink(
       link.copyWith(style: style, geometry: geometry, color: color),
@@ -2438,32 +2202,13 @@ class CliServer {
     final panels = board.panels.where((p) => !p.hidden).toList();
     if (panels.isEmpty) return {'ok': false, 'error': 'No panels to fit'};
 
-    final minX = panels.map((p) => p.bounds.x).reduce((a, b) => a < b ? a : b);
-    final minY = panels.map((p) => p.bounds.y).reduce((a, b) => a < b ? a : b);
-    final maxX = panels
-        .map((p) => p.bounds.x + p.bounds.width)
-        .reduce((a, b) => a > b ? a : b);
-    final maxY = panels
-        .map((p) => p.bounds.y + p.bounds.height)
-        .reduce((a, b) => a > b ? a : b);
-
-    final contentW = maxX - minX;
-    final contentH = maxY - minY;
-    const padding = 80.0;
-
-    final vpW = _double(raw['viewportWidth']) ?? 1280.0;
-    final vpH = _double(raw['viewportHeight']) ?? 800.0;
-    final scaleX = (vpW - padding * 2) / contentW;
-    final scaleY = (vpH - padding * 2) / contentH;
-    final scale = (scaleX < scaleY ? scaleX : scaleY).clamp(0.1, 2.0);
-    final tx = (vpW - contentW * scale) / 2 - minX * scale;
-    final ty = (vpH - contentH * scale) / 2 - minY * scale;
-
-    final vp = board.viewport.copyWith(
-      scale: scale,
-      translation: Offset(tx, ty),
+    final vp = fitBoardViewport(
+      board,
+      viewportWidth: _double(raw['viewportWidth']) ?? 1280.0,
+      viewportHeight: _double(raw['viewportHeight']) ?? 800.0,
     );
     await cubit.updateViewport(vp, boardId: board.id);
+    final bounds = boundingBoxOfPanels(panels);
     return {
       'ok': true,
       'viewport': {
@@ -2471,7 +2216,12 @@ class CliServer {
         'x': vp.translation.dx,
         'y': vp.translation.dy,
       },
-      'bounds': {'minX': minX, 'minY': minY, 'maxX': maxX, 'maxY': maxY},
+      'bounds': {
+        'minX': bounds.minX,
+        'minY': bounds.minY,
+        'maxX': bounds.maxX,
+        'maxY': bounds.maxY,
+      },
     };
   }
 
@@ -2642,22 +2392,9 @@ class CliServer {
     final geoStr = body['geometry'] as String?;
     final colorStr = body['color'] as String?;
 
-    final style =
-        styleStr != null
-            ? BoardLinkStyle.values.firstWhere(
-              (s) => s.name == styleStr,
-              orElse: () => link.style,
-            )
-            : link.style;
-    final geo =
-        geoStr != null
-            ? BoardLinkGeometry.values.firstWhere(
-              (g) => g.name == geoStr,
-              orElse: () => link.geometry,
-            )
-            : link.geometry;
-    final color =
-        colorStr != null ? (parseColor(colorStr) ?? link.color) : link.color;
+    final style = _linkStyleFromString(styleStr, link.style);
+    final geo = _linkGeometryFromString(geoStr, link.geometry);
+    final color = _parseLinkColor(colorStr, link.color);
 
     final updated = link.copyWith(style: style, geometry: geo, color: color);
     await cubit.upsertLink(updated, boardId: board.id);
@@ -2702,14 +2439,8 @@ class CliServer {
     final styleStr = body['style'] as String? ?? 'arrow';
     final geoStr = body['geometry'] as String? ?? 'bezier';
 
-    final style = BoardLinkStyle.values.firstWhere(
-      (s) => s.name == styleStr,
-      orElse: () => BoardLinkStyle.arrow,
-    );
-    final geo = BoardLinkGeometry.values.firstWhere(
-      (g) => g.name == geoStr,
-      orElse: () => BoardLinkGeometry.bezier,
-    );
+    final style = _linkStyleFromString(styleStr, BoardLinkStyle.arrow);
+    final geo = _linkGeometryFromString(geoStr, BoardLinkGeometry.bezier);
 
     final link = BoardPanelLink(
       id: 'link-${DateTime.now().millisecondsSinceEpoch}',
@@ -2749,6 +2480,106 @@ class CliServer {
   }
 
   String _short(String id) => id.length > 12 ? '${id.substring(0, 12)}…' : id;
+
+  int _nextZIndexForBoard(BoardDocument board) =>
+      board.panels.fold<int>(
+            0,
+            (value, panel) => panel.zIndex > value ? panel.zIndex : value,
+          ) +
+          1;
+
+  Map<String, dynamic> _simplePanelNotFoundResult() =>
+      const {'ok': false, 'error': 'Panel not found'};
+
+  Map<String, dynamic> _yamlPanelNotFoundError(
+    Map<String, dynamic> raw,
+    Map<String, String> refs,
+    Map<String, BoardPanelInstance> pendingPanels,
+  ) => {
+    'ok': false,
+    'error': 'Panel not found',
+    'rawPanel': raw['panel']?.toString(),
+    'rawPanelId': raw['panelId']?.toString(),
+    'rawPanelRef': raw['panelRef']?.toString(),
+    'rawRef': raw['ref']?.toString(),
+    'refs': refs,
+    'pending': pendingPanels.keys.toList(),
+  };
+
+  BoardLinkStyle _linkStyleFromString(
+    String? value,
+    BoardLinkStyle fallback,
+  ) =>
+      BoardLinkStyle.values.firstWhere(
+        (s) => s.name == value,
+        orElse: () => fallback,
+      );
+
+  BoardLinkGeometry _linkGeometryFromString(
+    String? value,
+    BoardLinkGeometry fallback,
+  ) =>
+      BoardLinkGeometry.values.firstWhere(
+        (g) => g.name == value,
+        orElse: () => fallback,
+      );
+
+  Color? _parseLinkColor(String? value, Color fallback) =>
+      value == null ? fallback : parseColor(value) ?? fallback;
+
+  Future<void> _focusPanelOnBoard(
+    BoardCubit cubit,
+    BoardDocument board,
+    String panelId,
+  ) async {
+    if (cubit.state.activeBoardId != board.id) {
+      await cubit.setActiveBoard(board.id);
+    }
+    await cubit.focusPanel(panelId, boardId: board.id, zoomOnFocus: true);
+  }
+
+  BoardViewport _fitBoardViewportFromBody(
+    BoardDocument board,
+    Map<String, dynamic> body,
+  ) =>
+      fitBoardViewport(
+        board,
+        viewportWidth:
+            (body['viewportWidth'] as num?)?.toDouble() ?? 1280.0,
+        viewportHeight:
+            (body['viewportHeight'] as num?)?.toDouble() ?? 800.0,
+      );
+
+  Future<BoardViewport> _updateBoardViewport(
+    BoardCubit cubit,
+    BoardDocument board,
+    Map<String, dynamic> body,
+  ) async {
+    final scale = (body['scale'] as num?)?.toDouble() ?? board.viewport.scale;
+    final tx = (body['x'] as num?)?.toDouble() ?? board.viewport.translation.dx;
+    final ty = (body['y'] as num?)?.toDouble() ?? board.viewport.translation.dy;
+    final vp = board.viewport.copyWith(
+      scale: scale.clamp(0.1, 4.0),
+      translation: Offset(tx, ty),
+    );
+    await cubit.updateViewport(vp, boardId: board.id);
+    cliScheduleRebuild();
+    return vp;
+  }
+
+  shelf.Response _viewportJson(
+    BoardViewport vp, {
+    Map<String, dynamic>? extra,
+  }) =>
+      cliJson({
+        'ok': true,
+        'viewport': {
+          'scale': vp.scale,
+          'x': vp.translation.dx,
+          'y': vp.translation.dy,
+        },
+        ...?extra,
+      });
 
   // parseColor moved to server_helpers.dart
 

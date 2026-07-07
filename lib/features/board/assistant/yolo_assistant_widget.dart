@@ -13,6 +13,7 @@ import 'package:yoloit/core/platform/microphone_permission_service.dart';
 import 'package:yoloit/core/platform/platform_dirs.dart';
 import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/core/ui/copyable_error_dialog.dart';
 import 'package:yoloit/core/utils/clipboard_utils.dart';
 import 'package:yoloit/core/utils/json_utils.dart';
 import 'package:yoloit/core/utils/string_utils.dart';
@@ -2667,36 +2668,10 @@ $messagesJson
     required String message,
   }) async {
     if (!mounted) return;
-    await showDialog<void>(
+    await showCopyableErrorDialog(
       context: context,
-      builder:
-          (dialogContext) => AlertDialog(
-            title: Text(title),
-            content: SizedBox(
-              width: 560,
-              child: SingleChildScrollView(child: SelectableText(message)),
-            ),
-            actions: [
-              TextButton.icon(
-                onPressed: () async {
-                  await copyToClipboard(message);
-                  if (!mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Copied error text'),
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.copy_outlined, size: 18),
-                label: const Text('Copy'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(),
-                child: const Text('Close'),
-              ),
-            ],
-          ),
+      title: title,
+      message: message,
     );
   }
 

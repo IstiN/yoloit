@@ -4,69 +4,18 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
-import 'package:yoloit/core/platform/platform_capabilities.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
+import 'package:yoloit/features/board/plugins/builtin/playlist_plugin_base.dart';
 import 'package:yoloit/features/board/plugins/builtin/playlist_player_registry.dart';
 import 'package:yoloit/features/board/ui/board_file_picker.dart';
 
 export 'package:yoloit/features/board/plugins/builtin/playlist_player_registry.dart'
     show PlaylistPlayerRegistry;
 
-final _playlistDefaultColors = AppColorScheme.fromAccent(Colors.deepPurple);
-
-/// Board panel plugin: media playlist player (audio + video).
-///
-/// Panel state JSON schema:
-/// ```json
-/// {
-///   "tracks": [
-///     { "id": "<unique>", "path": "/abs/path/to/file", "name": "song.mp3" }
-///   ],
-///   "currentIndex": 0,
-///   "repeat": false,
-///   "shuffle": false
-/// }
-/// ```
-/// This schema is intentionally simple so panels can be created programmatically
-/// via terminal commands or a remote server by POSTing the JSON config + state.
-class PlaylistPlugin extends BoardPanelPlugin {
+class PlaylistPlugin extends PlaylistPluginBase {
   const PlaylistPlugin();
-
-  static const String kTypeId = 'board.playlist';
-
-  @override
-  String get typeId => kTypeId;
-
-  @override
-  String get displayName => 'Playlist';
-
-  @override
-  IconData get icon => Icons.queue_music_rounded;
-
-  @override
-  Color get accentColor => _playlistDefaultColors.primary;
-
-  @override
-  Size get defaultSize => const Size(380, 480);
-
-  @override
-  Map<String, dynamic> get initialState => {
-    'tracks': <Map<String, dynamic>>[],
-    'currentIndex': 0,
-    'repeat': false,
-    'shuffle': false,
-  };
-
-  @override
-  bool get supportsHeadlessRender => false; // MPV initialises native GPU decoder on widget creation
-
-  @override
-  Set<PlatformCapability> get requiredCapabilities => const {
-        PlatformCapability.nativeMediaPlayback,
-        PlatformCapability.filesystem,
-      };
 
   @override
   Widget buildContent(

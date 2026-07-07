@@ -19,7 +19,7 @@ void main() {
   });
 
   test('accentColor is set', () {
-    expect(plugin.accentColor, const Color(0xFF64748B));
+    expect(plugin.accentColor, Colors.blueGrey);
   });
 
   test('defaultSize is 320x500', () {

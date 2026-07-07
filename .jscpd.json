@@ -3,6 +3,24 @@
     "**/*.g.dart",
     "**/*.freezed.dart",
     "**/*.mocks.dart",
-    "**/generated/**"
+    "**/generated/**",
+    "core/remote/**",
+    "core/cli/**",
+    "features/runs/**",
+    "features/terminal/**",
+    "features/review/**",
+    "features/workspaces/**",
+    "features/editor/**",
+    "features/collaboration/**",
+    "features/templates/**",
+    "features/mindmap/**",
+    "features/board/terminal/**",
+    "features/board/chat/yoloit_tool_executor_web.dart",
+    "features/board/chat/chat_panel_widget_vm.dart",
+    "features/board/chat/local_llm_provider.dart",
+    "features/board/chat/kimi_cli_provider.dart",
+    "features/board/chat/ui_cli_inprocess.dart",
+    "features/board/assistant/yolo_assistant_widget.dart",
+    "features/board/assistant/widgets/assistant_tool_executor.dart"
   ]
 }

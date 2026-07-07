@@ -140,7 +140,7 @@ class _WebViewOverlaysState extends State<WebViewOverlays> {
   Widget _loadingOverlay(BuildContext context, String panelId) {
     return ValueListenableBuilder<bool>(
       valueListenable:
-          WebpagePlugin.pageLoading[panelId] ?? ValueNotifier<bool>(false),
+          WebpagePluginBase.pageLoading[panelId] ?? ValueNotifier<bool>(false),
       builder: (_, isLoading, _) {
         if (!isLoading) return const SizedBox.shrink();
         return ColoredBox(
@@ -156,9 +156,9 @@ class _WebViewOverlaysState extends State<WebViewOverlays> {
         widget.panels
             .where(
               (p) =>
-                  p.type == WebpagePlugin.kTypeId &&
+                  p.type == WebpagePluginBase.kTypeId &&
                   !p.hidden &&
-                  WebpagePlugin.controllers.containsKey(p.id),
+                  WebpagePluginBase.controllers.containsKey(p.id),
             )
             .toList();
 
@@ -194,11 +194,11 @@ class _WebViewOverlaysState extends State<WebViewOverlays> {
           // Viewport culling — skip off-screen panels.
           if (!rect.overlaps(viewportRect)) continue;
 
-          final ctrl = WebpagePlugin.controllers[panel.id]!;
+          final ctrl = WebpagePluginBase.controllers[panel.id]! as WebViewController;
 
           // pageZoom in Swift handles viewport width. No CSS zoom needed.
-          if (!WebpagePlugin.pendingCssZoom.containsKey(panel.id)) {
-            WebpagePlugin.pendingCssZoom[panel.id] = 1.0;
+          if (!WebpagePluginBase.pendingCssZoom.containsKey(panel.id)) {
+            WebpagePluginBase.pendingCssZoom[panel.id] = 1.0;
           }
 
           children.add(
@@ -235,11 +235,11 @@ class _WebViewOverlaysState extends State<WebViewOverlays> {
         if (focusedPanel != null) {
           final rect = _screenRect(focusedPanel, matrix, scale);
           if (rect != null) {
-            final ctrl = WebpagePlugin.controllers[focusedPanel.id]!;
+            final ctrl = WebpagePluginBase.controllers[focusedPanel.id]! as WebViewController;
 
             // pageZoom in Swift handles viewport width via frame observer.
-            if (!WebpagePlugin.pendingCssZoom.containsKey(focusedPanel.id)) {
-              WebpagePlugin.pendingCssZoom[focusedPanel.id] = 1.0;
+            if (!WebpagePluginBase.pendingCssZoom.containsKey(focusedPanel.id)) {
+              WebpagePluginBase.pendingCssZoom[focusedPanel.id] = 1.0;
             }
 
             children.add(

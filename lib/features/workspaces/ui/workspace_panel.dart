@@ -241,8 +241,14 @@ class WorkspacePanelState extends State<WorkspacePanel> {
     }
   }
 
-  Future<String?> _showNameDialog(BuildContext context) async {
-    final controller = TextEditingController();
+  Future<String?> _showInputDialog(
+    BuildContext context, {
+    required String title,
+    required String hint,
+    String initialValue = '',
+    required String confirmLabel,
+  }) async {
+    final controller = TextEditingController(text: initialValue);
     final result = await showDialog<String>(
       context: context,
       builder:
@@ -253,7 +259,7 @@ class WorkspacePanelState extends State<WorkspacePanel> {
               side: BorderSide(color: ctx.appColors.border),
             ),
             title: Text(
-              'New Workspace',
+              title,
               style: TextStyle(
                 color: Theme.of(ctx).colorScheme.onSurface,
                 fontSize: 14,
@@ -267,10 +273,9 @@ class WorkspacePanelState extends State<WorkspacePanel> {
                 fontSize: 13,
               ),
               decoration: InputDecoration(
-                hintText: 'Workspace name',
+                hintText: hint,
                 hintStyle: TextStyle(
-                  color:
-                      ctx.appColors.textMuted,
+                  color: ctx.appColors.textMuted,
                   fontSize: 13,
                 ),
                 filled: true,
@@ -303,8 +308,7 @@ class WorkspacePanelState extends State<WorkspacePanel> {
                 child: Text(
                   'Cancel',
                   style: TextStyle(
-                    color:
-                        ctx.appColors.textMuted,
+                    color: ctx.appColors.textMuted,
                     fontSize: 12,
                   ),
                 ),
@@ -315,7 +319,7 @@ class WorkspacePanelState extends State<WorkspacePanel> {
                   if (trimmed.isNotEmpty) Navigator.of(ctx).pop(trimmed);
                 },
                 child: Text(
-                  'Next →',
+                  confirmLabel,
                   style: TextStyle(
                     color: ctx.appColors.primary,
                     fontSize: 12,
@@ -329,6 +333,13 @@ class WorkspacePanelState extends State<WorkspacePanel> {
     controller.dispose();
     return result;
   }
+
+  Future<String?> _showNameDialog(BuildContext context) => _showInputDialog(
+    context,
+    title: 'New Workspace',
+    hint: 'Workspace name',
+    confirmLabel: 'Next →',
+  );
 
   Future<void> _addPathToWorkspace(
     BuildContext context,
@@ -385,95 +396,13 @@ class WorkspacePanelState extends State<WorkspacePanel> {
     BuildContext context,
     Workspace ws,
   ) async {
-    final controller = TextEditingController(text: ws.name);
-    controller.selection = TextSelection(
-      baseOffset: 0,
-      extentOffset: ws.name.length,
+    final result = await _showInputDialog(
+      context,
+      title: 'Rename Workspace',
+      hint: 'Workspace name',
+      initialValue: ws.name,
+      confirmLabel: 'Rename',
     );
-    final result = await showDialog<String>(
-      context: context,
-      builder:
-          (ctx) => AlertDialog(
-            backgroundColor: ctx.appColors.surfaceElevated,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-              side: BorderSide(color: ctx.appColors.border),
-            ),
-            title: Text(
-              'Rename Workspace',
-              style: TextStyle(
-                color: Theme.of(ctx).colorScheme.onSurface,
-                fontSize: 14,
-              ),
-            ),
-            content: TextField(
-              controller: controller,
-              autofocus: true,
-              style: TextStyle(
-                color: Theme.of(ctx).colorScheme.onSurface,
-                fontSize: 13,
-              ),
-              decoration: InputDecoration(
-                hintText: 'Workspace name',
-                hintStyle: TextStyle(
-                  color:
-                      ctx.appColors.textMuted,
-                  fontSize: 13,
-                ),
-                filled: true,
-                fillColor: ctx.appColors.surface,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 8,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(6),
-                  borderSide: BorderSide(color: ctx.appColors.border),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(6),
-                  borderSide: BorderSide(color: ctx.appColors.border),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(6),
-                  borderSide: BorderSide(color: ctx.appColors.primary),
-                ),
-              ),
-              onSubmitted: (v) {
-                final trimmed = v.trim();
-                if (trimmed.isNotEmpty) Navigator.of(ctx).pop(trimmed);
-              },
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(null),
-                child: Text(
-                  'Cancel',
-                  style: TextStyle(
-                    color:
-                        ctx.appColors.textMuted,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-              TextButton(
-                onPressed: () {
-                  final trimmed = controller.text.trim();
-                  if (trimmed.isNotEmpty) Navigator.of(ctx).pop(trimmed);
-                },
-                child: Text(
-                  'Rename',
-                  style: TextStyle(
-                    color: ctx.appColors.primary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
-    );
-    controller.dispose();
     if (result != null && result != ws.name && context.mounted) {
       // Defer the emit until after the dialog-dismiss frame is fully built.
       // Calling renameWorkspace synchronously here can fire a BlocBuilder

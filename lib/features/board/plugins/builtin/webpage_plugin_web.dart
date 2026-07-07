@@ -7,46 +7,10 @@ import 'package:flutter/material.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
+import 'package:yoloit/features/board/plugins/builtin/webpage_plugin_base.dart';
 
-final _webpageDefaultColors = AppColorScheme.fromAccent(Colors.lightBlue);
-
-class WebpagePlugin extends BoardPanelPlugin {
+class WebpagePlugin extends WebpagePluginBase {
   const WebpagePlugin();
-
-  static const String kTypeId = 'board.webpage';
-
-  // Web stubs for symbols referenced by the shared board view. The web
-  // implementation renders webpage panels inline with an iframe, so these
-  // native-platform-view caches are never populated.
-  static final Map<String, dynamic> controllers = {};
-  static final Map<String, double> pendingCssZoom = {};
-  static final Map<String, double> viewportTargets = {};
-  static final Map<String, ValueNotifier<bool>> pageLoading = {};
-
-  @override
-  String get typeId => kTypeId;
-
-  @override
-  String get displayName => 'Webpage';
-
-  @override
-  IconData get icon => Icons.language_outlined;
-
-  @override
-  Color get accentColor => _webpageDefaultColors.accentBlue;
-
-  @override
-  Size get defaultSize => const Size(700, 500);
-
-  @override
-  Map<String, dynamic> get initialState => {
-    'url': '',
-    'title': '',
-    'favicon': '',
-  };
-
-  @override
-  bool get hasEditor => false;
 
   @override
   Widget buildContent(

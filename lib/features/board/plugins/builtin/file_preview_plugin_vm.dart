@@ -10,12 +10,12 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:path/path.dart' as p;
-import 'package:yoloit/core/platform/platform_capabilities.dart';
 import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/events/board_event_bus.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
+import 'package:yoloit/features/board/plugins/builtin/file_preview_plugin_base.dart';
 import 'package:yoloit/features/board/services/board_offscreen_renderer.dart';
 import 'package:yoloit/features/board/ui/board_file_picker.dart';
 import 'package:yoloit/features/board/utils/panel_scroll_memory.dart';
@@ -25,37 +25,10 @@ import 'package:yoloit/features/editor/utils/editor_language_registry.dart';
 import 'package:yoloit/features/preview/widgets/markdown_document_preview.dart';
 import 'package:yoloit/ui/components/typography/caption.dart';
 
-final _filePreviewDefaultColors = AppColorScheme.fromAccent(Colors.deepPurple);
-
-class FilePreviewPlugin extends BoardPanelPlugin {
+class FilePreviewPlugin extends FilePreviewPluginBase {
   const FilePreviewPlugin();
 
-  static const String kTypeId = 'board.file.preview';
-
-  @override
-  String get typeId => kTypeId;
-
-  @override
-  String get displayName => 'File Preview';
-
-  @override
-  IconData get icon => Icons.image_outlined;
-
-  @override
-  Color get accentColor => _filePreviewDefaultColors.primary;
-
-  @override
-  Size get defaultSize => const Size(460, 380);
-
-  @override
-  Map<String, dynamic> get initialState => {'path': '', 'title': ''};
-
-  @override
-  Set<PlatformCapability> get requiredCapabilities => const {
-        PlatformCapability.filesystem,
-        PlatformCapability.processes,
-        PlatformCapability.nativeMediaPlayback,
-      };
+  static const String kTypeId = FilePreviewPluginBase.kTypeId;
 
   @override
   Widget buildContent(

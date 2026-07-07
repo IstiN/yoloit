@@ -2,7 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
-import 'package:yoloit/features/board/plugins/builtin/file_preview_plugin.dart';
+import 'package:yoloit/features/board/plugins/builtin/file_preview_plugin_base.dart';
 
 /// Result of a placement computation.
 class PanelPlacement {
@@ -27,7 +27,7 @@ class PanelPlacementHelper {
     String filePath,
   ) {
     for (final panel in board.panels) {
-      if (panel.type != FilePreviewPlugin.kTypeId) continue;
+      if (panel.type != FilePreviewPluginBase.kTypeId) continue;
       if (panel.state['path'] == filePath) return panel;
     }
     return null;

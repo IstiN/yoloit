@@ -4,13 +4,14 @@ import 'dart:io';
 
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf/shelf_io.dart' as shelf_io;
+import 'package:yoloit/core/remote/server_process_utils.dart';
 import 'package:yoloit/core/remote/yoloitd_models.dart';
 import 'package:yoloit/core/remote/yoloitd_panel_actions.dart';
 import 'package:yoloit/core/remote/yoloitd_panel_catalog.dart';
 import 'package:yoloit/core/remote/yoloitd_store.dart';
-import 'package:yoloit/core/setup/setup_catalog.dart';
+import 'package:yoloit/core/utils/directory_utils.dart';
 
-class YoloitdServer {
+class YoloitdServer with ServerProcessMixin {
   YoloitdServer({
     required this.store,
     this.host = '127.0.0.1',
@@ -24,13 +25,6 @@ class YoloitdServer {
   final String? token;
 
   HttpServer? _server;
-  final Map<String, Process> _runs = <String, Process>{};
-  final Set<String> _activeTaskRuns = <String>{};
-  final Map<String, List<String>> _runLogs = <String, List<String>>{};
-  final Map<String, int> _runExitCodes = <String, int>{};
-  final Map<String, Process> _terminals = <String, Process>{};
-  final Map<String, List<String>> _terminalChunks = <String, List<String>>{};
-  final Map<String, int> _terminalExitCodes = <String, int>{};
 
   int? get boundPort => _server?.port;
 
@@ -43,22 +37,14 @@ class YoloitdServer {
   }
 
   Future<void> stop() async {
-    for (final process in _runs.values) {
-      process.kill();
-    }
-    _runs.clear();
-    _activeTaskRuns.clear();
-    for (final process in _terminals.values) {
-      process.kill();
-    }
-    _terminals.clear();
+    killAllRunsAndTerminals();
     await _server?.close(force: true);
     _server = null;
   }
 
   Future<shelf.Response> _handle(shelf.Request request) async {
     if (!_authorized(request)) {
-      return _json(<String, Object?>{
+      return jsonResponse(<String, Object?>{
         'ok': false,
         'error': 'unauthorized',
       }, 401);
@@ -68,12 +54,12 @@ class YoloitdServer {
     final method = request.method.toUpperCase();
 
     try {
-      if (path.isEmpty) return _html(_dashboardHtml());
+      if (path.isEmpty) return htmlResponse(_dashboardHtml());
       if (path.length == 1 && path[0] == 'api') {
-        return _json(<String, Object?>{'ok': true, 'service': 'yoloitd'});
+        return jsonResponse(<String, Object?>{'ok': true, 'service': 'yoloitd'});
       }
       if (path.length == 2 && path[0] == 'api' && path[1] == 'health') {
-        return _json(<String, Object?>{
+        return jsonResponse(<String, Object?>{
           'ok': true,
           'service': 'yoloitd',
           'dataDir': store.rootDir.path,
@@ -97,10 +83,10 @@ class YoloitdServer {
       if (path.length >= 2 && path[0] == 'api' && path[1] == 'templates') {
         return _handleTemplates(request, method, path.skip(2).toList());
       }
-      return _json(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
+      return jsonResponse(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
     } catch (error, stackTrace) {
       stderr.writeln('[yoloitd] $error\n$stackTrace');
-      return _json(<String, Object?>{
+      return jsonResponse(<String, Object?>{
         'ok': false,
         'error': error.toString(),
       }, 500);
@@ -118,7 +104,7 @@ class YoloitdServer {
       final includeArchived =
           request.url.queryParameters['includeArchived']?.toLowerCase() ==
           'true';
-      return _json(<String, Object?>{
+      return jsonResponse(<String, Object?>{
         'boards':
             boards
                 .where(
@@ -131,18 +117,18 @@ class YoloitdServer {
       });
     }
     if (sub.isEmpty && method == 'POST') {
-      final body = await _body(request);
+      final body = await readJsonBody(request);
       final name = (body['name'] as String? ?? 'Remote Board').trim();
       final board = await store.createBoard(
         name.isEmpty ? 'Remote Board' : name,
       );
-      return _json(<String, Object?>{
+      return jsonResponse(<String, Object?>{
         'ok': true,
         'board': board.summary(active: true),
       });
     }
     if (sub.isEmpty) {
-      return _json(<String, Object?>{
+      return jsonResponse(<String, Object?>{
         'ok': false,
         'error': 'method not allowed',
       }, 405);
@@ -150,16 +136,16 @@ class YoloitdServer {
 
     final board = await store.findBoard(Uri.decodeComponent(sub[0]));
     if (board == null) {
-      return _json(<String, Object?>{
+      return jsonResponse(<String, Object?>{
         'ok': false,
         'error': 'board not found',
       }, 404);
     }
 
-    if (sub.length == 1 && method == 'GET') return _json(board.toJson());
+    if (sub.length == 1 && method == 'GET') return jsonResponse(board.toJson());
     if (sub.length == 1 && method == 'DELETE') {
       await store.deleteBoard(board.id);
-      return _json(<String, Object?>{
+      return jsonResponse(<String, Object?>{
         'ok': true,
         'message': 'Deleted board ${board.name}',
       });
@@ -171,7 +157,7 @@ class YoloitdServer {
           metadata: <String, dynamic>{...current.metadata, 'archived': true},
         ),
       );
-      return _json(<String, Object?>{
+      return jsonResponse(<String, Object?>{
         'ok': result != null,
         'message': 'Archived board ${board.name}',
       });
@@ -183,18 +169,18 @@ class YoloitdServer {
           metadata: <String, dynamic>{...current.metadata, 'archived': false},
         ),
       );
-      return _json(<String, Object?>{
+      return jsonResponse(<String, Object?>{
         'ok': result != null,
         'message': 'Unarchived board ${board.name}',
       });
     }
     if (sub.length == 1 && method == 'PUT') {
-      final body = await _body(request);
+      final body = await readJsonBody(request);
       final expectedRevision = _expectedRevision(body);
       if (_isSnapshotUpdate(body) &&
           expectedRevision != null &&
           expectedRevision != board.historyRevision) {
-        return _json(<String, Object?>{
+        return jsonResponse(<String, Object?>{
           'ok': false,
           'error': 'board revision conflict',
           'expectedRevision': expectedRevision,
@@ -209,7 +195,7 @@ class YoloitdServer {
             (before, after, revision) =>
                 _snapshotPanelHistoryEvent(before, after, revision),
       );
-      return _json(<String, Object?>{
+      return jsonResponse(<String, Object?>{
         'ok': true,
         'board': result?.after.toJson(),
       });
@@ -217,7 +203,7 @@ class YoloitdServer {
     if (sub.length == 1 &&
         method == 'GET' &&
         request.url.path.endsWith('/history')) {
-      return _json(<String, Object?>{
+      return jsonResponse(<String, Object?>{
         'events':
             (await store.historyForBoard(
               board.id,
@@ -225,7 +211,7 @@ class YoloitdServer {
       });
     }
     if (sub.length == 2 && sub[1] == 'history' && method == 'GET') {
-      return _json(<String, Object?>{
+      return jsonResponse(<String, Object?>{
         'events':
             (await store.historyForBoard(
               board.id,
@@ -235,7 +221,7 @@ class YoloitdServer {
     if (sub.length == 2 && sub[1] == 'undo' && method == 'POST') {
       final undone = await store.undoLatestPanelHistory(board.id);
       final updated = await store.findBoard(board.id);
-      return _json(<String, Object?>{
+      return jsonResponse(<String, Object?>{
         'ok': undone,
         'undone': undone,
         'redoDepth': store.redoDepthForBoard(board.id),
@@ -249,7 +235,7 @@ class YoloitdServer {
     if (sub.length == 2 && sub[1] == 'redo' && method == 'POST') {
       final redone = await store.redoLatestPanelHistory(board.id);
       final updated = await store.findBoard(board.id);
-      return _json(<String, Object?>{
+      return jsonResponse(<String, Object?>{
         'ok': redone,
         'redone': redone,
         'redoDepth': store.redoDepthForBoard(board.id),
@@ -261,7 +247,7 @@ class YoloitdServer {
       });
     }
     if (sub.length == 2 && sub[1] == 'panel-types' && method == 'GET') {
-      return _json(<String, Object?>{'types': yoloitdPanelTypes});
+      return jsonResponse(<String, Object?>{'types': yoloitdPanelTypes});
     }
     if (sub.length == 2 && sub[1] == 'snapshot' && method == 'GET') {
       return shelf.Response.ok(
@@ -273,14 +259,14 @@ class YoloitdServer {
       return _handlePanels(request, method, board, sub.skip(2).toList());
     }
     if (sub.length == 2 && sub[1] == 'links' && method == 'GET') {
-      return _json(<String, Object?>{'links': board.links});
+      return jsonResponse(<String, Object?>{'links': board.links});
     }
     if (sub.length == 2 && sub[1] == 'links' && method == 'POST') {
-      final body = await _body(request);
+      final body = await readJsonBody(request);
       final fromId = (body['from'] as String? ?? '').trim();
       final toId = (body['to'] as String? ?? '').trim();
       if (fromId.isEmpty || toId.isEmpty) {
-        return _json(<String, Object?>{
+        return jsonResponse(<String, Object?>{
           'ok': false,
           'error': 'from and to required',
         }, 400);
@@ -288,7 +274,7 @@ class YoloitdServer {
       final fromPanel = _findPanel(board, fromId);
       final toPanel = _findPanel(board, toId);
       if (fromPanel == null || toPanel == null) {
-        return _json(<String, Object?>{
+        return jsonResponse(<String, Object?>{
           'ok': false,
           'error': 'panel not found',
         }, 404);
@@ -306,7 +292,7 @@ class YoloitdServer {
         board.id,
         (current) => current.copyWith(links: <Map<String, dynamic>>[...current.links, link]),
       );
-      return _json(<String, Object?>{
+      return jsonResponse(<String, Object?>{
         'ok': result != null,
         'link': link,
       });
@@ -319,14 +305,14 @@ class YoloitdServer {
           links: current.links.where((link) => link['id'] != linkId).toList(),
         ),
       );
-      return _json(<String, Object?>{
+      return jsonResponse(<String, Object?>{
         'ok': result != null,
         'message': 'Link deleted',
       });
     }
     if (sub.length == 3 && sub[1] == 'links' && method == 'PUT') {
       final linkId = Uri.decodeComponent(sub[2]);
-      final body = await _body(request);
+      final body = await readJsonBody(request);
       final result = await store.updateBoard(
         board.id,
         (current) => current.copyWith(
@@ -339,12 +325,12 @@ class YoloitdServer {
           }).toList(),
         ),
       );
-      return _json(<String, Object?>{'ok': result != null});
+      return jsonResponse(<String, Object?>{'ok': result != null});
     }
     if (sub.length >= 2 && sub[1] == 'groups') {
       return _handleGroups(request, method, board, sub.skip(2).toList());
     }
-    return _json(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
+    return jsonResponse(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
   }
 
   Future<shelf.Response> _handleTemplates(
@@ -353,25 +339,25 @@ class YoloitdServer {
     List<String> sub,
   ) async {
     if (sub.isEmpty && method == 'GET') {
-      return _json(<String, Object?>{
+      return jsonResponse(<String, Object?>{
         'ok': true,
         'templates': const <Map<String, Object?>>[],
       });
     }
     if (sub.isEmpty && method == 'POST') {
-      return _json(<String, Object?>{
+      return jsonResponse(<String, Object?>{
         'ok': true,
         'message': 'Templates synced',
         'templates': const <Map<String, Object?>>[],
       });
     }
     if (sub.length == 1 && method == 'GET') {
-      return _json(<String, Object?>{
+      return jsonResponse(<String, Object?>{
         'ok': false,
         'error': 'Template not found',
       }, 404);
     }
-    return _json(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
+    return jsonResponse(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
   }
 
   Future<shelf.Response> _handleFiles(
@@ -379,128 +365,56 @@ class YoloitdServer {
     String method,
     List<String> sub,
   ) async {
-    if (sub.isEmpty && method == 'GET') {
-      return _listFiles(request.url.queryParameters['path']?.trim());
-    }
-    if (sub.length == 1 && sub[0] == 'directories' && method == 'POST') {
-      final body = await _body(request);
-      final parentPath = (body['parentPath'] as String? ?? '').trim();
-      final name = (body['name'] as String? ?? '').trim();
-      if (!_validDirectoryName(name)) {
-        return _json(<String, Object?>{
-          'ok': false,
-          'error': 'invalid directory name',
-        }, 400);
-      }
-      final parent = Directory(
-        parentPath.isEmpty ? _defaultFileRoot() : parentPath,
-      );
-      if (!await parent.exists()) {
-        return _json(<String, Object?>{
-          'ok': false,
-          'error': 'parent directory not found',
-          'path': parent.path,
-        }, 404);
-      }
-      await Directory('${parent.path}${Platform.pathSeparator}$name').create();
-      return _listFiles(parent.path);
-    }
-    return _json(<String, Object?>{
-      'ok': false,
-      'error': 'method not allowed',
-    }, 405);
+    return handleFilesRequest(
+      request: request,
+      method: method,
+      sub: sub,
+      defaultRoot: _defaultFileRoot,
+      listFiles: _listFiles,
+    );
   }
 
   Future<shelf.Response> _listFiles(String? requested) async {
     final directory = Directory(
       requested == null || requested.isEmpty ? _defaultFileRoot() : requested,
     );
-    if (!await directory.exists()) {
-      return _json(<String, Object?>{
-        'ok': false,
-        'error': 'directory not found',
-        'path': directory.path,
-      }, 404);
-    }
+    final dirEntries = await listDirectoryEntries(directory);
+    final entries =
+        dirEntries
+            .map(
+              (e) => <String, Object?>{
+                'name': e.name,
+                'path': e.path,
+                'isDirectory': e.isDirectory,
+              },
+            )
+            .toList();
 
-    final entries = <Map<String, Object?>>[];
-    await for (final entity in directory.list(followLinks: false)) {
-      final stat = await entity.stat();
-      if (stat.type != FileSystemEntityType.directory &&
-          stat.type != FileSystemEntityType.file) {
-        continue;
-      }
-      entries.add(<String, Object?>{
-        'name': _fileName(entity.path),
-        'path': entity.path,
-        'isDirectory': stat.type == FileSystemEntityType.directory,
-      });
-    }
-    entries.sort((a, b) {
-      final aDir = a['isDirectory'] == true;
-      final bDir = b['isDirectory'] == true;
-      if (aDir != bDir) return aDir ? -1 : 1;
-      return (a['name'] as String).toLowerCase().compareTo(
-        (b['name'] as String).toLowerCase(),
-      );
-    });
-
-    return _json(<String, Object?>{
-      'ok': true,
-      'path': directory.path,
-      'parent':
-          directory.parent.path == directory.path
-              ? null
-              : directory.parent.path,
-      'roots': _fileRoots(),
-      'entries': entries,
-    });
-  }
-
-  static bool _validDirectoryName(String name) {
-    if (name.isEmpty || name == '.' || name == '..') return false;
-    return !name.contains('/') &&
-        !name.contains('\\') &&
-        !name.contains('\x00');
+    return buildFileListingResponse(
+      directory: directory,
+      entries: entries,
+      roots: _fileRoots(),
+    );
   }
 
   List<Map<String, Object?>> _fileRoots() {
-    final roots = <Map<String, Object?>>[];
-    final seen = <String>{};
-    void addRoot(String name, String? path) {
-      final value = path?.trim();
-      if (value == null || value.isEmpty || !seen.add(value)) return;
-      roots.add(<String, Object?>{
-        'name': name,
-        'path': value,
-        'isDirectory': true,
-      });
-    }
-
-    addRoot('Home', _homePath());
-    addRoot('YoLoIT data', store.rootDir.path);
-    addRoot('Current', Directory.current.path);
-    return roots;
+    return buildUniqueRoots({
+      'Home': homePath(),
+      'YoLoIT data': store.rootDir.path,
+      'Current': Directory.current.path,
+    })
+        .entries
+        .map(
+          (e) => <String, Object?>{
+            'name': e.key,
+            'path': e.value,
+            'isDirectory': true,
+          },
+        )
+        .toList();
   }
 
-  String _defaultFileRoot() => _homePath() ?? store.rootDir.path;
-
-  static String? _homePath() {
-    final home =
-        Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'];
-    final trimmed = home?.trim();
-    return trimmed == null || trimmed.isEmpty ? null : trimmed;
-  }
-
-  static String _fileName(String path) {
-    final normalized =
-        path.endsWith(Platform.pathSeparator)
-            ? path.substring(0, path.length - 1)
-            : path;
-    final index = normalized.lastIndexOf(Platform.pathSeparator);
-    if (index == -1) return normalized;
-    return normalized.substring(index + 1);
-  }
+  String _defaultFileRoot() => homePath() ?? store.rootDir.path;
 
   static bool _isSnapshotUpdate(Map<String, dynamic> body) {
     return body.containsKey('panels') ||
@@ -646,12 +560,12 @@ class YoloitdServer {
     List<String> sub,
   ) async {
     if (sub.isEmpty && method == 'GET') {
-      return _json(<String, Object?>{
+      return jsonResponse(<String, Object?>{
         'panels': board.panels.map(_panelSummary).toList(),
       });
     }
     if (sub.isEmpty && method == 'POST') {
-      final body = await _body(request);
+      final body = await readJsonBody(request);
       final panel = RemotePanel(
         id: body['id'] as String? ?? _nextId('p'),
         type: body['type'] as String? ?? 'board.note.markdown',
@@ -665,14 +579,14 @@ class YoloitdServer {
         state: Map<String, dynamic>.from(body['state'] as Map? ?? const {}),
       );
       final created = await store.addPanel(board.id, panel);
-      return _json(<String, Object?>{
+      return jsonResponse(<String, Object?>{
         'ok': true,
         'panel': created.toJson(),
         'id': created.id,
       });
     }
     if (sub.isEmpty) {
-      return _json(<String, Object?>{
+      return jsonResponse(<String, Object?>{
         'ok': false,
         'error': 'method not allowed',
       }, 405);
@@ -680,13 +594,13 @@ class YoloitdServer {
     final panelId = Uri.decodeComponent(sub[0]);
     final panel = _findPanel(board, panelId);
     if (panel == null) {
-      return _json(<String, Object?>{
+      return jsonResponse(<String, Object?>{
         'ok': false,
         'error': 'panel not found',
       }, 404);
     }
     if (sub.length == 1 && method == 'GET') {
-      return _json(<String, Object?>{
+      return jsonResponse(<String, Object?>{
         ...panel.toJson(),
         'typeName': panel.type,
         'content': panel.state,
@@ -698,10 +612,10 @@ class YoloitdServer {
     }
     if (sub.length == 1 && method == 'DELETE') {
       final ok = await store.removePanel(board.id, panel.id);
-      return _json(<String, Object?>{'ok': ok});
+      return jsonResponse(<String, Object?>{'ok': ok});
     }
     if (sub.length == 1 && method == 'PUT') {
-      final body = await _body(request);
+      final body = await readJsonBody(request);
       final updated = await store.updatePanel(
         board.id,
         panel.id,
@@ -724,20 +638,20 @@ class YoloitdServer {
                   : current.state,
         ),
       );
-      return _json(<String, Object?>{
+      return jsonResponse(<String, Object?>{
         'ok': updated != null,
         'panel': updated?.toJson(),
       });
     }
     if (sub.length == 2 && sub[1] == 'action' && method == 'POST') {
-      final body = await _body(request);
+      final body = await readJsonBody(request);
       final action = body['action'] as String? ?? 'get';
       final result = handleRemotePanelAction(panel, action, body);
       if (!result.ok) {
-        return _json(result.toJson(), 400);
+        return jsonResponse(result.toJson(), 400);
       }
       if (result.stateUpdate.isEmpty) {
-        return _json(<String, Object?>{
+        return jsonResponse(<String, Object?>{
           ...result.toJson(),
           'content': result.data.isEmpty ? panel.state : result.data,
         });
@@ -751,9 +665,9 @@ class YoloitdServer {
         panel.id,
         (current) => current.copyWith(state: nextState),
       );
-      return _json(result.toJson(panel: updated));
+      return jsonResponse(result.toJson(panel: updated));
     }
-    return _json(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
+    return jsonResponse(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
   }
 
   Future<shelf.Response> _handleGroups(
@@ -765,13 +679,13 @@ class YoloitdServer {
     final groups = _boardGroups(board);
 
     if (sub.isEmpty && method == 'GET') {
-      return _json(<String, Object?>{'ok': true, 'groups': groups});
+      return jsonResponse(<String, Object?>{'ok': true, 'groups': groups});
     }
     if (sub.isEmpty && method == 'POST') {
-      final body = await _body(request);
+      final body = await readJsonBody(request);
       final name = (body['name'] as String? ?? '').trim();
       if (name.isEmpty) {
-        return _json(<String, Object?>{
+        return jsonResponse(<String, Object?>{
           'ok': false,
           'error': 'name required',
         }, 400);
@@ -790,20 +704,20 @@ class YoloitdServer {
           metadata: <String, dynamic>{...current.metadata, 'groups': groups},
         ),
       );
-      return _json(<String, Object?>{
+      return jsonResponse(<String, Object?>{
         'ok': result != null,
         'group': group,
       });
     }
 
     if (sub.isEmpty) {
-      return _json(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
+      return jsonResponse(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
     }
 
     final groupId = Uri.decodeComponent(sub[0]);
     final index = groups.indexWhere((group) => group['id'] == groupId);
     if (index < 0) {
-      return _json(<String, Object?>{
+      return jsonResponse(<String, Object?>{
         'ok': false,
         'error': 'group not found',
       }, 404);
@@ -817,11 +731,11 @@ class YoloitdServer {
           metadata: <String, dynamic>{...current.metadata, 'groups': groups},
         ),
       );
-      return _json(<String, Object?>{'ok': true, 'message': 'Group deleted'});
+      return jsonResponse(<String, Object?>{'ok': true, 'message': 'Group deleted'});
     }
 
     if (sub.length == 1 && method == 'PUT') {
-      final body = await _body(request);
+      final body = await readJsonBody(request);
       final group = Map<String, dynamic>.from(groups[index]);
       if (body['name'] is String) group['name'] = body['name'];
       if (body.containsKey('color')) {
@@ -839,11 +753,11 @@ class YoloitdServer {
           metadata: <String, dynamic>{...current.metadata, 'groups': groups},
         ),
       );
-      return _json(<String, Object?>{'ok': true, 'group': group});
+      return jsonResponse(<String, Object?>{'ok': true, 'group': group});
     }
 
     if (sub.length == 2 && sub[1] == 'panels' && method == 'POST') {
-      final body = await _body(request);
+      final body = await readJsonBody(request);
       final ids = _parsePanelIds(board, body['panels']);
       final group = Map<String, dynamic>.from(groups[index]);
       final panelIds = _stringList(group['panelIds']).toSet()..addAll(ids);
@@ -855,14 +769,14 @@ class YoloitdServer {
           metadata: <String, dynamic>{...current.metadata, 'groups': groups},
         ),
       );
-      return _json(<String, Object?>{
+      return jsonResponse(<String, Object?>{
         'ok': true,
         'message': 'Panels added to group',
       });
     }
 
     if (sub.length == 2 && sub[1] == 'panels' && method == 'DELETE') {
-      final body = await _body(request);
+      final body = await readJsonBody(request);
       final ids = _parsePanelIds(board, body['panels']);
       final group = Map<String, dynamic>.from(groups[index]);
       group['panelIds'] = _stringList(group['panelIds'])
@@ -875,14 +789,14 @@ class YoloitdServer {
           metadata: <String, dynamic>{...current.metadata, 'groups': groups},
         ),
       );
-      return _json(<String, Object?>{
+      return jsonResponse(<String, Object?>{
         'ok': true,
         'message': 'Panels removed from group',
       });
     }
 
     if (sub.length == 2 && sub[1] == 'move' && method == 'POST') {
-      final body = await _body(request);
+      final body = await readJsonBody(request);
       final dx = (body['dx'] as num?)?.toDouble() ?? 0.0;
       final dy = (body['dy'] as num?)?.toDouble() ?? 0.0;
       final group = groups[index];
@@ -901,10 +815,10 @@ class YoloitdServer {
           }).toList(),
         ),
       );
-      return _json(<String, Object?>{'ok': true, 'message': 'Group moved'});
+      return jsonResponse(<String, Object?>{'ok': true, 'message': 'Group moved'});
     }
 
-    return _json(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
+    return jsonResponse(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
   }
 
   List<Map<String, dynamic>> _boardGroups(RemoteBoard board) {
@@ -970,32 +884,31 @@ class YoloitdServer {
     if (sub.isEmpty && method == 'GET') {
       final ids =
           <String>{
-              ..._runs.keys,
-              ..._runExitCodes.keys,
-              ..._runLogs.keys,
+              ...runs.keys,
+              ...runExitCodes.keys,
+              ...runLogs.keys,
             }.toList()
             ..sort();
-      return _json(<String, Object?>{
+      return jsonResponse(<String, Object?>{
         'runs':
             ids
                 .map(
                   (id) => <String, Object?>{
                     'id': id,
                     'running':
-                        _runs.containsKey(id) || _activeTaskRuns.contains(id),
-                    if (_runExitCodes.containsKey(id))
-                      'exitCode': _runExitCodes[id],
-                    'logLines': _runLogs[id]?.length ?? 0,
+                        runs.containsKey(id) || activeTaskRuns.contains(id),
+                    if (runExitCodes.containsKey(id)) 'exitCode': runExitCodes[id],
+                    'logLines': runLogs[id]?.length ?? 0,
                   },
                 )
                 .toList(),
       });
     }
     if (sub.isEmpty && method == 'POST') {
-      final body = await _body(request);
+      final body = await readJsonBody(request);
       final command = (body['command'] as String? ?? '').trim();
       if (command.isEmpty) {
-        return _json(<String, Object?>{
+        return jsonResponse(<String, Object?>{
           'ok': false,
           'error': 'command required',
         }, 400);
@@ -1006,23 +919,25 @@ class YoloitdServer {
         <String>['-lc', command],
         workingDirectory: body['cwd'] as String?,
       );
-      _runs[id] = process;
-      _runLogs[id] = <String>[];
-      unawaited(_collectRun(id, process));
-      return _json(<String, Object?>{'ok': true, 'id': id, 'pid': process.pid});
+      runs[id] = process;
+      runLogs[id] = <String>[];
+      unawaited(collectRun(id, process));
+      return jsonResponse(
+        <String, Object?>{'ok': true, 'id': id, 'pid': process.pid},
+      );
     }
     if (sub.length == 2 && sub[1] == 'log' && method == 'GET') {
-      return _json(<String, Object?>{
+      return jsonResponse(<String, Object?>{
         'id': sub[0],
-        'lines': _runLogs[sub[0]] ?? const <String>[],
+        'lines': runLogs[sub[0]] ?? const <String>[],
       });
     }
     if (sub.length == 2 && sub[1] == 'stop' && method == 'POST') {
-      final process = _runs.remove(sub[0]);
+      final process = runs.remove(sub[0]);
       final ok = process?.kill() ?? false;
-      return _json(<String, Object?>{'ok': ok});
+      return jsonResponse(<String, Object?>{'ok': ok});
     }
-    return _json(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
+    return jsonResponse(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
   }
 
   Future<shelf.Response> _handleSetup(
@@ -1030,64 +945,18 @@ class YoloitdServer {
     String method,
     List<String> sub,
   ) async {
-    if (sub.isEmpty && method == 'GET') {
-      final snapshot = await SetupCatalog.check();
-      return _json(snapshot.toJson());
-    }
-    if (sub.length == 1 && sub[0] == 'install' && method == 'POST') {
-      final body = await _body(request);
-      final ids =
-          (body['packageIds'] as List? ?? const <Object?>[])
-              .map((value) => value.toString().trim())
-              .where((value) => value.isNotEmpty)
-              .toList();
-      if (ids.isEmpty) {
-        return _json(<String, Object?>{
-          'ok': false,
-          'error': 'packageIds required',
-        }, 400);
-      }
-      final runtime = await SetupCatalog.detectRuntime();
-      final specialIds =
-          ids.where(SetupCatalog.isSpecialInstallTask).toList()..sort();
-      final script = SetupCatalog.installScript(ids, runtime.os);
-      if (script.trim().isEmpty && specialIds.isEmpty) {
-        return _json(<String, Object?>{
-          'ok': false,
-          'error': 'no install command for selected packages on this OS',
-        }, 400);
-      }
-      final displayScript = <String>[
-        for (final id in specialIds) SetupCatalog.specialInstallLabel(id),
-        if (script.trim().isNotEmpty) script,
-      ].join('\n');
-      if (body['dryRun'] == true) {
-        return _json(<String, Object?>{'ok': true, 'script': displayScript});
-      }
-      final id = body['id'] as String? ?? _nextId('setup');
-      _runLogs[id] = <String>['\$ $displayScript'];
-      _runExitCodes.remove(id);
-      _activeTaskRuns.add(id);
-      unawaited(
-        _runSetupInstallTasks(id, specialIds, script, store.rootDir.path),
-      );
-      return _json(<String, Object?>{
-        'ok': true,
-        'id': id,
-        'script': displayScript,
-      });
-    }
-    if (sub.length == 2 && sub[1] == 'log' && method == 'GET') {
-      return _json(<String, Object?>{
-        'id': sub[0],
-        'lines': _runLogs[sub[0]] ?? const <String>[],
-        'running':
-            _runs.containsKey(sub[0]) || _activeTaskRuns.contains(sub[0]),
-        if (_runExitCodes.containsKey(sub[0]))
-          'exitCode': _runExitCodes[sub[0]],
-      });
-    }
-    return _json(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
+    return handleSetupRequest(
+      request: request,
+      method: method,
+      sub: sub,
+      nextId: () => _nextId('setup'),
+      startTasks: (id, specialIds, script) => runSetupInstallTasks(
+        id,
+        specialIds,
+        script,
+        store.rootDir.path,
+      ),
+    );
   }
 
   Future<shelf.Response> _handleTerminals(
@@ -1095,225 +964,42 @@ class YoloitdServer {
     String method,
     List<String> sub,
   ) async {
-    if (sub.isEmpty && method == 'POST') {
-      final body = await _body(request);
-      final id = (body['id'] as String? ?? _nextId('terminal')).trim();
-      final cwd = (body['cwd'] as String? ?? store.rootDir.path).trim();
-      if (id.isEmpty) {
-        return _json(<String, Object?>{
-          'ok': false,
-          'error': 'id required',
-        }, 400);
-      }
-      final directory = Directory(cwd.isEmpty ? store.rootDir.path : cwd);
-      if (!await directory.exists()) {
-        return _json(<String, Object?>{
-          'ok': false,
-          'error': 'working directory not found',
-          'path': directory.path,
-        }, 404);
-      }
-      _terminals.remove(id)?.kill();
-      final rawEnv = body['env'];
-      final env =
-          rawEnv is Map
-              ? rawEnv.map(
-                (key, value) => MapEntry(key.toString(), value.toString()),
-              )
-              : const <String, String>{};
-      final shell = Platform.environment['SHELL'] ?? '/bin/sh';
-      final launcher = await _terminalLauncher(shell);
-      final process = await Process.start(
-        launcher.executable,
-        launcher.arguments,
-        workingDirectory: directory.path,
-        environment: <String, String>{
-          'TERM': 'xterm-256color',
-          if (env.isNotEmpty) ...env,
-        },
-      );
-      _terminals[id] = process;
-      _terminalChunks[id] = <String>[];
-      _terminalExitCodes.remove(id);
-      unawaited(_collectTerminal(id, process));
-      return _json(<String, Object?>{'ok': true, 'id': id, 'pid': process.pid});
-    }
-    if (sub.length == 2 && sub[1] == 'log' && method == 'GET') {
-      final since =
-          int.tryParse(request.url.queryParameters['since'] ?? '0') ?? 0;
-      final chunks = _terminalChunks[sub[0]] ?? const <String>[];
-      final start = since.clamp(0, chunks.length);
-      return _json(<String, Object?>{
-        'id': sub[0],
-        'next': chunks.length,
-        'chunks': chunks.skip(start).toList(),
-        'running': _terminals.containsKey(sub[0]),
-        if (_terminalExitCodes.containsKey(sub[0]))
-          'exitCode': _terminalExitCodes[sub[0]],
-      });
-    }
-    if (sub.length == 2 && sub[1] == 'input' && method == 'POST') {
-      final process = _terminals[sub[0]];
-      if (process == null) {
-        return _json(<String, Object?>{
-          'ok': false,
-          'error': 'terminal not found',
-        }, 404);
-      }
-      final body = await _body(request);
-      process.stdin.write(body['data'] as String? ?? '');
-      await process.stdin.flush();
-      return _json(<String, Object?>{'ok': true});
-    }
-    if (sub.length == 2 && sub[1] == 'stop' && method == 'POST') {
-      final process = _terminals.remove(sub[0]);
-      final ok = process?.kill() ?? false;
-      return _json(<String, Object?>{'ok': ok});
-    }
-    return _json(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
-  }
-
-  Future<({String executable, List<String> arguments})> _terminalLauncher(
-    String shell,
-  ) async {
-    final script =
-        (Platform.isLinux || Platform.isMacOS)
-            ? await _findExecutable('script')
-            : null;
-    if (script != null) {
-      if (Platform.isMacOS) {
-        return (
-          executable: script,
-          arguments: <String>['-q', '/dev/null', shell, '-i'],
-        );
-      }
-      return (
-        executable: script,
-        arguments: <String>['-q', '-f', '-c', shell, '/dev/null'],
-      );
-    }
-    return (executable: shell, arguments: <String>['-i']);
-  }
-
-  Future<String?> _findExecutable(String name) async {
-    final result = await Process.run(
-      Platform.environment['SHELL'] ?? '/bin/sh',
-      <String>['-lc', 'command -v ${_shellQuote(name)}'],
-    );
-    if (result.exitCode != 0) return null;
-    final path = (result.stdout as String).trim();
-    return path.isEmpty ? null : path.split('\n').first.trim();
-  }
-
-  static String _shellQuote(String value) =>
-      "'${value.replaceAll("'", "'\\''")}'";
-
-  Future<void> _collectTerminal(String id, Process process) async {
-    void add(String chunk) {
-      final chunks = _terminalChunks[id] ??= <String>[];
-      chunks.add(chunk);
-      if (chunks.length > 2000) chunks.removeRange(0, chunks.length - 2000);
-    }
-
-    process.stdout.transform(utf8.decoder).listen(add);
-    process.stderr.transform(utf8.decoder).listen(add);
-    final exitCode = await process.exitCode;
-    add('\n[exit $exitCode]\n');
-    _terminals.remove(id);
-    _terminalExitCodes[id] = exitCode;
-  }
-
-  Future<void> _collectRun(String id, Process process) async {
-    void add(String line) {
-      final lines = _runLogs[id] ??= <String>[];
-      lines.add(line);
-      if (lines.length > 1000) lines.removeRange(0, lines.length - 1000);
-    }
-
-    process.stdout
-        .transform(utf8.decoder)
-        .transform(const LineSplitter())
-        .listen(add);
-    process.stderr
-        .transform(utf8.decoder)
-        .transform(const LineSplitter())
-        .listen(add);
-    final exitCode = await process.exitCode;
-    add('[exit $exitCode]');
-    _runs.remove(id);
-    _runExitCodes[id] = exitCode;
-  }
-
-  Future<void> _runSetupInstallTasks(
-    String id,
-    List<String> specialIds,
-    String script,
-    String workingDirectory,
-  ) async {
-    final lines = _runLogs[id] ??= <String>[];
-    var exitCode = 0;
-    try {
-      for (final specialId in specialIds) {
-        await for (final line in SetupCatalog.runSpecialInstallTask(
-          specialId,
-        )) {
-          lines.add(line);
-        }
-      }
-      if (script.trim().isNotEmpty) {
-        final process = await Process.start(
-          Platform.environment['SHELL'] ?? '/bin/sh',
-          <String>['-lc', script],
-          workingDirectory: workingDirectory,
-        );
-        _runs[id] = process;
-        await _collectRun(id, process);
-        return;
-      }
-    } catch (error) {
-      exitCode = 1;
-      lines.add('[error] $error');
-    } finally {
-      _activeTaskRuns.remove(id);
-      if (!_runExitCodes.containsKey(id)) {
-        _runExitCodes[id] = exitCode;
-        lines.add('[exit $exitCode]');
-      }
-    }
-  }
-
-  bool _authorized(shelf.Request request) {
-    final expected = token?.trim();
-    if (expected == null || expected.isEmpty) return true;
-    final auth = request.headers['authorization'] ?? '';
-    if (auth == 'Bearer $expected') return true;
-    return request.url.queryParameters['token'] == expected;
-  }
-
-  Future<Map<String, dynamic>> _body(shelf.Request request) async {
-    final text = await request.readAsString();
-    if (text.trim().isEmpty) return <String, dynamic>{};
-    final decoded = jsonDecode(text);
-    return decoded is Map
-        ? Map<String, dynamic>.from(decoded)
-        : <String, dynamic>{};
-  }
-
-  shelf.Response _json(Object? value, [int status = 200]) {
-    return shelf.Response(
-      status,
-      body: jsonEncode(value),
-      headers: <String, String>{
-        'content-type': 'application/json; charset=utf-8',
+    return handleTerminalsRequest(
+      request: request,
+      method: method,
+      sub: sub,
+      defaultCwd: store.rootDir.path,
+      nextId: () => _nextId('terminal'),
+      killExisting: (id) => terminals.remove(id)?.kill(),
+      onProcessStarted: (id, process) {
+        terminals[id] = process;
+        terminalChunks[id] = <String>[];
+        terminalExitCodes.remove(id);
+        unawaited(collectTerminal(id, process));
       },
+      terminals: terminals,
+      terminalChunks: terminalChunks,
+      terminalExitCodes: terminalExitCodes,
     );
   }
 
-  shelf.Response _html(String value) {
-    return shelf.Response.ok(
-      value,
-      headers: <String, String>{'content-type': 'text/html; charset=utf-8'},
-    );
+  bool _authorized(shelf.Request request) => isAuthorized(request, token);
+
+  static RemotePanel? _findPanel(RemoteBoard board, String idOrTitle) {
+    final byId =
+        board.panels.where((panel) => panel.id == idOrTitle).firstOrNull;
+    if (byId != null) return byId;
+    return board.panels
+        .where((panel) => panel.title.toLowerCase() == idOrTitle.toLowerCase())
+        .firstOrNull;
+  }
+
+  static Map<String, dynamic> _panelSummary(RemotePanel panel) {
+    return <String, dynamic>{
+      ...panel.toJson(),
+      'typeName': panel.type,
+      'content': panel.state,
+    };
   }
 
   String _dashboardHtml() {
@@ -1345,23 +1031,6 @@ class YoloitdServer {
 </body>
 </html>
 ''';
-  }
-
-  static RemotePanel? _findPanel(RemoteBoard board, String idOrTitle) {
-    final byId =
-        board.panels.where((panel) => panel.id == idOrTitle).firstOrNull;
-    if (byId != null) return byId;
-    return board.panels
-        .where((panel) => panel.title.toLowerCase() == idOrTitle.toLowerCase())
-        .firstOrNull;
-  }
-
-  static Map<String, dynamic> _panelSummary(RemotePanel panel) {
-    return <String, dynamic>{
-      ...panel.toJson(),
-      'typeName': panel.type,
-      'content': panel.state,
-    };
   }
 
   static String _snapshot(RemoteBoard board) {
