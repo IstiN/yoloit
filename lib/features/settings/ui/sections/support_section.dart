@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:yoloit/core/platform/web_cache_clearer.dart';
 import 'package:yoloit/core/services/app_logger.dart';
 import 'package:yoloit/core/services/support_log_service.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
@@ -45,6 +47,10 @@ class SupportSectionState extends State<SupportSection> {
       const SnackBar(content: Text('Recent support events cleared')),
     );
     setState(() {});
+  }
+
+  Future<void> _clearPageCache() async {
+    await clearWebPageCache();
   }
 
   @override
@@ -95,6 +101,22 @@ class SupportSectionState extends State<SupportSection> {
               ),
               const SizedBox(height: 8),
               Caption('App log: ${_logPath ?? 'loading...'}'),
+              if (kIsWeb) ...[
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: FilledButton.icon(
+                    onPressed: _clearPageCache,
+                    icon: const Icon(Icons.cleaning_services_outlined, size: 16),
+                    label: const Text('Clear page cache'),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Caption(
+                  'Clears cached page resources and reloads from the latest deployed version. Board data in browser storage is preserved.',
+                  fontSize: 12,
+                ),
+              ],
             ],
           ),
         ),

@@ -54,6 +54,13 @@ jobs:
           BASE_HREF="/${{ github.event.repository.name }}/app/"
           flutter build web --release --target lib/main_web_full.dart --base-href "$BASE_HREF" --pwa-strategy none
 
+      - name: Cache-bust generated web assets
+        run: |
+          CACHE_TAG="${{ github.run_id }}"
+          sed -i "s|flutter_bootstrap\.js?v=[^\"']*|flutter_bootstrap.js?v=${CACHE_TAG}|g" build/web/index.html
+          sed -i 's|flutter_bootstrap\.js\"|flutter_bootstrap.js?v='"${CACHE_TAG}"'\"|g' build/web/index.html
+          sed -i "s|main\.dart\.js|main.dart.js?v=${CACHE_TAG}|g" build/web/flutter_bootstrap.js
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
