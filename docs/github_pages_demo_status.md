@@ -48,7 +48,7 @@
   - **Webpage** — rendered inline with an `<iframe>` on web
   - **Code Snippet**, **UI View**
   - **AI Chat** — cloud-provider chat on web (local on-device models are hidden)
-  - **Custom Widget / JS App** — custom `widget.js` panels run in a hidden sandboxed iframe and are stored in browser storage
+  - **Custom Widget / JS App** — custom `widget.js` panels run in a hidden sandboxed iframe and are stored in browser storage; built-in example widgets are fetched from the GitHub raw-content URL so they stay current without a full rebuild
 - The panel catalog is driven by `lib/core/remote/yoloitd_panel_catalog.dart`. Web-capable descriptors now include `'web'` in `localPlatforms`.
 - `WebpagePlugin` now uses a web-specific implementation (`webpage_plugin_web.dart`) that renders the page inside an `HtmlElementView`/`IFrameElement` instead of the native `webview_flutter` overlay layer. The overlay layer is stubbed out on web via `webview_overlays_web.dart`.
 - Fixed webpage URL input on web: `BoardPanelCard` no longer steals focus from the webpage panel on the web, and the iframe `src` is updated when the panel URL changes.
@@ -582,7 +582,7 @@ The left toolbar showed **Custom Widget** as disabled in the web demo, and exist
 - Extracted shared UI View implementation into `lib/features/board/plugins/builtin/ui_view_plugin_impl.dart`; the conditional export now points both VM and web to the same file.
 - Removed `PlatformCapability.processes` from `CustomWidgetPluginBase.requiredCapabilities` so the plugin is not treated as desktop-only.
 - Made `WidgetManifest` (`lib/features/board/widgets/widget_manifest.dart`) use `FileStorageAdapter` instead of `dart:io`, so manifest JSON can be read from browser storage or bundled assets on web.
-- Implemented `WidgetRegistryServiceWeb` (`lib/features/board/widgets/widget_registry_service_web.dart`) on top of `FileStorageAdapter` with a `widgets/` prefix. On first run it copies bundled example widgets from Flutter assets into browser storage, mirroring the desktop behavior.
+- Implemented `WidgetRegistryServiceWeb` (`lib/features/board/widgets/widget_registry_service_web.dart`) on top of `FileStorageAdapter` with a `widgets/` prefix. On first run it fetches the built-in example widgets from the GitHub raw-content URL (`https://raw.githubusercontent.com/IstiN/yoloit/main/tools/widgets/`) and writes them into browser storage; if the network is unavailable it falls back to the bundled Flutter assets.
 - Implemented `JsWidgetEngineWeb` (`lib/features/board/widgets/js_widget_engine_web.dart`) using a hidden sandboxed `IFrameElement` + `postMessage`. The bootstrap JS lives in `lib/features/board/widgets/js_widget_bootstrap.dart`; messages are typed in `js_widget_engine_message.dart`.
 - Made `AppCliUtils.basename` web-safe so CLI-style widget commands work in the browser without `dart:io`.
 
@@ -604,6 +604,19 @@ Extracting shared VM/web plugin content and adding web-safe `WidgetManifest` / `
 **Verification:**
 - `coverage/lcov.info` reports **43.81%** (>= 43.5% baseline).
 - `scripts/pre-commit` coverage gate passes.
+
+### 2.40 Built-in example widgets not pulled into the web app
+The first web implementation copied bundled example widgets from Flutter assets into browser storage. The user expected the existing widgets from the repository to be available in the browser, ideally fetched directly from GitHub so the web demo stays up to date without a full rebuild.
+
+**Fix:**
+- Added `lib/features/board/widgets/widget_remote_source.dart`, which fetches widget `manifest.json` and `widget.js` files from `https://raw.githubusercontent.com/IstiN/yoloit/main/tools/widgets/{id}/`.
+- The remote source honors the `files` array declared in `manifest.json` so multi-file widgets are fetched correctly.
+- Updated `lib/features/board/widgets/widget_registry_service_web.dart` to try the remote source first when browser storage is empty; if the network request fails or returns nothing, it falls back to the bundled Flutter assets.
+- Added `getString` to `YoloitHttpClient` (`lib/core/utils/http_client_base.dart`, `*_vm.dart`, `*_web.dart`) so the remote source can fetch plain text files through the existing cross-platform HTTP abstraction.
+
+**Verification:**
+- `flutter analyze --no-pub --no-fatal-infos --no-fatal-warnings lib/core/utils/http_client*.dart lib/features/board/widgets/widget_remote_source.dart lib/features/board/widgets/widget_registry_service_web.dart` reports no issues.
+- `flutter test test/unit/features/board/widgets/widget_registry_service_web_test.dart` passes, including remote-fetch and asset-fallback paths.
 
 ---
 
@@ -731,6 +744,7 @@ New:
 - `lib/features/board/demo/web_demo_board.dart`
 - `lib/core/platform/{platform_capabilities,file_storage_adapter,platform_dirs,platform_info,secure_storage_factory,yoloit_credential_store}*.dart`
 - `lib/core/remote/board_share_server_base.dart`
+- `lib/core/utils/http_client_base.dart`, `http_client_vm.dart`, `http_client_web.dart`
 - `lib/features/board/plugins/board_panel_plugin_base.dart`
 - `lib/features/board/plugins/builtin/*_base.dart`, `*_stub.dart`, `*_vm.dart`, `*_web.dart`
 - `lib/features/board/plugins/builtin/plugin_type_ids.dart`
@@ -738,6 +752,12 @@ New:
 - `lib/features/board/plugins/builtin/webpage_plugin_vm.dart` (renamed from `webpage_plugin.dart`)
 - `lib/features/board/plugins/builtin/diff_preview_plugin_base.dart`
 - `lib/features/board/plugins/builtin/custom_widget_plugin_base.dart`
+- `lib/features/board/plugins/builtin/custom_widget_plugin_content.dart` — shared VM/web custom widget UI/CLI
+- `lib/features/board/plugins/builtin/custom_widget_plugin_web.dart` — thin web wrapper
+- `lib/features/board/plugins/builtin/ui_view_plugin_impl.dart` — shared VM/web UI View implementation
+- `lib/features/board/widgets/widget_remote_source.dart` — fetches example widgets from GitHub raw content
+- `lib/features/board/widgets/js_widget_bootstrap.dart`
+- `lib/features/board/widgets/js_widget_engine_message.dart`
 - `lib/features/board/ui/webview_overlays_vm.dart` (renamed from `webview_overlays.dart`), `webview_overlays_web.dart`
 - `lib/features/board/plugins/unsupported_capability_panel.dart`
 - `lib/core/remote/board_share_server_{stub,vm}.dart`

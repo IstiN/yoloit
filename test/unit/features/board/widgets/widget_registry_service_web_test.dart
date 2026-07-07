@@ -2,7 +2,10 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yoloit/core/platform/file_storage_adapter.dart';
+import 'package:yoloit/core/utils/http_client_base.dart';
+import 'package:yoloit/features/board/widgets/widget_manifest.dart';
 import 'package:yoloit/features/board/widgets/widget_registry_service_web.dart';
+import 'package:yoloit/features/board/widgets/widget_remote_source.dart';
 
 class _FakeStorage implements FileStorageAdapter {
   final _strings = <String, String>{};
@@ -44,6 +47,43 @@ class _FakeStorage implements FileStorageAdapter {
         .toSet()
         .toList();
   }
+}
+
+class _FakeHttpClient implements YoloitHttpClient {
+  final Map<String, String> _responses;
+
+  _FakeHttpClient(this._responses);
+
+  @override
+  Future<String?> getString(
+    String url, {
+    Map<String, String>? headers,
+    Duration timeout = const Duration(seconds: 8),
+  }) async =>
+      _responses[url];
+
+  @override
+  Future<Map<String, dynamic>?> getJson(
+    String url, {
+    Map<String, String>? headers,
+    Duration timeout = const Duration(seconds: 8),
+  }) async {
+    final text = _responses[url];
+    if (text == null) return null;
+    return null; // not used by widget remote source
+  }
+
+  @override
+  Future<Stream<List<int>>> postJsonStream(
+    String url, {
+    required Object? body,
+    Map<String, String>? headers,
+    Duration timeout = const Duration(seconds: 30),
+  }) async =>
+      throw UnimplementedError();
+
+  @override
+  void close() {}
 }
 
 void main() {
@@ -110,6 +150,101 @@ void main() {
       );
       final all = await service.loadAll();
       expect(all.map((m) => m.name).toList(), ['Alpha', 'Zoo']);
+    });
+
+    test('loadAll fetches examples from remote source when storage is empty',
+        () async {
+      final storage = _FakeStorage();
+      final client = _FakeHttpClient({
+        'https://raw.githubusercontent.com/IstiN/yoloit/main/tools/widgets/weather/manifest.json':
+            '{"name":"Remote Weather","icon":"🌦️"}',
+        'https://raw.githubusercontent.com/IstiN/yoloit/main/tools/widgets/weather/widget.js':
+            '// remote weather',
+      });
+      final remote = WidgetRemoteSource(client: client);
+      final service = WidgetRegistryService.testInstance(
+        adapter: storage,
+        remoteSource: remote,
+      );
+
+      final all = await service.loadAll();
+      expect(all.length, 1);
+      expect(all.first.name, 'Remote Weather');
+      expect(all.first.id, 'weather');
+
+      final manifest = await WidgetManifest.fromStorage(
+        'widgets/weather',
+        adapter: storage,
+      );
+      expect(manifest, isNotNull);
+      expect(await manifest!.readJs(adapter: storage), '// remote weather');
+    });
+
+    test('loadAll falls back to assets when remote source returns nothing',
+        () async {
+      final storage = _FakeStorage();
+      final client = _FakeHttpClient({});
+      final remote = WidgetRemoteSource(client: client);
+      final service = WidgetRegistryService.testInstance(
+        adapter: storage,
+        remoteSource: remote,
+      );
+
+      // Remote returns nothing, so the service falls back to bundled Flutter
+      // assets. In the unit-test environment those assets are available.
+      final all = await service.loadAll();
+      expect(all, isNotEmpty);
+      final ids = all.map((m) => m.id).toSet();
+      for (final name in WidgetRemoteSource.exampleNames) {
+        expect(ids, contains(name));
+      }
+    });
+  });
+
+  group('WidgetRemoteSource', () {
+    test('fetchWidget returns null when manifest is missing', () async {
+      final client = _FakeHttpClient({});
+      final source = WidgetRemoteSource(client: client);
+      expect(await source.fetchWidget('weather'), isNull);
+    });
+
+    test('fetchWidget returns null when widget.js is missing', () async {
+      final client = _FakeHttpClient({
+        'https://raw.githubusercontent.com/IstiN/yoloit/main/tools/widgets/x/manifest.json':
+            '{"name":"X"}',
+      });
+      final source = WidgetRemoteSource(client: client);
+      expect(await source.fetchWidget('x'), isNull);
+    });
+
+    test('fetchWidget returns files from manifest and widget.js', () async {
+      final client = _FakeHttpClient({
+        'https://raw.githubusercontent.com/IstiN/yoloit/main/tools/widgets/calc/manifest.json':
+            '{"name":"Calc","files":["lib/a.js","widget.js"]}',
+        'https://raw.githubusercontent.com/IstiN/yoloit/main/tools/widgets/calc/lib/a.js':
+            '// a',
+        'https://raw.githubusercontent.com/IstiN/yoloit/main/tools/widgets/calc/widget.js':
+            '// calc',
+      });
+      final source = WidgetRemoteSource(client: client);
+      final files = await source.fetchWidget('calc');
+      expect(files, isNotNull);
+      expect(files!['manifest.json'], isNotNull);
+      expect(files['lib/a.js'], '// a');
+      expect(files['widget.js'], '// calc');
+    });
+
+    test('fetchAllExamples skips individual failures', () async {
+      final client = _FakeHttpClient({
+        'https://raw.githubusercontent.com/IstiN/yoloit/main/tools/widgets/weather/manifest.json':
+            '{"name":"Weather"}',
+        'https://raw.githubusercontent.com/IstiN/yoloit/main/tools/widgets/weather/widget.js':
+            '// weather',
+      });
+      final source = WidgetRemoteSource(client: client);
+      final all = await source.fetchAllExamples();
+      expect(all.length, 1);
+      expect(all['weather'], isNotNull);
     });
   });
 }

@@ -10,13 +10,14 @@ import 'package:yoloit/core/utils/http_client_base.dart';
 /// `package:http` uses `dart:html`/`fetch` under the hood on the web, so it
 /// respects browser CORS policies. The response body is exposed as a stream of
 /// UTF-8 byte chunks to keep the VM and web APIs identical.
-class YoloitHttpClientImpl implements YoloitHttpClient {
+class YoloitHttpClientImpl extends YoloitHttpClient
+    with YoloitHttpClientGetJsonMixin {
   YoloitHttpClientImpl() : _client = http.Client();
 
   final http.Client _client;
 
   @override
-  Future<Map<String, dynamic>?> getJson(
+  Future<String?> getString(
     String url, {
     Map<String, String>? headers,
     Duration timeout = const Duration(seconds: 8),
@@ -26,7 +27,7 @@ class YoloitHttpClientImpl implements YoloitHttpClient {
           .get(Uri.parse(url), headers: headers)
           .timeout(timeout);
       if (response.statusCode != 200) return null;
-      return jsonDecode(response.body) as Map<String, dynamic>;
+      return response.body;
     } catch (e) {
       assert(() {
         debugPrint('[YoloitHttpClient] GET $url failed: $e');

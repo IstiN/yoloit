@@ -6,13 +6,14 @@ import 'package:flutter/foundation.dart';
 import 'package:yoloit/core/utils/http_client_base.dart';
 
 /// VM implementation of [YoloitHttpClient] using `dart:io` [HttpClient].
-class YoloitHttpClientImpl implements YoloitHttpClient {
+class YoloitHttpClientImpl extends YoloitHttpClient
+    with YoloitHttpClientGetJsonMixin {
   YoloitHttpClientImpl() : _client = HttpClient();
 
   final HttpClient _client;
 
   @override
-  Future<Map<String, dynamic>?> getJson(
+  Future<String?> getString(
     String url, {
     Map<String, String>? headers,
     Duration timeout = const Duration(seconds: 8),
@@ -22,8 +23,7 @@ class YoloitHttpClientImpl implements YoloitHttpClient {
       headers?.forEach(request.headers.set);
       final response = await request.close().timeout(timeout);
       if (response.statusCode != 200) return null;
-      final body = await response.transform(utf8.decoder).join().timeout(timeout);
-      return jsonDecode(body) as Map<String, dynamic>;
+      return await response.transform(utf8.decoder).join().timeout(timeout);
     } catch (e) {
       assert(() {
         debugPrint('[YoloitHttpClient] GET $url failed: $e');

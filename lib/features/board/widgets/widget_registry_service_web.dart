@@ -1,23 +1,34 @@
 import 'package:flutter/services.dart';
 import 'package:yoloit/core/platform/file_storage_adapter.dart';
 import 'package:yoloit/features/board/widgets/widget_manifest.dart';
+import 'package:yoloit/features/board/widgets/widget_remote_source.dart';
 
 /// Discovers and manages custom JS apps stored in [FileStorageAdapter]
 /// under the `widgets/` prefix.
 ///
-/// On first run the service copies bundled example apps from Flutter assets
-/// (`tools/widgets/`) into browser storage.
+/// On first run the service tries to fetch the built-in example widgets from
+/// the GitHub raw-content URL (so the web demo always has the latest examples
+/// without a full rebuild). If the network request fails, it falls back to the
+/// bundled Flutter assets (`tools/widgets/`).
 class WidgetRegistryService {
-  WidgetRegistryService._({FileStorageAdapter? adapter})
-    : _adapter = adapter ?? FileStorageAdapter.instance;
+  WidgetRegistryService._({
+    FileStorageAdapter? adapter,
+    this._remoteSource,
+  }) : _adapter = adapter ?? FileStorageAdapter.instance;
 
   static final instance = WidgetRegistryService._();
 
-  /// Test hook with a fake storage adapter.
-  factory WidgetRegistryService.testInstance({FileStorageAdapter? adapter}) =
-      WidgetRegistryService._;
+  /// Test hook with a fake storage adapter / remote source.
+  factory WidgetRegistryService.testInstance({
+    FileStorageAdapter? adapter,
+    WidgetRemoteSource? remoteSource,
+  }) => WidgetRegistryService._(
+        adapter: adapter,
+        remoteSource: remoteSource,
+      );
 
   final FileStorageAdapter _adapter;
+  final WidgetRemoteSource? _remoteSource;
 
   static const _prefix = 'widgets/';
 
@@ -107,11 +118,30 @@ class WidgetRegistryService {
     return ids;
   }
 
-  /// Copy bundled example widgets from Flutter assets on first run.
+  /// Ensures built-in example widgets exist in browser storage.
+  ///
+  /// First tries the configured remote source (GitHub raw). If that yields no
+  /// widgets, falls back to bundled Flutter assets.
   Future<void> _ensureExamplesInstalled() async {
     final existing = await _adapter.list(_prefix);
     if (existing.isNotEmpty) return;
 
+    final remote = _remoteSource ?? WidgetRemoteSource();
+    final remoteWidgets = await remote.fetchAllExamples();
+    if (remoteWidgets.isNotEmpty) {
+      for (final entry in remoteWidgets.entries) {
+        final id = entry.key;
+        final files = entry.value;
+        await installFromFiles(id: id, files: files);
+      }
+      return;
+    }
+
+    await _ensureExamplesFromAssets();
+  }
+
+  /// Copy bundled example widgets from Flutter assets.
+  Future<void> _ensureExamplesFromAssets() async {
     const examples = [
       'weather',
       'crypto',
