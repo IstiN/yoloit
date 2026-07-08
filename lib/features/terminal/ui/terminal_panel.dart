@@ -10,6 +10,7 @@ import 'package:xterm/src/core/cell.dart' as xterm_core;
 import 'package:xterm/xterm.dart' hide TerminalState;
 import 'package:yoloit/core/hotkeys/hotkeys.dart';
 import 'package:yoloit/core/platform/platform_launcher.dart';
+import 'package:yoloit/core/services/support_log_service.dart';
 import 'package:yoloit/core/session/session_prefs.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/utils/clipboard_utils.dart';
@@ -742,6 +743,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
   final _searchFocusNode = FocusNode();
   List<CellOffset> _searchHits = [];
   int _currentHitIndex = -1;
+  bool _lastAltBuffer = false;
 
   Size? get _terminalRenderSize {
     final context = _terminalViewKey.currentContext;
@@ -780,6 +782,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
     _scrollController.addListener(_persistScrollOffset);
     _bindTerminal();
     _attachTerminalDiagnostics(widget.session);
+    _attachSupportLogging(widget.session);
     if (widget.autoRequestFocus) _requestFocusAfterFrame();
     HardwareKeyboard.instance.addHandler(_handleHardwareKey);
     // Load persisted font size
@@ -811,9 +814,11 @@ class TerminalWidgetState extends State<TerminalWidget> {
     if (oldWidget.session.id != widget.session.id) {
       _unbindTerminalIfOurs(oldWidget.session);
       _detachTerminalDiagnostics(oldWidget.session);
-      HardwareKeyboard.instance.removeHandler(_handleHardwareKey);
+      _detachSupportLogging(oldWidget.session);
       _bindTerminal();
       _attachTerminalDiagnostics(widget.session);
+      _attachSupportLogging(widget.session);
+      HardwareKeyboard.instance.removeHandler(_handleHardwareKey);
       HardwareKeyboard.instance.addHandler(_handleHardwareKey);
     }
     // Request focus when this session becomes active (conditional render shows it).
@@ -886,6 +891,38 @@ class TerminalWidgetState extends State<TerminalWidget> {
   void _detachTerminalDiagnostics(AgentSession session) {
     if (!_terminalDiagnosticsEnabled) return;
     session.terminal.removeListener(_onTerminalDiagnosticsChange);
+  }
+
+  void _attachSupportLogging(AgentSession session) {
+    _lastAltBuffer = session.terminal.isUsingAltBuffer;
+    _focusNode.addListener(_onFocusChanged);
+    session.terminal.addListener(_onTerminalStateChangedForSupportLog);
+    SupportLogService.instance.add(
+      'terminal-widget',
+      'session=${session.id} attach altBuffer=$_lastAltBuffer',
+    );
+  }
+
+  void _detachSupportLogging(AgentSession session) {
+    _focusNode.removeListener(_onFocusChanged);
+    session.terminal.removeListener(_onTerminalStateChangedForSupportLog);
+  }
+
+  void _onFocusChanged() {
+    SupportLogService.instance.add(
+      'terminal-widget',
+      'session=${widget.session.id} focus=${_focusNode.hasFocus}',
+    );
+  }
+
+  void _onTerminalStateChangedForSupportLog() {
+    final next = widget.session.terminal.isUsingAltBuffer;
+    if (next == _lastAltBuffer) return;
+    _lastAltBuffer = next;
+    SupportLogService.instance.add(
+      'terminal-widget',
+      'session=${widget.session.id} altBuffer=$next',
+    );
   }
 
   void _onTerminalDiagnosticsChange() {
@@ -1478,6 +1515,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
     HardwareKeyboard.instance.removeHandler(_handleHardwareKey);
     _unbindTerminalIfOurs(widget.session);
     _detachTerminalDiagnostics(widget.session);
+    _detachSupportLogging(widget.session);
     _terminalDiagnosticsDebounce?.cancel();
     _scrollController.removeListener(_persistScrollOffset);
     _controller.dispose();

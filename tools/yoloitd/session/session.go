@@ -135,6 +135,8 @@ func New(req *CreateRequest) (*Session, error) {
 		alive:        true,
 	}
 
+	log.Printf("[session] created id=%s command=%s cwd=%s cols=%d rows=%d pid=%d", s.id, s.command, s.cwd, req.Cols, req.Rows, s.PID())
+
 	go s.readLoop()
 	go s.waitLoop()
 
@@ -195,6 +197,8 @@ func (s *Session) waitLoop() {
 		s.exitCode = s.cmd.ProcessState.ExitCode()
 	}
 	s.mu.Unlock()
+
+	log.Printf("[session] exited id=%s exitCode=%d", s.id, s.exitCode)
 
 	s.publish(Event{Type: "exit", SessionID: s.id, ExitCode: s.exitCode})
 	_ = s.ptmx.Close()
@@ -259,6 +263,7 @@ func (s *Session) Write(data string) error {
 
 // Resize changes the terminal dimensions.
 func (s *Session) Resize(cols, rows int) error {
+	log.Printf("[session] resize id=%s cols=%d rows=%d", s.id, cols, rows)
 	return pty.Setsize(s.ptmx, &pty.Winsize{
 		Cols: uint16(cols),
 		Rows: uint16(rows),
@@ -272,6 +277,7 @@ func (s *Session) Kill() {
 	if !s.alive {
 		return
 	}
+	log.Printf("[session] kill id=%s pid=%d", s.id, s.PID())
 	if s.cmd.Process != nil {
 		_ = s.cmd.Process.Signal(syscall.SIGTERM)
 		go func(pid int) {

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:yoloit/core/remote/yoloit_remote_client.dart';
 import 'package:yoloit/core/services/resource_monitor_service.dart';
+import 'package:yoloit/core/services/support_log_service.dart';
 import 'package:yoloit/features/board/model/terminal_panel_models.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_session_history.dart';
 import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
@@ -11,6 +12,7 @@ import 'package:yoloit/features/terminal/data/terminal_backend.dart';
 import 'package:yoloit/features/terminal/data/terminal_backend_service.dart';
 import 'package:yoloit/features/terminal/models/agent_session.dart';
 import 'package:yoloit/features/terminal/models/agent_type.dart';
+import 'package:yoloit/features/terminal/models/terminal_backend_mode.dart';
 
 class BoardTerminalSessionManager extends ChangeNotifier {
   BoardTerminalSessionManager._();
@@ -105,6 +107,10 @@ class BoardTerminalSessionManager extends ChangeNotifier {
   }
 
   Future<void> killSession(String sessionId) async {
+    SupportLogService.instance.add(
+      'terminal-session-manager',
+      'killSession sessionId=$sessionId',
+    );
     _outputSubs.remove(sessionId)?.cancel();
     _batchFlushTimers.remove(sessionId)?.cancel();
     _batchedOutput.remove(sessionId);
@@ -168,6 +174,10 @@ class BoardTerminalSessionManager extends ChangeNotifier {
     );
     _sessions[sessionId] = session;
     _attachProcess(process, session);
+    SupportLogService.instance.add(
+      'terminal-session-manager',
+      'spawned sessionId=$sessionId workingDir=$workingDir backend=${_backendService.modeFor(sessionId).id}',
+    );
     await BoardTerminalSessionHistory.instance.upsert(
       BoardTerminalSessionEntry(
         id: session.id,
@@ -223,6 +233,10 @@ class BoardTerminalSessionManager extends ChangeNotifier {
         _batchFlushTimers[sessionId]?.cancel();
         _batchFlushTimers.remove(sessionId);
         flushBatch();
+        SupportLogService.instance.add(
+          'terminal-session-manager',
+          'outputStreamDone sessionId=$sessionId',
+        );
         _onSessionEnded(sessionId);
       },
       // ignore: avoid_types_on_closure_parameters
@@ -230,12 +244,20 @@ class BoardTerminalSessionManager extends ChangeNotifier {
         _batchFlushTimers[sessionId]?.cancel();
         _batchFlushTimers.remove(sessionId);
         flushBatch();
+        SupportLogService.instance.add(
+          'terminal-session-manager',
+          'outputStreamError sessionId=$sessionId error=$e',
+        );
         _onSessionEnded(sessionId);
       },
     );
   }
 
   void _onSessionEnded(String sessionId) {
+    SupportLogService.instance.add(
+      'terminal-session-manager',
+      'sessionEnded sessionId=$sessionId',
+    );
     _outputSubs.remove(sessionId);
     _batchFlushTimers.remove(sessionId)?.cancel();
     _batchedOutput.remove(sessionId);

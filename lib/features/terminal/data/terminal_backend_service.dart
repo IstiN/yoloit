@@ -46,6 +46,10 @@ class TerminalBackendService {
 
   void write(String sessionId, String data) {
     final backend = _bySession[sessionId] ?? _local;
+    SupportLogService.instance.add(
+      'terminal-backend',
+      'write session=$sessionId backend=${backend.mode.id} dataLen=${data.length}',
+    );
     assert(() {
       // ignore: avoid_print
       print('[TerminalBackend] write session=$sessionId backend=${backend.mode.id} dataLen=${data.length}');
@@ -55,10 +59,19 @@ class TerminalBackendService {
   }
 
   void resize(String sessionId, int columns, int rows) {
-    (_bySession[sessionId] ?? _local).resize(sessionId, columns, rows);
+    final backend = _bySession[sessionId] ?? _local;
+    SupportLogService.instance.add(
+      'terminal-backend',
+      'resize session=$sessionId backend=${backend.mode.id} cols=$columns rows=$rows',
+    );
+    backend.resize(sessionId, columns, rows);
   }
 
   Future<void> kill(String sessionId) async {
+    SupportLogService.instance.add(
+      'terminal-backend',
+      'kill session=$sessionId backend=${(_bySession[sessionId] ?? _local).mode.id}',
+    );
     await (_bySession.remove(sessionId) ?? _local).kill(sessionId);
   }
 
