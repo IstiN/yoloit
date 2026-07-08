@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:yoloit/core/services/support_log_service.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
@@ -11,6 +12,15 @@ import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/chart/model/chart_models.dart';
 import 'package:yoloit/features/table/model/table_models.dart' as table_models;
 import 'package:yoloit/ui/components/buttons/toolbar_button.dart';
+
+List<Map<String, dynamic>>? _parseChartDataJson(String text) {
+  try {
+    final decoded = jsonDecode(text) as List<dynamic>;
+    return decoded.whereType<Map<String, dynamic>>().toList();
+  } catch (_) {
+    return null;
+  }
+}
 
 class ChartPanelContent extends StatelessWidget {
   const ChartPanelContent({
@@ -60,15 +70,30 @@ class ChartPanelContent extends StatelessWidget {
       },
     );
 
-    if (confirmed == null) return;
+    if (confirmed == null) {
+      SupportLogService.instance.add(
+        'chart-panel',
+        'editDialog dismissed without save panel=${panel.id}',
+      );
+      return;
+    }
 
-    final parsedData = _parseJson(dataTextController.text);
+    final parsedData = _parseChartDataJson(dataTextController.text);
     if (parsedData == null) {
+      SupportLogService.instance.add(
+        'chart-panel',
+        'editDialog invalid JSON panel=${panel.id}',
+      );
       messenger.showSnackBar(
         const SnackBar(content: Text('Invalid JSON data')),
       );
       return;
     }
+
+    SupportLogService.instance.add(
+      'chart-panel',
+      'editDialog save panel=${panel.id} rows=${parsedData.length}',
+    );
 
     renderContext.onUpdateState(<String, dynamic>{
       ...panel.state,
@@ -198,18 +223,6 @@ class ChartPanelContent extends StatelessWidget {
       return encoder.convert(value);
     } catch (_) {
       return value.toString();
-    }
-  }
-
-  List<Map<String, dynamic>>? _parseJson(String text) {
-    try {
-      final decoded = jsonDecode(text) as List<dynamic>;
-      return
-          decoded
-              .whereType<Map<String, dynamic>>()
-              .toList();
-    } catch (_) {
-      return null;
     }
   }
 }
@@ -344,6 +357,7 @@ class _ChartDataDialog extends StatefulWidget {
 
 class _ChartDataDialogState extends State<_ChartDataDialog> {
   late String? _selectedTableId;
+  String? _dataError;
 
   @override
   void initState() {
@@ -395,7 +409,25 @@ class _ChartDataDialogState extends State<_ChartDataDialog> {
     });
   }
 
+  void _validateDataField() {
+    final text = widget.dataTextController.text;
+    if (text.trim().isEmpty) {
+      setState(() => _dataError = 'Data cannot be empty');
+      return;
+    }
+    final parsed = _parseChartDataJson(text);
+    setState(() => _dataError = parsed == null ? 'Invalid JSON data' : null);
+  }
+
   void _save() {
+    _validateDataField();
+    if (_dataError != null) {
+      SupportLogService.instance.add(
+        'chart-panel',
+        'editDialog save blocked by validation panel=${widget.panel.id} error=$_dataError',
+      );
+      return;
+    }
     Navigator.of(context).pop(<String, dynamic>{
       'xKey': widget.xKeyController.text,
       'yKey': widget.yKeyController.text,
@@ -517,12 +549,18 @@ class _ChartDataDialogState extends State<_ChartDataDialog> {
             const SizedBox(height: 12),
             TextField(
               controller: widget.dataTextController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Inline JSON data',
                 alignLabelWithHint: true,
+                errorText: _dataError,
               ),
               maxLines: 8,
               minLines: 4,
+              onChanged: (_) {
+                if (_dataError != null) {
+                  setState(() => _dataError = null);
+                }
+              },
             ),
           ],
         ),
@@ -533,7 +571,7 @@ class _ChartDataDialogState extends State<_ChartDataDialog> {
           child: const Text('Cancel'),
         ),
         FilledButton(
-          onPressed: _save,
+          onPressed: _dataError == null ? _save : null,
           child: const Text('Save'),
         ),
       ],
