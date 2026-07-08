@@ -362,7 +362,7 @@ void main() {
       expect(provider.sentRuntimeContexts.single, same(runtimeContext));
     });
 
-    test('sendMessage inlines yoloit_clip chat export and drops log dumps', () async {
+    test('sendMessage inlines yoloit_clip chat export and log dumps fully', () async {
       final clipDir = Directory('${PlatformDirs.instance.tempDir}/yoloit_clip');
       await clipDir.create(recursive: true);
       final chatClip = File('${clipDir.path}/clip_1782557969509.txt');
@@ -384,13 +384,17 @@ void main() {
       );
 
       expect(ok, true);
-      expect(session.messages.single.attachments, [chatClip.path]);
+      expect(session.messages.single.attachments, [chatClip.path, logClip.path]);
       expect(
         session.messages.single.content,
         contains('добавь мне тестовых данных сюда'),
       );
+      expect(
+        session.messages.single.content,
+        contains('Launching lib/main.dart'),
+      );
       expect(provider.sentMessages.single, contains('добавь мне тестовых данных'));
-      expect(provider.sentMessages.single, isNot(contains('Launching lib/main.dart')));
+      expect(provider.sentMessages.single, contains('Launching lib/main.dart'));
     });
 
     test('updateConfig notifies listeners and swaps provider', () {

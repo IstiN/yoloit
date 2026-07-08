@@ -115,26 +115,28 @@ void main() {
     expect(args['text'], 'Effort →');
   });
 
-  test('resolve rejects terminal log clip dumps', () async {
+  test('resolve reads terminal log clip dumps fully', () async {
     final logClip = File('${clipDir.path}/clip_1782557536456.txt');
-    await logClip.writeAsString('''
+    final logContent = '''
 Launching lib/main.dart on macOS in debug mode...
 flutter: [BoardView] Canvas background pointer down
 Another exception was thrown: type String is not a subtype of num
-''');
-    expect(CliTextArgumentResolver.resolve(logClip.path), isNull);
+''';
+    await logClip.writeAsString(logContent);
+    expect(CliTextArgumentResolver.resolve(logClip.path), logContent.trim());
     expect(CliTextArgumentResolver.isClipTextFilePath(logClip.path), isTrue);
 
     final args = CliTextArgumentResolver.resolveActionArgs({
       'text': logClip.path,
     });
-    expect(args.containsKey('text'), isFalse);
+    expect(args['text'], logContent.trim());
   });
 
-  test('resolve rejects oversized non-chat clip files', () async {
+  test('resolve reads oversized non-chat clip files fully', () async {
     final hugeClip = File('${clipDir.path}/clip_1782559999999.txt');
-    await hugeClip.writeAsString('x' * 9000);
-    expect(CliTextArgumentResolver.resolve(hugeClip.path), isNull);
+    final hugeContent = 'x' * 9000;
+    await hugeClip.writeAsString(hugeContent);
+    expect(CliTextArgumentResolver.resolve(hugeClip.path), hugeContent);
   });
 
   test('resolveActionArgs unwraps literal shell quotes from text fields', () {

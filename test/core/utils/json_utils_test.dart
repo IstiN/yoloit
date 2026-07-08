@@ -41,11 +41,11 @@ void main() {
       expect(compactToolResultForPrompt(''), 'none');
     });
 
-    test('returns truncated raw text for non-JSON', () {
+    test('returns full raw text for non-JSON', () {
       final longText = 'a' * 1000;
       expect(
         compactToolResultForPrompt(longText),
-        '${'a' * 800}…',
+        longText,
       );
     });
 
@@ -67,12 +67,12 @@ void main() {
       expect(result, contains('"id":"p1"'));
     });
 
-    test('truncates compact JSON to 800 chars', () {
+    test('does not truncate compact JSON', () {
       final longValue = 'x' * 2000;
       final result = compactToolResultForPrompt(
         '{"ok":true,"command":"$longValue"}',
       );
-      expect(result.length, lessThanOrEqualTo(801));
+      expect(result, contains(longValue));
     });
   });
 }

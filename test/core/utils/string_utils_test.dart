@@ -3,7 +3,7 @@ import 'package:yoloit/core/utils/string_utils.dart';
 
 void main() {
   group('truncatePromptText', () {
-    test('returns trimmed text when under maxChars', () {
+    test('returns trimmed text', () {
       expect(truncatePromptText('hello world', 20), 'hello world');
     });
 
@@ -14,8 +14,11 @@ void main() {
       );
     });
 
-    test('truncates with ellipsis when over maxChars', () {
-      expect(truncatePromptText('hello world', 5), 'hello…');
+    test('does not truncate long text', () {
+      expect(
+        truncatePromptText('hello world', 5),
+        'hello world',
+      );
     });
 
     test('handles empty string', () {
@@ -31,17 +34,17 @@ void main() {
       );
     });
 
-    test('truncates long JSON', () {
+    test('does not truncate long JSON', () {
       expect(
         compactPromptJson({'key': 'value'}, 5),
-        '{"key…',
+        '{"key":"value"}',
       );
     });
 
     test('falls back to toString on non-JSON-serializable value', () {
       expect(
         compactPromptJson(Object(), 10),
-        'Instance o…',
+        startsWith('Instance of'),
       );
     });
 

@@ -542,14 +542,11 @@ class CollaborationCubit extends Cubit<CollaborationState> {
       data: data,
       editorState: fileEditorCubit?.state,
     );
-    final content = props.content.length > 8000
-        ? props.content.substring(0, 8000)
-        : props.content;
     return {
       'type': 'editor',
       'filePath': props.filePath,
       'language': props.language,
-      'content': content,
+      'content': props.content,
       'tabs': props.tabs
           .map((tab) => {'path': tab.path, 'isActive': tab.isActive})
           .toList(),

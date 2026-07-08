@@ -45,10 +45,6 @@ class CliTextArgumentResolver {
     dotAll: true,
   );
 
-  /// Plain-text clips longer than this are not inlined unless they are chat
-  /// session exports (where only the last USER block is kept).
-  static const int _maxClipPlaintextBytes = 8192;
-
   static const Set<String> stateTextKeys = <String>{
     'text',
     'content',
@@ -99,11 +95,6 @@ class CliTextArgumentResolver {
     final normalized = text_normalize.normalizeText(raw);
     final trimmed = normalized.trim();
     if (trimmed.isEmpty) return null;
-    if (looksLikeTerminalOrLogDump(trimmed)) return null;
-    if (!_chatSessionExport.hasMatch(trimmed) &&
-        raw.length > _maxClipPlaintextBytes) {
-      return null;
-    }
     final extracted = extractUsableClipText(raw).trim();
     if (extracted.isEmpty) return null;
     return extracted;

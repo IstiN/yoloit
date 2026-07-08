@@ -4,9 +4,6 @@ import 'package:yoloit/core/cli/cli_server.dart';
 import 'package:yoloit/core/cli/panel_cli_handler.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 
-/// Max characters of panel content to include in the assistant context.
-const _maxContentChars = 2000;
-
 /// Max rows from a table/kanban to include in the context.
 const _maxRows = 10;
 
@@ -132,7 +129,7 @@ String _formatContent(
 String _formatNoteContent(Map<String, dynamic> content) {
   final markdown = content['markdown'] as String? ?? '';
   if (markdown.isEmpty) return '(empty note)';
-  return '```markdown\n${_truncate(markdown)}\n```';
+  return '```markdown\n$markdown\n```';
 }
 
 String _formatTerminalContent(
@@ -143,7 +140,7 @@ String _formatTerminalContent(
   final buffer = StringBuffer()
     ..writeln('**Configuration:**')
     ..writeln('```json')
-    ..writeln(_safeJsonEncode(config, maxChars: 600))
+    ..writeln(_safeJsonEncode(config))
     ..writeln('```');
   final lines = actionOutput?['lines'] as List<dynamic>?;
   if (lines != null && lines.isNotEmpty) {
@@ -152,7 +149,7 @@ String _formatTerminalContent(
       ..writeln()
       ..writeln('**Recent output (${lines.length} lines):**')
       ..writeln('```')
-      ..writeln(_truncate(text, maxChars: 1200))
+      ..writeln(text)
       ..writeln('```');
   }
   return buffer.toString().trim();
@@ -242,20 +239,10 @@ List<Map<String, dynamic>> _asMapList(dynamic value) {
   return value.whereType<Map<String, dynamic>>().toList();
 }
 
-String _truncate(String text, {int maxChars = _maxContentChars}) {
-  if (text.length <= maxChars) return text;
-  return '${text.substring(0, maxChars)}…';
-}
-
-String _safeJsonEncode(
-  Object? value, {
-  int maxChars = _maxContentChars,
-}) {
+String _safeJsonEncode(Object? value) {
   if (value == null) return '';
   try {
-    final encoded = const JsonEncoder.withIndent('  ').convert(value);
-    if (encoded.length <= maxChars) return encoded;
-    return '${encoded.substring(0, maxChars)}…';
+    return const JsonEncoder.withIndent('  ').convert(value);
   } catch (_) {
     return '$value';
   }
