@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -76,7 +77,7 @@ class BoardPanelResizeChrome extends StatelessWidget {
   final bool capturingScreenshot;
   final ValueChanged<BoardPanelResizeUpdate> onResize;
   final ValueChanged<DragStartDetails> onDragStart;
-  final VoidCallback onDragEnd;
+  final FutureOr<void> Function() onDragEnd;
 
   void _handleResize(BoardPanelResizeHandle handle, DragUpdateDetails details) {
     onResize(
@@ -128,7 +129,7 @@ class BoardPanelResizeOverlay {
     required bool locked,
     required ValueChanged<DragStartDetails> onStart,
     required void Function(BoardPanelResizeHandle, DragUpdateDetails) onUpdate,
-    required VoidCallback onEnd,
+    required FutureOr<void> Function() onEnd,
     required AppColorScheme colors,
   }) {
     if (locked) return const [];
@@ -159,7 +160,7 @@ class PanelResizeHandleWidget extends StatefulWidget {
   final BoardPanelResizeHandle handle;
   final ValueChanged<DragStartDetails> onStart;
   final ValueChanged<DragUpdateDetails> onUpdate;
-  final VoidCallback onEnd;
+  final FutureOr<void> Function() onEnd;
   final AppColorScheme colors;
 
   @override

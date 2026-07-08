@@ -1865,7 +1865,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     _stopPanAnimation();
   }
 
-  void _handlePanelDragEnd() {
+  Future<void> _handlePanelDragEnd() async {
     _boardDebugLog('panelDrag.end');
     _isPanelDragging = false;
     _lastPanelDragBoardPointer = null;
@@ -1873,18 +1873,18 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     final board = cubit.state.activeBoard;
     final panelId = _transformingPanelId;
     if (board != null && board.gridMode.enabled) {
-      _commitPanelGridTransform(board);
+      await _commitPanelGridTransform(board);
     }
     if (panelId != null) {
       unawaited(cubit.endPanelGesture(panelId, boardId: board?.id));
     }
-    if (board != null) {
+    if (board != null && mounted) {
       _persistViewport(context, board);
     }
     _scheduleCanvasExpansionIfNeeded();
   }
 
-  void _commitPanelGridTransform(BoardDocument board) {
+  Future<void> _commitPanelGridTransform(BoardDocument board) async {
     final panelId = _transformingPanelId;
     final startBounds = _transformStartBounds;
     if (panelId == null || startBounds == null) return;
@@ -1906,7 +1906,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
       targetRect = startRect.shifted(dCol, dRow);
     }
 
-    context.read<BoardCubit>().placePanelInGrid(
+    await context.read<BoardCubit>().placePanelInGrid(
       board.id,
       panelId,
       targetRect: targetRect,
@@ -2002,9 +2002,13 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   Offset _consumePanelDragDelta(Offset globalPosition, Offset fallbackDelta) {
     final previous = _lastPanelDragBoardPointer;
     final current = _boardPointFromGlobal(globalPosition);
-    if (previous == null || current == null) {
+    if (current == null) {
+      // Keep the previous anchor so the next event can resume smoothly.
+      return Offset.zero;
+    }
+    if (previous == null) {
       _lastPanelDragBoardPointer = current;
-      return _scaledDragFallbackDelta(fallbackDelta);
+      return Offset.zero;
     }
     _lastPanelDragBoardPointer = current;
     final delta = current - previous;
@@ -2019,11 +2023,6 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     _lastPanelDragBoardPointer = _boardPointFromGlobal(globalPosition);
   }
 
-  Offset _scaledDragFallbackDelta(Offset fallbackDelta) {
-    final scale = matrixScaleOf(_transformController.value);
-    if (scale == 0) return fallbackDelta;
-    return fallbackDelta / scale;
-  }
 
   Widget _buildMultiSelectOverlay(
     BuildContext context,

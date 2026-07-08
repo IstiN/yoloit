@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -49,7 +50,7 @@ class BoardPanelCard extends StatefulWidget {
   final ValueChanged<DragUpdateDetails> onMove;
   final ValueChanged<BoardPanelResizeUpdate> onResize;
   final ValueChanged<DragStartDetails> onDragStart;
-  final VoidCallback onDragEnd;
+  final FutureOr<void> Function() onDragEnd;
   final VoidCallback onDelete;
   final VoidCallback onEditColor;
   final VoidCallback onBringToFront;
@@ -87,7 +88,7 @@ class BoardPanelCardState extends State<BoardPanelCard>
   ValueChanged<DragUpdateDetails> get onMove => widget.onMove;
   ValueChanged<BoardPanelResizeUpdate> get onResize => widget.onResize;
   ValueChanged<DragStartDetails> get onDragStart => widget.onDragStart;
-  VoidCallback get onDragEnd => widget.onDragEnd;
+  FutureOr<void> Function() get onDragEnd => widget.onDragEnd;
   VoidCallback get onDelete => widget.onDelete;
   VoidCallback get onEditColor => widget.onEditColor;
   VoidCallback get onBringToFront => widget.onBringToFront;
@@ -166,11 +167,14 @@ class BoardPanelCardState extends State<BoardPanelCard>
     onDragStart(details);
   }
 
-  void _endPanelTransform() {
+  Future<void> _endPanelTransform() async {
     if (_isTransformingPanel) {
+      setState(() => _isTransformingPanel = true);
+    }
+    await widget.onDragEnd();
+    if (mounted) {
       setState(() => _isTransformingPanel = false);
     }
-    onDragEnd();
   }
 
   @override

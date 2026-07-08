@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
@@ -55,7 +57,7 @@ class BoardPanelLayer extends StatefulWidget {
   )
   onResizePanel;
   final void Function(String panelId, DragStartDetails details) onDragStart;
-  final VoidCallback onDragEnd;
+  final FutureOr<void> Function() onDragEnd;
   final void Function(BuildContext context, BoardDocument board, String panelId)
   onConnectTap;
   final void Function(BuildContext context, String panelId)? onFullscreenPanel;

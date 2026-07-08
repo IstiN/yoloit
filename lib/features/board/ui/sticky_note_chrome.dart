@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/utils/color_utils.dart';
@@ -33,7 +35,7 @@ class StickyNoteChrome extends StatelessWidget {
   final ValueChanged<Map<String, dynamic>> onUpdateState;
   final ValueChanged<DragStartDetails> onDragStart;
   final ValueChanged<DragUpdateDetails>? onDragUpdate;
-  final VoidCallback onDragEnd;
+  final FutureOr<void> Function() onDragEnd;
   final VoidCallback onDuplicate;
   final VoidCallback onToggleLocked;
   final VoidCallback onBringToFront;

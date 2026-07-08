@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yoloit/core/ui/adaptive_dialog.dart';
@@ -32,7 +34,7 @@ class BoardPanelFloatingChrome extends StatelessWidget {
   final bool capturingScreenshot;
   final ValueChanged<DragUpdateDetails> onMove;
   final ValueChanged<DragStartDetails> onDragStart;
-  final VoidCallback onDragEnd;
+  final FutureOr<void> Function() onDragEnd;
   final VoidCallback onDelete;
   final VoidCallback onEditColor;
   final VoidCallback? onEditNote;
