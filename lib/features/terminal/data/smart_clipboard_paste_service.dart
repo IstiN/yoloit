@@ -45,17 +45,22 @@ class SmartClipboardPasteService {
 
     if (text == null || text.isEmpty) return null;
 
+    return resolveText(text, allowInlineText: allowInlineText);
+  }
+
+  /// Decides whether [text] should be pasted inline or saved to a temp file.
+  /// Exposed for unit testing; callers should use [readInlineTextOrSavedFilePath].
+  Future<String?> resolveText(String text, {bool allowInlineText = false}) async {
     text = ClipboardFileService.instance.normalizeText(text);
 
     if (text.isEmpty) return null;
 
     if (CliTextArgumentResolver.looksLikeTerminalOrLogDump(text)) {
-      if (allowInlineText) {
-        const maxChars = 1500;
-        if (text.length <= maxChars) return text;
-        return '${text.substring(0, maxChars)}\n…[log truncated]';
-      }
-      return null;
+      const maxChars = 1500;
+      if (allowInlineText && text.length <= maxChars) return text;
+      // Long terminal/log dumps are saved to a temp file so the full content is
+      // preserved and can be referenced by path instead of being truncated.
+      return ClipboardFileService.instance.saveTextToFile(text);
     }
 
     // If the clipboard contains a single existing file path, return it as-is
