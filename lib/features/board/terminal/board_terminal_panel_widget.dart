@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:path/path.dart' as p;
+import 'package:xterm/xterm.dart';
 import 'package:yoloit/core/remote/yoloit_remote_client.dart';
 import 'package:yoloit/core/services/resource_monitor_service.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
@@ -635,6 +636,7 @@ class _BoardTerminalPanelWidgetState extends State<BoardTerminalPanelWidget> {
       children: [
         _BoardTerminalInfoBar(
           config: _config,
+          terminal: _session?.terminal,
           onHistory: _showHistoryDialog,
           onKill: _killCurrentSession,
           onEnvGroupsChanged: _onEnvGroupsChanged,
@@ -667,12 +669,14 @@ class _BoardTerminalInfoBar extends StatefulWidget {
     required this.onHistory,
     required this.onKill,
     required this.onEnvGroupsChanged,
+    this.terminal,
     this.onOpenFullView,
     this.onScrollUp,
     this.onScrollDown,
   });
 
   final BoardTerminalConfig config;
+  final Terminal? terminal;
   final VoidCallback onHistory;
   final VoidCallback onKill;
   final ValueChanged<List<String>> onEnvGroupsChanged;
@@ -686,6 +690,7 @@ class _BoardTerminalInfoBar extends StatefulWidget {
 
 class _BoardTerminalInfoBarState extends State<_BoardTerminalInfoBar> {
   late Future<List<String>> _envNamesFuture;
+  bool _isAltBuffer = false;
 
   @override
   void initState() {
@@ -693,6 +698,7 @@ class _BoardTerminalInfoBarState extends State<_BoardTerminalInfoBar> {
     _envNamesFuture = GlobalEnvGroupsService.instance.resolveSelectedGroupNames(
       widget.config.envGroupIds,
     );
+    _attachTerminalListener();
   }
 
   @override
@@ -703,6 +709,33 @@ class _BoardTerminalInfoBarState extends State<_BoardTerminalInfoBar> {
       _envNamesFuture = GlobalEnvGroupsService.instance
           .resolveSelectedGroupNames(widget.config.envGroupIds);
     }
+    if (!identical(oldWidget.terminal, widget.terminal)) {
+      _detachTerminalListener(oldWidget.terminal);
+      _attachTerminalListener();
+    }
+  }
+
+  void _attachTerminalListener() {
+    final terminal = widget.terminal;
+    if (terminal == null) return;
+    terminal.addListener(_onTerminalChange);
+    _isAltBuffer = terminal.isUsingAltBuffer;
+  }
+
+  void _detachTerminalListener(Terminal? terminal) {
+    terminal?.removeListener(_onTerminalChange);
+  }
+
+  void _onTerminalChange() {
+    final next = widget.terminal?.isUsingAltBuffer ?? false;
+    if (next == _isAltBuffer) return;
+    setState(() => _isAltBuffer = next);
+  }
+
+  @override
+  void dispose() {
+    _detachTerminalListener(widget.terminal);
+    super.dispose();
   }
 
   String _shortPath(String path) {
@@ -744,6 +777,31 @@ class _BoardTerminalInfoBarState extends State<_BoardTerminalInfoBar> {
               style: TextStyle(fontSize: 10, color: mutedColor),
             ),
           ),
+          if (_isAltBuffer)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Tooltip(
+                message:
+                    'A fullscreen TUI app is running. '
+                    'Press Esc, q, or Ctrl+C to return to the shell.',
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: colors.accentOrange.withAlpha(40),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: colors.accentOrange.withAlpha(120)),
+                  ),
+                  child: Text(
+                    'TUI',
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      color: colors.accentOrange,
+                    ),
+                  ),
+                ),
+              ),
+            ),
           FutureBuilder<List<String>>(
             future: _envNamesFuture,
             builder: (context, snapshot) {
