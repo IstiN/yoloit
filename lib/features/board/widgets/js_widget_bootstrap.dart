@@ -10,18 +10,18 @@ var __raf_cbs = {};
 var __nid = function(){return Math.random().toString(36).slice(2)+Date.now().toString(36);};
 
 var console = {
-  log:   function(){sendMessage('__yoloit_log',JSON.stringify(Array.prototype.slice.call(arguments).join(' ')));},
-  warn:  function(){sendMessage('__yoloit_log',JSON.stringify('[W] '+Array.prototype.slice.call(arguments).join(' ')));},
-  error: function(){sendMessage('__yoloit_log',JSON.stringify('[E] '+Array.prototype.slice.call(arguments).join(' ')));}
+  log:   function(){sendMessage('__yoloit_log', Array.prototype.slice.call(arguments).join(' '));},
+  warn:  function(){sendMessage('__yoloit_log', '[W] '+Array.prototype.slice.call(arguments).join(' '));},
+  error: function(){sendMessage('__yoloit_log', '[E] '+Array.prototype.slice.call(arguments).join(' '));}
 };
 
 var setTimeout = function(fn,ms){ var id=__nid(); __iv_cbs[id]=function(){fn();clearInterval(id);}; sendMessage('__yoloit_set_interval',JSON.stringify({id:id,ms:ms||0})); return id; };
-var clearTimeout = function(id){ sendMessage('__yoloit_clear_interval',JSON.stringify(String(id))); };
+var clearTimeout = function(id){ sendMessage('__yoloit_clear_interval', String(id)); };
 var setInterval = function(fn,ms){ var id=__nid(); __iv_cbs[id]=fn; sendMessage('__yoloit_set_interval',JSON.stringify({id:id,ms:ms||1000})); return id; };
-var clearInterval = function(id){ sendMessage('__yoloit_clear_interval',JSON.stringify(String(id))); delete __iv_cbs[String(id)]; };
+var clearInterval = function(id){ sendMessage('__yoloit_clear_interval', String(id)); delete __iv_cbs[String(id)]; };
 
 var requestAnimationFrame = function(fn){ var id=__nid(); __raf_cbs[id]=fn; sendMessage('__yoloit_raf',JSON.stringify({id:id})); return id; };
-var cancelAnimationFrame = function(id){ delete __raf_cbs[String(id)]; sendMessage('__yoloit_caf',JSON.stringify(String(id))); };
+var cancelAnimationFrame = function(id){ delete __raf_cbs[String(id)]; sendMessage('__yoloit_caf', String(id)); };
 
 var yoloit = {
   render: function(tree){ sendMessage('__yoloit_render', JSON.stringify(tree)); },
@@ -60,7 +60,7 @@ var yoloit = {
     }
   },
 
-  panel:{setTitle:function(t){sendMessage('__yoloit_set_title', JSON.stringify(t));}},
+  panel:{setTitle:function(t){sendMessage('__yoloit_set_title', String(t));}},
 
   // Structured state for CLI (yoloit app:state)
   exportState:function(obj){sendMessage('__yoloit_export_state', JSON.stringify(obj||{}));},
