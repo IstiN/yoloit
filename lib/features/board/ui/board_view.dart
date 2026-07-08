@@ -432,7 +432,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                           constrained: false,
                                           minScale: 0.2,
                                           maxScale: 2.5,
-                                          scaleEnabled: true,
+                                          scaleEnabled: !isLocked,
                                           boundaryMargin: const EdgeInsets.all(
                                             canvasExpansionChunk,
                                           ),

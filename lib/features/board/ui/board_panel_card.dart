@@ -15,6 +15,7 @@ import 'package:yoloit/features/board/ui/panel_settings_dialog.dart';
 import 'package:yoloit/features/board/ui/board_panel_resize_chrome.dart';
 import 'package:yoloit/features/board/ui/board_panel_selection_metrics.dart';
 import 'package:yoloit/features/board/ui/unified_panel_header.dart';
+import 'package:yoloit/features/mindmap/widgets/canvas_interaction_lock.dart';
 import 'package:yoloit/ui/components/layout/panel_content_toolbar.dart';
 
 class BoardPanelCard extends StatefulWidget {
@@ -597,10 +598,13 @@ class BoardPanelCardState extends State<BoardPanelCard>
   Widget _buildPanelContent(BuildContext context, BoardPanelInstance panel) {
     final plugin = BoardPluginRegistry.instance.pluginFor(panel.type);
     if (plugin != null) {
-      return plugin.buildContent(
-        context,
-        panel,
-        _buildRenderContext(context, panel),
+      return ScrollConfiguration(
+        behavior: const PanelScrollLockBehavior(),
+        child: plugin.buildContent(
+          context,
+          panel,
+          _buildRenderContext(context, panel),
+        ),
       );
     }
     // Fallback for unknown types

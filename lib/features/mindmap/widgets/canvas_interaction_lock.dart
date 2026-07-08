@@ -114,6 +114,26 @@ class CanvasInteractionLock {
   }
 }
 
+/// A [ScrollBehavior] that wraps every scrollable inside a board panel with
+/// [ScrollableCardRegion]. This makes the canvas lock its pan/zoom whenever
+/// the pointer is over a panel that has internal scrollable content, so the
+/// panel's own scroll consumes the wheel/trackpad event instead of also
+/// scrolling the infinite board.
+class PanelScrollLockBehavior extends ScrollBehavior {
+  const PanelScrollLockBehavior();
+
+  @override
+  Widget buildOverscrollIndicator(
+    BuildContext context,
+    Widget child,
+    ScrollableDetails details,
+  ) {
+    return ScrollableCardRegion(
+      child: super.buildOverscrollIndicator(context, child, details),
+    );
+  }
+}
+
 /// Wraps a scrollable widget so that while the pointer is over it, the
 /// mindmap canvas pan is disabled. The wrapped widget can freely consume
 /// wheel / two-finger scroll / drag gestures.
