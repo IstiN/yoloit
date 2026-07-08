@@ -93,7 +93,7 @@ class BoardTitleBar extends StatelessWidget {
       behavior: HitTestBehavior.translucent,
       child: ClipRRect(
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
           child: Container(
             height: 44,
             decoration: BoxDecoration(
@@ -101,20 +101,13 @@ class BoardTitleBar extends StatelessWidget {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  colors.surface.withAlpha(31),
-                  colors.surface.withAlpha(82),
+                  colors.surface.withAlpha(120),
+                  colors.surface.withAlpha(200),
                 ],
               ),
               border: Border(
-                bottom: BorderSide(color: colors.border.withAlpha(166)),
+                bottom: BorderSide(color: colors.border),
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: colors.textPrimary.withAlpha(46),
-                  blurRadius: 12,
-                  offset: const Offset(0, 3),
-                ),
-              ],
             ),
             child: content,
           ),
