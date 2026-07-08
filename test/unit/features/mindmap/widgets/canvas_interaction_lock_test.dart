@@ -37,6 +37,25 @@ void main() {
     });
 
     testWidgets(
+      'ScrollableCardRegion wraps its child with a ScrollableCardMarker',
+      (tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: SizedBox(
+              width: 200,
+              height: 200,
+              child: ScrollableCardRegion(
+                child: Container(color: Colors.green),
+              ),
+            ),
+          ),
+        );
+
+        expect(find.byType(ScrollableCardMarker), findsOneWidget);
+      },
+    );
+
+    testWidgets(
       'enters canvas lock while pointer is over the region and releases on exit',
       (tester) async {
         await tester.pumpWidget(

@@ -90,6 +90,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   String? _transformingPanelId;
   BoardPanelBounds? _transformStartBounds;
   bool _isCurrentTransformResize = false;
+  bool _panZoomLockedByBoard = false;
 
   String? _syncedBoardId;
   BoardViewport? _syncedViewport;
@@ -349,36 +350,22 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                               _transformController.value,
                                             );
                                             _boardSupportLog(
-                                              'pointerScroll locked=$isLocked '
-                                              'canvasGesture=${CanvasInteractionLock.instance.isCanvasGestureActive} '
-                                              'overScrollable=$overScrollable '
-                                              'tool=${_activeTool.name} '
-                                              'kind=${event.kind.name} '
-                                              'delta=${fmtOffset(event.scrollDelta)} '
-                                              'pos=${fmtOffset(event.position)} '
-                                              'scale=${fmtDouble(scale)}',
+                                              'pointerScroll locked=$isLocked canvasGesture=${CanvasInteractionLock.instance.isCanvasGestureActive} overScrollable=$overScrollable tool=${_activeTool.name} kind=${event.kind.name} delta=${fmtOffset(event.scrollDelta)} pos=${fmtOffset(event.position)} scale=${fmtDouble(scale)}',
                                             );
                                             if (overScrollable) {
                                               CanvasInteractionLock.instance
                                                   .clearCanvasSignalGesture();
-                                            } else {
-                                              CanvasInteractionLock.instance
-                                                  .markCanvasSignalGesture();
+                                              // Swallow the event so the inner
+                                              // scrollable handles it and the
+                                              // board canvas does not pan/zoom.
+                                              return;
                                             }
+                                            CanvasInteractionLock.instance
+                                                .markCanvasSignalGesture();
                                           } else {
                                             _boardSupportLog(
-                                              'pointerSignal locked=$isLocked '
-                                              'canvasGesture=${CanvasInteractionLock.instance.isCanvasGestureActive} '
-                                              'overScrollable=$overScrollable '
-                                              'tool=${_activeTool.name} '
-                                              'type=${event.runtimeType} '
-                                              'pos=${fmtOffset(event.position)}',
+                                              'pointerSignal locked=$isLocked canvasGesture=${CanvasInteractionLock.instance.isCanvasGestureActive} overScrollable=$overScrollable tool=${_activeTool.name} type=${event.runtimeType} pos=${fmtOffset(event.position)}',
                                             );
-                                          }
-                                          if (isLocked && overScrollable) {
-                                            // Swallow the event here so
-                                            // InteractiveViewer never sees it.
-                                            return;
                                           }
                                         },
                                         onPointerPanZoomStart: (event) {
@@ -387,42 +374,39 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                 event.position,
                                                 event.viewId,
                                               );
-                                          if (!overScrollable) {
+                                          if (overScrollable) {
+                                            CanvasInteractionLock.instance
+                                                .clearCanvasSignalGesture();
+                                            CanvasInteractionLock.instance
+                                                .enter();
+                                            _panZoomLockedByBoard = true;
+                                          } else {
                                             CanvasInteractionLock.instance
                                                 .beginCanvasGesture();
+                                            _panZoomLockedByBoard = false;
                                           }
                                           _boardSupportLog(
-                                            'panZoom.start locked=$isLocked '
-                                            'canvasGesture=${CanvasInteractionLock.instance.isCanvasGestureActive} '
-                                            'overScrollable=$overScrollable '
-                                            'tool=${_activeTool.name} '
-                                            'pos=${fmtOffset(event.position)} '
-                                            'scale=${fmtDouble(matrixScaleOf(_transformController.value))}',
+                                            'panZoom.start locked=$isLocked canvasGesture=${CanvasInteractionLock.instance.isCanvasGestureActive} overScrollable=$overScrollable tool=${_activeTool.name} pos=${fmtOffset(event.position)} scale=${fmtDouble(matrixScaleOf(_transformController.value))}',
                                           );
                                         },
                                         onPointerPanZoomUpdate: (event) {
                                           _boardSupportLog(
-                                            'panZoom.update locked=$isLocked '
-                                            'tool=${_activeTool.name} '
-                                            'pan=${fmtOffset(event.pan)} '
-                                            'panDelta=${fmtOffset(event.panDelta)} '
-                                            'scale=${fmtDouble(event.scale)} '
-                                            'rotation=${event.rotation.toStringAsFixed(3)} '
-                                            'viewScale=${fmtDouble(matrixScaleOf(_transformController.value))}',
+                                            'panZoom.update locked=$isLocked tool=${_activeTool.name} pan=${fmtOffset(event.pan)} panDelta=${fmtOffset(event.panDelta)} scale=${fmtDouble(event.scale)} rotation=${event.rotation.toStringAsFixed(3)} viewScale=${fmtDouble(matrixScaleOf(_transformController.value))}',
                                           );
                                         },
                                         onPointerPanZoomEnd: (event) {
-                                          if (CanvasInteractionLock
+                                          if (_panZoomLockedByBoard) {
+                                            CanvasInteractionLock.instance
+                                                .exit();
+                                            _panZoomLockedByBoard = false;
+                                          } else if (CanvasInteractionLock
                                               .instance
                                               .isCanvasGestureActive) {
                                             CanvasInteractionLock.instance
                                                 .endCanvasGesture();
                                           }
                                           _boardSupportLog(
-                                            'panZoom.end locked=$isLocked '
-                                            'canvasGesture=${CanvasInteractionLock.instance.isCanvasGestureActive} '
-                                            'tool=${_activeTool.name} '
-                                            'scale=${fmtDouble(matrixScaleOf(_transformController.value))}',
+                                            'panZoom.end locked=$isLocked canvasGesture=${CanvasInteractionLock.instance.isCanvasGestureActive} tool=${_activeTool.name} scale=${fmtDouble(matrixScaleOf(_transformController.value))}',
                                           );
                                         },
                                         child: InteractiveViewer(

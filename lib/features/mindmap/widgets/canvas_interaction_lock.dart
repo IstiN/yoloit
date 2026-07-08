@@ -224,9 +224,10 @@ class _ScrollableCardRegionState extends State<ScrollableCardRegion> {
 
   @override
   Widget build(BuildContext context) {
-    return Listener(
-      behavior: HitTestBehavior.opaque,
-      onPointerSignal: (event) {
+    return ScrollableCardMarker(
+      child: Listener(
+        behavior: HitTestBehavior.opaque,
+        onPointerSignal: (event) {
         if (event is PointerScrollEvent) {
           final vertical =
               event.scrollDelta.dy.abs() >= event.scrollDelta.dx.abs();
@@ -298,6 +299,7 @@ class _ScrollableCardRegionState extends State<ScrollableCardRegion> {
         });
       },
       child: MouseRegion(onEnter: _enter, onExit: _exit, child: widget.child),
+      ),
     );
   }
 }
