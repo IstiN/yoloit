@@ -62,7 +62,7 @@ jobs:
           sed -i "s|main\.dart\.js|main.dart.js?v=${CACHE_TAG}|g" build/web/flutter_bootstrap.js
 
       - name: Setup Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
 
       - name: Assemble Pages artifact
         run: |
