@@ -1,7 +1,7 @@
 # YoLoIT GitHub Pages Demo — Current Status
 
 > Hand-off document created: 2026-07-05  
-> Last updated: 2026-07-07 (deployed from commit `adf96ff`)  
+> Last updated: 2026-07-09 (deployed from commit `ac3bc1f`)  
 > Goal: deploy a static landing page + Flutter web demo to GitHub Pages, with all native-only features rendered as "Available in YoLoIT for macOS" placeholders.  
 >
 > **Deployment is live.** The web demo is auto-deployed from every `main` branch push via `.github/workflows/deploy_demo.yml`. Each deploy appends a unique `github.run_id` query parameter to `flutter_bootstrap.js` and `main.dart.js` so GitHub Pages / Fastly cannot serve a stale cached build. A **Clear page cache** button is also available in Settings → Support on the web for manual cache reset.
@@ -618,19 +618,115 @@ The first web implementation copied bundled example widgets from Flutter assets 
 - `flutter analyze --no-pub --no-fatal-infos --no-fatal-warnings lib/core/utils/http_client*.dart lib/features/board/widgets/widget_remote_source.dart lib/features/board/widgets/widget_registry_service_web.dart` reports no issues.
 - `flutter test test/unit/features/board/widgets/widget_registry_service_web_test.dart` passes, including remote-fetch and asset-fallback paths.
 
+### 2.37 Chart JSON validation and save diagnostics on web
+Editing chart data in the **Chart** panel on web sometimes failed to save because the inline JSON editor returned values that the chart parser rejected without feedback.
+
+**Fix:**
+- Added inline JSON validation to `lib/features/chart/ui/chart_panel_content.dart`.
+- Surface parse errors directly in the panel UI so the user can correct the data before saving.
+- Added 127 new widget/unit tests covering valid/invalid chart JSON round-trips.
+
+**Verification:**
+- `flutter test test/unit/features/chart/ui/chart_panel_content_test.dart` passes.
+- `flutter analyze --no-pub --no-fatal-infos --no-fatal-warnings lib/features/chart/ui/chart_panel_content.dart` reports no issues.
+
+### 2.41 Canvas pan/zoom locked when scrolling over panel scrollables
+On web, scrolling inside a panel with a scrollable subtree (table, code editor, chat, etc.) also panned/zoomed the underlying board canvas.
+
+**Fix:**
+- Reused and extended `CanvasInteractionLock` so any panel scrollable can request a temporary lock on board canvas interactions.
+- `BoardPanelCard` reports pointer presence over scrollables; `BoardView` respects the lock and ignores wheel/pan events while the lock is held.
+- Added unit tests in `test/unit/features/mindmap/widgets/canvas_interaction_lock_test.dart`.
+
+**Verification:**
+- `flutter test test/unit/features/mindmap/widgets/canvas_interaction_lock_test.dart` passes.
+- Manual verification: scrolling a long table or chat panel no longer moves the board canvas.
+
+### 2.42 Web JS widget engine moved to Web Worker
+The web implementation of custom JS widgets ran inside a hidden sandboxed iframe. The user wanted the Dart JS interpreter to remain on macOS, but on the web the engine was moved to a dedicated Web Worker for better isolation and performance.
+
+**Fix:**
+- Refactored `lib/features/board/widgets/js_widget_engine_web.dart` to spawn a Web Worker and communicate via typed messages.
+- Introduced `lib/features/board/widgets/js_widget_bridge.dart` as the shared VM/web bridge protocol.
+- Updated `js_widget_bootstrap.dart` to load inside the worker context.
+- Kept the VM engine (`js_widget_engine_vm.dart`) unchanged so macOS still uses the Dart interpreter.
+
+**Verification:**
+- `flutter build web --release --target lib/main_web_full.dart --base-href /yoloit/app/ --pwa-strategy none` succeeds.
+- `flutter test test/unit/features/board/widgets/js_widget_bridge_test.dart test/unit/features/board/widgets/js_widget_engine_web_test.dart` passes.
+
+### 2.43 Terminal support logging and TUI indicator
+To make terminal sessions easier to debug, lifecycle and PTY operations are now logged, and a TUI indicator is shown when the terminal switches to the alternate screen buffer.
+
+**Fix:**
+- `BoardTerminalSessionManager` and `TerminalBackendService` emit lifecycle/PTY log events.
+- `TerminalPanel` displays a small TUI indicator while the alt buffer is active.
+- Added server-side session logging in `tools/yoloitd/session/session.go`.
+
+**Verification:**
+- Existing terminal unit tests pass.
+- Manual verification: running `vim`, `htop`, or `tmux` in a terminal panel shows the TUI indicator.
+
+### 2.44 User input is never truncated
+Pasting large text into terminals or chat panels could silently truncate the content. The user explicitly asked to never cut input text.
+
+**Fix:**
+- Removed truncation logic from `StringUtils.truncateWithEllipsis` callers in clipboard/CLI/panel-context/editor paths.
+- `SmartClipboardPasteService` now writes oversized clipboard content to a temporary file and pastes a file link instead of truncating.
+- Updated `cli_text_argument_resolver_test.dart`, `string_utils_test.dart`, and `chat_session_manager_test.dart`.
+
+**Verification:**
+- `flutter test test/core/cli/cli_text_argument_resolver_test.dart test/core/utils/string_utils_test.dart test/unit/features/terminal/smart_clipboard_paste_service_test.dart` passes.
+- `flutter analyze --no-pub --no-fatal-infos --no-fatal-warnings lib/core/utils/string_utils.dart lib/core/cli/cli_text_argument_resolver.dart lib/features/board/chat/panel_context_builder.dart lib/features/collaboration/bloc/collaboration_cubit.dart` reports no issues.
+
+### 2.45 Terminal long dumps saved to file instead of truncated inline
+Long terminal or log output was being truncated inline, making it hard to inspect full output.
+
+**Fix:**
+- `SmartClipboardPasteService` detects oversized terminal/log dumps and writes them to a file, then inserts a link to the file instead of the truncated text.
+- Added 75 unit tests for the new behavior.
+
+**Verification:**
+- `flutter test test/unit/features/terminal/smart_clipboard_paste_service_test.dart` passes.
+
+### 2.46 Desktop title bar blur reduced
+The desktop title bar looked blurry/muddy because of a strong blur filter with low opacity.
+
+**Fix:**
+- Reduced the blur radius and increased the background opacity in `lib/ui/shell/board_title_bar.dart`.
+- The shared `BoardTitleBar` now looks crisp on both macOS and web.
+
+**Verification:**
+- `flutter analyze --no-pub --no-fatal-infos --no-fatal-warnings lib/ui/shell/board_title_bar.dart` reports no issues.
+- Golden tests regenerated where needed.
+
+### 2.47 Board drag, zoom, and edge-pan fixes
+Two related issues were reported:
+1. When dragging a panel at zoom levels other than 100 %, the panel jumped because the fallback drag delta was not scaled correctly.
+2. When dragging a panel to the edge of the viewport, the canvas panned faster than the panel, creating a visible gap between the pointer and the panel.
+
+**Fix:**
+- Removed the flawed `_scaledDragFallbackDelta` fallback; `_consumePanelDragDelta` now returns `Offset.zero` on the first event and computes the true board-space delta on subsequent events.
+- Made `_commitPanelGridTransform` async and awaited it in `_handlePanelDragEnd` to suppress the grid-snap animation that appeared after a drag.
+- In `_movePanelWithEdgePan`, `_moveGroupWithEdgePan`, and `_resizePanelWithEdgePan`, `_panViewportNearEdge` is now called **before** `_consumePanelDragDelta`. This ensures the board-space pointer coordinate includes the viewport pan, so the panel moves in sync with the canvas during edge pan.
+
+**Verification:**
+- `flutter test test/widget/features/board/board_panel_chrome_test.dart test/widget/features/board/board_panel_resize_chrome_test.dart test/unit/features/board/ui/board_math_test.dart test/unit/features/board/board_cubit_operations_test.dart test/unit/features/board/board_cubit_history_test.dart test/unit/board/board_grid_layout_test.dart --no-pub` passes (102 tests).
+- Full `flutter test --no-pub --concurrency=1` passes.
+
 ---
 
 ## 3. Deployment status
 
-The demo has been deployed automatically from the `main` branch push.
+The demo has been deployed automatically from the `main` branch push and the desktop release was built for all platforms.
 
-- **Git commit:** `adf96ff`
-- **GitHub Actions run:** `28899467181` — `Deploy demo to GitHub Pages` — **success**
+- **Git commit:** `ac3bc1f`
+- **GitHub Actions run:** `29002314823` — `Deploy demo to GitHub Pages` — **success**
+- **Release:** `v1.0.242` — GitHub Release with macOS (arm64 / x86_64 DMG + ZIP), Linux tar.gz, and Windows ZIP assets
 - **Live URLs:**
   - Landing page: `https://istin.github.io/yoloit/` (HTTP 200)
   - Flutter web demo: `https://istin.github.io/yoloit/app/index.html` (HTTP 200)
-
-> The `workflow_dispatch` trigger requires admin rights, so `gh workflow run` failed with 403. However, the push itself triggered the workflow because the commit touched `lib/**`, `web/**`, `.github/workflows/deploy_demo.yml`, and `site/**`.
+  - Latest desktop downloads: `https://github.com/IstiN/yoloit/releases/latest`
 
 ### 3.1 Local verification URLs
 - Landing page: `http://127.0.0.1:8097/` (currently served by `python3 -m http.server 8097 --bind 127.0.0.1 --directory site`)
@@ -758,6 +854,7 @@ New:
 - `lib/features/board/widgets/widget_remote_source.dart` — fetches example widgets from GitHub raw content
 - `lib/features/board/widgets/js_widget_bootstrap.dart`
 - `lib/features/board/widgets/js_widget_engine_message.dart`
+- `lib/features/board/widgets/js_widget_bridge.dart` — shared VM/web bridge protocol for the JS widget engine
 - `lib/features/board/ui/webview_overlays_vm.dart` (renamed from `webview_overlays.dart`), `webview_overlays_web.dart`
 - `lib/features/board/plugins/unsupported_capability_panel.dart`
 - `lib/core/remote/board_share_server_{stub,vm}.dart`
@@ -765,6 +862,13 @@ New:
 - `lib/features/templates/data/template_sources_service_base.dart`, `template_sources_service_vm.dart`, `template_sources_service_web.dart`
 - `lib/ui/shell/board_title_bar.dart`
 - Conditional export web stubs for terminal, chat, preview, search, JS engine, widget registry, history store, etc.
+
+New tests:
+- `test/unit/features/board/widgets/js_widget_bridge_test.dart`
+- `test/unit/features/board/widgets/js_widget_engine_web_test.dart`
+- `test/unit/features/chart/ui/chart_panel_content_test.dart`
+- `test/unit/features/mindmap/widgets/canvas_interaction_lock_test.dart`
+- `test/unit/features/terminal/smart_clipboard_paste_service_test.dart`
 
 Modified:
 - `.github/workflows/deploy_demo.yml` — needs `submodules: recursive` fix, explicit `flutter_code_editor` clone step, and `lib web` analyze scope
@@ -867,6 +971,20 @@ Modified:
 - `lib/features/settings/ui/sections/support_section.dart` — added web-only **Clear page cache** button
 - `.github/workflows/deploy_demo.yml` — added post-build cache-bust step
 - `web/index.html` — bumped `flutter_bootstrap.js` query param to `?v=4`
+- `lib/features/chart/ui/chart_panel_content.dart` — inline JSON validation and save diagnostics
+- `lib/features/mindmap/widgets/canvas_interaction_lock.dart` — extended to lock board canvas while pointer is over any panel scrollable
+- `lib/features/board/ui/board_panel_card.dart` — reports pointer presence over scrollables to the canvas lock
+- `lib/features/board/widgets/js_widget_engine_web.dart` — moved web JS widget execution to a Web Worker
+- `lib/features/board/widgets/js_widget_engine_vm.dart` — kept the Dart JS interpreter for macOS
+- `lib/core/utils/string_utils.dart` — removed truncation logic from callers
+- `lib/core/cli/cli_text_argument_resolver.dart` — never truncates resolved text arguments
+- `lib/features/board/chat/panel_context_builder.dart` — never truncates panel context text
+- `lib/features/collaboration/bloc/collaboration_cubit.dart` — never truncates collaboration text
+- `lib/features/terminal/data/smart_clipboard_paste_service.dart` — writes oversized terminal/log dumps to a file instead of truncating inline
+- `lib/ui/shell/board_title_bar.dart` — reduced blur and increased opacity for a crisp title bar
+- `lib/features/terminal/board_terminal_session_manager.dart`, `lib/features/terminal/data/terminal_backend_service.dart`, `lib/features/terminal/ui/terminal_panel.dart`, `lib/features/terminal/board_terminal_panel_widget.dart` — support logging and TUI indicator
+- `tools/yoloitd/session/session.go` — server-side terminal session logging
+- `lib/features/board/ui/board_view.dart` — corrected drag delta under zoom, suppressed grid-snap animation, fixed edge-pan lag
 - Various test files (platform dirs fakes, plugin tests, color ratchet, calendar tests)
 
 ---
@@ -888,26 +1006,38 @@ Modified:
 
 ---
 
-## 8. Final verification (2026-07-07)
+## 8. Final verification (2026-07-09)
 
 This section records the state after the final push and deployment.
 
-- **Commit:** `adf96ff` — `feat(web): fetch built-in widgets from GitHub raw content`
+- **Commit:** `ac3bc1f` — `fix(board): pan viewport before computing drag delta so panel keeps up during edge pan`
 - **Pre-commit quality gates:**
   - File-size guard: ✅ pass (max 2800 lines)
-  - Code duplication (`jscpd --min-tokens 50 --min-lines 5 lib/`): ✅ **0.996%** (< 1.0%)
+  - Code duplication (`jscpd --min-tokens 50 --min-lines 5 lib/`): ✅ **0.97%** (< 1.0%)
   - Coverage ratchet: ✅ **43.8%** (>= 43.5% baseline)
   - CLI registry validation: ✅ pass
   - CLI integration-test coverage: ✅ 258/258 commands covered or exempt
   - Panel write-coverage: ✅ 11/11 panel types covered
-  - Full test suite (`flutter test --concurrency=4 --exclude-tags=flaky test/unit test/widget test/core test/features`): ✅ **+2638 tests, ~7 skipped, EXIT_CODE=0**
+  - Full test suite (`flutter test --no-pub --concurrency=1`): ✅ **+2721 tests, 12 skipped, EXIT_CODE=0**
 - **CI/CD:**
-  - GitHub Actions run `28899467181` completed successfully.
-  - Build job: 2 m 9 s.
-  - Deploy job: 9 s.
+  - GitHub Actions run `29002312918` — `Release All Platforms` — **success**
+  - GitHub Actions run `29002444337` — `Build macOS Release` — **success** (arm64 + x86_64 DMGs/ZIPs uploaded)
+  - GitHub Actions run `29002445133` — `Build Windows Release` — **success**
+  - GitHub Actions run `29002446057` — `Build Linux Release` — **success**
+  - GitHub Actions run `29002314823` — `Deploy demo to GitHub Pages` — **success**
+  - Deploy job: ~9 s.
   - Demo URL: `https://istin.github.io/yoloit/`
+- **Release:** `v1.0.242` on GitHub with assets:
+  - `yoloit-macos-arm64-1.0.242.dmg`
+  - `yoloit-macos-arm64-1.0.242-mac.zip`
+  - `yoloit-macos-x86_64-1.0.242.dmg`
+  - `yoloit-macos-x86_64-1.0.242-mac.zip`
+  - `yoloit-linux-x64-1.0.242.tar.gz`
+  - `yoloit-windows-x64-1.0.242.zip`
+  - `latest-mac.yml`
 - **Deployment artifacts:**
-  - Cache-busted `flutter_bootstrap.js` and `main.dart.js` via `github.run_id` query parameter (`?v=28899467181`).
+  - Cache-busted `flutter_bootstrap.js` and `main.dart.js` via `github.run_id` query parameter (`?v=29002314823`).
   - Web-only **Clear page cache** button available in Settings → Support.
-  - Custom Widget / JS App panels run in the browser via sandboxed iframe + `postMessage`.
+  - Custom Widget / JS App panels run in the browser via Web Worker (web) / Dart JS interpreter (macOS).
   - Built-in example widgets are fetched from GitHub raw content on first load.
+  - Board drag/resize now stays in sync with the canvas during edge-pan and at any zoom level.
