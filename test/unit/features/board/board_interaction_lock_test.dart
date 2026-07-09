@@ -49,26 +49,30 @@ void main() {
     });
   });
 
-  group('boardShouldRevertZoomOverScrollableCard', () {
-    test('reverts mouse-wheel zoom over scrollable panel content', () {
+  group('boardViewportInteractionRevertReason', () {
+    test('allows pinch zoom even when the gesture started over a locked card',
+        () {
+      CanvasInteractionLock.instance.enter();
       expect(
-        boardShouldRevertZoomOverScrollableCard(
-          overScrollable: true,
+        boardViewportInteractionRevertReason(
           startScale: 1.0,
-          currentScale: 1.1,
+          currentScale: 1.5,
+          interactionStartedLocked: true,
         ),
-        isTrue,
+        isNull,
       );
     });
 
-    test('does not revert pan-scale over empty canvas', () {
+    test('still reverts a pure pan that started while the canvas was locked',
+        () {
+      CanvasInteractionLock.instance.enter();
       expect(
-        boardShouldRevertZoomOverScrollableCard(
-          overScrollable: false,
+        boardViewportInteractionRevertReason(
           startScale: 1.0,
-          currentScale: 1.1,
+          currentScale: 1.0,
+          interactionStartedLocked: true,
         ),
-        isFalse,
+        'canvasLock',
       );
     });
   });

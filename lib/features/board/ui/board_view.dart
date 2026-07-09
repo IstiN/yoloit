@@ -416,7 +416,13 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                           constrained: false,
                                           minScale: 0.2,
                                           maxScale: 5.0,
-                                          scaleEnabled: !isLocked,
+                                          // Pinch-to-zoom must work everywhere,
+                                          // including over panels (panels do not
+                                          // consume scale gestures). Pan stays
+                                          // gated by isLocked so two-finger
+                                          // scroll over a panel still scrolls
+                                          // the panel instead of the canvas.
+                                          scaleEnabled: true,
                                           boundaryMargin: const EdgeInsets.all(
                                             canvasExpansionChunk,
                                           ),
@@ -465,21 +471,14 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                             final currentScale = matrixScaleOf(
                                               _transformController.value,
                                             );
-                                            final view = View.maybeOf(context);
                                             final revertReason =
-                                                view == null
-                                                    ? null
-                                                    : boardViewportInteractionRevertReason(
-                                                      focalPoint:
-                                                          details.focalPoint,
-                                                      viewId: view.viewId,
-                                                      startScale:
-                                                          _interactionStartScale,
-                                                      currentScale:
-                                                          currentScale,
-                                                      interactionStartedLocked:
-                                                          _interactionStartedLocked,
-                                                    );
+                                                boardViewportInteractionRevertReason(
+                                                  startScale:
+                                                      _interactionStartScale,
+                                                  currentScale: currentScale,
+                                                  interactionStartedLocked:
+                                                      _interactionStartedLocked,
+                                                );
                                             if (revertReason != null &&
                                                 _interactionStartMatrix !=
                                                     null) {
