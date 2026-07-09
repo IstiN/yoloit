@@ -23,8 +23,27 @@ _runtime_home() {
 _board() {
   local val="${1:-}"
   if [[ -n "$val" ]]; then echo "$val"; return; fi
+  # Prefer the running app's focused board so "current board" matches what the
+  # user is looking at in the UI. Fall back to state.json only when the app is
+  # unreachable (offline / not running).
+  local from_api
+  from_api=$(_active_board 2>/dev/null || true)
+  if [[ -n "$from_api" ]]; then echo "$from_api"; return; fi
   if [[ ! -f "$STATE_FILE" ]]; then return; fi
   python3 -c "import json,sys; f=sys.argv[1]; print(json.load(open(f)).get('board',''))" "$STATE_FILE" 2>/dev/null || true
+}
+
+# Returns the focused board name/id from the running app, or empty if the app
+# is not reachable. This is the live source of truth for "current board".
+_active_board() {
+  _resolve_base 2>/dev/null || return 0
+  [[ -z "$BASE" ]] && return 0
+  python3 -c "
+import json, sys
+d = json.loads(sys.stdin.read() or '{}')
+b = d.get('board') or {}
+print(b.get('name') or b.get('id') or '')
+" <<<"$(_get "/active-board" 2>/dev/null)" 2>/dev/null || true
 }
 
 _use_board() {
@@ -2296,24 +2315,11 @@ _auto_panel() {
 
 # ── Smart board/panel resolution ──────────────────────────────────────
 
-# Returns active board raw name/id: explicit arg → state.json → API active board
+# Returns active board raw name/id: explicit arg → running app active board → state.json
 _require_board() {
-  local explicit="${1:-}"
-  if [[ -n "$explicit" ]]; then echo "$explicit"; return; fi
-  local from_state
-  from_state=$(_board "")
-  if [[ -n "$from_state" ]]; then echo "$from_state"; return; fi
-  _resolve_base 2>/dev/null || true
-  if [[ -n "$BASE" ]]; then
-    local name
-    name=$(python3 -c "
-import json, sys
-d = json.loads(sys.stdin.read() or '{}')
-b = d.get('board') or {}
-print(b.get('name') or b.get('id') or '')
-" <<<"$(_get "/active-board" 2>/dev/null)" 2>/dev/null || echo "")
-    [[ -n "$name" ]] && { echo "$name"; return; }
-  fi
+  local bid
+  bid=$(_board "${1:-}")
+  if [[ -n "$bid" ]]; then echo "$bid"; return; fi
   echo "Error: no board specified and no active board found. Use 'yoloit board:use <name>'." >&2
   exit 1
 }
