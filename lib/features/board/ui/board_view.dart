@@ -1761,8 +1761,10 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     String panelId,
     DragUpdateDetails details,
   ) {
-    final delta = _consumePanelDragDelta(details.globalPosition, details.delta);
+    // Pan the viewport first so that the board-space delta includes the
+    // edge-pan amount. Otherwise the panel lags behind the moving canvas.
     _panViewportNearEdge(details.globalPosition);
+    final delta = _consumePanelDragDelta(details.globalPosition, details.delta);
     _reanchorPanelDragPointer(details.globalPosition);
     final board = context.read<BoardCubit>().state.activeBoard;
     if (board != null && board.gridMode.enabled) {
@@ -1788,8 +1790,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     String groupId,
     DragUpdateDetails details,
   ) {
-    final delta = _consumePanelDragDelta(details.globalPosition, details.delta);
     _panViewportNearEdge(details.globalPosition);
+    final delta = _consumePanelDragDelta(details.globalPosition, details.delta);
     _reanchorPanelDragPointer(details.globalPosition);
     final board = context.read<BoardCubit>().state.activeBoard;
     if (board == null) return;
@@ -1801,8 +1803,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     BoardPanelInstance panel,
     BoardPanelResizeUpdate update,
   ) {
-    final delta = _consumePanelDragDelta(update.globalPosition, update.delta);
     _panViewportNearEdge(update.globalPosition);
+    final delta = _consumePanelDragDelta(update.globalPosition, update.delta);
     _reanchorPanelDragPointer(update.globalPosition);
     _isCurrentTransformResize = true;
     final next = _resizeBoundsForHandle(panel, update.handle, delta);
