@@ -2234,7 +2234,7 @@ class CliServer {
     final scale = _double(raw['scale']);
     if (scale == null) return {'ok': false, 'error': 'Missing "scale"'};
     await cubit.updateViewport(
-      board.viewport.copyWith(scale: scale.clamp(0.1, 4.0)),
+      board.viewport.copyWith(scale: scale.clamp(0.1, 5.0)),
       boardId: board.id,
     );
     return {'ok': true, 'scale': scale};
@@ -2559,7 +2559,7 @@ class CliServer {
     final tx = (body['x'] as num?)?.toDouble() ?? board.viewport.translation.dx;
     final ty = (body['y'] as num?)?.toDouble() ?? board.viewport.translation.dy;
     final vp = board.viewport.copyWith(
-      scale: scale.clamp(0.1, 4.0),
+      scale: scale.clamp(0.1, 5.0),
       translation: Offset(tx, ty),
     );
     await cubit.updateViewport(vp, boardId: board.id);
