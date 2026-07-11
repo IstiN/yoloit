@@ -1,6 +1,7 @@
+import 'package:yoloit/features/board/audio_recorder/transcription_local_stub.dart'
+    if (dart.library.io) 'package:yoloit/features/board/audio_recorder/transcription_local_io.dart';
 import 'package:yoloit/features/board/chat/cloud_asr_service.dart';
 import 'package:yoloit/features/settings/data/cloud_llm_settings_service.dart';
-import 'package:yoloit/features/settings/data/local_ai_models_service.dart';
 
 /// Result of a transcription run.
 ///
@@ -48,13 +49,16 @@ abstract class VoiceSettingsProvider {
 /// any recognition itself. Backend selection mirrors
 /// `lib/features/board/assistant/yolo_assistant_widget.dart`: cloud when
 /// `voiceSettings.useCloudAsr == true`, otherwise local.
+///
+/// The local backend is FFI-based and desktop-only, so it is resolved lazily
+/// via `createDefaultLocalTranscriber` (conditionally imported) — web builds
+/// compile the stub and never pull the FFI engine into dart2js output.
 class TranscriptionService {
   TranscriptionService({
     CloudTranscriber? cloud,
-    LocalTranscriber? local,
+    this._local,
     VoiceSettingsProvider? settings,
   }) : _cloud = cloud ?? CloudAsrService(),
-       _local = local ?? LocalAiModelsService.instance,
        _settings = settings ?? CloudLlmSettingsService.instance;
 
   /// Shared singleton used by production callers (CLI handler, etc.).
@@ -82,8 +86,14 @@ class TranscriptionService {
   }) => TranscriptionService(cloud: cloud, local: local, settings: settings);
 
   final CloudTranscriber _cloud;
-  final LocalTranscriber _local;
+  LocalTranscriber? _local;
   final VoiceSettingsProvider _settings;
+
+  /// Resolves the local backend on first use. On web this throws — the
+  /// recorder panel is desktop-only, so a local-mode run is never requested
+  /// there in practice.
+  LocalTranscriber get _localBackend =>
+      _local ??= createDefaultLocalTranscriber();
 
   /// Transcribes [audioPath].
   ///
@@ -108,7 +118,7 @@ class TranscriptionService {
       )).trim();
       return TranscriptResult(text: text, modeUsed: 'cloud');
     }
-    final text = (await _local.transcribeWithSelectedAsr(
+    final text = (await _localBackend.transcribeWithSelectedAsr(
       audioPath,
       language: language,
     )).trim();
