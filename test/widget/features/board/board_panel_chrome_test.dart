@@ -11,6 +11,7 @@ import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/builtin/markdown_note_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/yolo_assistant_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/yolo_assistant_plugin_base.dart';
+import 'package:yoloit/features/board/ui/board_history_visibility.dart';
 import 'package:yoloit/features/board/ui/board_view.dart';
 
 void main() {
@@ -132,7 +133,7 @@ void main() {
     expect(find.text('Edit markdown note'), findsOneWidget);
   });
 
-  testWidgets('left toolbar opens board history and restores deleted panel', (
+  testWidgets('board history panel restores deleted panel', (
     tester,
   ) async {
     SharedPreferences.setMockInitialValues({});
@@ -184,7 +185,10 @@ void main() {
     );
     await tester.pump(const Duration(milliseconds: 450));
 
-    await tester.tap(find.byTooltip('Show board history'));
+    // The history toggle lives in the app title bar (MainShell); BoardView
+    // renders the panel when the shared notifier is on.
+    addTearDown(() => boardHistoryVisibility.value = false);
+    boardHistoryVisibility.value = true;
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 250));
 

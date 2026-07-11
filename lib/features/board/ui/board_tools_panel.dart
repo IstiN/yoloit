@@ -22,11 +22,7 @@ class BoardToolsPanel extends StatelessWidget {
     required this.onToolChanged,
     required this.onDrawSettingsChanged,
     required this.onConnectSettingsChanged,
-    required this.historyPanelVisible,
     required this.onToggle,
-    required this.onShowHistory,
-    this.onUndo,
-    this.onRedo,
     this.onAddNote,
     this.onAddChat,
     this.onAddTerminal,
@@ -42,11 +38,7 @@ class BoardToolsPanel extends StatelessWidget {
   final ValueChanged<BoardToolId> onToolChanged;
   final ValueChanged<DrawSettings> onDrawSettingsChanged;
   final ValueChanged<ConnectSettings> onConnectSettingsChanged;
-  final bool historyPanelVisible;
   final VoidCallback onToggle;
-  final VoidCallback onShowHistory;
-  final VoidCallback? onUndo;
-  final VoidCallback? onRedo;
   final VoidCallback? onAddNote;
   final VoidCallback? onAddChat;
   final VoidCallback? onAddTerminal;
@@ -139,41 +131,6 @@ class BoardToolsPanel extends StatelessWidget {
               onChanged: onConnectSettingsChanged,
             ),
           ],
-          const SizedBox(height: 8),
-          _toolGroup(
-            colors: colors,
-            panelBg: panelBg,
-            isLight: isLight,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                MiroLeftToolbarButton(
-                  icon: Icons.undo_rounded,
-                  tooltip: 'Undo latest panel change',
-                  onTap: onUndo,
-                  color: mutedColor,
-                ),
-                const SizedBox(height: 4),
-                MiroLeftToolbarButton(
-                  icon: Icons.redo_rounded,
-                  tooltip: 'Redo',
-                  onTap: onRedo,
-                  color: mutedColor,
-                ),
-                const SizedBox(height: 4),
-                MiroLeftToolbarButton(
-                  icon: Icons.manage_history_rounded,
-                  tooltip:
-                      historyPanelVisible
-                          ? 'Hide board history'
-                          : 'Show board history',
-                  active: historyPanelVisible,
-                  onTap: onShowHistory,
-                  color: colors.primary,
-                ),
-              ],
-            ),
-          ),
         ],
         // ── Add panel buttons (always visible) ───────────────────────────
         const SizedBox(height: 8),
@@ -446,6 +403,10 @@ class _PanelCatalogCategoryButtonState extends State<PanelCatalogCategoryButton>
   Timer? _hoverTimer;
   Timer? _closeTimer;
 
+  /// Vertical shift (in logical pixels, upward) applied to the submenu overlay
+  /// so it never overflows the bottom edge of the screen on small windows.
+  double _overlayShiftUp = 0;
+
   bool get _hosted => widget.onHoverOpen != null;
 
   @override
@@ -479,6 +440,7 @@ class _PanelCatalogCategoryButtonState extends State<PanelCatalogCategoryButton>
 
   void _insertOverlay() {
     if (_overlayEntry != null) return;
+    _overlayShiftUp = _computeShiftUp();
     final entry = OverlayEntry(builder: _buildOverlay);
     _overlayEntry = entry;
     Overlay.of(context).insert(entry);
@@ -487,6 +449,26 @@ class _PanelCatalogCategoryButtonState extends State<PanelCatalogCategoryButton>
   void _removeOverlay() {
     _overlayEntry?.remove();
     _overlayEntry = null;
+  }
+
+  /// Computes how far the submenu would extend past the bottom of the screen
+  /// and returns the upward shift needed to keep it fully visible. The shift is
+  /// clamped so the menu top never goes above the top margin.
+  double _computeShiftUp() {
+    const margin = 12.0;
+    final renderObject = context.findRenderObject();
+    if (renderObject is! RenderBox || !renderObject.hasSize) return 0;
+    final top = renderObject.localToGlobal(Offset.zero).dy;
+    final screenHeight = MediaQuery.sizeOf(context).height;
+    final maxMenuHeight = screenHeight - margin * 2;
+    final rawHeight =
+        _itemsFor(context, widget.category).length * 52.0 + 12.0;
+    final menuHeight = rawHeight > maxMenuHeight ? maxMenuHeight : rawHeight;
+    final overflow = top + menuHeight + margin - screenHeight;
+    if (overflow <= 0) return 0;
+    final maxShift = top - margin;
+    if (maxShift <= 0) return 0;
+    return overflow > maxShift ? maxShift : overflow;
   }
 
   // ── Standalone open/close (no host) ──────────────────────────────────────
@@ -553,6 +535,7 @@ class _PanelCatalogCategoryButtonState extends State<PanelCatalogCategoryButton>
   @override
   Widget build(BuildContext context) {
     final hasItems = _hasItems(context);
+    final submenuOpen = _hosted ? widget.isOpen : _localOpen;
     return CompositedTransformTarget(
       link: _layerLink,
       child: MouseRegion(
@@ -572,10 +555,13 @@ class _PanelCatalogCategoryButtonState extends State<PanelCatalogCategoryButton>
           }
         },
         child: Tooltip(
+          // No point showing the hint while its submenu is already open.
           message:
-              hasItems
-                  ? widget.tooltip
-                  : '${widget.tooltip} unavailable on this board',
+              submenuOpen
+                  ? ''
+                  : hasItems
+                      ? widget.tooltip
+                      : '${widget.tooltip} unavailable on this board',
           child: InkWell(
             borderRadius: BorderRadius.circular(8),
             onTap: hasItems ? _onTap : null,
@@ -605,7 +591,7 @@ class _PanelCatalogCategoryButtonState extends State<PanelCatalogCategoryButton>
           showWhenUnlinked: false,
           targetAnchor: Alignment.topRight,
           followerAnchor: Alignment.topLeft,
-          offset: const Offset(4, 0),
+          offset: Offset(4, -_overlayShiftUp),
           child: MouseRegion(
             onEnter: (_) {
               if (_hosted) {
@@ -621,7 +607,23 @@ class _PanelCatalogCategoryButtonState extends State<PanelCatalogCategoryButton>
                 _scheduleLocalClose();
               }
             },
-            child: _buildMenu(context),
+            // Light entrance: fade + short slide from the toolbar side so
+            // opening and hover-switching between submenus feels smooth
+            // instead of popping in.
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: 1),
+              duration: const Duration(milliseconds: 140),
+              curve: Curves.easeOutCubic,
+              builder:
+                  (context, t, child) => Opacity(
+                    opacity: t,
+                    child: Transform.translate(
+                      offset: Offset(-6 * (1 - t), 0),
+                      child: child,
+                    ),
+                  ),
+              child: _buildMenu(context),
+            ),
           ),
         ),
       ],
@@ -629,29 +631,35 @@ class _PanelCatalogCategoryButtonState extends State<PanelCatalogCategoryButton>
   }
 
   Widget _buildMenu(BuildContext context) {
-    return Container(
-      width: 264,
-      decoration: BoxDecoration(
-        color: _menuColor(context),
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(60),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(14),
-        clipBehavior: Clip.antiAlias,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: _itemsFor(context, widget.category),
+    // Cap the menu height to the available screen space and make it scrollable
+    // so a long category never gets clipped off-screen on small windows.
+    final maxHeight = MediaQuery.sizeOf(context).height - 24;
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: maxHeight),
+      child: Container(
+        width: 264,
+        decoration: BoxDecoration(
+          color: _menuColor(context),
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(60),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
+          clipBehavior: Clip.antiAlias,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: _itemsFor(context, widget.category),
+            ),
           ),
         ),
       ),

@@ -13,7 +13,8 @@ import 'package:yoloit/core/theme/app_color_scheme.dart';
 /// window controls.
 ///
 /// A settings button is always shown so the web demo has the same entry point
-/// as the desktop app.
+/// as the desktop app. When [onHistory] is provided a board-history toggle is
+/// shown on the left, after the platform window-controls padding.
 class BoardTitleBar extends StatelessWidget {
   const BoardTitleBar({
     super.key,
@@ -22,6 +23,10 @@ class BoardTitleBar extends StatelessWidget {
     this.leading,
     this.trailing,
     this.afterSettings,
+    this.onHistory,
+    this.historyActive = false,
+    this.onUndo,
+    this.onRedo,
   });
 
   final VoidCallback onSettings;
@@ -41,6 +46,17 @@ class BoardTitleBar extends StatelessWidget {
   /// Windows/Linux).
   final Widget? afterSettings;
 
+  /// When non-null, shows a board-history toggle button on the left side of
+  /// the bar, right after the platform window-controls padding.
+  /// [historyActive] drives its highlighted state.
+  final VoidCallback? onHistory;
+  final bool historyActive;
+
+  /// Undo/redo for panel changes, shown next to the history toggle on the
+  /// left. Null callbacks render the buttons disabled.
+  final VoidCallback? onUndo;
+  final VoidCallback? onRedo;
+
   /// Whether the current platform has macOS-style native traffic lights on the
   /// left and therefore needs extra padding.
   static bool get _hasMacOSTrafficLights {
@@ -54,6 +70,34 @@ class BoardTitleBar extends StatelessWidget {
     final content = Row(
       children: [
         SizedBox(width: _hasMacOSTrafficLights ? 82 : 12),
+        if (onHistory != null) ...[
+          _PanelToggleButton(
+            icon: Icons.manage_history_rounded,
+            tooltip: historyActive ? 'Hide board history' : 'Show board history',
+            semanticsLabel: 'Toggle board history',
+            active: historyActive,
+            onTap: onHistory!,
+          ),
+          const SizedBox(width: 8),
+        ],
+        if (onUndo != null || onRedo != null) ...[
+          _PanelToggleButton(
+            icon: Icons.undo_rounded,
+            tooltip: 'Undo latest panel change',
+            semanticsLabel: 'Undo latest panel change',
+            active: false,
+            onTap: onUndo,
+          ),
+          const SizedBox(width: 4),
+          _PanelToggleButton(
+            icon: Icons.redo_rounded,
+            tooltip: 'Redo',
+            semanticsLabel: 'Redo',
+            active: false,
+            onTap: onRedo,
+          ),
+          const SizedBox(width: 8),
+        ],
         if (leading != null) leading!,
         const Spacer(),
         if (trailing != null) ...[
@@ -75,6 +119,13 @@ class BoardTitleBar extends StatelessWidget {
       ],
     );
 
+    // On macOS the native traffic lights are drawn by the OS slightly below
+    // the geometric center of the 44px bar, so shift our content down to
+    // keep the icons visually aligned with them.
+    final alignedContent = _hasMacOSTrafficLights
+        ? Padding(padding: const EdgeInsets.only(top: 10), child: content)
+        : content;
+
     if (kIsWeb) {
       return Container(
         height: 44,
@@ -84,7 +135,7 @@ class BoardTitleBar extends StatelessWidget {
             bottom: BorderSide(color: colors.border),
           ),
         ),
-        child: content,
+        child: alignedContent,
       );
     }
 
@@ -109,7 +160,7 @@ class BoardTitleBar extends StatelessWidget {
                 bottom: BorderSide(color: colors.border),
               ),
             ),
-            child: content,
+            child: alignedContent,
           ),
         ),
       ),
@@ -129,7 +180,9 @@ class _PanelToggleButton extends StatefulWidget {
   final IconData icon;
   final String tooltip;
   final bool active;
-  final VoidCallback onTap;
+
+  /// Null disables the button (dimmed icon, no tap handling).
+  final VoidCallback? onTap;
   final String? semanticsLabel;
 
   @override
@@ -142,22 +195,26 @@ class _PanelToggleButtonState extends State<_PanelToggleButton> {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
+    final enabled = widget.onTap != null;
     return Tooltip(
       message: widget.tooltip,
       child: Semantics(
         label: widget.semanticsLabel ?? widget.tooltip,
         button: true,
         toggled: widget.active,
+        enabled: enabled,
         child: MouseRegion(
-          onEnter: (_) => setState(() => _hovered = true),
+          onEnter: (_) {
+            if (enabled) setState(() => _hovered = true);
+          },
           onExit: (_) => setState(() => _hovered = false),
           child: GestureDetector(
             onTap: widget.onTap,
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 120),
               curve: Curves.easeOut,
-              width: 32,
-              height: 28,
+              width: 34,
+              height: 34,
               decoration: BoxDecoration(
                 color: widget.active
                     ? colors.primary.withAlpha(46)
@@ -171,10 +228,12 @@ class _PanelToggleButtonState extends State<_PanelToggleButton> {
               ),
               child: Icon(
                 widget.icon,
-                size: 16,
+                size: 20,
                 color: widget.active
                     ? colors.primary
-                    : context.appColors.textMuted,
+                    : enabled
+                        ? context.appColors.textMuted
+                        : context.appColors.textMuted.withAlpha(90),
                 semanticLabel: widget.tooltip,
               ),
             ),

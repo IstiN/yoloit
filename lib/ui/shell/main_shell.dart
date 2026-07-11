@@ -17,6 +17,7 @@ import 'package:yoloit/features/board/bloc/board_state.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/terminal_panel_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
+import 'package:yoloit/features/board/ui/board_history_visibility.dart';
 import 'package:yoloit/features/board/ui/board_view.dart';
 import 'package:yoloit/features/editor/bloc/file_editor_cubit.dart';
 import 'package:yoloit/features/editor/bloc/file_editor_state.dart';
@@ -314,15 +315,25 @@ class _MainShellState extends State<MainShell> with WindowListener {
                     body: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        BoardTitleBar(
-                          onSettings: () => SettingsPage.show(context),
-                          onDragStart: () => windowManager.startDragging(),
-                          trailing: const _ResourceChip(),
-                          afterSettings:
-                              defaultTargetPlatform == TargetPlatform.windows ||
-                                      defaultTargetPlatform == TargetPlatform.linux
-                                  ? const _WindowControls()
-                                  : null,
+                        ValueListenableBuilder<bool>(
+                          valueListenable: boardHistoryVisibility,
+                          builder: (context, historyActive, _) => BoardTitleBar(
+                            onSettings: () => SettingsPage.show(context),
+                            onDragStart: () => windowManager.startDragging(),
+                            trailing: const _ResourceChip(),
+                            onHistory:
+                                () =>
+                                    boardHistoryVisibility.value =
+                                        !boardHistoryVisibility.value,
+                            historyActive: historyActive,
+                            onUndo: () => BoardUndoRedo.undo?.call(),
+                            onRedo: () => BoardUndoRedo.redo?.call(),
+                            afterSettings:
+                                defaultTargetPlatform == TargetPlatform.windows ||
+                                        defaultTargetPlatform == TargetPlatform.linux
+                                    ? const _WindowControls()
+                                    : null,
+                          ),
                         ),
                         if (_updatePhase != null && _updateInfo != null)
                           AutoUpdateBanner(

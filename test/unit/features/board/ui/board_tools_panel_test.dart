@@ -20,14 +20,10 @@ void main() {
       BoardToolId activeTool = BoardToolId.select,
       DrawSettings drawSettings = const DrawSettings(),
       ConnectSettings connectSettings = const ConnectSettings(),
-      bool historyPanelVisible = false,
       ValueChanged<BoardToolId>? onToolChanged,
       ValueChanged<DrawSettings>? onDrawSettingsChanged,
       ValueChanged<ConnectSettings>? onConnectSettingsChanged,
       VoidCallback? onToggle,
-      VoidCallback? onShowHistory,
-      VoidCallback? onUndo,
-      VoidCallback? onRedo,
       VoidCallback? onAddNote,
       VoidCallback? onAddChat,
       VoidCallback? onAddTerminal,
@@ -47,11 +43,7 @@ void main() {
               onToolChanged: onToolChanged ?? (_) {},
               onDrawSettingsChanged: onDrawSettingsChanged ?? (_) {},
               onConnectSettingsChanged: onConnectSettingsChanged ?? (_) {},
-              historyPanelVisible: historyPanelVisible,
               onToggle: onToggle ?? () {},
-              onShowHistory: onShowHistory ?? () {},
-              onUndo: onUndo,
-              onRedo: onRedo,
               onAddNote: onAddNote,
               onAddChat: onAddChat,
               onAddTerminal: onAddTerminal,
@@ -113,38 +105,6 @@ void main() {
       );
       expect(find.byType(ConnectSettingsPanel), findsOneWidget);
       expect(find.byType(DrawSettingsPanel), findsNothing);
-    });
-
-    testWidgets('renders undo/redo/history buttons', (tester) async {
-      await tester.pumpWidget(buildPanel());
-      expect(find.byTooltip('Undo latest panel change'), findsOneWidget);
-      expect(find.byTooltip('Redo'), findsOneWidget);
-      expect(find.byTooltip('Show board history'), findsOneWidget);
-    });
-
-    testWidgets('history button tooltip changes when visible', (tester) async {
-      await tester.pumpWidget(
-        buildPanel(historyPanelVisible: true),
-      );
-      expect(find.byTooltip('Hide board history'), findsOneWidget);
-    });
-
-    testWidgets('undo button calls onUndo', (tester) async {
-      var called = false;
-      await tester.pumpWidget(
-        buildPanel(onUndo: () => called = true),
-      );
-      await tester.tap(find.byTooltip('Undo latest panel change'));
-      expect(called, isTrue);
-    });
-
-    testWidgets('redo button calls onRedo', (tester) async {
-      var called = false;
-      await tester.pumpWidget(
-        buildPanel(onRedo: () => called = true),
-      );
-      await tester.tap(find.byTooltip('Redo'));
-      expect(called, isTrue);
     });
 
     testWidgets('renders add panel category buttons with handlers', (
@@ -237,7 +197,6 @@ void main() {
         BoardToolId activeTool = BoardToolId.select,
         DrawSettings drawSettings = const DrawSettings(),
         ConnectSettings connectSettings = const ConnectSettings(),
-        bool historyPanelVisible = false,
         VoidCallback? onAddNote,
         VoidCallback? onAddChat,
         VoidCallback? onAddTerminal,
@@ -257,11 +216,7 @@ void main() {
                 onToolChanged: (_) {},
                 onDrawSettingsChanged: (_) {},
                 onConnectSettingsChanged: (_) {},
-                historyPanelVisible: historyPanelVisible,
                 onToggle: () {},
-                onShowHistory: () {},
-                onUndo: null,
-                onRedo: null,
                 onAddNote: onAddNote,
                 onAddChat: onAddChat,
                 onAddTerminal: onAddTerminal,

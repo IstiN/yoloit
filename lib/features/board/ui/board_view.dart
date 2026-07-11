@@ -28,6 +28,7 @@ import 'package:yoloit/features/board/ui/board_drawing_widgets.dart';
 import 'package:yoloit/features/board/ui/board_grid_painter.dart';
 import 'package:yoloit/features/board/ui/board_group_overlay.dart';
 import 'package:yoloit/features/board/ui/board_history_panel.dart';
+import 'package:yoloit/features/board/ui/board_history_visibility.dart';
 import 'package:yoloit/features/board/ui/board_link_widgets.dart';
 import 'package:yoloit/features/board/ui/board_links_painter.dart';
 import 'package:yoloit/features/board/ui/board_math.dart';
@@ -98,7 +99,6 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   String? _focusedPanelVisibilityKey;
   bool _showMinimap = true;
   bool _showToolsPanel = true;
-  bool _showHistoryPanel = false;
   bool _isBoardOverviewOpen = false;
   bool _isOpeningBoardOverview = false;
   bool _cancelBgCapture = false;
@@ -157,6 +157,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   @override
   void dispose() {
     _cancelBgCapture = true;
+    BoardUndoRedo.undo = null;
+    BoardUndoRedo.redo = null;
     _stopPanAnimation();
     _transformController.removeListener(_scheduleCanvasExpansionIfNeeded);
     _panController.dispose();
@@ -236,6 +238,10 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
           }
 
           _syncViewport(activeBoard);
+
+          // Expose undo/redo to the app-level title bar (see BoardTitleBar).
+          BoardUndoRedo.undo = () => _restoreLatestPanelHistory(context, activeBoard);
+          BoardUndoRedo.redo = () => _redoLatestPanelHistory(context, activeBoard);
 
           return Container(
             color: colors.background,
@@ -980,28 +986,11 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                             (s) => setState(
                                               () => _connectSettings = s,
                                             ),
-                                        historyPanelVisible: _showHistoryPanel,
                                         onToggle:
                                             () => setState(
                                               () =>
                                                   _showToolsPanel =
                                                       !_showToolsPanel,
-                                            ),
-                                        onUndo:
-                                            () => _restoreLatestPanelHistory(
-                                              context,
-                                              activeBoard,
-                                            ),
-                                        onRedo:
-                                            () => _redoLatestPanelHistory(
-                                              context,
-                                              activeBoard,
-                                            ),
-                                        onShowHistory:
-                                            () => setState(
-                                              () =>
-                                                  _showHistoryPanel =
-                                                      !_showHistoryPanel,
                                             ),
                                         onAddNote:
                                             () => BoardPanelActions.showAddNoteDialog(
@@ -1026,21 +1015,28 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                 ),
                                       ),
                                     ),
-                                  if (!_isBoardOverviewOpen &&
-                                      !_isCapturingScreenshot &&
-                                      _showHistoryPanel)
-                                    Positioned(
-                                      top: 58,
-                                      right: 12,
-                                      bottom: 24,
-                                      child: BoardHistoryPanel(
-                                        board: activeBoard,
-                                        onClose:
-                                            () => setState(
-                                              () => _showHistoryPanel = false,
-                                            ),
-                                      ),
-                                    ),
+                                  ValueListenableBuilder<bool>(
+                                    valueListenable: boardHistoryVisibility,
+                                    builder: (context, historyVisible, _) {
+                                      if (_isBoardOverviewOpen ||
+                                          _isCapturingScreenshot ||
+                                          !historyVisible) {
+                                        return const SizedBox.shrink();
+                                      }
+                                      return Positioned(
+                                        top: 58,
+                                        right: 12,
+                                        bottom: 24,
+                                        child: BoardHistoryPanel(
+                                          board: activeBoard,
+                                          onClose:
+                                              () =>
+                                                  boardHistoryVisibility.value =
+                                                      false,
+                                        ),
+                                      );
+                                    },
+                                  ),
                                   // ── Cancel connection button ───────────────────────
                                   if (!_isBoardOverviewOpen &&
                                       _activeTool == BoardToolId.connect &&
