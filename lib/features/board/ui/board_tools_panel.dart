@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:yoloit/core/remote/yoloit_remote_client.dart';
 import 'package:yoloit/core/remote/yoloitd_panel_catalog.dart';
@@ -179,74 +181,15 @@ class BoardToolsPanel extends StatelessWidget {
           colors: colors,
           panelBg: panelBg,
           isLight: isLight,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              PanelCatalogCategoryButton(
-                board: board,
-                platform: platform,
-                category: PanelCatalogCategory.basics,
-                icon: Icons.category_outlined,
-                tooltip: 'Miro basics',
-                color: mutedColor,
-                onAddNote: onAddNote,
-                onAddChat: onAddChat,
-                onAddTerminal: onAddTerminal,
-                onAddGeneric: onAddGeneric,
-              ),
-              const SizedBox(height: 4),
-              PanelCatalogCategoryButton(
-                board: board,
-                platform: platform,
-                category: PanelCatalogCategory.ai,
-                icon: Icons.auto_awesome,
-                tooltip: 'AI and terminal',
-                color: colors.statusActive,
-                onAddNote: onAddNote,
-                onAddChat: onAddChat,
-                onAddTerminal: onAddTerminal,
-                onAddGeneric: onAddGeneric,
-              ),
-              const SizedBox(height: 4),
-              PanelCatalogCategoryButton(
-                board: board,
-                platform: platform,
-                category: PanelCatalogCategory.files,
-                icon: Icons.folder_outlined,
-                tooltip: 'Files and web',
-                color: mutedColor,
-                onAddNote: onAddNote,
-                onAddChat: onAddChat,
-                onAddTerminal: onAddTerminal,
-                onAddGeneric: onAddGeneric,
-              ),
-              const SizedBox(height: 4),
-              PanelCatalogCategoryButton(
-                board: board,
-                platform: platform,
-                category: PanelCatalogCategory.planning,
-                icon: Icons.view_kanban_outlined,
-                tooltip: 'Planning',
-                color: mutedColor,
-                onAddNote: onAddNote,
-                onAddChat: onAddChat,
-                onAddTerminal: onAddTerminal,
-                onAddGeneric: onAddGeneric,
-              ),
-              const SizedBox(height: 4),
-              PanelCatalogCategoryButton(
-                board: board,
-                platform: platform,
-                category: PanelCatalogCategory.advanced,
-                icon: Icons.extension_outlined,
-                tooltip: 'Advanced',
-                color: mutedColor,
-                onAddNote: onAddNote,
-                onAddChat: onAddChat,
-                onAddTerminal: onAddTerminal,
-                onAddGeneric: onAddGeneric,
-              ),
-            ],
+          child: _CategoryMenuHost(
+            board: board,
+            platform: platform,
+            mutedColor: mutedColor,
+            statusActive: colors.statusActive,
+            onAddNote: onAddNote,
+            onAddChat: onAddChat,
+            onAddTerminal: onAddTerminal,
+            onAddGeneric: onAddGeneric,
           ),
         ),
       ],
@@ -328,7 +271,129 @@ class MiroLeftToolbarButton extends StatelessWidget {
   }
 }
 
-class PanelCatalogCategoryButton extends StatelessWidget {
+class _CategoryMenuHost extends StatefulWidget {
+  const _CategoryMenuHost({
+    required this.board,
+    required this.platform,
+    required this.mutedColor,
+    required this.statusActive,
+    this.onAddNote,
+    this.onAddChat,
+    this.onAddTerminal,
+    this.onAddGeneric,
+  });
+
+  final BoardDocument board;
+  final String platform;
+  final Color mutedColor;
+  final Color statusActive;
+  final VoidCallback? onAddNote;
+  final VoidCallback? onAddChat;
+  final VoidCallback? onAddTerminal;
+  final ValueChanged<String>? onAddGeneric;
+
+  @override
+  State<_CategoryMenuHost> createState() => _CategoryMenuHostState();
+}
+
+class _CategoryMenuHostState extends State<_CategoryMenuHost> {
+  PanelCatalogCategory? _open;
+  Timer? _closeTimer;
+
+  void _setOpen(PanelCatalogCategory c) {
+    _cancelClose();
+    setState(() => _open = c);
+  }
+
+  void _close() {
+    _cancelClose();
+    if (_open != null) setState(() => _open = null);
+  }
+
+  void _scheduleClose() {
+    _cancelClose();
+    _closeTimer = Timer(const Duration(milliseconds: 150), _close);
+  }
+
+  void _cancelClose() {
+    _closeTimer?.cancel();
+  }
+
+  @override
+  void dispose() {
+    _closeTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    Widget button(
+      PanelCatalogCategory category,
+      IconData icon,
+      String tooltip,
+      Color color,
+    ) {
+      return PanelCatalogCategoryButton(
+        board: widget.board,
+        platform: widget.platform,
+        category: category,
+        icon: icon,
+        tooltip: tooltip,
+        color: color,
+        onAddNote: widget.onAddNote,
+        onAddChat: widget.onAddChat,
+        onAddTerminal: widget.onAddTerminal,
+        onAddGeneric: widget.onAddGeneric,
+        isOpen: _open == category,
+        onHoverOpen: _setOpen,
+        onScheduleClose: _scheduleClose,
+        onCancelClose: _cancelClose,
+      );
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        button(
+          PanelCatalogCategory.basics,
+          Icons.category_outlined,
+          'Miro basics',
+          widget.mutedColor,
+        ),
+        const SizedBox(height: 4),
+        button(
+          PanelCatalogCategory.ai,
+          Icons.auto_awesome,
+          'AI and terminal',
+          widget.statusActive,
+        ),
+        const SizedBox(height: 4),
+        button(
+          PanelCatalogCategory.files,
+          Icons.folder_outlined,
+          'Files and web',
+          widget.mutedColor,
+        ),
+        const SizedBox(height: 4),
+        button(
+          PanelCatalogCategory.planning,
+          Icons.view_kanban_outlined,
+          'Planning',
+          widget.mutedColor,
+        ),
+        const SizedBox(height: 4),
+        button(
+          PanelCatalogCategory.advanced,
+          Icons.extension_outlined,
+          'Advanced',
+          widget.mutedColor,
+        ),
+      ],
+    );
+  }
+}
+
+class PanelCatalogCategoryButton extends StatefulWidget {
   const PanelCatalogCategoryButton({
     super.key,
     required this.board,
@@ -341,6 +406,10 @@ class PanelCatalogCategoryButton extends StatelessWidget {
     this.onAddNote,
     this.onAddChat,
     this.onAddTerminal,
+    this.isOpen = false,
+    this.onHoverOpen,
+    this.onScheduleClose,
+    this.onCancelClose,
   });
 
   final BoardDocument board;
@@ -354,71 +423,247 @@ class PanelCatalogCategoryButton extends StatelessWidget {
   final VoidCallback? onAddChat;
   final VoidCallback? onAddTerminal;
 
+  /// When [onHoverOpen] is provided, the open state is owned by a host that
+  /// coordinates a single open submenu, instant hover-switching and
+  /// close-on-leave. When null, the button manages its own submenu (used by
+  /// tests and standalone usage).
+  final bool isOpen;
+  final void Function(PanelCatalogCategory)? onHoverOpen;
+  final VoidCallback? onScheduleClose;
+  final VoidCallback? onCancelClose;
+
+  @override
+  State<PanelCatalogCategoryButton> createState() =>
+      _PanelCatalogCategoryButtonState();
+}
+
+class _PanelCatalogCategoryButtonState extends State<PanelCatalogCategoryButton> {
+  final LayerLink _layerLink = LayerLink();
+  OverlayEntry? _overlayEntry;
+
+  // Standalone (un-hosted) state. Used when no host coordinates this button.
+  bool _localOpen = false;
+  Timer? _hoverTimer;
+  Timer? _closeTimer;
+
+  bool get _hosted => widget.onHoverOpen != null;
+
+  @override
+  void didUpdateWidget(covariant PanelCatalogCategoryButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_hosted && widget.isOpen != oldWidget.isOpen) {
+      // Inserting/removing an OverlayEntry marks the Overlay dirty, which must
+      // not happen during the build phase (didUpdateWidget runs while the host
+      // is building). Defer the mutation to the end of the frame.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (widget.isOpen) {
+          _insertOverlay();
+        } else {
+          _removeOverlay();
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _hoverTimer?.cancel();
+    _closeTimer?.cancel();
+    _removeOverlay();
+    super.dispose();
+  }
+
+  bool _hasItems(BuildContext context) =>
+      _itemsFor(context, widget.category).isNotEmpty;
+
+  void _insertOverlay() {
+    if (_overlayEntry != null) return;
+    final entry = OverlayEntry(builder: _buildOverlay);
+    _overlayEntry = entry;
+    Overlay.of(context).insert(entry);
+  }
+
+  void _removeOverlay() {
+    _overlayEntry?.remove();
+    _overlayEntry = null;
+  }
+
+  // ── Standalone open/close (no host) ──────────────────────────────────────
+  void _onStandaloneHoverEnter() {
+    _hoverTimer?.cancel();
+    _cancelLocalClose();
+    if (_localOpen || !_hasItems(context)) return;
+    // Short debounce so merely scrubbing across the toolbar does not flicker
+    // every submenu open; still feels instant to the user.
+    _hoverTimer = Timer(const Duration(milliseconds: 120), () {
+      if (!mounted || _localOpen) return;
+      _openLocal();
+    });
+  }
+
+  void _openLocal() {
+    if (_localOpen || !_hasItems(context)) return;
+    setState(() => _localOpen = true);
+    _insertOverlay();
+  }
+
+  void _scheduleLocalClose() {
+    _cancelLocalClose();
+    _closeTimer = Timer(const Duration(milliseconds: 150), _closeLocal);
+  }
+
+  void _closeLocal() {
+    _cancelLocalClose();
+    _removeOverlay();
+    if (mounted && _localOpen) setState(() => _localOpen = false);
+  }
+
+  void _cancelLocalClose() {
+    _closeTimer?.cancel();
+  }
+
+  // ── Tap / selection ──────────────────────────────────────────────────────
+  void _onTap() {
+    if (!_hasItems(context)) return;
+    if (_hosted) {
+      widget.onHoverOpen!(widget.category);
+    } else {
+      _openLocal();
+    }
+  }
+
+  void _handleSelect(String value) {
+    if (value == '__note') {
+      widget.onAddNote?.call();
+    } else if (value == '__chat') {
+      widget.onAddChat?.call();
+    } else if (value == '__terminal') {
+      widget.onAddTerminal?.call();
+    } else {
+      widget.onAddGeneric?.call(value);
+    }
+    if (_hosted) {
+      widget.onScheduleClose!();
+    } else {
+      _closeLocal();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final hasItems = _itemsFor(context, category).isNotEmpty;
-    return Builder(
-      builder:
-          (btnCtx) => Tooltip(
-            message: hasItems ? tooltip : '$tooltip unavailable on this board',
-            child: InkWell(
-              borderRadius: BorderRadius.circular(8),
-              onTap: hasItems ? () => _showCategoryItems(btnCtx) : null,
-              child: Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  icon,
-                  size: 18,
-                  color: hasItems ? color : color.withAlpha(80),
-                ),
+    final hasItems = _hasItems(context);
+    return CompositedTransformTarget(
+      link: _layerLink,
+      child: MouseRegion(
+        onEnter: (_) {
+          if (_hosted) {
+            if (hasItems) widget.onHoverOpen!(widget.category);
+          } else {
+            _onStandaloneHoverEnter();
+          }
+        },
+        onExit: (_) {
+          if (_hosted) {
+            widget.onScheduleClose!();
+          } else {
+            _hoverTimer?.cancel();
+            _scheduleLocalClose();
+          }
+        },
+        child: Tooltip(
+          message:
+              hasItems
+                  ? widget.tooltip
+                  : '${widget.tooltip} unavailable on this board',
+          child: InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: hasItems ? _onTap : null,
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                widget.icon,
+                size: 18,
+                color: hasItems ? widget.color : widget.color.withAlpha(80),
               ),
             ),
           ),
-    );
-  }
-
-  Future<void> _showCategoryItems(BuildContext context) async {
-    final box = context.findRenderObject() as RenderBox?;
-    if (box == null) return;
-    final pos = box.localToGlobal(Offset(box.size.width, 0));
-    final selected = await showMenu<String>(
-      context: context,
-      position: RelativeRect.fromLTRB(
-        pos.dx + 4,
-        pos.dy,
-        pos.dx + 340,
-        pos.dy + 100,
+        ),
       ),
-      color: _menuColor(context),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      items: _itemsFor(context, category),
     );
-    if (selected == null) return;
-    if (selected == '__note') {
-      onAddNote?.call();
-      return;
-    }
-    if (selected == '__chat') {
-      onAddChat?.call();
-      return;
-    }
-    if (selected == '__terminal') {
-      onAddTerminal?.call();
-      return;
-    }
-    onAddGeneric?.call(selected);
   }
 
-  List<PopupMenuEntry<String>> _itemsFor(
+  Widget _buildOverlay(BuildContext context) {
+    return Stack(
+      children: [
+        CompositedTransformFollower(
+          link: _layerLink,
+          showWhenUnlinked: false,
+          targetAnchor: Alignment.topRight,
+          followerAnchor: Alignment.topLeft,
+          offset: const Offset(4, 0),
+          child: MouseRegion(
+            onEnter: (_) {
+              if (_hosted) {
+                widget.onCancelClose!();
+              } else {
+                _cancelLocalClose();
+              }
+            },
+            onExit: (_) {
+              if (_hosted) {
+                widget.onScheduleClose!();
+              } else {
+                _scheduleLocalClose();
+              }
+            },
+            child: _buildMenu(context),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMenu(BuildContext context) {
+    return Container(
+      width: 264,
+      decoration: BoxDecoration(
+        color: _menuColor(context),
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(60),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(14),
+        clipBehavior: Clip.antiAlias,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: _itemsFor(context, widget.category),
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _itemsFor(
     BuildContext context,
     PanelCatalogCategory category,
   ) {
-    PopupMenuEntry<String>? pluginItem(String typeId) {
-      if (onAddGeneric == null) return null;
+    Widget? pluginItem(String typeId) {
+      if (widget.onAddGeneric == null) return null;
       if (!_isPanelTypeAvailable(typeId)) return null;
       final plugin = BoardPluginRegistry.instance.pluginFor(typeId);
       if (plugin == null) return null;
@@ -432,8 +677,8 @@ class PanelCatalogCategoryButton extends StatelessWidget {
     }
 
     final items = switch (category) {
-      PanelCatalogCategory.basics => <PopupMenuEntry<String>?>[
-        if (onAddNote != null && _isPanelTypeAvailable('board.note.markdown'))
+      PanelCatalogCategory.basics => <Widget?>[
+        if (widget.onAddNote != null && _isPanelTypeAvailable('board.note.markdown'))
           _catalogItem(
             context,
             value: '__note',
@@ -442,7 +687,7 @@ class PanelCatalogCategoryButton extends StatelessWidget {
             label: 'Markdown Note',
           ),
         pluginItem('board.sticky'),
-        if (onAddGeneric != null && _isPanelTypeAvailable('board.shape'))
+        if (widget.onAddGeneric != null && _isPanelTypeAvailable('board.shape'))
           _catalogItem(
             context,
             value: '__shape:frame',
@@ -451,8 +696,8 @@ class PanelCatalogCategoryButton extends StatelessWidget {
             label: 'Shape / Frame',
           ),
       ],
-      PanelCatalogCategory.ai => <PopupMenuEntry<String>?>[
-        if (onAddChat != null && _isPanelTypeAvailable('board.chat'))
+      PanelCatalogCategory.ai => <Widget?>[
+        if (widget.onAddChat != null && _isPanelTypeAvailable('board.chat'))
           _catalogItem(
             context,
             value: '__chat',
@@ -460,7 +705,7 @@ class PanelCatalogCategoryButton extends StatelessWidget {
             iconColor: context.appColors.statusActive,
             label: 'AI Chat',
           ),
-        if (onAddTerminal != null && _isPanelTypeAvailable('board.terminal'))
+        if (widget.onAddTerminal != null && _isPanelTypeAvailable('board.terminal'))
           _catalogItem(
             context,
             value: '__terminal',
@@ -470,13 +715,13 @@ class PanelCatalogCategoryButton extends StatelessWidget {
           ),
         pluginItem('board.yolo_assistant'),
       ],
-      PanelCatalogCategory.files => <PopupMenuEntry<String>?>[
+      PanelCatalogCategory.files => <Widget?>[
         pluginItem('board.filetree'),
         pluginItem('board.files'),
         pluginItem('board.file.preview'),
         pluginItem('board.webpage'),
       ],
-      PanelCatalogCategory.planning => <PopupMenuEntry<String>?>[
+      PanelCatalogCategory.planning => <Widget?>[
         pluginItem('board.kanban'),
         pluginItem('board.checklist'),
         pluginItem('board.timer'),
@@ -484,51 +729,57 @@ class PanelCatalogCategoryButton extends StatelessWidget {
         pluginItem('board.table'),
         pluginItem('board.chart'),
       ],
-      PanelCatalogCategory.advanced => <PopupMenuEntry<String>?>[
+      PanelCatalogCategory.advanced => <Widget?>[
         pluginItem('board.setup_guide'),
         pluginItem('board.code.snippet'),
         pluginItem('board.playlist'),
+        pluginItem('board.audio_recorder'),
         pluginItem('board.run_configs'),
         pluginItem('board.widget.custom'),
         pluginItem('board.ui'),
       ],
     };
-    return items.whereType<PopupMenuEntry<String>>().toList();
+    return items.whereType<Widget>().toList();
   }
 
   bool _isPanelTypeAvailable(String typeId) {
     return yoloitdPanelTypeAvailableOn(
       typeId,
-      platform: platform,
-      remote: isRemoteBoard(board),
+      platform: widget.platform,
+      remote: isRemoteBoard(widget.board),
     );
   }
 
-  PopupMenuItem<String> _catalogItem(
+  Widget _catalogItem(
     BuildContext context, {
     required String value,
     required IconData icon,
     required Color iconColor,
     required String label,
   }) {
-    return PopupMenuItem<String>(
-      value: value,
-      height: 52,
-      child: Row(
-        children: [
-          Icon(icon, size: 21, color: iconColor),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Text(
-              label,
-              style: TextStyle(
-                color: _menuTextColor(context),
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
+    return InkWell(
+      onTap: () => _handleSelect(value),
+      child: Container(
+        height: 52,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        alignment: Alignment.centerLeft,
+        child: Row(
+          children: [
+            Icon(icon, size: 21, color: iconColor),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: _menuTextColor(context),
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

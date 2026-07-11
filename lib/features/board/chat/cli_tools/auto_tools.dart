@@ -262,4 +262,34 @@ final List<YoloitCliTool> autoTools = <YoloitCliTool>[
     group: 'timer',
     params: <YoloitCliToolParam>[boardParam(), panelParam()],
   ),
+  YoloitCliTool(
+    command: 'audio:start',
+    description: 'Add an audio recorder panel (if missing) and start native capture on the current board',
+    group: 'audio',
+    params: <YoloitCliToolParam>[boardParam()],
+  ),
+  YoloitCliTool(
+    command: 'audio:stop',
+    description: 'Stop the active recording on the board audio panel and finalize the file',
+    group: 'audio',
+    params: <YoloitCliToolParam>[boardParam()],
+  ),
+  YoloitCliTool(
+    command: 'audio:list',
+    description: 'List recordings captured by the board audio panel',
+    group: 'audio',
+    params: <YoloitCliToolParam>[boardParam()],
+  ),
+  YoloitCliTool(
+    command: 'audio:set-folder',
+    description: 'Set the folder where the board audio panel writes recordings',
+    group: 'audio',
+    params: <YoloitCliToolParam>[toolParam('folder', 'Absolute path to the output folder', required: true), boardParam()],
+  ),
+  YoloitCliTool(
+    command: 'audio:transcribe',
+    description: 'Transcribe a recording (latest by default) to a Markdown file next to the WAV',
+    group: 'audio',
+    params: <YoloitCliToolParam>[toolParam('id', 'Recording id (defaults to the latest recording)', required: false, flag: 'id'), toolParam('mode', 'ASR mode: local or cloud (defaults to voice settings)', required: false, flag: 'mode'), boardParam()],
+  ),
 ];

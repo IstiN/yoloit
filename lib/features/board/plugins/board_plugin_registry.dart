@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:yoloit/features/board/chat/chat_panel_plugin.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
+import 'package:yoloit/features/board/plugins/builtin/audio_recorder_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/calendar_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/chart_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/checklist_plugin.dart';
@@ -103,6 +104,7 @@ class BoardPluginRegistry {
     register(const CustomWidgetPlugin());
     register(const UiViewPlugin());
     register(const TimerPlugin());
+    register(const AudioRecorderPlugin());
   }
 }
 

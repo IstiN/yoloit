@@ -8,6 +8,7 @@ import 'package:local_models_sdk/local_models_sdk.dart' as sdk;
 import 'package:path/path.dart' as p;
 import 'package:yoloit/core/platform/local_model_registry_locator.dart';
 import 'package:yoloit/core/platform/platform_dirs.dart';
+import 'package:yoloit/features/board/audio_recorder/transcription_service.dart';
 
 enum LocalAiModelKind { chat, asr }
 
@@ -53,7 +54,7 @@ class LocalAiModelState {
       status == LocalAiModelStatus.paused;
 }
 
-class LocalAiModelsService {
+class LocalAiModelsService implements LocalTranscriber {
   LocalAiModelsService._();
 
   static final instance = LocalAiModelsService._();
@@ -252,6 +253,7 @@ class LocalAiModelsService {
   bool get hasSelectedAsrInstalled =>
       installedModelById(_selectedAsrModelId) != null;
 
+  @override
   Future<String> transcribeWithSelectedAsr(
     String audioPath, {
     String? language,

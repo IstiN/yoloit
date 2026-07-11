@@ -28,11 +28,15 @@ import 'package:yoloit/core/cli/handlers/voice_settings_handler.dart';
 import 'package:yoloit/core/cli/handlers/widgets_handler.dart';
 import 'package:yoloit/core/cli/handlers/yolo_chat_handler.dart';
 import 'package:yoloit/core/cli/panel_cli_handler.dart';
+import 'package:yoloit/core/platform/system_audio_bridge.dart';
 import 'package:yoloit/core/theme/theme_manager.dart';
+import 'package:yoloit/features/board/audio_recorder/audio_recording_manager.dart';
+import 'package:yoloit/features/board/audio_recorder/system_audio_source.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/chat/yoloit_cli_tools.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
+import 'package:yoloit/features/board/plugins/builtin/audio_recorder_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/playlist_player_registry.dart';
 import 'package:yoloit/features/board/plugins/builtin/timer_manager.dart';
 import 'package:yoloit/features/board/services/board_offscreen_renderer.dart';
@@ -1265,6 +1269,24 @@ class CliServer {
         panel.id,
         mergedState,
       );
+    }
+    // Drive native audio capture when recorder state changes via CLI — needed
+    // when the widget is not mounted (user is on a different board).
+    if (panel.type == 'board.audio_recorder') {
+      final config = AudioRecorderConfig.fromState(mergedState);
+      if (mergedState['isRecording'] == true) {
+        final systemSource =
+            (config.captureSystemAudio && SystemAudioBridge.instance.isSupported)
+                ? SystemAudioSource()
+                : null;
+        await AudioRecordingManager.instance.start(
+          panelId: panel.id,
+          boardId: board.id,
+          systemSource: systemSource,
+        );
+      } else {
+        await AudioRecordingManager.instance.stop(panel.id);
+      }
     }
     await _maybeAutoSizeMarkdownNote(
       cubit,

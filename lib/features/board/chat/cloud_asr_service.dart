@@ -2,10 +2,11 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:yoloit/features/board/audio_recorder/transcription_service.dart';
 import 'package:yoloit/features/board/chat/cloud_asr_http_client.dart';
 import 'package:yoloit/features/settings/data/cloud_llm_settings_service.dart';
 
-class CloudAsrService {
+class CloudAsrService implements CloudTranscriber {
   CloudAsrService({CloudLlmSettingsService? settingsService})
     : _settingsService = settingsService ?? CloudLlmSettingsService.instance;
 
@@ -39,6 +40,7 @@ class CloudAsrService {
     );
   }
 
+  @override
   Future<String> transcribeFromFile({
     required String audioPath,
     required VoiceSettings voiceSettings,

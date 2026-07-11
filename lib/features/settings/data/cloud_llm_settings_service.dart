@@ -5,6 +5,7 @@ import 'package:json_annotation/json_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yoloit/core/platform/secure_storage_factory.dart';
 import 'package:yoloit/core/platform/yoloit_credential_store.dart';
+import 'package:yoloit/features/board/audio_recorder/transcription_service.dart';
 
 part 'cloud_llm_settings_service.g.dart';
 
@@ -235,7 +236,7 @@ const kCloudLlmPresets = <CloudLlmPreset>[
 // Settings service — persists cloud provider configs
 // ─────────────────────────────────────────────────────────────────────────────
 
-class CloudLlmSettingsService {
+class CloudLlmSettingsService implements VoiceSettingsProvider {
   CloudLlmSettingsService._();
 
   static final instance = CloudLlmSettingsService._();
@@ -399,6 +400,7 @@ class CloudLlmSettingsService {
     await prefs.setString(_assistantProviderPrefKey, type);
   }
 
+  @override
   Future<VoiceSettings> loadVoiceSettings() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_voiceSettingsPrefKey);

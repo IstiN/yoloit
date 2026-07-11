@@ -31,6 +31,7 @@
 		34C6762A88E4388C2B7AA716 /* resvg in Resources */ = {isa = PBXBuildFile; fileRef = 2E3D6996D5716B29888ECABD /* resvg */; };
 		A1B2C3D4E5F6A7B800112233 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B800112234 /* main.swift */; };
 		AA11BB22CC33DD440000FF00 /* WebViewZoomPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD440000EEFF /* WebViewZoomPlugin.swift */; };
+		AA11BB22CC33DD440000FF11 /* SystemAudioPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD440000EE11 /* SystemAudioPlugin.swift */; };
 		B20807362F8CC01900237752 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = B20807352F8CC01900237752 /* AppIcon.icon */; };
 		B20807372F8CC01900237752 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = B20807352F8CC01900237752 /* AppIcon.icon */; };
 		BB11CC22DD33EE440000FF02 /* WKWebViewFullscreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB11CC22DD33EE440000FF01 /* WKWebViewFullscreen.swift */; };
@@ -94,6 +95,7 @@
 		A1B2C3D4E5F6A7B800112234 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		A649AA14B768CC0E286EC9D5 /* Pods-RunnerTests.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.profile.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.profile.xcconfig"; sourceTree = "<group>"; };
 		AA11BB22CC33DD440000EEFF /* WebViewZoomPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebViewZoomPlugin.swift; sourceTree = "<group>"; };
+		AA11BB22CC33DD440000EE11 /* SystemAudioPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemAudioPlugin.swift; sourceTree = "<group>"; };
 		AB367B59FBC4BDFEC429A565 /* Pods_Runner.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Runner.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		B20807352F8CC01900237752 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		BB11CC22DD33EE440000FF01 /* WKWebViewFullscreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WKWebViewFullscreen.swift; sourceTree = "<group>"; };
@@ -192,6 +194,7 @@
 			children = (
 				33CC10F02044A3C60003C045 /* AppDelegate.swift */,
 				AA11BB22CC33DD440000EEFF /* WebViewZoomPlugin.swift */,
+				AA11BB22CC33DD440000EE11 /* SystemAudioPlugin.swift */,
 				BB11CC22DD33EE440000FF01 /* WKWebViewFullscreen.swift */,
 				A1B2C3D4E5F6A7B800112234 /* main.swift */,
 				33CC11122044BFA00003C045 /* MainFlutterWindow.swift */,
@@ -466,6 +469,7 @@
 				33CC11132044BFA00003C045 /* MainFlutterWindow.swift in Sources */,
 				33CC10F12044A3C60003C045 /* AppDelegate.swift in Sources */,
 				AA11BB22CC33DD440000FF00 /* WebViewZoomPlugin.swift in Sources */,
+				AA11BB22CC33DD440000FF11 /* SystemAudioPlugin.swift in Sources */,
 				BB11CC22DD33EE440000FF02 /* WKWebViewFullscreen.swift in Sources */,
 				A1B2C3D4E5F6A7B800112233 /* main.swift in Sources */,
 				335BBD1B22A9A15E00E9071D /* GeneratedPluginRegistrant.swift in Sources */,

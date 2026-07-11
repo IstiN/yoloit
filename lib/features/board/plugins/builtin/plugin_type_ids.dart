@@ -27,6 +27,7 @@ const String kFilePreviewPluginTypeId = 'board.file.preview';
 const String kFileTreePluginTypeId = 'board.filetree';
 const String kDiffPreviewPluginTypeId = 'board.diff.preview';
 const String kPlaylistPluginTypeId = 'board.playlist';
+const String kAudioRecorderPluginTypeId = 'board.audio_recorder';
 const String kRunPluginTypeId = 'board.run';
 const String kRunConfigsPluginTypeId = 'board.run_configs';
 const String kTerminalPluginTypeId = 'board.terminal';

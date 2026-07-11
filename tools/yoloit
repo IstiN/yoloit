@@ -1878,6 +1878,34 @@ commands = [{'group': 'app',
   'description': 'Reset timer to full duration',
   'params': [['board', 'Board id or name', True], ['panel', 'Timer panel id or title', True]],
   'example': 'yoloit timer:reset "My Board" "Timer"'},
+ {'group': 'audio',
+  'name': 'audio:start',
+  'description': 'Add an audio recorder panel (if missing) and start native capture on the current board',
+  'params': [['[board]', 'Board name (defaults to the current board)', False]],
+  'example': 'yoloit audio:start'},
+ {'group': 'audio',
+  'name': 'audio:stop',
+  'description': 'Stop the active recording on the board audio panel and finalize the file',
+  'params': [['[board]', 'Board name (defaults to the current board)', False]],
+  'example': 'yoloit audio:stop'},
+ {'group': 'audio',
+  'name': 'audio:list',
+  'description': 'List recordings captured by the board audio panel',
+  'params': [['[board]', 'Board name (defaults to the current board)', False]],
+  'example': 'yoloit audio:list'},
+ {'group': 'audio',
+  'name': 'audio:set-folder',
+  'description': 'Set the folder where the board audio panel writes recordings',
+  'params': [['folder', 'Absolute path to the output folder', True],
+             ['[board]', 'Board name (defaults to the current board)', False]],
+  'example': 'yoloit audio:set-folder ~/Recordings'},
+ {'group': 'audio',
+  'name': 'audio:transcribe',
+  'description': 'Transcribe a recording (latest by default) to a Markdown file next to the WAV',
+  'params': [['--id', 'Recording id (defaults to the latest recording)', False],
+             ['--mode', 'ASR mode: local or cloud (defaults to voice settings)', False],
+             ['[board]', 'Board name (defaults to the current board)', False]],
+  'example': 'yoloit audio:transcribe --mode local'},
  {'group': 'app',
   'name': 'app:list',
   'description': 'List installed apps and which are currently running',
@@ -2361,6 +2389,23 @@ for p in d.get('panels') or []:
     display=$(python3 -c "import sys; print(sys.argv[1].capitalize())" "$display")
     _auto_panel "$bid" "$type" "$display"
   fi
+}
+
+# Find the first visible panel of a given type on a board (no creation).
+# Usage: _find_panel_by_type <encoded-bid> <type>
+# Returns panel id (raw, not encoded) or empty.
+_find_panel_by_type() {
+  local bid=$1 type=$2
+  local panels_json
+  panels_json=$(_get "/boards/${bid}/panels" 2>/dev/null)
+  python3 -c "
+import json, sys
+d = json.loads(sys.stdin.read() or '{}')
+typ = sys.argv[1]
+for p in d.get('panels') or []:
+    if not p.get('hidden') and p.get('type','') == typ:
+        print(p.get('id','')); break
+" "$type" <<<"$panels_json" 2>/dev/null
 }
 
 # ── Command dispatch ──────────────────────────────────────────────────
@@ -5572,6 +5617,89 @@ PY
     board="$1"; panel="$2"; _use_board "$board"
     json=$(python3 -c "import json,sys; print(json.dumps({}))")
     "$0" do "$board" "$panel" reset "$json"
+    ;;
+  audio:start)
+    board_arg=""
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --board) board_arg="${2:-}"; shift 2 ;;
+        *) [[ -z "$board_arg" ]] && board_arg="$1"; shift ;;
+      esac
+    done
+    bid_raw=$(_require_board "$board_arg")
+    bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
+    panel=$(_smart_panel "$bid" "board.audio_recorder" "Audio Recorder")
+    [[ -z "$panel" ]] && { echo "Error: failed to create or find audio recorder panel" >&2; exit 1; }
+    pid=$(_encode "$panel")
+    _post "/boards/${bid}/panels/${pid}/action" '{"action":"start"}' | python3 -m json.tool 2>/dev/null
+    ;;
+  audio:stop)
+    board_arg=""
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --board) board_arg="${2:-}"; shift 2 ;;
+        *) [[ -z "$board_arg" ]] && board_arg="$1"; shift ;;
+      esac
+    done
+    bid_raw=$(_require_board "$board_arg")
+    bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
+    panel=$(_find_panel_by_type "$bid" "board.audio_recorder")
+    [[ -z "$panel" ]] && { echo "Error: no audio recorder panel on board '${bid_raw}'. Run 'yoloit audio:start' first." >&2; exit 1; }
+    pid=$(_encode "$panel")
+    _post "/boards/${bid}/panels/${pid}/action" '{"action":"stop"}' | python3 -m json.tool 2>/dev/null
+    ;;
+  audio:list)
+    board_arg=""
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --board) board_arg="${2:-}"; shift 2 ;;
+        *) [[ -z "$board_arg" ]] && board_arg="$1"; shift ;;
+      esac
+    done
+    bid_raw=$(_require_board "$board_arg")
+    bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
+    panel=$(_find_panel_by_type "$bid" "board.audio_recorder")
+    [[ -z "$panel" ]] && { echo "Error: no audio recorder panel on board '${bid_raw}'. Run 'yoloit audio:start' first." >&2; exit 1; }
+    pid=$(_encode "$panel")
+    _post "/boards/${bid}/panels/${pid}/action" '{"action":"list"}' | python3 -m json.tool 2>/dev/null
+    ;;
+  audio:set-folder)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit audio:set-folder <folder> [--board <name>]" >&2; exit 1; }
+    folder="$1"; shift
+    board_arg=""
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --board) board_arg="${2:-}"; shift 2 ;;
+        *) shift ;;
+      esac
+    done
+    bid_raw=$(_require_board "$board_arg")
+    bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
+    panel=$(_find_panel_by_type "$bid" "board.audio_recorder")
+    [[ -z "$panel" ]] && { echo "Error: no audio recorder panel on board '${bid_raw}'. Run 'yoloit audio:start' first." >&2; exit 1; }
+    pid=$(_encode "$panel")
+    folder_json=$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$folder")
+    _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"set-folder\",\"folder\":${folder_json}}" | python3 -m json.tool 2>/dev/null
+    ;;
+  audio:transcribe)
+    rec_id=""
+    mode=""
+    board_arg=""
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --id) rec_id="${2:-}"; shift 2 ;;
+        --mode) mode="${2:-}"; shift 2 ;;
+        --board) board_arg="${2:-}"; shift 2 ;;
+        *) [[ -z "$board_arg" ]] && board_arg="$1"; shift ;;
+      esac
+    done
+    bid_raw=$(_require_board "$board_arg")
+    bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
+    panel=$(_find_panel_by_type "$bid" "board.audio_recorder")
+    [[ -z "$panel" ]] && { echo "Error: no audio recorder panel on board '${bid_raw}'. Run 'yoloit audio:start' first." >&2; exit 1; }
+    pid=$(_encode "$panel")
+    payload=$(REC_ID="$rec_id" MODE="$mode" python3 -c "import json,os; d={'action':'transcribe'}; rid=os.environ.get('REC_ID',''); m=os.environ.get('MODE',''); rid and d.update(id=rid); m and d.update(mode=m); print(json.dumps(d))")
+    _post "/boards/${bid}/panels/${pid}/action" "$payload" | python3 -m json.tool 2>/dev/null
     ;;
   web:get)
     [[ $# -lt 2 ]] && { echo "Usage: yoloit web:get <board> <panel>" >&2; exit 1; }

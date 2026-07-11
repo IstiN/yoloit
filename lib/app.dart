@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yoloit/core/cli/cli_server.dart';
 import 'package:yoloit/core/cli/handlers/assistant_handler.dart';
+import 'package:yoloit/core/cli/handlers/audio_recorder_handler.dart';
 import 'package:yoloit/core/cli/handlers/calendar_handler.dart';
 import 'package:yoloit/core/cli/handlers/chart_handler.dart';
 import 'package:yoloit/core/cli/handlers/chat_handler.dart';
@@ -29,6 +30,7 @@ import 'package:yoloit/core/cli/handlers/webpage_handler.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/theme/theme_manager.dart';
 import 'package:yoloit/core/utils/git_init_prompt.dart';
+import 'package:yoloit/features/board/audio_recorder/audio_recording_manager.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/history/board_history_store.dart';
 import 'package:yoloit/features/board/plugins/builtin/custom_widget_plugin.dart';
@@ -742,6 +744,7 @@ class _AutoHostShellState extends State<_AutoHostShell> {
     server.registerPanelHandler(const AssistantCliHandler());
     server.registerPanelHandler(const TimerCliHandler());
     server.registerPanelHandler(const CalendarCliHandler());
+    server.registerPanelHandler(const AudioRecorderCliHandler());
     server.registerPanelHandler(const TableCliHandler());
     server.registerPanelHandler(const ChartCliHandler());
     server.registerPanelHandler(const CustomWidgetCliHandler());
@@ -749,6 +752,7 @@ class _AutoHostShellState extends State<_AutoHostShell> {
     server.start(cubit, terminalCubit: terminalCubit);
     // Wire service managers to BoardCubit for headless state updates
     TimerManager.instance.setCubit(cubit);
+    AudioRecordingManager.instance.setCubit(cubit);
     WidgetEngineManager.instance.setCubit(cubit);
   }
 

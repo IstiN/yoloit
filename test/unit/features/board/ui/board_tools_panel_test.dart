@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yoloit/core/theme/app_theme.dart';
@@ -176,6 +177,58 @@ void main() {
         find.byTooltip('AI and terminal unavailable on this board'),
         findsOneWidget,
       );
+    });
+
+    testWidgets('advanced category offers Audio Recorder on macOS', (
+      tester,
+    ) async {
+      await tester.pumpWidget(buildPanel(onAddGeneric: (_) {}));
+      await tester.tap(find.byTooltip('Advanced'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Audio Recorder'), findsOneWidget);
+    });
+
+    testWidgets('hovering a different category switches the submenu', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        buildPanel(onAddNote: () {}, onAddGeneric: (_) {}),
+      );
+
+      final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await gesture.addPointer(location: Offset.zero);
+      addTearDown(gesture.removePointer);
+
+      await gesture.moveTo(tester.getCenter(find.byTooltip('Planning')));
+      await tester.pumpAndSettle();
+      expect(find.text('Kanban Board'), findsOneWidget);
+
+      await gesture.moveTo(tester.getCenter(find.byTooltip('Miro basics')));
+      await tester.pumpAndSettle();
+      expect(find.text('Kanban Board'), findsNothing);
+      expect(find.text('Markdown Note'), findsOneWidget);
+    });
+
+    testWidgets('leaving the toolbar closes the submenu', (tester) async {
+      await tester.pumpWidget(
+        buildPanel(onAddNote: () {}, onAddGeneric: (_) {}),
+      );
+
+      final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await gesture.addPointer(location: Offset.zero);
+      addTearDown(gesture.removePointer);
+
+      await gesture.moveTo(tester.getCenter(find.byTooltip('Miro basics')));
+      await tester.pumpAndSettle();
+      expect(find.text('Markdown Note'), findsOneWidget);
+
+      // Move to empty space far from the toolbar and its submenu.
+      await gesture.moveTo(const Offset(400, 400));
+      await tester.pump(const Duration(milliseconds: 250));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Markdown Note'), findsNothing);
     });
 
     group('on web', () {
@@ -436,6 +489,26 @@ void main() {
       await tester.tap(find.text('Markdown Note'));
       await tester.pumpAndSettle();
       expect(called, isTrue);
+    });
+
+    testWidgets('hovering opens the submenu without a tap', (tester) async {
+      await tester.pumpWidget(
+        buildButton(
+          category: PanelCatalogCategory.basics,
+          onAddNote: () {},
+          onAddGeneric: (_) {},
+        ),
+      );
+
+      final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await gesture.addPointer(location: Offset.zero);
+      addTearDown(gesture.removePointer);
+      await gesture.moveTo(tester.getCenter(find.byIcon(Icons.category)));
+      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Markdown Note'), findsOneWidget);
+      expect(find.text('Sticky Note'), findsOneWidget);
     });
   });
 }

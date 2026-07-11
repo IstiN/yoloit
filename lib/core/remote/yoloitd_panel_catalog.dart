@@ -181,6 +181,23 @@ yoloitdPanelDescriptors = <RemotePanelTypeDescriptor>[
     supportsHeadlessPreview: false,
   ),
   RemotePanelTypeDescriptor(
+    type: 'board.audio_recorder',
+    displayName: 'Audio Recorder',
+    defaultWidth: 380,
+    defaultHeight: 460,
+    actions: <String>[
+      'get',
+      'start',
+      'stop',
+      'list',
+      'set-folder',
+      'set-config',
+      'delete',
+    ],
+    requiresNativeHost: true,
+    supportsHeadlessPreview: false,
+  ),
+  RemotePanelTypeDescriptor(
     type: 'board.run',
     displayName: 'Run',
     defaultWidth: 560,
