@@ -1,5 +1,11 @@
 // Smoke test: the desktop app's real remote client (YoloitRemoteClient)
-// against the Go yoloit-hub backend, spawned as a local process.
+// against the Go yoloit-hub backend.
+//
+// By default the hub is spawned as a local process built from
+// `remote/yoloit-hub`. To run against an already-deployed hub (e.g. Cloud
+// Run), set the environment variables instead:
+//   YOLOIT_HUB_SMOKE_URL=https://... YOLOIT_HUB_SMOKE_TOKEN=... \
+//     flutter test test/integration/yoloit_hub_client_test.dart
 // Proves contract compatibility with no client-side changes.
 import 'dart:async';
 import 'dart:io';
@@ -9,10 +15,12 @@ import 'package:yoloit/core/remote/yoloit_remote_client.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 
 void main() {
-  late Directory workDir;
-  late Directory dataDir;
-  late Process hub;
-  late int port;
+  late String baseUrl;
+  late String token;
+
+  Directory? workDir;
+  Directory? dataDir;
+  Process? hub;
 
   Future<int> _freePort() async {
     final socket = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
@@ -23,8 +31,18 @@ void main() {
 
   setUpAll(() async {
     // TestWidgetsFlutterBinding installs a mock HttpClient that 400s
-    // everything; reset it so the test talks to the real hub process.
+    // everything; reset it so the test talks to the real hub.
     HttpOverrides.global = null;
+
+    final envUrl = Platform.environment['YOLOIT_HUB_SMOKE_URL'];
+    final envToken = Platform.environment['YOLOIT_HUB_SMOKE_TOKEN'];
+    if (envUrl != null && envUrl.isNotEmpty) {
+      // Deployed-hub mode: no local process, use the given endpoint.
+      baseUrl = envUrl;
+      token = envToken ?? '';
+      return;
+    }
+
     workDir = await Directory.systemTemp.createTemp('yoloit_hub_smoke_');
     dataDir = await Directory.systemTemp.createTemp('yoloit_hub_data_');
 
@@ -32,7 +50,7 @@ void main() {
     final build = await Process.run('go', [
       'build',
       '-o',
-      '${workDir.path}/yoloit-hub',
+      '${workDir!.path}/yoloit-hub',
       '.',
     ], workingDirectory: 'remote/yoloit-hub');
     expect(
@@ -41,26 +59,26 @@ void main() {
       reason: 'go build failed: ${build.stderr}',
     );
 
-    port = await _freePort();
+    token = 'it-token';
+    final port = await _freePort();
     hub = await Process.start(
-      '${workDir.path}/yoloit-hub',
+      '${workDir!.path}/yoloit-hub',
       const [],
       environment: {
         'YOLOIT_HUB_HOST': '127.0.0.1',
         'YOLOIT_HUB_PORT': '$port',
-        'YOLOIT_HUB_DATA_DIR': dataDir.path,
-        'YOLOIT_HUB_TOKEN': 'it-token',
+        'YOLOIT_HUB_DATA_DIR': dataDir!.path,
+        'YOLOIT_HUB_TOKEN': token,
       },
     );
+    baseUrl = 'http://127.0.0.1:$port';
     // Wait until the health endpoint answers.
     final probe = HttpClient();
     var up = false;
     for (var i = 0; i < 50 && !up; i++) {
       try {
-        final req = await probe.getUrl(
-          Uri.parse('http://127.0.0.1:$port/api/health'),
-        );
-        req.headers.set('Authorization', 'Bearer it-token');
+        final req = await probe.getUrl(Uri.parse('$baseUrl/api/health'));
+        req.headers.set('Authorization', 'Bearer $token');
         final res = await req.close();
         up = res.statusCode == 200;
         await res.drain<void>();
@@ -73,16 +91,13 @@ void main() {
   });
 
   tearDownAll(() async {
-    hub.kill();
-    await workDir.delete(recursive: true);
-    await dataDir.delete(recursive: true);
+    hub?.kill();
+    await workDir?.delete(recursive: true);
+    await dataDir?.delete(recursive: true);
   });
 
   test('desktop client manages boards and panels on the Go hub', () async {
-    final client = YoloitRemoteClient(
-      baseUrl: 'http://127.0.0.1:$port',
-      token: 'it-token',
-    );
+    final client = YoloitRemoteClient(baseUrl: baseUrl, token: token);
 
     final health = await client.health();
     expect(health['ok'], isTrue);
@@ -128,10 +143,7 @@ void main() {
   });
 
   test('hub rejects wrong token with 401', () async {
-    final bad = YoloitRemoteClient(
-      baseUrl: 'http://127.0.0.1:$port',
-      token: 'wrong-token',
-    );
+    final bad = YoloitRemoteClient(baseUrl: baseUrl, token: 'wrong-token');
     await expectLater(bad.listBoards(), throwsA(anything));
   });
 }

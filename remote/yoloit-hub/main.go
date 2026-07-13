@@ -27,7 +27,8 @@ func configFromEnv() config {
 	defaultDataDir := filepath.Join(home, ".local", "share", "yoloit-hub")
 	return config{
 		Host:        envOr("YOLOIT_HUB_HOST", "127.0.0.1"),
-		Port:        envOr("YOLOIT_HUB_PORT", "43111"), // yoloitd uses 43110; 43111 allows side-by-side
+		// Cloud Run injects PORT; YOLOIT_HUB_PORT takes precedence when set.
+		Port:        envOr("YOLOIT_HUB_PORT", envOr("PORT", "43111")), // yoloitd uses 43110; 43111 allows side-by-side
 		DataDir:     envOr("YOLOIT_HUB_DATA_DIR", defaultDataDir),
 		Token:       os.Getenv("YOLOIT_HUB_TOKEN"),
 		Actor:       envOr("YOLOIT_HUB_ACTOR", "yoloit-hub"),
