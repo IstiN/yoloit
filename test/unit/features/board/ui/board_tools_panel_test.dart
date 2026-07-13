@@ -191,6 +191,25 @@ void main() {
       expect(find.text('Markdown Note'), findsNothing);
     });
 
+    testWidgets('tapping outside closes a tap-opened submenu', (tester) async {
+      await tester.pumpWidget(
+        buildPanel(onAddNote: () {}, onAddGeneric: (_) {}),
+      );
+
+      // Touch-style open: tap the category button (no mouse hover).
+      await tester.tap(find.byTooltip('Miro basics'));
+      await tester.pumpAndSettle();
+      expect(find.text('Markdown Note'), findsOneWidget);
+
+      // Tap empty space far from the toolbar and its submenu — the
+      // tap-outside barrier must dismiss the submenu on touch platforms.
+      await tester.tapAt(const Offset(700, 500));
+      await tester.pump(const Duration(milliseconds: 250));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Markdown Note'), findsNothing);
+    });
+
     group('on web', () {
       Widget buildWebPanel({
         bool visible = true,

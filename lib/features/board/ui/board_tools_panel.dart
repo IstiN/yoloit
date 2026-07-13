@@ -586,6 +586,22 @@ class _PanelCatalogCategoryButtonState extends State<PanelCatalogCategoryButton>
   Widget _buildOverlay(BuildContext context) {
     return Stack(
       children: [
+        // Tap-outside dismissal. On touch platforms MouseRegion never fires,
+        // so without this barrier a tap-opened submenu would float forever.
+        // Translucent so desktop hover events still reach the toolbar
+        // buttons underneath (hover-switching between categories).
+        Positioned.fill(
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: () {
+              if (_hosted) {
+                widget.onScheduleClose!();
+              } else {
+                _closeLocal();
+              }
+            },
+          ),
+        ),
         CompositedTransformFollower(
           link: _layerLink,
           showWhenUnlinked: false,

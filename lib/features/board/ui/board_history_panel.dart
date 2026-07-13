@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
@@ -57,7 +59,9 @@ class BoardHistoryPanelState extends State<BoardHistoryPanel> {
     return Material(
       color: Colors.transparent,
       child: Container(
-        width: 360,
+        // Clamp to the viewport (minus side margins) so the panel never
+        // clips off-screen on narrow phone layouts.
+        width: math.min(360, MediaQuery.sizeOf(context).width - 24),
         decoration: BoxDecoration(
           color: surface,
           borderRadius: BorderRadius.circular(18),
