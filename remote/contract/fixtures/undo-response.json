@@ -1,0 +1,14 @@
+{
+    "board": {
+        "active": true,
+        "defaultFolder": "",
+        "id": "board-1783969411163277",
+        "linkCount": 0,
+        "name": "Fixture Board",
+        "panelCount": 1
+    },
+    "message": "Undid latest panel change",
+    "ok": true,
+    "redoDepth": 1,
+    "undone": true
+}

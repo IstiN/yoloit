@@ -1,0 +1,22 @@
+{
+    "id": "p-1783969411230671",
+    "ok": true,
+    "panel": {
+        "id": "p-1783969411230671",
+        "type": "board.checklist",
+        "title": "Launch Checklist",
+        "bounds": {
+            "x": 160.0,
+            "y": 120.0,
+            "width": 360.0,
+            "height": 240.0
+        },
+        "state": {},
+        "params": {},
+        "color": null,
+        "zIndex": 1,
+        "hidden": false,
+        "locked": false,
+        "pinned": false
+    }
+}

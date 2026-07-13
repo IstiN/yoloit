@@ -1,0 +1,69 @@
+{
+  "types": [
+    {
+      "actions": [
+        "get",
+        "set",
+        "append",
+        "wrap",
+        "nowrap"
+      ],
+      "capabilities": {
+        "localPlatforms": [
+          "web",
+          "macos",
+          "linux",
+          "windows",
+          "ios"
+        ],
+        "remotePlatforms": [
+          "macos",
+          "linux",
+          "windows",
+          "ios"
+        ],
+        "requiresNativeHost": false,
+        "supportsHeadlessPreview": true,
+        "supportsRemoteState": true
+      },
+      "defaultSize": {
+        "height": 220.0,
+        "width": 360.0
+      },
+      "displayName": "Markdown Note",
+      "type": "board.note.markdown"
+    },
+    {
+      "actions": [
+        "get",
+        "set",
+        "append",
+        "color"
+      ],
+      "capabilities": {
+        "localPlatforms": [
+          "web",
+          "macos",
+          "linux",
+          "windows",
+          "ios"
+        ],
+        "remotePlatforms": [
+          "macos",
+          "linux",
+          "windows",
+          "ios"
+        ],
+        "requiresNativeHost": false,
+        "supportsHeadlessPreview": true,
+        "supportsRemoteState": true
+      },
+      "defaultSize": {
+        "height": 220.0,
+        "width": 260.0
+      },
+      "displayName": "Sticky Note",
+      "type": "board.sticky"
+    }
+  ]
+}

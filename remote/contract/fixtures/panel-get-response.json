@@ -1,0 +1,72 @@
+{
+    "actionHelp": {
+        "actions": [
+            "items",
+            "add",
+            "check",
+            "uncheck",
+            "remove",
+            "rename"
+        ],
+        "capabilities": {
+            "localPlatforms": [
+                "web",
+                "macos",
+                "linux",
+                "windows",
+                "ios"
+            ],
+            "remotePlatforms": [
+                "macos",
+                "linux",
+                "windows",
+                "ios"
+            ],
+            "requiresNativeHost": false,
+            "supportsHeadlessPreview": true,
+            "supportsRemoteState": true
+        }
+    },
+    "bounds": {
+        "height": 240.0,
+        "width": 400.0,
+        "x": 160.0,
+        "y": 120.0
+    },
+    "color": null,
+    "content": {
+        "items": [
+            {
+                "done": true,
+                "id": "item-1783969411331917",
+                "text": "ship it"
+            }
+        ]
+    },
+    "hidden": false,
+    "id": "p-1783969411230671",
+    "locked": false,
+    "params": {},
+    "pinned": false,
+    "state": {
+        "items": [
+            {
+                "done": true,
+                "id": "item-1783969411331917",
+                "text": "ship it"
+            }
+        ]
+    },
+    "supportedActions": [
+        "items",
+        "add",
+        "check",
+        "uncheck",
+        "remove",
+        "rename"
+    ],
+    "title": "Launch Checklist",
+    "type": "board.checklist",
+    "typeName": "board.checklist",
+    "zIndex": 1
+}

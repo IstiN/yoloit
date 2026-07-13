@@ -1,0 +1,167 @@
+{
+  "events": [
+    {
+      "opId": "op-1783969411230795",
+      "boardId": "board-1783969411163277",
+      "type": "panel.created",
+      "entityType": "panel",
+      "entityId": "p-1783969411230671",
+      "actorId": "yoloit-hub",
+      "timestamp": "2026-07-13T19:03:31.230796Z",
+      "revision": 1,
+      "before": null,
+      "after": {
+        "id": "p-1783969411230671",
+        "type": "board.checklist",
+        "title": "Launch Checklist",
+        "bounds": {
+          "x": 160.0,
+          "y": 120.0,
+          "width": 360.0,
+          "height": 240.0
+        },
+        "state": {},
+        "params": {},
+        "color": null,
+        "zIndex": 1,
+        "hidden": false,
+        "locked": false,
+        "pinned": false
+      },
+      "patch": {},
+      "restoresOpId": null
+    },
+    {
+      "opId": "op-1783969411319597",
+      "boardId": "board-1783969411163277",
+      "type": "panel.updated",
+      "entityType": "panel",
+      "entityId": "p-1783969411230671",
+      "actorId": "yoloit-hub",
+      "timestamp": "2026-07-13T19:03:31.319599Z",
+      "revision": 2,
+      "before": {
+        "id": "p-1783969411230671",
+        "type": "board.checklist",
+        "title": "Launch Checklist",
+        "bounds": {
+          "x": 160.0,
+          "y": 120.0,
+          "width": 360.0,
+          "height": 240.0
+        },
+        "state": {},
+        "params": {},
+        "color": null,
+        "zIndex": 1,
+        "hidden": false,
+        "locked": false,
+        "pinned": false
+      },
+      "after": {
+        "id": "p-1783969411230671",
+        "type": "board.checklist",
+        "title": "Launch Checklist",
+        "bounds": {
+          "x": 160.0,
+          "y": 120.0,
+          "width": 400.0,
+          "height": 240.0
+        },
+        "state": {},
+        "params": {},
+        "color": null,
+        "zIndex": 1,
+        "hidden": false,
+        "locked": false,
+        "pinned": false
+      },
+      "patch": {
+        "bounds": {
+          "after": {
+            "x": 160.0,
+            "y": 120.0,
+            "width": 400.0,
+            "height": 240.0
+          },
+          "before": {
+            "x": 160.0,
+            "y": 120.0,
+            "width": 360.0,
+            "height": 240.0
+          }
+        }
+      },
+      "restoresOpId": null
+    },
+    {
+      "opId": "op-1783969411332006",
+      "boardId": "board-1783969411163277",
+      "type": "panel.updated",
+      "entityType": "panel",
+      "entityId": "p-1783969411230671",
+      "actorId": "yoloit-hub",
+      "timestamp": "2026-07-13T19:03:31.332006Z",
+      "revision": 3,
+      "before": {
+        "id": "p-1783969411230671",
+        "type": "board.checklist",
+        "title": "Launch Checklist",
+        "bounds": {
+          "x": 160.0,
+          "y": 120.0,
+          "width": 400.0,
+          "height": 240.0
+        },
+        "state": {},
+        "params": {},
+        "color": null,
+        "zIndex": 1,
+        "hidden": false,
+        "locked": false,
+        "pinned": false
+      },
+      "after": {
+        "id": "p-1783969411230671",
+        "type": "board.checklist",
+        "title": "Launch Checklist",
+        "bounds": {
+          "x": 160.0,
+          "y": 120.0,
+          "width": 400.0,
+          "height": 240.0
+        },
+        "state": {
+          "items": [
+            {
+              "done": false,
+              "id": "item-1783969411331917",
+              "text": "ship it"
+            }
+          ]
+        },
+        "params": {},
+        "color": null,
+        "zIndex": 1,
+        "hidden": false,
+        "locked": false,
+        "pinned": false
+      },
+      "patch": {
+        "state": {
+          "after": {
+            "items": [
+              {
+                "done": false,
+                "id": "item-1783969411331917",
+                "text": "ship it"
+              }
+            ]
+          },
+          "before": {}
+        }
+      },
+      "restoresOpId": null
+    }
+  ]
+}

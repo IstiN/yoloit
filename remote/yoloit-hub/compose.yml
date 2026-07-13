@@ -1,0 +1,32 @@
+services:
+  yoloit-hub:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: yoloit-hub:dev
+    restart: unless-stopped
+    ports:
+      - "${YOLOIT_HUB_PORT:-43111}:43111"
+    environment:
+      YOLOIT_HUB_HOST: 0.0.0.0
+      YOLOIT_HUB_PORT: 43111
+      YOLOIT_HUB_DATA_DIR: /data
+      YOLOIT_HUB_ACTOR: ${YOLOIT_HUB_ACTOR:-server}
+      YOLOIT_HUB_TOKEN: ${YOLOIT_HUB_TOKEN:?Set YOLOIT_HUB_TOKEN before starting yoloit-hub}
+      YOLOIT_HUB_CORS_ORIGINS: ${YOLOIT_HUB_CORS_ORIGINS:-*}
+    volumes:
+      - yoloit-hub-data:/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "/usr/local/bin/yoloit-hub_healthcheck",
+          "http://127.0.0.1:43111/api/health"
+        ]
+      interval: 20s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+
+volumes:
+  yoloit-hub-data:

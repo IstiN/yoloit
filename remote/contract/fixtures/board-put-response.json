@@ -1,0 +1,41 @@
+{
+    "board": {
+        "id": "board-1783967507567884",
+        "name": "Contract Fixture Board",
+        "viewport": {
+            "scale": 1.0,
+            "translation": {
+                "dx": 0.0,
+                "dy": 0.0
+            }
+        },
+        "panels": [
+            {
+                "id": "p-fixture-1",
+                "type": "board.note.markdown",
+                "title": "Fixture Note",
+                "bounds": {
+                    "x": 120.0,
+                    "y": 80.0,
+                    "width": 360.0,
+                    "height": 240.0
+                },
+                "state": {
+                    "markdown": "# Hello from yoloit-hub"
+                },
+                "params": {},
+                "color": null,
+                "zIndex": 1,
+                "hidden": false,
+                "locked": false,
+                "pinned": false
+            }
+        ],
+        "links": [],
+        "drawings": [],
+        "metadata": {
+            "historyRevision": 1
+        }
+    },
+    "ok": true
+}
