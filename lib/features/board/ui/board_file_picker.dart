@@ -26,12 +26,9 @@ class BoardFilePicker {
     String? initialPath,
     String title = 'Choose folder',
   }) {
-    if (remoteInfo == null) {
-      return native.FilePicker.getDirectoryPath(
-        dialogTitle: title,
-        initialDirectory: _nativeInitialDirectory(initialPath),
-      );
-    }
+    // Always use the in-app dialog (local and remote): the native macOS
+    // directory panel from file_picker offers no "New Folder" button,
+    // while this dialog can create folders in both modes.
     return showDialog<String>(
       context: context,
       builder:

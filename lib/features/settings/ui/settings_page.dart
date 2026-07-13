@@ -12,6 +12,7 @@ import 'package:yoloit/features/settings/ui/sections/chat_context_section.dart';
 import 'package:yoloit/features/settings/ui/sections/ignored_tool_calls_section.dart';
 import 'package:yoloit/features/settings/ui/sections/notifications_section.dart';
 import 'package:yoloit/features/settings/ui/sections/prompts_section.dart';
+import 'package:yoloit/features/settings/ui/sections/remote_section.dart';
 import 'package:yoloit/features/settings/ui/sections/section_header.dart';
 import 'package:yoloit/features/settings/ui/sections/session_settings_section.dart';
 import 'package:yoloit/features/settings/ui/sections/shortcuts_table_section.dart';
@@ -37,6 +38,7 @@ const _kDesktopCategories = [
   'Shortcuts',
   'Skills',
   'Sync',
+  'Remote',
   'Setup Guide',
   'Apps & Widgets',
   'Support',
@@ -325,6 +327,14 @@ class _SettingsPageState extends State<SettingsPage> {
           SectionHeader(title: 'Sync'),
           SizedBox(height: 12),
           SyncSection(),
+        ],
+      ),
+      'Remote' => const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionHeader(title: 'Remote'),
+          SizedBox(height: 12),
+          RemoteSection(),
         ],
       ),
       'Setup Guide' => const SetupGuideEmbedded(),

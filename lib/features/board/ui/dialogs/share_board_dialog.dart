@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:yoloit/core/utils/clipboard_utils.dart';
-
 import 'package:yoloit/core/remote/board_share_server.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/ui/adaptive_dialog.dart';
+import 'package:yoloit/core/utils/clipboard_utils.dart';
 import 'package:yoloit/ui/components/typography/caption.dart';
 
 /// Dialog that shows the current board-sharing URL and token.
@@ -52,14 +50,14 @@ class _ShareBoardDialogState extends State<ShareBoardDialog> {
               fontSize: 12,
             ),
             const SizedBox(height: 16),
-            _ShareValueRow(
+            ShareValueRow(
               label: 'URL',
               value: widget.info.url,
               copied: _copiedUrl,
               onCopy: () => _copy(widget.info.url, (value) => _copiedUrl = value),
             ),
             const SizedBox(height: 10),
-            _ShareValueRow(
+            ShareValueRow(
               label: 'Token',
               value: widget.info.token,
               copied: _copiedToken,
@@ -90,8 +88,11 @@ class _ShareBoardDialogState extends State<ShareBoardDialog> {
   }
 }
 
-class _ShareValueRow extends StatelessWidget {
-  const _ShareValueRow({
+/// Read-only value row with a copy button, shared by the share dialog and
+/// the settings Remote section.
+class ShareValueRow extends StatelessWidget {
+  const ShareValueRow({
+    super.key,
     required this.label,
     required this.value,
     required this.copied,
