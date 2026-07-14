@@ -21,7 +21,7 @@ func newTestServer(t *testing.T, token string) (*httptest.Server, *Store, string
 	if err := store.Init(); err != nil {
 		t.Fatalf("store init: %v", err)
 	}
-	srv := httptest.NewServer(newServer(store, token, "*"))
+	srv := httptest.NewServer(newServer(store, token, "*", newRelayHub(t.TempDir())))
 	t.Cleanup(srv.Close)
 	return srv, store, dataDir
 }
@@ -453,7 +453,7 @@ func TestCORSRestrictedOrigins(t *testing.T) {
 	if err := store.Init(); err != nil {
 		t.Fatal(err)
 	}
-	srv := httptest.NewServer(newServer(store, "", "https://app.example.com"))
+	srv := httptest.NewServer(newServer(store, "", "https://app.example.com", newRelayHub(t.TempDir())))
 	defer srv.Close()
 
 	req, _ := http.NewRequest(http.MethodGet, srv.URL+"/api/health", nil)

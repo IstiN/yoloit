@@ -155,5 +155,26 @@ WebSocket watch channel are intentionally excluded (native-host features or
 later phases); those routes return the contract's
 `404 {"ok": false, "error": "not found"}`.
 
+## Relay mode (device → hub reverse tunnel)
+
+A Mac running YoLoIT can share its boards without any inbound connectivity:
+it dials **out** to the hub over a WebSocket, and clients reach it through
+the hub. The hub stays thin — it routes, the Mac executes against its live
+board state.
+
+```text
+POST   /api/devices                 create device → {deviceId, key} (hub token)
+GET    /api/devices                 list devices with online status (hub token)
+DELETE /api/devices/:id             revoke device (hub token)
+GET    /api/relay/connect?deviceId  WS upgrade, auth: Bearer <device key>
+ALL    /api/devices/:id/*           proxied to the device over its WS
+```
+
+Client base URL for a relayed device is `https://<hub>/api/devices/<id>` —
+the existing `YoloitRemoteClient` works unchanged. Instead of POST, a
+pre-shared static device can be configured via env
+(`YOLOIT_HUB_DEVICE_KEY` / `YOLOIT_HUB_DEVICE_ID` / `YOLOIT_HUB_DEVICE_NAME`),
+which survives Cloud Run redeploys.
+
 See `docs/remote-hub.md` and `remote/contract/README.md` for contract details
 and golden fixtures.

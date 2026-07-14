@@ -15,11 +15,12 @@ type server struct {
 	store       *Store
 	token       string
 	corsOrigins []string
+	relay       *relayHub
 	mux         *http.ServeMux
 }
 
-func newServer(store *Store, token, corsOrigins string) *server {
-	s := &server{store: store, token: strings.TrimSpace(token)}
+func newServer(store *Store, token, corsOrigins string, relay *relayHub) *server {
+	s := &server{store: store, token: strings.TrimSpace(token), relay: relay}
 	s.corsOrigins = parseOrigins(corsOrigins)
 
 	mux := http.NewServeMux()
@@ -27,6 +28,9 @@ func newServer(store *Store, token, corsOrigins string) *server {
 	mux.HandleFunc("GET /api/health", s.handleHealth)
 	mux.HandleFunc("/api/boards", s.handleBoardsRoot)
 	mux.HandleFunc("/api/boards/", s.handleBoardsSubtree)
+	mux.HandleFunc("/api/devices", s.handleDevicesRoot)
+	mux.HandleFunc("/api/devices/", s.handleDevicesSubtree)
+	mux.HandleFunc("GET /api/relay/connect", s.handleRelayConnect)
 	mux.HandleFunc("/", s.handleRoot)
 	s.mux = mux
 	return s
@@ -92,6 +96,12 @@ func parseOrigins(raw string) []string {
 // access; otherwise require `Authorization: Bearer <token>` or `?token=`.
 func (s *server) auth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// The relay connect endpoint authenticates with a per-device key
+		// instead of the hub token (checked inside the handler).
+		if r.URL.Path == "/api/relay/connect" {
+			next.ServeHTTP(w, r)
+			return
+		}
 		if !s.authorized(r) {
 			writeJSON(w, http.StatusUnauthorized, map[string]any{
 				"ok":    false,

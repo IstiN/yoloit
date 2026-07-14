@@ -20,19 +20,28 @@ type config struct {
 	Token       string
 	Actor       string
 	CORSOrigins string
+	DeviceKey   string
+	DeviceID    string
+	DeviceName  string
 }
 
 func configFromEnv() config {
 	home, _ := os.UserHomeDir()
 	defaultDataDir := filepath.Join(home, ".local", "share", "yoloit-hub")
 	return config{
-		Host:        envOr("YOLOIT_HUB_HOST", "127.0.0.1"),
+		Host: envOr("YOLOIT_HUB_HOST", "127.0.0.1"),
 		// Cloud Run injects PORT; YOLOIT_HUB_PORT takes precedence when set.
 		Port:        envOr("YOLOIT_HUB_PORT", envOr("PORT", "43111")), // yoloitd uses 43110; 43111 allows side-by-side
 		DataDir:     envOr("YOLOIT_HUB_DATA_DIR", defaultDataDir),
 		Token:       os.Getenv("YOLOIT_HUB_TOKEN"),
 		Actor:       envOr("YOLOIT_HUB_ACTOR", "yoloit-hub"),
 		CORSOrigins: envOr("YOLOIT_HUB_CORS_ORIGINS", "*"),
+		// Pre-shared static device: a Mac connecting with this key registers
+		// as DeviceID without an admin POST /api/devices call. Survives
+		// Cloud Run redeploys (the devices.json store is ephemeral there).
+		DeviceKey:  os.Getenv("YOLOIT_HUB_DEVICE_KEY"),
+		DeviceID:   envOr("YOLOIT_HUB_DEVICE_ID", "default"),
+		DeviceName: envOr("YOLOIT_HUB_DEVICE_NAME", "Static device"),
 	}
 }
 
@@ -51,6 +60,9 @@ func main() {
 	flag.StringVar(&cfg.Token, "token", cfg.Token, "shared bearer token; empty = open access (env YOLOIT_HUB_TOKEN)")
 	flag.StringVar(&cfg.Actor, "actor", cfg.Actor, "actor id recorded in history events (env YOLOIT_HUB_ACTOR)")
 	flag.StringVar(&cfg.CORSOrigins, "cors-origins", cfg.CORSOrigins, "comma-separated allowed origins, * for all (env YOLOIT_HUB_CORS_ORIGINS)")
+	flag.StringVar(&cfg.DeviceKey, "device-key", cfg.DeviceKey, "pre-shared static relay device key; empty = disabled (env YOLOIT_HUB_DEVICE_KEY)")
+	flag.StringVar(&cfg.DeviceID, "device-id", cfg.DeviceID, "static relay device id (env YOLOIT_HUB_DEVICE_ID)")
+	flag.StringVar(&cfg.DeviceName, "device-name", cfg.DeviceName, "static relay device display name (env YOLOIT_HUB_DEVICE_NAME)")
 	flag.Parse()
 
 	store := NewStore(cfg.DataDir, cfg.Actor)
@@ -58,7 +70,13 @@ func main() {
 		log.Fatalf("[yoloit-hub] failed to initialize store at %s: %v", cfg.DataDir, err)
 	}
 
-	srv := newServer(store, cfg.Token, cfg.CORSOrigins)
+	relay := newRelayHub(cfg.DataDir)
+	if strings.TrimSpace(cfg.DeviceKey) != "" {
+		relay.devices.registerStatic(cfg.DeviceID, cfg.DeviceName, cfg.DeviceKey)
+		log.Printf("[yoloit-hub] static relay device enabled: id=%s name=%q", cfg.DeviceID, cfg.DeviceName)
+	}
+
+	srv := newServer(store, cfg.Token, cfg.CORSOrigins, relay)
 	addr := cfg.Host + ":" + cfg.Port
 	log.Printf("[yoloit-hub] listening on http://%s (dataDir=%s, auth=%s)", addr, cfg.DataDir, authMode(cfg.Token))
 	if err := http.ListenAndServe(addr, srv); err != nil {
