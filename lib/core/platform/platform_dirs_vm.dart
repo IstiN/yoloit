@@ -17,8 +17,7 @@ PlatformDirs createPlatformDirs() {
 /// Logs:    `~/Library/Logs/yoloit/`
 /// Data:    `~/Library/Application Support/yoloit/`
 class MacosPlatformDirs extends PlatformDirs {
-  const MacosPlatformDirs({String? homeOverride})
-    : _homeOverride = homeOverride;
+  const MacosPlatformDirs({this._homeOverride});
 
   final String? _homeOverride;
 
@@ -48,13 +47,15 @@ class MacosPlatformDirs extends PlatformDirs {
 /// Config/Data: `<sandbox>/Documents/yoloit/`
 /// Logs:        `<sandbox>/Documents/yoloit/logs/`
 class IosPlatformDirs extends PlatformDirs {
-  const IosPlatformDirs({String? homeOverride}) : _homeOverride = homeOverride;
+  const IosPlatformDirs({this._homeOverride, this._rootOverride});
 
   final String? _homeOverride;
+  final String? _rootOverride;
 
   String get _home => _homeOverride ?? Platform.environment['HOME'] ?? '/tmp';
 
-  String get _root => '$_home/Documents/yoloit';
+  String get _root =>
+      _rootOverride ?? '$_home/Documents/yoloit';
 
   @override
   String get configDir => _root;
@@ -81,8 +82,7 @@ class IosPlatformDirs extends PlatformDirs {
 /// Data:    `~/.local/share/yoloit/`
 /// Logs:    `~/.local/share/yoloit/logs/`
 class LinuxPlatformDirs extends PlatformDirs {
-  const LinuxPlatformDirs({String? homeOverride})
-    : _homeOverride = homeOverride;
+  const LinuxPlatformDirs({this._homeOverride});
 
   final String? _homeOverride;
 
@@ -113,8 +113,7 @@ class LinuxPlatformDirs extends PlatformDirs {
 /// Data:    `%APPDATA%\yoloit\`
 /// Logs:    `%APPDATA%\yoloit\logs\`
 class WindowsPlatformDirs extends PlatformDirs {
-  const WindowsPlatformDirs({String? appDataOverride})
-    : _appDataOverride = appDataOverride;
+  const WindowsPlatformDirs({this._appDataOverride});
 
   final String? _appDataOverride;
 
