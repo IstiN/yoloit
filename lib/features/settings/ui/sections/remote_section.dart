@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:yoloit/core/remote/board_relay_client.dart';
 import 'package:yoloit/core/remote/board_share_server.dart';
 import 'package:yoloit/core/remote/yoloit_remote_client.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
@@ -24,6 +25,9 @@ class RemoteSection extends StatefulWidget {
 class _RemoteSectionState extends State<RemoteSection> {
   final _urlCtrl = TextEditingController();
   final _tokenCtrl = TextEditingController();
+  final _relayUrlCtrl = TextEditingController();
+  final _relayDeviceIdCtrl = TextEditingController();
+  final _relayDeviceKeyCtrl = TextEditingController();
   bool _connecting = false;
   bool _shareBusy = false;
   bool _copiedUrl = false;
@@ -33,14 +37,17 @@ class _RemoteSectionState extends State<RemoteSection> {
   void dispose() {
     _urlCtrl.dispose();
     _tokenCtrl.dispose();
+    _relayUrlCtrl.dispose();
+    _relayDeviceIdCtrl.dispose();
+    _relayDeviceKeyCtrl.dispose();
     super.dispose();
   }
 
   void _snack(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _connect() async {
@@ -108,6 +115,8 @@ class _RemoteSectionState extends State<RemoteSection> {
         _buildConnectCard(colors),
         const SizedBox(height: 20),
         _buildShareCard(colors),
+        const SizedBox(height: 20),
+        _buildRelayCard(colors),
       ],
     );
   }
@@ -147,14 +156,13 @@ class _RemoteSectionState extends State<RemoteSection> {
           const SizedBox(height: 12),
           FilledButton.icon(
             onPressed: _connecting ? null : _connect,
-            icon:
-                _connecting
-                    ? const SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                    : const Icon(Icons.link, size: 16),
+            icon: _connecting
+                ? const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.link, size: 16),
             label: Text(_connecting ? 'Connecting...' : 'Connect'),
           ),
           const SizedBox(height: 16),
@@ -239,23 +247,22 @@ class _RemoteSectionState extends State<RemoteSection> {
           Text(
             info == null
                 ? 'Start a LAN server so other devices can connect to this '
-                    'app with the URL and token below.'
+                      'app with the URL and token below.'
                 : 'Sharing is on. Enter this URL and token on the other '
-                    'device (Settings → Remote → Connect).',
+                      'device (Settings → Remote → Connect).',
             style: TextStyle(color: colors.textMuted, fontSize: 11),
           ),
           const SizedBox(height: 12),
           if (info == null)
             FilledButton.icon(
               onPressed: _shareBusy ? null : _startSharing,
-              icon:
-                  _shareBusy
-                      ? const SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                      : const Icon(Icons.ios_share_outlined, size: 16),
+              icon: _shareBusy
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.ios_share_outlined, size: 16),
               label: Text(_shareBusy ? 'Starting...' : 'Start sharing'),
             )
           else ...[
@@ -285,6 +292,138 @@ class _RemoteSectionState extends State<RemoteSection> {
               label: Text(_shareBusy ? 'Stopping...' : 'Stop sharing'),
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _startRelay() async {
+    final hubUrl = _relayUrlCtrl.text.trim();
+    final deviceId = _relayDeviceIdCtrl.text.trim();
+    final deviceKey = _relayDeviceKeyCtrl.text.trim();
+    if (hubUrl.isEmpty || deviceId.isEmpty || deviceKey.isEmpty) {
+      _snack('Fill hub URL, device ID and device key');
+      return;
+    }
+    try {
+      await BoardRelayClient.instance.start(
+        context.read<BoardCubit>(),
+        hubUrl: hubUrl,
+        deviceId: deviceId,
+        deviceKey: deviceKey,
+      );
+    } on Object catch (error) {
+      _snack('Relay start failed: $error');
+    }
+  }
+
+  Future<void> _stopRelay() async {
+    await BoardRelayClient.instance.stop();
+  }
+
+  Widget _buildRelayCard(AppColorScheme colors) {
+    return SettingsCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Share via yoloit-hub',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Share this device through a yoloit-hub relay. No inbound '
+            'connections required — the app dials out to the hub over a '
+            'WebSocket.',
+            style: TextStyle(color: colors.textMuted, fontSize: 11),
+          ),
+          const SizedBox(height: 12),
+          LabeledTextField(
+            controller: _relayUrlCtrl,
+            label: 'Hub URL',
+            hint: 'https://yoloit-hub-...run.app',
+          ),
+          const SizedBox(height: 10),
+          LabeledTextField(
+            controller: _relayDeviceIdCtrl,
+            label: 'Device ID',
+            hint: 'default',
+          ),
+          const SizedBox(height: 10),
+          LabeledTextField(
+            controller: _relayDeviceKeyCtrl,
+            label: 'Device key',
+            hint: 'Shared device key from the hub',
+            obscureText: true,
+          ),
+          const SizedBox(height: 12),
+          ValueListenableBuilder<BoardRelayStatus>(
+            valueListenable: BoardRelayClient.instance.status,
+            builder: (context, status, _) {
+              final running =
+                  status == BoardRelayStatus.connected ||
+                  status == BoardRelayStatus.connecting;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  FilledButton.icon(
+                    onPressed: running ? null : _startRelay,
+                    icon: Icon(
+                      status == BoardRelayStatus.connecting
+                          ? Icons.pending_outlined
+                          : Icons.cloud_upload_outlined,
+                      size: 16,
+                    ),
+                    label: Text(
+                      status == BoardRelayStatus.connected
+                          ? 'Sharing'
+                          : status == BoardRelayStatus.connecting
+                          ? 'Connecting...'
+                          : 'Start sharing via hub',
+                    ),
+                  ),
+                  if (running) ...[
+                    const SizedBox(height: 8),
+                    TextButton.icon(
+                      onPressed: _stopRelay,
+                      icon: const Icon(Icons.stop_circle_outlined, size: 16),
+                      label: const Text('Stop sharing via hub'),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: switch (status) {
+                            BoardRelayStatus.connected => colors.accentGreen,
+                            BoardRelayStatus.connecting => colors.accentOrange,
+                            BoardRelayStatus.disconnected => colors.accentRed,
+                          },
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        switch (status) {
+                          BoardRelayStatus.connected => 'Connected to hub',
+                          BoardRelayStatus.connecting => 'Connecting to hub',
+                          BoardRelayStatus.disconnected => 'Disconnected',
+                        },
+                        style: TextStyle(color: colors.textMuted, fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ],
+              );
+            },
+          ),
         ],
       ),
     );

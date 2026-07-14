@@ -85,7 +85,10 @@ class BoardShareServer extends BoardShareServerBase with ServerProcessMixin {
         'error': 'unauthorized',
       }, 401);
     }
+    return _route(request);
+  }
 
+  Future<shelf.Response> _route(shelf.Request request) async {
     final method = request.method.toUpperCase();
     final path = request.url.pathSegments;
     final cubit = _cubit;
@@ -117,7 +120,10 @@ class BoardShareServer extends BoardShareServerBase with ServerProcessMixin {
       if (path.length >= 2 && path[0] == 'api' && path[1] == 'terminals') {
         return _handleTerminals(request, method, path.skip(2).toList());
       }
-      return jsonResponse(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
+      return jsonResponse(<String, Object?>{
+        'ok': false,
+        'error': 'not found',
+      }, 404);
     } catch (error, stackTrace) {
       debugPrint('[BoardShare] $error\n$stackTrace');
       return jsonResponse(<String, Object?>{
@@ -136,10 +142,9 @@ class BoardShareServer extends BoardShareServerBase with ServerProcessMixin {
     if (sub.isEmpty && method == 'GET') {
       final active = cubit.state.activeBoardId;
       return jsonResponse(<String, Object?>{
-        'boards':
-            cubit.state.boards
-                .map((board) => _summary(board, activeId: active))
-                .toList(),
+        'boards': cubit.state.boards
+            .map((board) => _summary(board, activeId: active))
+            .toList(),
       });
     }
     if (sub.isEmpty && method == 'POST') {
@@ -175,7 +180,9 @@ class BoardShareServer extends BoardShareServerBase with ServerProcessMixin {
       }, 404);
     }
 
-    if (sub.length == 1 && method == 'GET') return jsonResponse(_sharedBoard(board));
+    if (sub.length == 1 && method == 'GET') {
+      return jsonResponse(_sharedBoard(board));
+    }
     if (sub.length == 1 && method == 'PUT') {
       final body = await readJsonBody(request);
       final expectedRevision = (body['expectedRevision'] as num?)?.toInt();
@@ -205,7 +212,10 @@ class BoardShareServer extends BoardShareServerBase with ServerProcessMixin {
         'board': _sharedBoard(updated),
       });
     }
-    return jsonResponse(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
+    return jsonResponse(<String, Object?>{
+      'ok': false,
+      'error': 'not found',
+    }, 404);
   }
 
   Future<shelf.Response> _handleFiles(
@@ -227,16 +237,15 @@ class BoardShareServer extends BoardShareServerBase with ServerProcessMixin {
       requested == null || requested.isEmpty ? _defaultFileRoot() : requested,
     );
     final dirEntries = await listDirectoryEntries(directory);
-    final entries =
-        dirEntries
-            .map(
-              (e) => <String, Object?>{
-                'name': e.name,
-                'path': e.path,
-                'isDirectory': e.isDirectory,
-              },
-            )
-            .toList();
+    final entries = dirEntries
+        .map(
+          (e) => <String, Object?>{
+            'name': e.name,
+            'path': e.path,
+            'isDirectory': e.isDirectory,
+          },
+        )
+        .toList();
 
     return buildFileListingResponse(
       directory: directory,
@@ -255,12 +264,8 @@ class BoardShareServer extends BoardShareServerBase with ServerProcessMixin {
       method: method,
       sub: sub,
       nextId: () => _nextId('setup'),
-      startTasks: (id, specialIds, script) => runSetupInstallTasks(
-        id,
-        specialIds,
-        script,
-        Directory.current.path,
-      ),
+      startTasks: (id, specialIds, script) =>
+          runSetupInstallTasks(id, specialIds, script, Directory.current.path),
     );
   }
 
@@ -288,6 +293,31 @@ class BoardShareServer extends BoardShareServerBase with ServerProcessMixin {
     );
   }
 
+  void attachForRelay(BoardCubit cubit) {
+    _cubit ??= cubit;
+  }
+
+  void detachForRelay() {
+    if (_server == null) {
+      _cubit = null;
+    }
+  }
+
+  Future<shelf.Response> handleRelayRequest(
+    String method,
+    String path,
+    String query,
+    String body,
+  ) async {
+    final uri = Uri(
+      scheme: 'http',
+      host: 'relay',
+      path: path,
+      query: query.isEmpty ? null : query,
+    );
+    return _route(shelf.Request(method.toUpperCase(), uri, body: body));
+  }
+
   bool _authorized(shelf.Request request) => isAuthorized(request, _token);
 
   Map<String, Object?> _summary(BoardDocument board, {String? activeId}) {
@@ -302,10 +332,9 @@ class BoardShareServer extends BoardShareServerBase with ServerProcessMixin {
   }
 
   Map<String, dynamic> _sharedBoard(BoardDocument board) {
-    final metadata =
-        Map<String, dynamic>.from(board.metadata)
-          ..remove('remote')
-          ..remove('remoteSource');
+    final metadata = Map<String, dynamic>.from(board.metadata)
+      ..remove('remote')
+      ..remove('remoteSource');
     return <String, dynamic>{...board.toJson(), 'metadata': metadata};
   }
 
