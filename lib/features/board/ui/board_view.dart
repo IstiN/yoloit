@@ -54,6 +54,7 @@ import 'package:yoloit/features/board/ui/yolo_badge_with_chat.dart';
 import 'package:yoloit/features/board/utils/board_grid_layout.dart';
 import 'package:yoloit/features/mindmap/widgets/canvas_interaction_lock.dart';
 import 'package:yoloit/features/search/ui/file_search_overlay.dart';
+import 'package:yoloit/features/settings/ui/settings_page.dart';
 import 'package:yoloit/features/templates/ui/template_wizard_dialog.dart';
 
 class BoardView extends StatefulWidget {
@@ -189,7 +190,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
             }
             return KeyEventResult.ignored;
           }
-          final isMeta = HardwareKeyboard.instance.isMetaPressed ||
+          final isMeta =
+              HardwareKeyboard.instance.isMetaPressed ||
               HardwareKeyboard.instance.isControlPressed;
           final cubit = context.read<BoardCubit>();
           if (event.logicalKey == LogicalKeyboardKey.delete ||
@@ -240,8 +242,10 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
           _syncViewport(activeBoard);
 
           // Expose undo/redo to the app-level title bar (see BoardTitleBar).
-          BoardUndoRedo.undo = () => _restoreLatestPanelHistory(context, activeBoard);
-          BoardUndoRedo.redo = () => _redoLatestPanelHistory(context, activeBoard);
+          BoardUndoRedo.undo = () =>
+              _restoreLatestPanelHistory(context, activeBoard);
+          BoardUndoRedo.redo = () =>
+              _redoLatestPanelHistory(context, activeBoard);
 
           return Container(
             color: colors.background,
@@ -251,12 +255,13 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                 BoardToolbar(
                   board: activeBoard,
                   onCreateBoard: () => _createBoard(context),
-                  onCreateBoardFromTemplate:
-                      () => _createBoardFromTemplate(context),
+                  onCreateBoardFromTemplate: () =>
+                      _createBoardFromTemplate(context),
                   onConnectRemote: () => _connectRemoteYoloit(context),
                   onShareBoard: () => _shareBoard(context),
-                  onBoardSettings:
-                      () => _showBoardSettings(context, activeBoard),
+                  onBoardSettings: () =>
+                      _showBoardSettings(context, activeBoard),
+                  onAppSettings: () => _openAppSettings(context),
                   onDeleteBoard: () => _deleteBoard(context, activeBoard),
                   onOpenBoardOverview: () => _openBoardOverview(activeBoard),
                   onSearch: () => _openBoardSearch(context),
@@ -290,50 +295,45 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                     child: IgnorePointer(
                                       child: CustomPaint(
                                         isComplex: true,
-                                        painter:
-                                            activeBoard.gridMode.enabled
-                                                ? BoardGridPainter(
-                                                  transformCtrl:
-                                                      _transformController,
-                                                  origin: _canvasOrigin,
-                                                  cellSize:
-                                                      activeBoard
-                                                          .gridMode
-                                                          .cellSize,
-                                                  spacing:
-                                                      activeBoard
-                                                          .gridMode
-                                                          .spacing,
-                                                  color: colors.divider
-                                                      .withAlpha(90),
-                                                )
-                                                : InfiniteBoardGridPainter(
-                                                  transformCtrl:
-                                                      _transformController,
-                                                  origin: _canvasOrigin,
-                                                  minorColor: colors.divider
-                                                      .withAlpha(60),
-                                                  majorColor: colors.divider
-                                                      .withAlpha(110),
+                                        painter: activeBoard.gridMode.enabled
+                                            ? BoardGridPainter(
+                                                transformCtrl:
+                                                    _transformController,
+                                                origin: _canvasOrigin,
+                                                cellSize: activeBoard
+                                                    .gridMode
+                                                    .cellSize,
+                                                spacing: activeBoard
+                                                    .gridMode
+                                                    .spacing,
+                                                color: colors.divider.withAlpha(
+                                                  90,
                                                 ),
+                                              )
+                                            : InfiniteBoardGridPainter(
+                                                transformCtrl:
+                                                    _transformController,
+                                                origin: _canvasOrigin,
+                                                minorColor: colors.divider
+                                                    .withAlpha(60),
+                                                majorColor: colors.divider
+                                                    .withAlpha(110),
+                                              ),
                                       ),
                                     ),
                                   ),
                                   ValueListenableBuilder<int>(
-                                    valueListenable:
-                                        CanvasInteractionLock
-                                            .instance
-                                            .lockStateVersion,
+                                    valueListenable: CanvasInteractionLock
+                                        .instance
+                                        .lockStateVersion,
                                     builder: (context, lockVersion, child) {
-                                      final activeCount =
-                                          CanvasInteractionLock
-                                              .instance
-                                              .activeCount
-                                              .value;
-                                      final isLocked =
-                                          CanvasInteractionLock
-                                              .instance
-                                              .isLocked;
+                                      final activeCount = CanvasInteractionLock
+                                          .instance
+                                          .activeCount
+                                          .value;
+                                      final isLocked = CanvasInteractionLock
+                                          .instance
+                                          .isLocked;
                                       if (_lastLoggedLockCount != lockVersion) {
                                         _lastLoggedLockCount = lockVersion;
                                         assert(() {
@@ -542,7 +542,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                     WebpagePluginBase.kTypeId) {
                                                   continue;
                                                 }
-                                                final ctrl = WebpagePluginBase.controllers[panel.id];
+                                                final ctrl = WebpagePluginBase
+                                                    .controllers[panel.id];
                                                 if (ctrl == null) continue;
                                                 ctrl.runJavaScript(
                                                   "window.dispatchEvent(new Event('resize'));",
@@ -566,12 +567,10 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                       isComplex: true,
                                                       painter:
                                                           BoardLinksPainter(
-                                                            panels:
-                                                                activeBoard
-                                                                    .panels,
-                                                            links:
-                                                                activeBoard
-                                                                    .links,
+                                                            panels: activeBoard
+                                                                .panels,
+                                                            links: activeBoard
+                                                                .links,
                                                             origin:
                                                                 _canvasOrigin,
                                                           ),
@@ -630,15 +629,13 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                         );
                                                   },
                                                   onMoveGroupStart: (_) {},
-                                                  onMoveGroup: (
-                                                    groupId,
-                                                    details,
-                                                  ) =>
-                                                      _moveGroupWithEdgePan(
-                                                        context,
-                                                        groupId,
-                                                        details,
-                                                      ),
+                                                  onMoveGroup:
+                                                      (groupId, details) =>
+                                                          _moveGroupWithEdgePan(
+                                                            context,
+                                                            groupId,
+                                                            details,
+                                                          ),
                                                   onMoveGroupEnd: (_) {},
                                                   onRenameGroup: (groupId) {
                                                     _showRenameGroupDialog(
@@ -647,30 +644,26 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                       groupId,
                                                     );
                                                   },
-                                                  onCycleFocus: (
-                                                    groupId,
-                                                    direction,
-                                                  ) {
-                                                    context
-                                                        .read<BoardCubit>()
-                                                        .cycleGroupFocus(
-                                                          activeBoard.id,
-                                                          groupId,
-                                                          direction,
-                                                        );
-                                                  },
-                                                  onResizeCollapsedGroup: (
-                                                    groupId,
-                                                    bounds,
-                                                  ) {
-                                                    context
-                                                        .read<BoardCubit>()
-                                                        .resizeGroupCollapsedBounds(
-                                                          activeBoard.id,
-                                                          groupId,
-                                                          bounds,
-                                                        );
-                                                  },
+                                                  onCycleFocus:
+                                                      (groupId, direction) {
+                                                        context
+                                                            .read<BoardCubit>()
+                                                            .cycleGroupFocus(
+                                                              activeBoard.id,
+                                                              groupId,
+                                                              direction,
+                                                            );
+                                                      },
+                                                  onResizeCollapsedGroup:
+                                                      (groupId, bounds) {
+                                                        context
+                                                            .read<BoardCubit>()
+                                                            .resizeGroupCollapsedBounds(
+                                                              activeBoard.id,
+                                                              groupId,
+                                                              bounds,
+                                                            );
+                                                      },
                                                 ),
                                                 // ── Link delete badges ─────────────────────
                                                 if (_activeTool ==
@@ -687,7 +680,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                     isCapturingScreenshot:
                                                         _isCapturingScreenshot,
                                                     selectedPanelIds:
-                                                        selectedPanelIds.toSet(),
+                                                        selectedPanelIds
+                                                            .toSet(),
                                                     activeTool: _activeTool,
                                                     connectSourceId:
                                                         _connectSourceId,
@@ -740,10 +734,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                                 _activeTool ==
                                                                 BoardToolId
                                                                     .select,
-                                                            onMove:
-                                                                (
-                                                                  newPos,
-                                                                ) => context
+                                                            onMove: (newPos) =>
+                                                                context
                                                                     .read<
                                                                       BoardCubit
                                                                     >()
@@ -752,15 +744,13 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                                           .id,
                                                                       newPos,
                                                                     ),
-                                                            onDelete:
-                                                                () => context
-                                                                    .read<
-                                                                      BoardCubit
-                                                                    >()
-                                                                    .removeDrawing(
-                                                                      drawing
-                                                                          .id,
-                                                                    ),
+                                                            onDelete: () => context
+                                                                .read<
+                                                                  BoardCubit
+                                                                >()
+                                                                .removeDrawing(
+                                                                  drawing.id,
+                                                                ),
                                                           ),
                                                         ),
                                                       ),
@@ -773,9 +763,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                         painter: ActiveStrokePainter(
                                                           points: _activeStroke,
                                                           origin: _canvasOrigin,
-                                                          color:
-                                                              _drawSettings
-                                                                  .strokeColor,
+                                                          color: _drawSettings
+                                                              .strokeColor,
                                                           strokeWidth:
                                                               _drawSettings
                                                                   .strokeWidth,
@@ -793,9 +782,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                     child: IgnorePointer(
                                                       child: CustomPaint(
                                                         painter: ConnectPreviewPainter(
-                                                          panels:
-                                                              activeBoard
-                                                                  .panels,
+                                                          panels: activeBoard
+                                                              .panels,
                                                           sourceId:
                                                               _connectSourceId!,
                                                           targetPoint:
@@ -901,8 +889,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                     ),
                                   if (activeBoard.panels.isEmpty)
                                     BoardEmptyState(
-                                      onAddNote:
-                                          () => BoardPanelActions.showAddNoteDialog(
+                                      onAddNote: () =>
+                                          BoardPanelActions.showAddNoteDialog(
                                             context,
                                           ),
                                     ),
@@ -910,47 +898,39 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                       !_isCapturingScreenshot)
                                     BoardTopRightControls(
                                       showMinimap: _showMinimap,
-                                      onToggleMinimap:
-                                          () => setState(
-                                            () => _showMinimap = !_showMinimap,
-                                          ),
-                                      onFitBoard:
-                                          () => _fitBoardPanels(
-                                            activeBoard,
-                                            persist: true,
-                                          ),
+                                      onToggleMinimap: () => setState(
+                                        () => _showMinimap = !_showMinimap,
+                                      ),
+                                      onFitBoard: () => _fitBoardPanels(
+                                        activeBoard,
+                                        persist: true,
+                                      ),
                                       isGridMode: activeBoard.gridMode.enabled,
-                                      onToggleGrid:
-                                          () => context
-                                              .read<BoardCubit>()
-                                              .setGridMode(
-                                                activeBoard.id,
-                                                enabled:
-                                                    !activeBoard
-                                                        .gridMode
-                                                        .enabled,
-                                              ),
-                                      onResetGrid:
-                                          () => context
-                                              .read<BoardCubit>()
-                                              .resetGridView(activeBoard.id),
-                                      onGroupByType:
-                                          () => context
-                                              .read<BoardCubit>()
-                                              .arrangePanelsByTypeInGrid(
-                                                activeBoard.id,
-                                              ),
+                                      onToggleGrid: () => context
+                                          .read<BoardCubit>()
+                                          .setGridMode(
+                                            activeBoard.id,
+                                            enabled:
+                                                !activeBoard.gridMode.enabled,
+                                          ),
+                                      onResetGrid: () => context
+                                          .read<BoardCubit>()
+                                          .resetGridView(activeBoard.id),
+                                      onGroupByType: () => context
+                                          .read<BoardCubit>()
+                                          .arrangePanelsByTypeInGrid(
+                                            activeBoard.id,
+                                          ),
                                       panels: activeBoard.panels,
                                       transformController: _transformController,
                                       viewportSize:
                                           _viewportSize ?? const Size(1, 1),
                                       origin: _canvasOrigin,
-                                      onPanTo:
-                                          (center) => _centerViewportOn(
-                                            activeBoard,
-                                            center,
-                                            persist: true,
-                                          ),
+                                      onPanTo: (center) => _centerViewportOn(
+                                        activeBoard,
+                                        center,
+                                        persist: true,
+                                      ),
                                     ),
                                   if (!_isBoardOverviewOpen &&
                                       !_isCapturingScreenshot)
@@ -964,55 +944,43 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                         activeTool: _activeTool,
                                         drawSettings: _drawSettings,
                                         connectSettings: _connectSettings,
-                                        onToolChanged:
-                                            (tool) => setState(() {
-                                              _activeTool = tool;
-                                              _activeStroke.clear();
-                                              _connectSourceId = null;
-                                              _connectPreviewPointer = null;
-                                              _clearMultiSelectGesture();
-                                              if (tool !=
-                                                  BoardToolId.multiSelect) {
-                                                context
-                                                    .read<BoardCubit>()
-                                                    .clearSelection();
-                                              }
-                                            }),
-                                        onDrawSettingsChanged:
-                                            (s) => setState(
-                                              () => _drawSettings = s,
-                                            ),
-                                        onConnectSettingsChanged:
-                                            (s) => setState(
+                                        onToolChanged: (tool) => setState(() {
+                                          _activeTool = tool;
+                                          _activeStroke.clear();
+                                          _connectSourceId = null;
+                                          _connectPreviewPointer = null;
+                                          _clearMultiSelectGesture();
+                                          if (tool != BoardToolId.multiSelect) {
+                                            context
+                                                .read<BoardCubit>()
+                                                .clearSelection();
+                                          }
+                                        }),
+                                        onDrawSettingsChanged: (s) =>
+                                            setState(() => _drawSettings = s),
+                                        onConnectSettingsChanged: (s) =>
+                                            setState(
                                               () => _connectSettings = s,
                                             ),
-                                        onToggle:
-                                            () => setState(
-                                              () =>
-                                                  _showToolsPanel =
-                                                      !_showToolsPanel,
-                                            ),
-                                        onAddNote:
-                                            () => BoardPanelActions.showAddNoteDialog(
+                                        onToggle: () => setState(
+                                          () => _showToolsPanel =
+                                              !_showToolsPanel,
+                                        ),
+                                        onAddNote: () =>
+                                            BoardPanelActions.showAddNoteDialog(
                                               context,
                                             ),
-                                        onAddChat:
-                                            () => context
-                                                .read<BoardCubit>()
-                                                .createChatPanel(
-                                                  configured: false,
-                                                ),
-                                        onAddTerminal:
-                                            () =>
-                                                context
-                                                    .read<BoardCubit>()
-                                                    .createTerminalPanel(),
-                                        onAddGeneric:
-                                            (typeId) =>
-                                                _handleGenericToolSelection(
-                                                  context,
-                                                  typeId,
-                                                ),
+                                        onAddChat: () => context
+                                            .read<BoardCubit>()
+                                            .createChatPanel(configured: false),
+                                        onAddTerminal: () => context
+                                            .read<BoardCubit>()
+                                            .createTerminalPanel(),
+                                        onAddGeneric: (typeId) =>
+                                            _handleGenericToolSelection(
+                                              context,
+                                              typeId,
+                                            ),
                                       ),
                                     ),
                                   ValueListenableBuilder<bool>(
@@ -1029,10 +997,9 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                         bottom: 24,
                                         child: BoardHistoryPanel(
                                           board: activeBoard,
-                                          onClose:
-                                              () =>
-                                                  boardHistoryVisibility.value =
-                                                      false,
+                                          onClose: () =>
+                                              boardHistoryVisibility.value =
+                                                  false,
                                         ),
                                       );
                                     },
@@ -1042,11 +1009,10 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                       _activeTool == BoardToolId.connect &&
                                       _connectSourceId != null)
                                     CancelConnectionBar(
-                                      onCancel:
-                                          () => setState(() {
-                                            _connectSourceId = null;
-                                            _connectPreviewPointer = null;
-                                          }),
+                                      onCancel: () => setState(() {
+                                        _connectSourceId = null;
+                                        _connectPreviewPointer = null;
+                                      }),
                                     ),
                                   // ── Multi-selection toolbar ────────────────────────
                                   if (!_isBoardOverviewOpen &&
@@ -1060,24 +1026,26 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                         child: BoardSelectionToolbar(
                                           selectedCount:
                                               selectedPanelIds.length,
-                                          onClear:
-                                              () => context
-                                                  .read<BoardCubit>()
-                                                  .clearSelection(),
-                                          onAddToGroup:
-                                              () => _addSelectionToGroup(
+                                          onClear: () => context
+                                              .read<BoardCubit>()
+                                              .clearSelection(),
+                                          onAddToGroup: () =>
+                                              _addSelectionToGroup(
                                                 context,
                                                 activeBoard,
                                               ),
-                                          onDelete:
-                                              () {
-                                                final cubit = context.read<BoardCubit>();
-                                                final ids = cubit.state.selectedPanelIds.toList();
-                                                for (final id in ids) {
-                                                  cubit.removePanel(id);
-                                                }
-                                                cubit.clearSelection();
-                                              },
+                                          onDelete: () {
+                                            final cubit = context
+                                                .read<BoardCubit>();
+                                            final ids = cubit
+                                                .state
+                                                .selectedPanelIds
+                                                .toList();
+                                            for (final id in ids) {
+                                              cubit.removePanel(id);
+                                            }
+                                            cubit.clearSelection();
+                                          },
                                         ),
                                       ),
                                     ),
@@ -1092,19 +1060,17 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                   boards: state.activeBoards,
                                   previewPngs: _boardPreviewPngs,
                                   debugLog: _boardOverviewLog,
-                                  onDisconnectRemoteBoard:
-                                      (board) => context
-                                          .read<BoardCubit>()
-                                          .disconnectRemoteBoard(board.id),
-                                  onDeleteRemoteBoard:
-                                      (board) => _deleteRemoteBoardOnServer(
+                                  onDisconnectRemoteBoard: (board) => context
+                                      .read<BoardCubit>()
+                                      .disconnectRemoteBoard(board.id),
+                                  onDeleteRemoteBoard: (board) =>
+                                      _deleteRemoteBoardOnServer(
                                         context,
                                         board,
                                       ),
-                                  onDisconnectRemoteUrl:
-                                      (url) => context
-                                          .read<BoardCubit>()
-                                          .disconnectRemoteBoardsForUrl(url),
+                                  onDisconnectRemoteUrl: (url) => context
+                                      .read<BoardCubit>()
+                                      .disconnectRemoteBoardsForUrl(url),
                                   onClose: () {
                                     if (!mounted) return;
                                     _boardOverviewLog('close.parent');
@@ -1124,7 +1090,9 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                   },
                                   onCreateBoardFromTemplate: () {
                                     if (!mounted) return;
-                                    _boardOverviewLog('createFromTemplate.parent');
+                                    _boardOverviewLog(
+                                      'createFromTemplate.parent',
+                                    );
                                     setState(() {
                                       _isBoardOverviewOpen = false;
                                       _cancelBgCapture = true;
@@ -1172,9 +1140,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                             'elapsed=${switchWatch.elapsedMilliseconds}ms',
                                           );
                                           setState(
-                                            () =>
-                                                _boardSwitchPreviewVisible =
-                                                    false,
+                                            () => _boardSwitchPreviewVisible =
+                                                false,
                                           );
                                         },
                                       );
@@ -1300,9 +1267,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     final board = context.read<BoardCubit>().state.boards.firstWhere(
       (candidate) => candidate.id == boardId,
     );
-    final bytes = await BoardOffscreenRenderer.instance.renderBoardOverviewPreview(
-      board,
-    );
+    final bytes = await BoardOffscreenRenderer.instance
+        .renderBoardOverviewPreview(board);
 
     _boardOverviewLog(
       'capture.done board=$boardId '
@@ -1348,15 +1314,14 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   /// the same quality as the background refresh.
   Future<void> _generateMissingBoardPreviews(String activeBoardId) async {
     final allBoards = context.read<BoardCubit>().state.boards;
-    final missing =
-        allBoards
-            .where(
-              (b) =>
-                  b.id != activeBoardId &&
-                  !_boardPreviewPngs.containsKey(b.id) &&
-                  !_previewCache.isFresh(b, themeKey: _previewThemeKey),
-            )
-            .toList();
+    final missing = allBoards
+        .where(
+          (b) =>
+              b.id != activeBoardId &&
+              !_boardPreviewPngs.containsKey(b.id) &&
+              !_previewCache.isFresh(b, themeKey: _previewThemeKey),
+        )
+        .toList();
     if (missing.isEmpty) return;
 
     final cancelToken = CancelToken();
@@ -1368,10 +1333,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
         cancelToken.cancel();
         break;
       }
-      final png = await BoardOffscreenRenderer.instance.renderBoardOverviewPreview(
-        board,
-        cancelToken: cancelToken,
-      );
+      final png = await BoardOffscreenRenderer.instance
+          .renderBoardOverviewPreview(board, cancelToken: cancelToken);
       if (png != null) {
         captured[board.id] = png;
         _previewCache.save(board, png, themeKey: _previewThemeKey);
@@ -1392,15 +1355,14 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   /// switching needed, no JSC crashes, no UI flicker.
   Future<void> _refreshBoardPreviewsInBackground(String activeBoardId) async {
     final allBoards = context.read<BoardCubit>().state.boards;
-    final toCapture =
-        allBoards
-            .where(
-              (b) =>
-                  b.id != activeBoardId &&
-                  b.panels.isNotEmpty &&
-                  !_previewCache.isFresh(b, themeKey: _previewThemeKey),
-            )
-            .toList();
+    final toCapture = allBoards
+        .where(
+          (b) =>
+              b.id != activeBoardId &&
+              b.panels.isNotEmpty &&
+              !_previewCache.isFresh(b, themeKey: _previewThemeKey),
+        )
+        .toList();
     if (toCapture.isEmpty) return;
 
     final cancelToken = CancelToken();
@@ -1420,10 +1382,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
         _boardOverviewLog(
           'bgCapture.render board=${board.id} (${board.name}) started',
         );
-        final png = await BoardOffscreenRenderer.instance.renderBoardOverviewPreview(
-          board,
-          cancelToken: cancelToken,
-        );
+        final png = await BoardOffscreenRenderer.instance
+            .renderBoardOverviewPreview(board, cancelToken: cancelToken);
         if (_cancelBgCapture || !mounted || !_isBoardOverviewOpen) {
           cancelToken.cancel();
           _boardOverviewLog(
@@ -1461,7 +1421,9 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   Future<void> _warmBoardPreviewCaptures(String activeBoardId) async {
     try {
       final boards = context.read<BoardCubit>().state.boards;
-      final activeBoard = boards.firstWhere((board) => board.id == activeBoardId);
+      final activeBoard = boards.firstWhere(
+        (board) => board.id == activeBoardId,
+      );
       if (!_previewCache.isFresh(activeBoard, themeKey: _previewThemeKey)) {
         await _captureBoardPreviewPng(activeBoardId);
       }
@@ -1773,11 +1735,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
       );
       return;
     }
-    context.read<BoardCubit>().movePanel(
-      panelId,
-      delta,
-      recordHistory: false,
-    );
+    context.read<BoardCubit>().movePanel(panelId, delta, recordHistory: false);
   }
 
   void _moveGroupWithEdgePan(
@@ -1817,8 +1775,9 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   ) {
     const minWidth = 220.0;
     const minHeight = 140.0;
-    final maxWidth =
-        panel.type == WebpagePluginBase.kTypeId ? 1440.0 : double.infinity;
+    final maxWidth = panel.type == WebpagePluginBase.kTypeId
+        ? 1440.0
+        : double.infinity;
 
     var x = panel.bounds.x;
     var y = panel.bounds.y;
@@ -1854,10 +1813,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     final board = context.read<BoardCubit>().state.activeBoard;
     final panel = board?.panels.where((p) => p.id == panelId).firstOrNull;
     _transformStartBounds = panel?.bounds;
-    context.read<BoardCubit>().beginPanelGesture(
-      panelId,
-      boardId: board?.id,
-    );
+    context.read<BoardCubit>().beginPanelGesture(panelId, boardId: board?.id);
     _boardDebugLog('panelDrag.start panel=$panelId');
     _stopPanAnimation();
   }
@@ -2020,11 +1976,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     _lastPanelDragBoardPointer = _boardPointFromGlobal(globalPosition);
   }
 
-
-  Widget _buildMultiSelectOverlay(
-    BuildContext context,
-    BoardDocument board,
-  ) {
+  Widget _buildMultiSelectOverlay(BuildContext context, BoardDocument board) {
     return Positioned.fill(
       child: MouseRegion(
         cursor: SystemMouseCursors.precise,
@@ -2132,12 +2084,9 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     BoardDocument board,
   ) async {
     final cubit = context.read<BoardCubit>();
-    final result = await showDialog<
-      ({String? groupId, String? newName})?
-    >(
+    final result = await showDialog<({String? groupId, String? newName})?>(
       context: context,
-      builder:
-          (_) => BoardSelectionGroupDialog(groups: board.groups),
+      builder: (_) => BoardSelectionGroupDialog(groups: board.groups),
     );
     if (result == null) return;
     if (result.newName != null && result.newName!.trim().isNotEmpty) {
@@ -2285,12 +2234,13 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
       'from=${fmtMatrix(_transformController.value)} to=${fmtMatrix(target)}',
     );
     _stopPanAnimation();
-    final animation = Matrix4Tween(
-      begin: _transformController.value.clone(),
-      end: target,
-    ).animate(
-      CurvedAnimation(parent: _panController, curve: Curves.easeInOutCubic),
-    );
+    final animation =
+        Matrix4Tween(
+          begin: _transformController.value.clone(),
+          end: target,
+        ).animate(
+          CurvedAnimation(parent: _panController, curve: Curves.easeInOutCubic),
+        );
     _panAnimation = animation;
     _panAnimationListener = () {
       _transformController.value = animation.value;
@@ -2399,40 +2349,35 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     final controller = TextEditingController(text: group.name);
     await showDialog<void>(
       context: context,
-      builder:
-          (dialogContext) => AlertDialog(
-            title: const Text('Rename group'),
-            content: TextField(
-              controller: controller,
-              autofocus: true,
-              decoration: const InputDecoration(hintText: 'Group name'),
-              onSubmitted: (value) {
-                context.read<BoardCubit>().renameGroup(
-                  boardId,
-                  groupId,
-                  value,
-                );
-                Navigator.of(dialogContext).pop();
-              },
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(),
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: () {
-                  context.read<BoardCubit>().renameGroup(
-                    boardId,
-                    groupId,
-                    controller.text,
-                  );
-                  Navigator.of(dialogContext).pop();
-                },
-                child: const Text('Rename'),
-              ),
-            ],
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Rename group'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'Group name'),
+          onSubmitted: (value) {
+            context.read<BoardCubit>().renameGroup(boardId, groupId, value);
+            Navigator.of(dialogContext).pop();
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
           ),
+          TextButton(
+            onPressed: () {
+              context.read<BoardCubit>().renameGroup(
+                boardId,
+                groupId,
+                controller.text,
+              );
+              Navigator.of(dialogContext).pop();
+            },
+            child: const Text('Rename'),
+          ),
+        ],
+      ),
     );
     controller.dispose();
   }
@@ -2603,6 +2548,12 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     }
   }
 
+  Future<void> _openAppSettings(BuildContext context) async {
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const SettingsPage()));
+  }
+
   Future<void> _showBoardSettings(
     BuildContext context,
     BoardDocument board,
@@ -2613,25 +2564,22 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
           ({String name, String defaultFolder, bool archived})
         >(
           context: context,
-          builder:
-              (_) => BoardSettingsDialog(
-                initialName: board.name,
-                initialDefaultFolder: board.defaultFolder,
-                initialArchived: board.archived,
-                remoteInfo: remote,
-                onPickFolder:
-                    kIsWeb
-                        ? null
-                        : () async => BoardFilePicker.pickDirectory(
-                          context,
-                          remoteInfo: remote,
-                          initialPath: board.defaultFolder,
-                          title:
-                              remote == null
-                                  ? 'Choose folder'
-                                  : 'Choose remote folder',
-                        ),
-              ),
+          builder: (_) => BoardSettingsDialog(
+            initialName: board.name,
+            initialDefaultFolder: board.defaultFolder,
+            initialArchived: board.archived,
+            remoteInfo: remote,
+            onPickFolder: kIsWeb
+                ? null
+                : () async => BoardFilePicker.pickDirectory(
+                    context,
+                    remoteInfo: remote,
+                    initialPath: board.defaultFolder,
+                    title: remote == null
+                        ? 'Choose folder'
+                        : 'Choose remote folder',
+                  ),
+          ),
         );
     if (!context.mounted || result == null) return;
     final cubit = context.read<BoardCubit>();
@@ -2655,21 +2603,20 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     }
     final shouldDelete = await showAdaptiveYoloDialog<bool>(
       context: context,
-      builder:
-          (dialogContext) => AlertDialog(
-            title: const Text('Delete board?'),
-            content: Text('Delete "${board.name}"?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(false),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(dialogContext).pop(true),
-                child: const Text('Delete'),
-              ),
-            ],
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete board?'),
+        content: Text('Delete "${board.name}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
           ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
     );
     if (!context.mounted || shouldDelete != true) return;
     await context.read<BoardCubit>().deleteBoard(board.id);
@@ -2681,24 +2628,23 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   ) async {
     final shouldDisconnect = await showAdaptiveYoloDialog<bool>(
       context: context,
-      builder:
-          (dialogContext) => AlertDialog(
-            title: const Text('Disconnect remote board?'),
-            content: Text(
-              'Remove "${board.name}" from this device only? '
-              'The board will remain on the remote YoLoIT server.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(false),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(dialogContext).pop(true),
-                child: const Text('Disconnect'),
-              ),
-            ],
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Disconnect remote board?'),
+        content: Text(
+          'Remove "${board.name}" from this device only? '
+          'The board will remain on the remote YoLoIT server.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
           ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Disconnect'),
+          ),
+        ],
+      ),
     );
     if (!context.mounted || shouldDisconnect != true) return;
     await context.read<BoardCubit>().disconnectRemoteBoard(board.id);
@@ -2713,27 +2659,26 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     final remoteLabel = Uri.tryParse(remote.url)?.authority ?? remote.url;
     final shouldDelete = await showAdaptiveYoloDialog<bool>(
       context: context,
-      builder:
-          (dialogContext) => AlertDialog(
-            title: const Text('Delete remote board?'),
-            content: Text(
-              'Delete "${board.name}" from $remoteLabel? '
-              'This removes it from the remote machine for everyone connected to that server.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(false),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                style: FilledButton.styleFrom(
-                  backgroundColor: context.appColors.accentRed,
-                ),
-                onPressed: () => Navigator.of(dialogContext).pop(true),
-                child: const Text('Delete remote'),
-              ),
-            ],
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete remote board?'),
+        content: Text(
+          'Delete "${board.name}" from $remoteLabel? '
+          'This removes it from the remote machine for everyone connected to that server.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
           ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: context.appColors.accentRed,
+            ),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Delete remote'),
+          ),
+        ],
+      ),
     );
     if (!context.mounted || shouldDelete != true) return;
     await context.read<BoardCubit>().deleteRemoteBoardOnServer(board.id);
@@ -2756,8 +2701,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
             controller: controller,
             decoration: InputDecoration(labelText: label),
             autofocus: true,
-            onSubmitted:
-                (_) => Navigator.of(dialogContext).pop(controller.text.trim()),
+            onSubmitted: (_) =>
+                Navigator.of(dialogContext).pop(controller.text.trim()),
           ),
           actions: [
             TextButton(
@@ -2765,8 +2710,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
               child: const Text('Cancel'),
             ),
             FilledButton(
-              onPressed:
-                  () => Navigator.of(dialogContext).pop(controller.text.trim()),
+              onPressed: () =>
+                  Navigator.of(dialogContext).pop(controller.text.trim()),
               child: Text(confirmLabel),
             ),
           ],

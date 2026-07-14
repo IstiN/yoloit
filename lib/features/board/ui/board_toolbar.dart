@@ -18,6 +18,7 @@ class BoardToolbar extends StatelessWidget {
     required this.onConnectRemote,
     required this.onShareBoard,
     required this.onBoardSettings,
+    this.onAppSettings,
     required this.onDeleteBoard,
     required this.onOpenBoardOverview,
     required this.onSearch,
@@ -29,6 +30,7 @@ class BoardToolbar extends StatelessWidget {
   final VoidCallback onConnectRemote;
   final VoidCallback onShareBoard;
   final VoidCallback onBoardSettings;
+  final VoidCallback? onAppSettings;
   final VoidCallback onDeleteBoard;
   final VoidCallback onOpenBoardOverview;
   final VoidCallback onSearch;
@@ -173,6 +175,8 @@ class BoardToolbar extends StatelessWidget {
                           unawaited(launchExternalUrl(_downloadReleasesUrl));
                         case 'settings':
                           onBoardSettings();
+                        case 'appSettings':
+                          onAppSettings?.call();
                         case 'delete':
                           onDeleteBoard();
                       }
@@ -207,6 +211,11 @@ class BoardToolbar extends StatelessWidget {
                         value: 'settings',
                         child: Text('Settings'),
                       ),
+                      if (onAppSettings != null)
+                        const PopupMenuItem(
+                          value: 'appSettings',
+                          child: Text('YoLoIT settings'),
+                        ),
                       PopupMenuItem(value: 'delete', child: Text(deleteLabel)),
                     ],
                   )

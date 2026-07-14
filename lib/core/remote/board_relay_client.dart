@@ -23,6 +23,7 @@ class BoardRelayClient {
 
   final ValueNotifier<BoardRelayStatus> status =
       ValueNotifier<BoardRelayStatus>(BoardRelayStatus.disconnected);
+  final ValueNotifier<String?> lastError = ValueNotifier<String?>(null);
 
   WebSocketChannel? _channel;
   StreamSubscription<dynamic>? _sub;
@@ -49,6 +50,7 @@ class BoardRelayClient {
     _deviceId = deviceId.trim();
     _deviceKey = deviceKey.trim();
     _backoffSeconds = 1;
+    lastError.value = null;
     BoardShareServer.instance.attachForRelay(cubit);
     _connect();
   }
@@ -72,7 +74,7 @@ class BoardRelayClient {
   void _connect() {
     if (_stopped) return;
     status.value = BoardRelayStatus.connecting;
-    final hub = _hubUrl!;
+    final hub = _hubUrl!.replaceAll(RegExp(r'/+$'), '');
     final wsBase = hub.startsWith('https://')
         ? hub.replaceFirst('https://', 'wss://')
         : hub.replaceFirst('http://', 'ws://');
@@ -83,23 +85,31 @@ class BoardRelayClient {
     );
 
     try {
+      debugPrint('[BoardRelayClient] connecting to $uri');
       _channel = WebSocketChannel.connect(uri);
       _sub = _channel!.stream.listen(
         _onFrame,
         onDone: _onConnectionLost,
-        onError: (_) => _onConnectionLost(),
+        onError: (Object error) {
+          debugPrint('[BoardRelayClient] stream error: $error');
+          _onConnectionLost();
+        },
       );
       _channel!.ready
           .then((_) {
             if (!_stopped) {
               _backoffSeconds = 1;
               status.value = BoardRelayStatus.connected;
+              debugPrint('[BoardRelayClient] connected');
             }
           })
-          .catchError((_) {
+          .catchError((Object error) {
+            debugPrint('[BoardRelayClient] ready error: $error');
             _onConnectionLost();
           });
-    } on Object catch (_) {
+    } on Object catch (error) {
+      debugPrint('[BoardRelayClient] connect error: $error');
+      lastError.value = error.toString();
       _scheduleReconnect();
     }
   }
@@ -114,6 +124,7 @@ class BoardRelayClient {
   void _scheduleReconnect() {
     if (_stopped) return;
     _reconnectTimer?.cancel();
+    lastError.value = 'connection lost; retrying in ${_backoffSeconds}s';
     final delay = _backoffSeconds;
     _backoffSeconds = (_backoffSeconds * 2).clamp(1, 30);
     _reconnectTimer = Timer(Duration(seconds: delay), _connect);
