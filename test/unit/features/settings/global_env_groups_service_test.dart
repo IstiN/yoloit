@@ -140,7 +140,7 @@ void main() {
       expect(content, contains('SECRET'));
     });
 
-    test('values are stored in FlutterSecureStorage', () async {
+    test('values are stored in scoped file', () async {
       final data = [
         const GlobalEnvGroup(
           id: 'g1',
@@ -151,11 +151,10 @@ void main() {
 
       await GlobalEnvGroupsService.instance.saveAll(data);
 
-      // Read directly from mock secure storage.
-      const storage = FlutterSecureStorage();
-      final raw = await storage.read(key: 'env_group_g1');
-      expect(raw, isNotNull);
-      final decoded = jsonDecode(raw!) as Map;
+      final file = File(p.join(tmpDir.path, 'env_groups_values', 'g1.json'));
+      expect(file.existsSync(), isTrue);
+      final raw = file.readAsStringSync();
+      final decoded = jsonDecode(raw) as Map;
       expect(decoded['TOKEN'], 'my_token');
     });
 
@@ -178,16 +177,16 @@ void main() {
           ),
         ]);
 
-        const storage = FlutterSecureStorage();
-        final raw = await storage.read(key: 'env_group_g1');
-        final decoded = jsonDecode(raw!) as Map;
+        final file = File(p.join(tmpDir.path, 'env_groups_values', 'g1.json'));
+        final raw = file.readAsStringSync();
+        final decoded = jsonDecode(raw) as Map;
         expect(decoded['TOKEN'], 'my_token');
         expect(decoded['EMPTY'], '');
       },
     );
 
     test(
-      'prefixed group ids do not produce double-prefixed secure keys',
+      'prefixed group ids do not produce double-prefixed file names',
       () async {
         final data = [
           const GlobalEnvGroup(
@@ -199,9 +198,11 @@ void main() {
 
         await GlobalEnvGroupsService.instance.saveAll(data);
 
-        const storage = FlutterSecureStorage();
-        expect(await storage.read(key: 'env_group_123'), isNotNull);
-        expect(await storage.read(key: 'env_group_env_group_123'), isNull);
+        final file = File(p.join(tmpDir.path, 'env_groups_values', '123.json'));
+        expect(file.existsSync(), isTrue);
+        final raw = file.readAsStringSync();
+        final decoded = jsonDecode(raw) as Map;
+        expect(decoded['TOKEN'], 'my_token');
       },
     );
 
@@ -227,11 +228,13 @@ void main() {
       expect(updatedContent, isNot(contains('old_value')));
       expect(updatedContent, contains('"keys"'));
 
-      // Value should now be in secure storage.
-      const storage = FlutterSecureStorage();
-      final raw = await storage.read(key: 'env_group_g1');
-      expect(raw, isNotNull);
-      final decoded = jsonDecode(raw!) as Map;
+      // Value should now be in the scoped values file.
+      final valuesFile = File(
+        p.join(tmpDir.path, 'env_groups_values', 'g1.json'),
+      );
+      expect(valuesFile.existsSync(), isTrue);
+      final raw = valuesFile.readAsStringSync();
+      final decoded = jsonDecode(raw) as Map;
       expect(decoded['OLD_KEY'], 'old_value');
     });
 
@@ -260,18 +263,18 @@ void main() {
       expect(File(p.join(tmpDir.path, 'env_groups.json')).existsSync(), isTrue);
     });
 
-    test('deleteGroupSecrets removes from secure storage', () async {
+    test('deleteGroupSecrets removes values file', () async {
       final data = [
         const GlobalEnvGroup(id: 'g1', name: 'test', values: {'KEY': 'val'}),
       ];
 
       await GlobalEnvGroupsService.instance.saveAll(data);
 
-      const storage = FlutterSecureStorage();
-      expect(await storage.read(key: 'env_group_g1'), isNotNull);
+      final file = File(p.join(tmpDir.path, 'env_groups_values', 'g1.json'));
+      expect(file.existsSync(), isTrue);
 
       await GlobalEnvGroupsService.instance.deleteGroupSecrets('g1');
-      expect(await storage.read(key: 'env_group_g1'), isNull);
+      expect(file.existsSync(), isFalse);
     });
 
     test('loadAll migrates legacy double-prefixed secure key', () async {
@@ -295,9 +298,14 @@ void main() {
       expect(loaded.length, 1);
       expect(loaded.first.values['TOKEN'], 'legacy_token');
 
-      const storage = FlutterSecureStorage();
-      expect(await storage.read(key: 'env_group_legacy'), isNotNull);
-      expect(await storage.read(key: 'env_group_env_group_legacy'), isNull);
+      // Values should now live in the scoped values file.
+      final valuesFile = File(
+        p.join(tmpDir.path, 'env_groups_values', 'legacy.json'),
+      );
+      expect(valuesFile.existsSync(), isTrue);
+      final raw = valuesFile.readAsStringSync();
+      final decoded = jsonDecode(raw) as Map;
+      expect(decoded['TOKEN'], 'legacy_token');
     });
   });
 

@@ -17,11 +17,14 @@ part 'global_env_groups_service.g.dart';
 /// **Security model:**
 /// - Group metadata (id, name, list of variable keys) is stored in a JSON
 ///   file at `~/.config/yoloit/env_groups.json`.
-/// - Secret **values** are stored in the platform's secure credential store
-///   (macOS Keychain / Windows DPAPI / Linux libsecret) via
-///   [FlutterSecureStorage], keyed by `env_group_<id>`.
-/// - On first load after upgrade, values embedded in the old JSON format are
-///   automatically migrated into secure storage and removed from the file.
+/// - Secret **values** are stored in scoped files under
+///   `~/.config/yoloit/env_groups_values/` (mode 0600 on macOS/Linux).
+///   macOS Keychain is intentionally avoided for env group values because
+///   repeated Keychain writes trigger a "Keychain Not Found" system dialog
+///   when the user's default keychain is locked or missing.
+/// - On first load after upgrade, values stored in the legacy OS secure store
+///   (macOS Keychain) are automatically migrated into the file store.
+/// - Old JSON files that embedded values inline are also migrated.
 class GlobalEnvGroupsService {
   GlobalEnvGroupsService._();
 
@@ -126,10 +129,10 @@ class GlobalEnvGroupsService {
         if (meta.embeddedValues.isNotEmpty) {
           // Migration: move embedded values → secure storage.
           values = meta.embeddedValues;
-          final ok = await _writeSecureValues(meta.id, values);
+          final ok = await _writeValues(meta.id, values);
           if (!ok) allWritesSucceeded = false;
         } else {
-          values = await _readSecureValues(meta.id, meta.keys);
+          values = await _readValues(meta.id, meta.keys);
         }
         groups.add(
           GlobalEnvGroup(id: meta.id, name: meta.name, values: values),
@@ -208,15 +211,15 @@ class GlobalEnvGroupsService {
       );
       final persistedGroup = group.copyWith(values: valuesToPersist);
       persistedGroups.add(persistedGroup);
-      final ok = await _writeSecureValues(group.id, valuesToPersist);
+      final ok = await _writeValues(group.id, valuesToPersist);
       if (!ok) {
         debugPrint(
           '[EnvGroups] WARNING: saveAll failed to persist secrets for '
           '${group.name} (${group.id})',
         );
       }
-      // Verify the write by reading back
-      final readBack = await _readSecureValues(
+      // Verify the write by reading back.
+      final readBack = await _readValues(
         group.id,
         valuesToPersist.keys.toList(),
       );
@@ -233,24 +236,31 @@ class GlobalEnvGroupsService {
     _loadAllInFlight = null;
   }
 
-  /// Deletes a group's secure values from the credential store.
+  /// Deletes a group's values from the file store and, as a best-effort
+  /// cleanup, from the legacy secure credential store.
   Future<void> deleteGroupSecrets(String groupId) async {
     try {
-      final key = _secureStorageKey(groupId);
-      if (_useSecureStorage) {
-        await _storage.delete(key: key);
-      }
       await FileStorageAdapter.instance.delete(_valuesPath(groupId));
-      final legacyKey = _legacySecureStorageKey(groupId);
-      if (legacyKey != null && legacyKey != key && _useSecureStorage) {
-        await _storage.delete(key: legacyKey);
-      }
-      _loadAllCache = null;
-      _loadAllInFlight = null;
-      _loadAllCacheSignature = null;
     } catch (e) {
-      debugPrint('[EnvGroups] deleteGroupSecrets error: $e');
+      debugPrint('[EnvGroups] deleteGroupSecrets file error: $e');
     }
+
+    if (_useSecureStorage) {
+      try {
+        final key = _secureStorageKey(groupId);
+        await _storage.delete(key: key);
+        final legacyKey = _legacySecureStorageKey(groupId);
+        if (legacyKey != null && legacyKey != key) {
+          await _storage.delete(key: legacyKey);
+        }
+      } catch (e) {
+        debugPrint('[EnvGroups] deleteGroupSecrets legacy secure error: $e');
+      }
+    }
+
+    _loadAllCache = null;
+    _loadAllInFlight = null;
+    _loadAllCacheSignature = null;
   }
 
   Future<Map<String, String>> resolveSelectedGroups(
@@ -384,7 +394,7 @@ class GlobalEnvGroupsService {
     Map<String, String> incomingValues,
   ) async {
     if (incomingValues.isEmpty) return incomingValues;
-    final existingValues = await _readSecureValues(
+    final existingValues = await _readValues(
       groupId,
       incomingValues.keys.toList(),
     );
@@ -399,67 +409,52 @@ class GlobalEnvGroupsService {
     };
   }
 
-  /// Returns `true` if the write succeeded.
-  Future<bool> _writeSecureValues(
-    String groupId,
-    Map<String, String> values,
-  ) async {
+  /// Writes values to a scoped file.  macOS Keychain is intentionally avoided
+  /// here because repeated Keychain writes trigger a "Keychain Not Found"
+  /// system dialog when the default keychain is locked/missing.  The file is
+  /// stored in `~/.config/yoloit/env_groups_values/` with 0600 permissions.
+  Future<bool> _writeValues(String groupId, Map<String, String> values) async {
     try {
       final encoded = jsonEncode(values);
-      final key = _secureStorageKey(groupId);
+      final path = _valuesPath(groupId);
       debugPrint(
-        '[EnvGroups] _writeSecureValues $groupId: '
-        '${values.length} keys, ${encoded.length} bytes',
+        '[EnvGroups] _writeValues $groupId: '
+        '${values.length} keys, ${encoded.length} bytes -> $path',
       );
-      if (_useSecureStorage) {
-        await _storage.write(key: key, value: encoded);
-      } else {
-        // Web demo fallback: values are stored as plain JSON in the adapter.
-        // This is not suitable for production secrets but is acceptable for
-        // the web demo where no hardware-backed keystore is available.
-        await FileStorageAdapter.instance.writeString(_valuesPath(groupId), encoded);
-      }
-      final legacyKey = _legacySecureStorageKey(groupId);
-      if (legacyKey != null && legacyKey != key) {
-        await _storage.delete(key: legacyKey);
-      }
+      await FileStorageAdapter.instance.writeString(path, encoded);
+      await _setFilePermissions(path);
       return true;
     } catch (e) {
-      debugPrint('[EnvGroups] _writeSecureValues FAILED for $groupId: $e');
+      debugPrint('[EnvGroups] _writeValues FAILED for $groupId: $e');
       return false;
     }
   }
 
-  Future<Map<String, String>> _readSecureValues(
+  Future<Map<String, String>> _readValues(
     String groupId,
     List<String> expectedKeys,
   ) async {
     try {
-      final key = _secureStorageKey(groupId);
-      String? raw;
-      if (_useSecureStorage) {
-        raw = await _storage.read(key: key);
-      } else {
-        raw = await FileStorageAdapter.instance.readString(_valuesPath(groupId));
-      }
-      final legacyKey = _legacySecureStorageKey(groupId);
-      if ((raw == null || raw.isEmpty) &&
-          legacyKey != null &&
-          legacyKey != key &&
-          _useSecureStorage) {
-        raw = await _storage.read(key: legacyKey);
+      final path = _valuesPath(groupId);
+      String? raw = await FileStorageAdapter.instance.readString(path);
+
+      // One-time migration: older builds stored env group values in the OS
+      // secure store (macOS Keychain).  Read them back once and mirror to the
+      // file so future accesses never touch Keychain again.
+      if ((raw == null || raw.isEmpty) && _useSecureStorage) {
+        raw = await _readLegacySecureValue(groupId);
         if (raw != null && raw.isNotEmpty) {
-          await _storage.write(key: key, value: raw);
-          await _storage.delete(key: legacyKey);
+          await FileStorageAdapter.instance.writeString(path, raw);
+          await _setFilePermissions(path);
           debugPrint(
-            '[EnvGroups] Migrated legacy secure key for $groupId '
-            '($legacyKey -> $key)',
+            '[EnvGroups] Migrated secure-stored values for $groupId to file',
           );
         }
       }
+
       if (raw == null || raw.isEmpty) {
         debugPrint(
-          '[EnvGroups] _readSecureValues: no data for $groupId '
+          '[EnvGroups] _readValues: no data for $groupId '
           '(keys: $expectedKeys)',
         );
         return {for (final k in expectedKeys) k: ''};
@@ -473,14 +468,40 @@ class GlobalEnvGroupsService {
           .map((e) => e.key);
       if (emptyKeys.isNotEmpty) {
         debugPrint(
-          '[EnvGroups] _readSecureValues: empty values for $groupId '
+          '[EnvGroups] _readValues: empty values for $groupId '
           'keys: ${emptyKeys.toList()}',
         );
       }
       return result;
     } catch (e) {
-      debugPrint('[EnvGroups] _readSecureValues error for $groupId: $e');
+      debugPrint('[EnvGroups] _readValues error for $groupId: $e');
       return {for (final k in expectedKeys) k: ''};
+    }
+  }
+
+  Future<String?> _readLegacySecureValue(String groupId) async {
+    try {
+      final key = _secureStorageKey(groupId);
+      String? raw = await _storage.read(key: key);
+      final legacyKey = _legacySecureStorageKey(groupId);
+      if ((raw == null || raw.isEmpty) &&
+          legacyKey != null &&
+          legacyKey != key) {
+        raw = await _storage.read(key: legacyKey);
+      }
+      return raw;
+    } catch (e) {
+      debugPrint('[EnvGroups] _readLegacySecureValue error for $groupId: $e');
+      return null;
+    }
+  }
+
+  Future<void> _setFilePermissions(String path) async {
+    if (!Platform.isLinux && !Platform.isMacOS) return;
+    try {
+      await Process.run('chmod', ['600', path]);
+    } on Exception {
+      // Best-effort permissions.
     }
   }
 }
