@@ -180,9 +180,14 @@ class BoardPanelCardState extends State<BoardPanelCard>
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
+    final cubit = context.read<BoardCubit>();
     final focusedPanelId = context.select<BoardCubit, String?>(
-      (cubit) => cubit.state.activeBoard?.viewport.focusedPanelId,
+      (c) => c.state.activeBoard?.viewport.focusedPanelId,
     );
+    final activeBoard = cubit.state.activeBoard;
+    final remoteLockActor = activeBoard == null
+        ? null
+        : cubit.panelLockActor(activeBoard, panel.id);
     final isFocused = panel.id == focusedPanelId;
     final isWebpage = panel.type == 'board.webpage';
     final plugin = BoardPluginRegistry.instance.pluginFor(panel.type);
@@ -363,6 +368,7 @@ class BoardPanelCardState extends State<BoardPanelCard>
                                       onSendToBack: onSendToBack,
                                       onEdit: onEditNote,
                                       onFullscreen: onFullscreen,
+                                      remoteLockActor: remoteLockActor,
                                       onSettings:
                                           () => _showPanelSettingsDialog(
                                             context,
@@ -533,18 +539,23 @@ class BoardPanelCardState extends State<BoardPanelCard>
     BuildContext context,
     BoardPanelInstance panel,
   ) {
-    final activeBoard = context.read<BoardCubit>().state.activeBoard;
+    final cubit = context.read<BoardCubit>();
+    final activeBoard = cubit.state.activeBoard;
+    final remoteLockActor = activeBoard == null
+        ? null
+        : cubit.panelLockActor(activeBoard, panel.id);
     return BoardPanelRenderContext(
       isSelected:
           panel.id ==
           context.select<BoardCubit, String?>(
-            (cubit) => cubit.state.activeBoard?.viewport.focusedPanelId,
+            (c) => c.state.activeBoard?.viewport.focusedPanelId,
           ),
       onFocus: onTap,
       onDelete: onDelete,
       onUpdateState: onUpdateState ?? (_) {},
       onShowEditor: onEditNote ?? () {},
       remoteInfo: activeBoard == null ? null : remoteInfoForBoard(activeBoard),
+      readOnly: remoteLockActor != null,
       onCreateLinkedPanel: onCreateLinkedPanel,
       onFindPanelByGroup: (typeId, group) {
         final board = context.read<BoardCubit>().state.activeBoard;

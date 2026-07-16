@@ -65,6 +65,7 @@ class StickyNotePlugin extends BoardPanelPlugin with PanelEditorDialogMixin {
       color: color,
       textColor: textColor,
       fontSize: fontSize,
+      readOnly: renderContext.readOnly,
       onChanged: (value) {
         renderContext.onUpdateState({...panel.state, 'text': value});
       },
@@ -83,6 +84,7 @@ class _StickyNoteContent extends StatefulWidget {
     required this.textColor,
     required this.fontSize,
     required this.onChanged,
+    this.readOnly = false,
   });
 
   final BoardPanelInstance panel;
@@ -90,6 +92,7 @@ class _StickyNoteContent extends StatefulWidget {
   final Color textColor;
   final double fontSize;
   final ValueChanged<String> onChanged;
+  final bool readOnly;
 
   @override
   State<_StickyNoteContent> createState() => _StickyNoteContentState();
@@ -118,12 +121,13 @@ class _StickyNoteContentState extends State<_StickyNoteContent>
         padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
         child: TextField(
           controller: controller,
+          readOnly: widget.readOnly,
           expands: true,
           maxLines: null,
           minLines: null,
           keyboardType: TextInputType.multiline,
           textAlignVertical: TextAlignVertical.top,
-          onChanged: widget.onChanged,
+          onChanged: widget.readOnly ? null : widget.onChanged,
           decoration: InputDecoration(
             border: InputBorder.none,
             enabledBorder: InputBorder.none,

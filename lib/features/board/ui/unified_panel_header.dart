@@ -26,6 +26,7 @@ class UnifiedPanelHeader extends StatelessWidget {
     required this.onDelete,
     this.leadingIcon,
     this.pluginActions = const [],
+    this.remoteLockActor,
     super.key,
   });
 
@@ -43,6 +44,9 @@ class UnifiedPanelHeader extends StatelessWidget {
   final VoidCallback onDelete;
   final Widget? leadingIcon;
   final List<Widget> pluginActions;
+
+  /// Non-null when another remote actor holds the edit lock for this panel.
+  final String? remoteLockActor;
 
   @override
   Widget build(BuildContext context) {
@@ -87,23 +91,31 @@ class UnifiedPanelHeader extends StatelessWidget {
               ),
             ),
           ),
-          HeaderIconButton(
-            icon: Icons.copy,
-            tooltip: 'Duplicate panel',
-            onPressed: onDuplicate,
-          ),
-          HeaderIconButton(
-            icon: Icons.format_color_fill,
-            tooltip: 'Panel color',
-            onPressed: onEditColor,
-            swatch: accent == Colors.transparent ? null : accent,
-          ),
-          if (onEdit != null)
+          if (remoteLockActor != null)
             HeaderIconButton(
-              icon: Icons.edit_outlined,
-              tooltip: 'Edit content',
-              onPressed: onEdit!,
+              icon: Icons.lock_outline,
+              tooltip: 'Editing by $remoteLockActor',
+              onPressed: () {},
+            )
+          else ...[
+            HeaderIconButton(
+              icon: Icons.copy,
+              tooltip: 'Duplicate panel',
+              onPressed: onDuplicate,
             ),
+            HeaderIconButton(
+              icon: Icons.format_color_fill,
+              tooltip: 'Panel color',
+              onPressed: onEditColor,
+              swatch: accent == Colors.transparent ? null : accent,
+            ),
+            if (onEdit != null)
+              HeaderIconButton(
+                icon: Icons.edit_outlined,
+                tooltip: 'Edit content',
+                onPressed: onEdit!,
+              ),
+          ],
           ...pluginActions,
           PanelOverflowMenu(
             onToggleLocked: onToggleLocked,

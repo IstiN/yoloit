@@ -1,11 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:yoloit/app_mobile.dart';
 import 'package:yoloit/core/config/app_config.dart';
 import 'package:yoloit/core/platform/platform_dirs.dart';
 import 'package:yoloit/core/theme/theme_manager.dart';
+import 'package:yoloit/features/terminal/bloc/terminal_cubit.dart';
+import 'package:yoloit/features/workspaces/bloc/workspace_cubit.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -15,12 +18,13 @@ Future<void> main() async {
   );
   await ThemeManager.instance.load();
   await AppConfig.instance.load();
-  const remoteUrl = String.fromEnvironment('YOLOIT_REMOTE_URL');
-  const remoteToken = String.fromEnvironment('YOLOIT_REMOTE_TOKEN');
   runApp(
-    const MobileBoardApp(
-      initialRemoteUrl: remoteUrl,
-      initialRemoteToken: remoteToken,
+    MultiBlocProvider(
+      providers: [
+        BlocProvider(create: (_) => WorkspaceCubit()),
+        BlocProvider(create: (_) => TerminalCubit()..initialize()),
+      ],
+      child: const MobileBoardApp(),
     ),
   );
 }

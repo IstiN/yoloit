@@ -339,6 +339,7 @@ class _KanbanContentState extends State<_KanbanContent> {
   }
 
   Future<void> _editCard(_CardData card, List<String> columns) async {
+    if (widget.renderContext.readOnly) return;
     final cardId = card['id']?.toString() ?? '';
     if (cardId.isEmpty) return;
 
@@ -503,7 +504,10 @@ class _KanbanContentState extends State<_KanbanContent> {
                       Tooltip(
                         message: 'Edit columns',
                         child: InkWell(
-                          onTap: () => setState(() => _editMode = true),
+                          onTap: () {
+                            if (widget.renderContext.readOnly) return;
+                            setState(() => _editMode = true);
+                          },
                           borderRadius: BorderRadius.circular(6),
                           child: Padding(
                             padding: const EdgeInsets.all(4),
@@ -540,7 +544,9 @@ class _KanbanContentState extends State<_KanbanContent> {
                           child: Tooltip(
                             message: 'Add column',
                             child: InkWell(
-                              onTap: _addColumn,
+                              onTap: widget.renderContext.readOnly
+                                  ? null
+                                  : _addColumn,
                               borderRadius: BorderRadius.circular(8),
                               child: Container(
                                 width: 36,
@@ -620,7 +626,8 @@ class _KanbanContentState extends State<_KanbanContent> {
                           (card) => _buildCard(card, ci, columns.length),
                         ),
                         // Inline add field
-                        if (_adding[ci] == true)
+                        if (_adding[ci] == true &&
+                            !widget.renderContext.readOnly)
                           Padding(
                             padding: const EdgeInsets.only(top: 4),
                             child: TextField(

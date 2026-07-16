@@ -128,6 +128,36 @@ class YoloitRemoteClient {
     await _json('POST', '/api/terminals/${Uri.encodeComponent(id)}/stop');
   }
 
+  Future<void> resizeTerminal(String id, int rows, int cols) async {
+    await _json(
+      'POST',
+      '/api/terminals/${Uri.encodeComponent(id)}/resize',
+      body: {'rows': rows, 'cols': cols},
+    );
+  }
+
+  Future<void> acquirePanelLock(
+    String boardId,
+    String panelId, {
+    required String actorId,
+    int ttlSec = 60,
+  }) async {
+    await _json(
+      'PUT',
+      '/api/boards/${Uri.encodeComponent(boardId)}/panels/'
+      '${Uri.encodeComponent(panelId)}/lock',
+      body: {'actorId': actorId, 'ttlSec': ttlSec},
+    );
+  }
+
+  Future<void> releasePanelLock(String boardId, String panelId) async {
+    await _json(
+      'DELETE',
+      '/api/boards/${Uri.encodeComponent(boardId)}/panels/'
+      '${Uri.encodeComponent(panelId)}/lock',
+    );
+  }
+
   Future<SetupCheckSnapshot> setupCheck() async {
     final response = await _json('GET', '/api/setup');
     return SetupCheckSnapshot.fromJson(response);
@@ -157,11 +187,35 @@ class YoloitRemoteClient {
     String path, {
     Map<String, dynamic>? body,
   }) async {
+    final rawPath = path.startsWith('/') ? path : '/$path';
+    final rawUri = Uri.parse(rawPath);
+    final basePath = baseUri.path;
+    final resolvedPath = basePath.endsWith('/')
+        ? '$basePath${rawUri.path.substring(1)}'
+        : '$basePath${rawUri.path}';
+    final url = baseUri.replace(
+      path: resolvedPath,
+      queryParameters: <String, String>{
+        ...baseUri.queryParameters,
+        ...rawUri.queryParameters,
+      },
+    );
+    // Device proxy URLs authenticate with the device key; pass it as a query
+    // parameter because some runtimes (e.g. iOS HttpClient behind Cloud Run)
+    // drop or transform the Authorization header on WebSocket-upgrade paths.
+    final useKeyQuery =
+        token != null && url.path.startsWith('/api/devices/');
+    final resolvedUrl = useKeyQuery
+        ? url.replace(queryParameters: {
+          ...url.queryParameters,
+          'key': token!,
+        })
+        : url;
     final request = await _http
-        .openUrl(method, baseUri.resolve(path))
+        .openUrl(method, resolvedUrl)
         .timeout(const Duration(seconds: 10));
     request.headers.set(HttpHeaders.acceptHeader, 'application/json');
-    if (token != null && token!.trim().isNotEmpty) {
+    if (token != null && token!.trim().isNotEmpty && !useKeyQuery) {
       request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
     }
     if (body != null) {

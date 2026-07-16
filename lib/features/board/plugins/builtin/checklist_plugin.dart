@@ -109,6 +109,7 @@ class _ChecklistContentState extends State<_ChecklistContent> {
     final done = items.where((i) => i['done'] == true).length;
     final total = items.length;
     final progress = total == 0 ? 0.0 : done / total;
+    final readOnly = widget.renderContext.readOnly;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -160,6 +161,7 @@ class _ChecklistContentState extends State<_ChecklistContent> {
               return _ChecklistItem(
                 text: text,
                 isDone: isDone,
+                readOnly: readOnly,
                 onToggle: () => _toggle(id),
                 onDelete: () => _delete(id),
               );
@@ -175,9 +177,10 @@ class _ChecklistContentState extends State<_ChecklistContent> {
               Expanded(
                 child: TextField(
                   controller: _addCtrl,
+                  readOnly: readOnly,
                   style: const TextStyle(fontSize: 13),
                   decoration: InputDecoration(
-                    hintText: 'Add item…',
+                    hintText: readOnly ? 'Locked by another user' : 'Add item…',
                     isDense: true,
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 10,
@@ -194,12 +197,12 @@ class _ChecklistContentState extends State<_ChecklistContent> {
                       ),
                     ),
                   ),
-                  onSubmitted: (_) => _addItem(),
+                  onSubmitted: readOnly ? null : (_) => _addItem(),
                 ),
               ),
               const SizedBox(width: 6),
               IconButton.filled(
-                onPressed: _addItem,
+                onPressed: readOnly ? null : _addItem,
                 icon: const Icon(Icons.add, size: 16),
                 style: IconButton.styleFrom(
                   backgroundColor: colors.accentOrange,
@@ -222,10 +225,12 @@ class _ChecklistItem extends StatefulWidget {
     required this.isDone,
     required this.onToggle,
     required this.onDelete,
+    this.readOnly = false,
   });
 
   final String text;
   final bool isDone;
+  final bool readOnly;
   final VoidCallback onToggle;
   final VoidCallback onDelete;
 
@@ -256,7 +261,8 @@ class _ChecklistItemState extends State<_ChecklistItem> {
                 height: 24,
                 child: Checkbox(
                   value: widget.isDone,
-                  onChanged: (_) => widget.onToggle(),
+                  onChanged:
+                      widget.readOnly ? null : (_) => widget.onToggle(),
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   activeColor: colors.accentOrange,
                   shape: RoundedRectangleBorder(
@@ -275,7 +281,7 @@ class _ChecklistItemState extends State<_ChecklistItem> {
                   ),
                 ),
               ),
-              if (hovered)
+              if (hovered && !widget.readOnly)
                 SizedBox(
                   width: 22,
                   height: 22,

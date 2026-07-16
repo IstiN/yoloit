@@ -29,6 +29,7 @@ import 'package:yoloit/features/settings/data/provider_model_catalog_service.dar
 
 
 part 'board_cubit_panel_history.dart';
+part 'board_cubit_locks.dart';
 
 class BoardCubit extends Cubit<BoardState> {
   BoardCubit({
@@ -53,6 +54,31 @@ class BoardCubit extends Cubit<BoardState> {
     });
   }
 
+  void _startRemoteRefreshTimer() {
+    final active = state.activeBoard;
+    final isRemote = active != null && remoteInfoForBoard(active) != null;
+    if (!isRemote) {
+      _remoteRefreshTimer?.cancel();
+      _remoteRefreshTimer = null;
+      return;
+    }
+    if (_remoteRefreshTimer != null && _remoteRefreshTimer!.isActive) return;
+    _remoteRefreshTimer?.cancel();
+    _remoteRefreshTimer = Timer.periodic(_remoteRefreshInterval, (_) {
+      unawaited(_onRemoteRefreshTick());
+    });
+  }
+
+  Future<void> _onRemoteRefreshTick() async {
+    if (_remoteRefreshInProgress) return;
+    try {
+      _remoteRefreshInProgress = true;
+      await refreshRemoteBoards();
+    } finally {
+      _remoteRefreshInProgress = false;
+    }
+  }
+
   static const _boardsStorageKey = 'board.documents.v1';
   static const _activeBoardStorageKey = 'board.active.id.v1';
 
@@ -66,6 +92,9 @@ class BoardCubit extends Cubit<BoardState> {
   String? _pendingRemoteSyncActiveBoardId;
   bool _remoteSyncInFlight = false;
   Timer? _remoteRefreshDebounce;
+  Timer? _remoteRefreshTimer;
+  bool _remoteRefreshInProgress = false;
+  static const _remoteRefreshInterval = Duration(milliseconds: 1200);
   StreamSubscription<BoardEvent>? _boardEventSub;
   final Map<String, BoardPanelInstance> _panelGestureStarts = {};
   final Map<String, List<BoardRedoEntry>> _redoStacks = {};
@@ -223,7 +252,11 @@ class BoardCubit extends Cubit<BoardState> {
         baseUrl: remote.url,
         token: remote.token,
       );
-      refreshed[board.id] = await client.fetchBoard(remote.boardId);
+      final fetched = await client.fetchBoard(
+        remote.boardId,
+        viewportOverride: board.viewport,
+      );
+      refreshed[board.id] = _mergeRemoteBoard(board, fetched);
     }
     final next = state.boards
         .map((board) => refreshed[board.id] ?? board)
@@ -234,6 +267,29 @@ class BoardCubit extends Cubit<BoardState> {
     } finally {
       _suppressRemoteSync = false;
     }
+  }
+
+  BoardDocument _mergeRemoteBoard(
+    BoardDocument local,
+    BoardDocument remote,
+  ) {
+    final lockedIds = _panelIdsLockedByActor(local, _actorId);
+    final localById = {for (final panel in local.panels) panel.id: panel};
+    final remoteById = {for (final panel in remote.panels) panel.id: panel};
+    final mergedPanels = <BoardPanelInstance>[];
+    for (final panel in remote.panels) {
+      if (lockedIds.contains(panel.id) && localById.containsKey(panel.id)) {
+        mergedPanels.add(localById[panel.id]!);
+      } else {
+        mergedPanels.add(panel);
+      }
+    }
+    for (final panel in local.panels) {
+      if (!remoteById.containsKey(panel.id)) {
+        mergedPanels.add(panel);
+      }
+    }
+    return remote.copyWith(panels: mergedPanels, viewport: local.viewport);
   }
 
   Future<void> disconnectRemoteBoard(String boardId) async {
@@ -367,6 +423,7 @@ class BoardCubit extends Cubit<BoardState> {
     if (!state.boards.any((board) => board.id == id)) return;
     await _setBoards(state.boards, activeBoardId: id);
     emit(state.copyWith(clearSelection: true));
+    _startRemoteRefreshTimer();
   }
 
   Future<void> renameBoard(String id, String name) async {
@@ -499,6 +556,17 @@ class BoardCubit extends Cubit<BoardState> {
       debugPrint('[BoardCubit] focusPanel panelId=$panelId targetId=$targetId stateActiveBoardId=${state.activeBoard?.id}');
     }
     if (targetId == null) return;
+    final previousBoard = state.boards.firstWhereOrNull((b) => b.id == targetId);
+    if (previousBoard != null) {
+      final previousLocks = _panelIdsLockedByActor(previousBoard, _actorId)
+          .where((id) => id != panelId);
+      for (final id in previousLocks) {
+        await releasePanelLock(targetId, id);
+      }
+      final acquired = await acquirePanelLock(targetId, panelId);
+      if (!acquired) return;
+      _startPanelLockRenewal(targetId, panelId);
+    }
     await _updateBoard(targetId, (board) {
       final maxZ = board.panels.fold<int>(
         0,
@@ -581,8 +649,13 @@ class BoardCubit extends Cubit<BoardState> {
   }
 
   Future<void> clearFocusedPanel({String? boardId}) async {
+    _stopPanelLockRenewal();
     final targetId = boardId ?? state.activeBoard?.id;
     if (targetId == null) return;
+    final board = state.boards.firstWhereOrNull((b) => b.id == targetId);
+    final locks = board == null
+        ? <String>{}
+        : _panelIdsLockedByActor(board, _actorId);
     await _updateBoard(targetId, (board) {
       if (board.viewport.focusedPanelId == null) {
         return board;
@@ -591,6 +664,9 @@ class BoardCubit extends Cubit<BoardState> {
         viewport: board.viewport.copyWith(clearFocusedPanelId: true),
       );
     });
+    for (final panelId in locks) {
+      unawaited(releasePanelLock(targetId, panelId));
+    }
   }
 
   // ── Grid view ─────────────────────────────────────────────────────────────
@@ -2303,6 +2379,20 @@ class BoardCubit extends Cubit<BoardState> {
     );
   }
 
+
+  void _emitPanelLockConflict(String panelId, String? actorId) {
+    emit(
+      state.copyWith(
+        panelLockConflictPanelId: panelId,
+        panelLockConflictActorId: actorId,
+      ),
+    );
+  }
+
+  void clearPanelLockConflict() {
+    emit(state.copyWith(clearPanelLockConflict: true));
+  }
+
   Map<String, dynamic> _panelSnapshot(BoardPanelInstance panel) {
     final plugin = BoardPluginRegistry.instance.pluginFor(panel.type);
     final snapshot = Map<String, dynamic>.from(panel.toJson());
@@ -2383,6 +2473,7 @@ class BoardCubit extends Cubit<BoardState> {
         );
       }
     }
+    _startRemoteRefreshTimer();
   }
 
   List<BoardDocument> _changedRemoteBoards({
@@ -2512,6 +2603,8 @@ class BoardCubit extends Cubit<BoardState> {
     await flushRemoteSync();
     _remoteSyncDebounce?.cancel();
     _remoteRefreshDebounce?.cancel();
+    _remoteRefreshTimer?.cancel();
+    _panelLockRenewalTimer?.cancel();
     await _boardEventSub?.cancel();
     return super.close();
   }

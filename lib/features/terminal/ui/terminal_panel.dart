@@ -14,6 +14,8 @@ import 'package:yoloit/core/services/support_log_service.dart';
 import 'package:yoloit/core/session/session_prefs.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/utils/clipboard_utils.dart';
+import 'package:yoloit/core/remote/yoloit_remote_client.dart';
+import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/mindmap/widgets/canvas_interaction_lock.dart';
 import 'package:yoloit/features/settings/data/agent_config_service.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_cubit.dart';
@@ -52,6 +54,24 @@ class TerminalPanel extends StatelessWidget {
 class _EmptyTerminal extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final remote = _remoteInfoForTerminal(context);
+    return _buildContent(context, remote: remote);
+  }
+
+  RemoteBoardInfo? _remoteInfoForTerminal(BuildContext context) {
+    try {
+      final board = context.read<BoardCubit>().state.activeBoard;
+      if (board == null) return null;
+      return remoteInfoForBoard(board);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Widget _buildContent(
+    BuildContext context, {
+    required RemoteBoardInfo? remote,
+  }) {
     final colors = context.appColors;
     return Container(
       color: colors.terminalBackground,
@@ -78,7 +98,7 @@ class _EmptyTerminal extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'AI Agents',
+                    remote != null ? 'Remote Terminal' : 'AI Agents',
                     style: TextStyle(
                       color: colors.textPrimary,
                       fontSize: 18,
@@ -86,18 +106,45 @@ class _EmptyTerminal extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  const Caption(
-                    'Open a workspace and start an AI agent to begin',
+                  Caption(
+                    remote != null
+                        ? 'Start a shell on the connected Mac'
+                        : 'Open a workspace and start an AI agent to begin',
                     fontSize: 13,
                   ),
                   const SizedBox(height: 24),
-                  const _AgentLaunchButtons(),
+                  if (remote != null)
+                    _RemoteTerminalButton(remote: remote)
+                  else
+                    const _AgentLaunchButtons(),
                 ],
               ),
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _RemoteTerminalButton extends StatelessWidget {
+  const _RemoteTerminalButton({required this.remote});
+
+  final RemoteBoardInfo remote;
+
+  @override
+  Widget build(BuildContext context) {
+    final board = context.read<BoardCubit>().state.activeBoard;
+    final cwd = board?.defaultFolder ?? '';
+    return FilledButton.icon(
+      onPressed: () {
+        context.read<TerminalCubit>().createRemoteSession(
+          remoteInfo: remote,
+          cwd: cwd.isEmpty ? '/' : cwd,
+        );
+      },
+      icon: const Icon(Icons.terminal, size: 18),
+      label: const Text('Start remote terminal'),
     );
   }
 }

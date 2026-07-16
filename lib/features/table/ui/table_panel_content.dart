@@ -307,6 +307,7 @@ class _TablePanelContentState extends State<TablePanelContent> {
     final colors = context.appColors;
     _colors = colors;
     final columns = _columns;
+    final readOnly = widget.renderContext.readOnly;
     final plutoColumns = columns
         .map(
           (column) => table_models.TableDataHelper.toPlutoColumn(
@@ -328,6 +329,7 @@ class _TablePanelContentState extends State<TablePanelContent> {
             widget.panel.state,
             widget.panel.id,
           ),
+          readOnly: readOnly,
           onCopyTableId: () {
             Clipboard.setData(
               ClipboardData(
@@ -341,12 +343,13 @@ class _TablePanelContentState extends State<TablePanelContent> {
               const SnackBar(content: Text('Table ID copied to clipboard')),
             );
           },
-          onEditTableId: _showEditTableIdDialog,
-          onAddRow: _addRow,
-          onRemoveRow: _rows.isEmpty ? null : _removeLastRow,
-          onAddColumn: _addColumn,
-          onRemoveColumn: columns.isEmpty ? null : (ctx) => _showColumnMenu(ctx),
-          onClear: _rows.isEmpty ? null : _clearRows,
+          onEditTableId: readOnly ? null : _showEditTableIdDialog,
+          onAddRow: readOnly ? null : _addRow,
+          onRemoveRow: readOnly || _rows.isEmpty ? null : _removeLastRow,
+          onAddColumn: readOnly ? null : _addColumn,
+          onRemoveColumn:
+              readOnly || columns.isEmpty ? null : (ctx) => _showColumnMenu(ctx),
+          onClear: readOnly || _rows.isEmpty ? null : _clearRows,
         ),
         const Divider(height: 1),
         Expanded(
@@ -361,13 +364,14 @@ class _TablePanelContentState extends State<TablePanelContent> {
                   key: ValueKey<int>(columns.length),
                   columns: plutoColumns,
                   rows: plutoRows,
-                  onChanged: _onCellChanged,
+                  onChanged: readOnly ? null : _onCellChanged,
                   onLoaded: (event) {
                     _stateManager = event.stateManager;
                     WidgetsBinding.instance
                         .addPostFrameCallback((_) => _syncStateManager());
                   },
-                  mode: PlutoGridMode.normal,
+                  mode:
+                      readOnly ? PlutoGridMode.readOnly : PlutoGridMode.normal,
                   configuration: PlutoGridConfiguration(
                     style: PlutoGridStyleConfig.dark(
                       gridBackgroundColor: colors.surface,
@@ -404,22 +408,24 @@ class _Toolbar extends StatelessWidget {
   const _Toolbar({
     required this.tableId,
     required this.onCopyTableId,
-    required this.onEditTableId,
-    required this.onAddRow,
-    required this.onRemoveRow,
-    required this.onAddColumn,
-    required this.onRemoveColumn,
-    required this.onClear,
+    this.onEditTableId,
+    this.onAddRow,
+    this.onRemoveRow,
+    this.onAddColumn,
+    this.onRemoveColumn,
+    this.onClear,
+    this.readOnly = false,
   });
 
   final String tableId;
   final VoidCallback onCopyTableId;
-  final VoidCallback onEditTableId;
-  final VoidCallback onAddRow;
+  final VoidCallback? onEditTableId;
+  final VoidCallback? onAddRow;
   final VoidCallback? onRemoveRow;
-  final VoidCallback onAddColumn;
+  final VoidCallback? onAddColumn;
   final ValueChanged<BuildContext>? onRemoveColumn;
   final VoidCallback? onClear;
+  final bool readOnly;
 
   @override
   Widget build(BuildContext context) {

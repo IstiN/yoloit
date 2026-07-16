@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:yoloit/core/remote/yoloit_remote_client.dart';
 import 'package:yoloit/core/services/agent_hook_service.dart';
 import 'package:yoloit/core/session/session_prefs.dart';
 import 'package:yoloit/features/settings/data/agent_config_service.dart';
@@ -10,6 +11,7 @@ import 'package:yoloit/features/skills/data/skills_install_service.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_state.dart';
 import 'package:yoloit/features/terminal/data/logging_service.dart';
 import 'package:yoloit/features/terminal/data/session_persistence_service.dart';
+import 'package:yoloit/features/terminal/data/remote_yoloit_terminal_backend.dart';
 import 'package:yoloit/features/terminal/data/terminal_backend.dart';
 import 'package:yoloit/features/terminal/data/terminal_backend_service.dart';
 import 'package:yoloit/features/terminal/data/tmux_service.dart';
@@ -319,6 +321,38 @@ class TerminalCubit extends Cubit<TerminalState> {
       await Future<void>.delayed(const Duration(milliseconds: 1200));
       _backendService.write(sessionId, '$effectiveCommand\n');
     }
+  }
+
+  /// Spawns a plain shell on a remote YoLoIT device (used from mobile/browser).
+  Future<void> createRemoteSession({
+    required RemoteBoardInfo remoteInfo,
+    required String cwd,
+    String? name,
+  }) async {
+    if (state is! TerminalLoaded) return;
+
+    final sessionId =
+        'remote_${DateTime.now().millisecondsSinceEpoch}';
+    final session = AgentSession(
+      id: sessionId,
+      type: AgentType.terminal,
+      workspacePath: cwd,
+      workspaceId: null,
+      status: AgentStatus.live,
+      sessionId: _generateSessionId(),
+      customName: name?.trim().isNotEmpty == true ? name!.trim() : 'Remote',
+    );
+
+    final process = await _backendService.launch(
+      sessionId: sessionId,
+      workspacePath: cwd,
+      backendOverride: RemoteYoloitTerminalBackend(remoteInfo: remoteInfo),
+    );
+    _attachProcessToSession(process, session);
+    _allSessions.removeWhere((s) => s.id == sessionId);
+    _allSessions.add(session);
+    final visible = _workspaceSessions;
+    _emitLoaded(visible, visible.length - 1);
   }
 
   void switchTab(int index) {

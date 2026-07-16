@@ -5,14 +5,14 @@ import 'package:yoloit/core/theme/app_color_scheme.dart';
 class PanelIdChip extends StatelessWidget {
   const PanelIdChip({
     required this.id,
-    required this.onEdit,
+    this.onEdit,
     required this.onCopy,
     this.label = 'ID',
     super.key,
   });
 
   final String id;
-  final VoidCallback onEdit;
+  final VoidCallback? onEdit;
   final VoidCallback onCopy;
   final String label;
 

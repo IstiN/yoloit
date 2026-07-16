@@ -222,7 +222,20 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
         }
         return KeyEventResult.ignored;
       },
-      child: BlocBuilder<BoardCubit, BoardState>(
+      child: BlocConsumer<BoardCubit, BoardState>(
+        listener: (context, state) {
+          final conflictPanelId = state.panelLockConflictPanelId;
+          if (conflictPanelId != null) {
+            final actor = state.panelLockConflictActorId;
+            final message = actor != null && actor.isNotEmpty
+                ? 'Panel is being edited by $actor'
+                : 'Panel is locked by another user';
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(message)),
+            );
+            context.read<BoardCubit>().clearPanelLockConflict();
+          }
+        },
         builder: (context, state) {
           if (!state.isLoaded) {
             return const Center(child: CircularProgressIndicator());
@@ -2505,11 +2518,13 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
       builder: (_) => const ConnectRemoteYoloitDialog(),
     );
     if (!context.mounted || result == null) return;
+    debugPrint('[BoardView] connectRemoteYoloit result url=${result.url}');
     try {
       final boards = await context.read<BoardCubit>().connectRemoteBoards(
         url: result.url,
         token: result.token,
       );
+      debugPrint('[BoardView] connectRemoteYoloit boards=${boards.length}');
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -2522,7 +2537,9 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
       if (activeBoard != null) {
         await _openBoardOverview(activeBoard);
       }
-    } catch (error) {
+    } catch (error, stackTrace) {
+      debugPrint('[BoardView] connectRemoteYoloit error=$error');
+      debugPrint('$stackTrace');
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Remote YoLoIT connection failed: $error')),

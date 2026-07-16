@@ -477,6 +477,21 @@ Future<shelf.Response> handleTerminalsRequest({
     await process.stdin.flush();
     return jsonResponse(<String, Object?>{'ok': true});
   }
+  if (sub.length == 2 && sub[1] == 'resize' && method == 'POST') {
+    final process = terminals[sub[0]];
+    if (process == null) {
+      return jsonResponse(<String, Object?>{
+        'ok': false,
+        'error': 'terminal not found',
+      }, 404);
+    }
+    final body = await readJsonBody(request);
+    final rows = (body['rows'] as num?)?.toInt() ?? 24;
+    final cols = (body['cols'] as num?)?.toInt() ?? 80;
+    process.stdin.write('stty rows $rows cols $cols\n');
+    await process.stdin.flush();
+    return jsonResponse(<String, Object?>{'ok': true});
+  }
   if (sub.length == 2 && sub[1] == 'stop' && method == 'POST') {
     final process = terminals.remove(sub[0]);
     final ok = process?.kill() ?? false;

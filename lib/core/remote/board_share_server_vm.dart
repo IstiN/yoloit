@@ -212,6 +212,92 @@ class BoardShareServer extends BoardShareServerBase with ServerProcessMixin {
         'board': _sharedBoard(updated),
       });
     }
+    if (sub.length == 4 && sub[1] == 'panels' && sub[3] == 'lock') {
+      final panelId = Uri.decodeComponent(sub[2]);
+      final panel = board.panels
+              .where((p) => p.id == panelId)
+              .firstOrNull ??
+          board.panels
+              .where(
+                (p) => p.title.toLowerCase() == panelId.toLowerCase(),
+              )
+              .firstOrNull;
+      if (panel == null) {
+        return jsonResponse(
+          <String, Object?>{'ok': false, 'error': 'panel not found'},
+          404,
+        );
+      }
+      if (method == 'PUT') {
+        final body = await readJsonBody(request);
+        final actorId = (body['actorId'] as String? ?? '').trim();
+        final ttlSec = (body['ttlSec'] as num?)?.toInt() ?? 60;
+        if (actorId.isEmpty) {
+          return jsonResponse(
+            <String, Object?>{'ok': false, 'error': 'actorId required'},
+            400,
+          );
+        }
+        final now = DateTime.now().toUtc().millisecondsSinceEpoch;
+        final existing = (board.metadata['panelLocks'] as Map?)?[panelId];
+        if (existing is Map) {
+          final existingActor = existing['actorId'] as String?;
+          final existingExpires = existing['expiresAt'];
+          if (existingActor != actorId &&
+              existingExpires is int &&
+              existingExpires > now) {
+            return jsonResponse(
+              <String, Object?>{
+                'ok': false,
+                'error': 'panel locked by another actor',
+                'actorId': existingActor,
+              },
+              409,
+            );
+          }
+        }
+        final expires = now + ttlSec * 1000;
+        final locks =
+            board.metadata['panelLocks'] is Map
+                ? Map<String, dynamic>.from(
+                  board.metadata['panelLocks'] as Map,
+                )
+                : <String, dynamic>{};
+        locks[panelId] = {'actorId': actorId, 'expiresAt': expires};
+        final updated = board.copyWith(
+          metadata: <String, dynamic>{...board.metadata, 'panelLocks': locks},
+        );
+        await cubit.replaceBoardSnapshotFromShare(updated);
+        return jsonResponse(
+          <String, Object?>{'ok': true, 'panelId': panelId, 'actorId': actorId},
+        );
+      }
+      if (method == 'DELETE') {
+        final locks =
+            board.metadata['panelLocks'] is Map
+                ? Map<String, dynamic>.from(
+                  board.metadata['panelLocks'] as Map,
+                )
+                : <String, dynamic>{};
+        if (!locks.containsKey(panelId)) {
+          return jsonResponse(
+            <String, Object?>{'ok': true, 'panelId': panelId},
+          );
+        }
+        final next = Map<String, dynamic>.from(locks)..remove(panelId);
+        final updated = board.copyWith(
+          metadata: <String, dynamic>{...board.metadata, 'panelLocks': next},
+        );
+        await cubit.replaceBoardSnapshotFromShare(updated);
+        return jsonResponse(
+          <String, Object?>{'ok': true, 'panelId': panelId},
+        );
+      }
+      return jsonResponse(
+        <String, Object?>{'ok': false, 'error': 'method not allowed'},
+        405,
+      );
+    }
     return jsonResponse(<String, Object?>{
       'ok': false,
       'error': 'not found',

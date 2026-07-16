@@ -103,9 +103,9 @@ func TestRelayProxyRoundTrip(t *testing.T) {
 	srv := newRelayTestServer(t, "tok")
 	deviceID, key := createDevice(t, srv, "tok", "macbook")
 
-	// Device offline → 503.
+	// Device offline → 503 (using the device key for proxy access).
 	resp, body, _ := do(t, http.MethodGet,
-		srv.URL+"/api/devices/"+deviceID+"/api/health", "tok", nil)
+		srv.URL+"/api/devices/"+deviceID+"/api/health", key, nil)
 	if resp.StatusCode != http.StatusServiceUnavailable {
 		t.Fatalf("expected 503 for offline device, got %d: %v", resp.StatusCode, body)
 	}
@@ -145,14 +145,14 @@ func TestRelayProxyRoundTrip(t *testing.T) {
 	}
 
 	resp, body, raw := do(t, http.MethodGet,
-		srv.URL+"/api/devices/"+deviceID+"/api/health", "tok", nil)
+		srv.URL+"/api/devices/"+deviceID+"/api/health", key, nil)
 	if resp.StatusCode != http.StatusOK || body["echo"] != "/api/health" {
 		t.Fatalf("unexpected proxied response: %d %s", resp.StatusCode, raw)
 	}
 
 	// POST with a body is proxied too.
 	resp, body, _ = do(t, http.MethodPost,
-		srv.URL+"/api/devices/"+deviceID+"/api/boards", "tok",
+		srv.URL+"/api/devices/"+deviceID+"/api/boards", key,
 		map[string]any{"name": "via relay"})
 	if resp.StatusCode != http.StatusOK || body["method"] != "POST" {
 		t.Fatalf("unexpected proxied POST response: %d %v", resp.StatusCode, body)

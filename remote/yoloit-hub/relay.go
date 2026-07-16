@@ -380,13 +380,28 @@ func (s *server) handleDevicesSubtree(w http.ResponseWriter, r *http.Request) {
 		proxyPath = rest[idx:]
 	}
 
+	rec := s.relay.devices.get(deviceID)
+	if rec == nil {
+		notFound(w)
+		return
+	}
+
+	// DELETE /api/devices/:id is protected by the hub token in the auth
+	// middleware; device-key auth is only required for proxying to the device.
+	isProxy := proxyPath != "" || r.Method != http.MethodDelete
+	if isProxy {
+		key := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		if key == "" {
+			key = r.URL.Query().Get("key")
+		}
+		if subtle.ConstantTimeCompare([]byte(key), []byte(rec.Key)) != 1 {
+			writeJSON(w, http.StatusUnauthorized, map[string]any{"ok": false, "error": "unauthorized"})
+			return
+		}
+	}
+
 	if proxyPath == "" {
 		if r.Method == http.MethodDelete {
-			rec := s.relay.devices.get(deviceID)
-			if rec == nil {
-				notFound(w)
-				return
-			}
 			if !s.relay.devices.delete(deviceID) {
 				writeJSON(w, http.StatusConflict, map[string]any{"ok": false, "error": "static device cannot be deleted"})
 				return

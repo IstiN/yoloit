@@ -220,11 +220,13 @@ class _CodeSnippetPanelContentState extends State<_CodeSnippetPanelContent> {
               child: RepaintBoundary(
                 child: CodeField(
                   controller: _controller,
+                  readOnly: widget.renderContext.readOnly,
                   textStyle: const TextStyle(
                     fontSize: 13,
                     fontFamily: 'monospace',
                   ),
-                  onChanged: _saveCode,
+                  onChanged:
+                      widget.renderContext.readOnly ? null : _saveCode,
                 ),
               ),
             ),

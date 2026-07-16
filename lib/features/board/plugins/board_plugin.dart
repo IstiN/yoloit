@@ -19,6 +19,7 @@ class BoardPanelRenderContext {
     this.onFocusPanelById,
     this.onFindPanelById,
     this.remoteInfo,
+    this.readOnly = false,
     this.isHeadlessPreview = false,
   });
 
@@ -27,6 +28,10 @@ class BoardPanelRenderContext {
   final VoidCallback onDelete;
   final ValueChanged<Map<String, dynamic>> onUpdateState;
   final VoidCallback onShowEditor;
+
+  /// True when the panel is locked for editing by another remote actor.
+  /// Plugins should treat this as read-only (disable inline editors, etc.).
+  final bool readOnly;
 
   /// Resize the panel to exact width × height.
   final void Function(double width, double height)? onResize;

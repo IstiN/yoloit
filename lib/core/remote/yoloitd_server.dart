@@ -330,6 +330,92 @@ class YoloitdServer with ServerProcessMixin {
     if (sub.length >= 2 && sub[1] == 'groups') {
       return _handleGroups(request, method, board, sub.skip(2).toList());
     }
+    if (sub.length == 4 &&
+        sub[1] == 'panels' &&
+        sub[3] == 'lock') {
+      final panelId = Uri.decodeComponent(sub[2]);
+      final panel = _findPanel(board, panelId);
+      if (panel == null) {
+        return jsonResponse(
+          <String, Object?>{'ok': false, 'error': 'panel not found'},
+          404,
+        );
+      }
+      if (method == 'PUT') {
+        final body = await readJsonBody(request);
+        final actorId = (body['actorId'] as String? ?? '').trim();
+        final ttlSec = (body['ttlSec'] as num?)?.toInt() ?? 60;
+        if (actorId.isEmpty) {
+          return jsonResponse(
+            <String, Object?>{'ok': false, 'error': 'actorId required'},
+            400,
+          );
+        }
+        final now = DateTime.now().toUtc().millisecondsSinceEpoch;
+        final existing =
+            (board.metadata['panelLocks'] as Map?)?[panelId];
+        if (existing is Map) {
+          final existingActor = existing['actorId'] as String?;
+          final existingExpires = existing['expiresAt'];
+          if (existingActor != actorId &&
+              existingExpires is int &&
+              existingExpires > now) {
+            return jsonResponse(
+              <String, Object?>{
+                'ok': false,
+                'error': 'panel locked by another actor',
+                'actorId': existingActor,
+              },
+              409,
+            );
+          }
+        }
+        final expires = now + ttlSec * 1000;
+        await store.updateBoard(
+          board.id,
+          (current) {
+            final locks =
+                current.metadata['panelLocks'] is Map
+                    ? Map<String, dynamic>.from(
+                      current.metadata['panelLocks'] as Map,
+                    )
+                    : <String, dynamic>{};
+            locks[panelId] = {'actorId': actorId, 'expiresAt': expires};
+            return current.copyWith(
+              metadata: <String, dynamic>{...current.metadata, 'panelLocks': locks},
+            );
+          },
+        );
+        return jsonResponse(
+          <String, Object?>{'ok': true, 'panelId': panelId, 'actorId': actorId},
+        );
+      }
+      if (method == 'DELETE') {
+        await store.updateBoard(
+          board.id,
+          (current) {
+            final locks =
+                current.metadata['panelLocks'] is Map
+                    ? Map<String, dynamic>.from(
+                      current.metadata['panelLocks'] as Map,
+                    )
+                    : <String, dynamic>{};
+            if (!locks.containsKey(panelId)) return current;
+            final next = Map<String, dynamic>.from(locks)..remove(panelId);
+            return current.copyWith(
+              metadata: <String, dynamic>{...current.metadata, 'panelLocks': next},
+            );
+          },
+        );
+        return jsonResponse(
+          <String, Object?>{'ok': true, 'panelId': panelId},
+        );
+      }
+      return jsonResponse(
+        <String, Object?>{'ok': false, 'error': 'method not allowed'},
+        405,
+      );
+    }
     return jsonResponse(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
   }
 

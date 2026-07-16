@@ -102,6 +102,12 @@ func (s *server) auth(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
+		// Device-scoped proxy endpoints authenticate with the per-device key
+		// inside the subtree handler; skip the hub-token check there.
+		if isDeviceProxyPath(r.URL.Path) {
+			next.ServeHTTP(w, r)
+			return
+		}
 		if !s.authorized(r) {
 			writeJSON(w, http.StatusUnauthorized, map[string]any{
 				"ok":    false,
@@ -111,6 +117,17 @@ func (s *server) auth(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+func isDeviceProxyPath(path string) bool {
+	// /api/devices/<id>/...  -> device key auth inside the handler.
+	// /api/devices/<id>       -> hub token auth (DELETE / list entry).
+	if !strings.HasPrefix(path, "/api/devices/") {
+		return false
+	}
+	rest := strings.TrimPrefix(path, "/api/devices/")
+	// Must have at least one more slash after the device ID.
+	return strings.Contains(rest, "/")
 }
 
 func (s *server) authorized(r *http.Request) bool {

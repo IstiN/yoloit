@@ -9,6 +9,8 @@ class BoardState extends Equatable {
     this.selectedPanelIds = const {},
     this.yoloAssistantAnchorPanelId,
     this.yoloAssistantStartMic = false,
+    this.panelLockConflictPanelId,
+    this.panelLockConflictActorId,
   });
 
   final List<BoardDocument> boards;
@@ -17,6 +19,8 @@ class BoardState extends Equatable {
   final Set<String> selectedPanelIds;
   final String? yoloAssistantAnchorPanelId;
   final bool yoloAssistantStartMic;
+  final String? panelLockConflictPanelId;
+  final String? panelLockConflictActorId;
 
   List<BoardDocument> get activeBoards =>
       boards.where((board) => !board.archived).toList();
@@ -46,6 +50,9 @@ class BoardState extends Equatable {
     String? yoloAssistantAnchorPanelId,
     bool clearYoloAssistantAnchor = false,
     bool? yoloAssistantStartMic,
+    String? panelLockConflictPanelId,
+    bool clearPanelLockConflict = false,
+    String? panelLockConflictActorId,
   }) {
     return BoardState(
       boards: boards ?? this.boards,
@@ -60,6 +67,12 @@ class BoardState extends Equatable {
               : (yoloAssistantAnchorPanelId ?? this.yoloAssistantAnchorPanelId),
       yoloAssistantStartMic:
           yoloAssistantStartMic ?? this.yoloAssistantStartMic,
+      panelLockConflictPanelId: clearPanelLockConflict
+          ? null
+          : (panelLockConflictPanelId ?? this.panelLockConflictPanelId),
+      panelLockConflictActorId: clearPanelLockConflict
+          ? null
+          : (panelLockConflictActorId ?? this.panelLockConflictActorId),
     );
   }
 
@@ -71,5 +84,7 @@ class BoardState extends Equatable {
     selectedPanelIds,
     yoloAssistantAnchorPanelId,
     yoloAssistantStartMic,
+    panelLockConflictPanelId,
+    panelLockConflictActorId,
   ];
 }

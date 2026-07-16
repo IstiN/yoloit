@@ -75,7 +75,7 @@ class RemoteYoloitTerminalBackend implements TerminalBackend {
 
   @override
   void resize(String sessionId, int columns, int rows) {
-    // yoloitd remote terminals currently run over stdio, not a PTY.
+    unawaited(_client.resizeTerminal(sessionId, rows, columns));
   }
 
   @override
