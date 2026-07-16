@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yoloit/core/platform/platform_dirs.dart';
 import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
@@ -33,10 +34,18 @@ class _TempPlatformDirs extends PlatformDirs {
 
 void _cleanupScopedFiles() {
   try {
-    final meta = File('env_groups.json');
+    final configDir = PlatformDirs.instance.configDir;
+    final meta = File(p.join(configDir, 'env_groups.json'));
     if (meta.existsSync()) meta.deleteSync();
-    final valuesDir = Directory('env_groups_values');
+    final valuesDir = Directory(p.join(configDir, 'env_groups_values'));
     if (valuesDir.existsSync()) valuesDir.deleteSync(recursive: true);
+    final credentialsDir = Directory(p.join(configDir, 'credentials'));
+    if (credentialsDir.existsSync()) credentialsDir.deleteSync(recursive: true);
+    // Also remove any legacy relative-path leftovers from older test runs.
+    final legacyMeta = File('env_groups.json');
+    if (legacyMeta.existsSync()) legacyMeta.deleteSync();
+    final legacyValuesDir = Directory('env_groups_values');
+    if (legacyValuesDir.existsSync()) legacyValuesDir.deleteSync(recursive: true);
   } catch (_) {}
 }
 
@@ -121,7 +130,7 @@ void main() {
 
       await GlobalEnvGroupsService.instance.saveAll(data);
 
-      final file = File('env_groups.json');
+      final file = File(p.join(tmpDir.path, 'env_groups.json'));
       expect(file.existsSync(), isTrue);
       final content = file.readAsStringSync();
       // JSON must NOT contain the secret value.
@@ -205,7 +214,7 @@ void main() {
           'values': {'OLD_KEY': 'old_value'},
         },
       ]);
-      final file = File('env_groups.json');
+      final file = File(p.join(tmpDir.path, 'env_groups.json'));
       file.writeAsStringSync(oldJson);
 
       // Load should migrate automatically.
@@ -224,6 +233,31 @@ void main() {
       expect(raw, isNotNull);
       final decoded = jsonDecode(raw!) as Map;
       expect(decoded['OLD_KEY'], 'old_value');
+    });
+
+    test('migrates legacy relative-path env_groups.json into configDir', () async {
+      // Simulate an old build that wrote env_groups.json next to the executable.
+      final legacy = File('env_groups.json');
+      legacy.writeAsStringSync(
+        jsonEncode([
+          {
+            'id': 'g1',
+            'name': 'relative',
+            'keys': ['TOKEN'],
+          },
+        ]),
+      );
+      FlutterSecureStorage.setMockInitialValues({
+        'env_group_g1': jsonEncode({'TOKEN': 'relative_token'}),
+      });
+
+      final loaded = await GlobalEnvGroupsService.instance.loadAll();
+      expect(loaded.length, 1);
+      expect(loaded.first.name, 'relative');
+      expect(loaded.first.values['TOKEN'], 'relative_token');
+
+      // The file should now exist under configDir.
+      expect(File(p.join(tmpDir.path, 'env_groups.json')).existsSync(), isTrue);
     });
 
     test('deleteGroupSecrets removes from secure storage', () async {
@@ -246,7 +280,7 @@ void main() {
         'env_group_env_group_legacy': encoded,
       });
 
-      final file = File('env_groups.json');
+      final file = File(p.join(tmpDir.path, 'env_groups.json'));
       file.writeAsStringSync(
         jsonEncode([
           {

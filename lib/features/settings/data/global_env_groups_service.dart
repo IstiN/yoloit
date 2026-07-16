@@ -3,9 +3,11 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:json_annotation/json_annotation.dart';
+import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yoloit/core/platform/file_storage_adapter.dart';
 import 'package:yoloit/core/platform/platform_capabilities.dart';
+import 'package:yoloit/core/platform/platform_dirs.dart';
 import 'package:yoloit/core/platform/secure_storage_factory.dart';
 
 part 'global_env_groups_service.g.dart';
@@ -48,7 +50,8 @@ class GlobalEnvGroupsService {
   Future<List<GlobalEnvGroup>>? _loadAllInFlight;
   String? _loadAllCacheSignature;
 
-  static const _metaPath = 'env_groups.json';
+  static String get _metaPath =>
+      p.join(PlatformDirs.instance.configDir, 'env_groups.json');
 
   /// True when the runtime can use a real OS secure credential store.
   /// Web uses plain adapter entries for the demo because browser storage is
@@ -58,8 +61,11 @@ class GlobalEnvGroupsService {
       PlatformCapabilities.current.has(PlatformCapability.processes) &&
       PlatformCapabilities.current.has(PlatformCapability.secureStorage);
 
-  String _valuesPath(String groupId) =>
-      'env_groups_values/${_canonicalGroupId(groupId)}.json';
+  String _valuesPath(String groupId) => p.join(
+    PlatformDirs.instance.configDir,
+    'env_groups_values',
+    '${_canonicalGroupId(groupId)}.json',
+  );
 
   /// Loads all env groups.  Values come from secure storage; only metadata
   /// (id, name, keys) lives in the JSON file.
@@ -67,6 +73,11 @@ class GlobalEnvGroupsService {
   /// Returns a mutable deep copy so callers can edit groups in UI without
   /// mutating the internal cache.
   Future<List<GlobalEnvGroup>> loadAll() async {
+    // Older builds stored the metadata file relative to CWD. If the scoped
+    // config-dir file is missing but a legacy relative file exists, migrate
+    // it before the cache/signature check so the data is visible immediately.
+    await _migrateFromLegacyRelativePath();
+
     final signature = await _storageFileSignature();
     final cached = _loadAllCache;
     if (cached != null && _loadAllCacheSignature == signature) {
@@ -166,6 +177,24 @@ class GlobalEnvGroupsService {
     } catch (_) {
       return null;
     }
+  }
+
+  /// Older builds wrote `env_groups.json` relative to the current working
+  /// directory instead of inside [PlatformDirs.configDir]. If the scoped file
+  /// is missing but a legacy relative file exists, copy it into place.
+  Future<void> _migrateFromLegacyRelativePath() async {
+    try {
+      final legacy = File('env_groups.json');
+      if (!await legacy.exists()) return;
+      final target = File(_metaPath);
+      if (await target.exists()) return;
+      await target.parent.create(recursive: true);
+      await legacy.copy(target.path);
+      debugPrint(
+        '[EnvGroups] Migrated legacy env_groups.json from '
+        '${legacy.absolute.path} to ${target.path}',
+      );
+    } catch (_) {}
   }
 
   /// Persists all groups: metadata to JSON, values to secure storage.
