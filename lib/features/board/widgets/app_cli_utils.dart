@@ -1,4 +1,4 @@
-import 'package:yoloit/features/board/widgets/widget_manifest.dart';
+import 'package:js_widget_runtime/js_widget_runtime.dart';
 
 /// Shared helpers for YoLoIT app CLI (`app:help`, `app:state`, `app:snapshot`).
 class AppCliUtils {

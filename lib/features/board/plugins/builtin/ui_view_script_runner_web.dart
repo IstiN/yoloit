@@ -1,4 +1,4 @@
-import 'package:yoloit/features/board/plugins/builtin/ui_view_bindings.dart';
+import 'package:js_widget_runtime/js_widget_runtime.dart';
 
 /// Web stub for [UiViewScriptRunner].
 ///

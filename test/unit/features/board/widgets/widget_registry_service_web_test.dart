@@ -1,9 +1,10 @@
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:js_widget_runtime/js_widget_runtime.dart';
 import 'package:yoloit/core/platform/file_storage_adapter.dart';
 import 'package:yoloit/core/utils/http_client_base.dart';
-import 'package:yoloit/features/board/widgets/widget_manifest.dart';
+import 'package:yoloit/features/board/widgets/widget_file_reader_web.dart';
 import 'package:yoloit/features/board/widgets/widget_registry_service_web.dart';
 import 'package:yoloit/features/board/widgets/widget_remote_source.dart';
 
@@ -174,10 +175,13 @@ void main() {
 
       final manifest = await WidgetManifest.fromStorage(
         'widgets/weather',
-        adapter: storage,
+        reader: WebWidgetFileReader(adapter: storage),
       );
       expect(manifest, isNotNull);
-      expect(await manifest!.readJs(adapter: storage), '// remote weather');
+      expect(
+        await manifest!.readJs(reader: WebWidgetFileReader(adapter: storage)),
+        '// remote weather',
+      );
     });
 
     test('loadAll falls back to assets when remote source returns nothing',

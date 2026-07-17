@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:js_widget_runtime/js_widget_runtime.dart';
 import 'package:yoloit/features/board/widgets/app_cli_utils.dart';
-import 'package:yoloit/features/board/widgets/widget_manifest.dart';
 
 void main() {
   test('basename normalizes paths with forward slashes', () {

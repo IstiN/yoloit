@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:yoloit/features/board/plugins/builtin/ui_view_field_registry.dart';
-import 'package:yoloit/features/board/plugins/builtin/ui_view_bindings.dart';
+import 'package:js_widget_runtime/js_widget_runtime.dart';
 import 'package:yoloit/features/board/plugins/builtin/ui_view_tree_normalizer.dart';
 
 void main() {

@@ -1,21 +1,17 @@
 // covers-write: board.widget.custom
 import 'package:flutter_test/flutter_test.dart';
+import 'package:js_widget_runtime/js_widget_runtime.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
-import 'package:yoloit/features/board/widgets/js_widget_engine.dart';
 import 'package:yoloit/features/board/widgets/widget_app_registry.dart';
 import 'package:yoloit/features/board/widgets/widget_engine_manager.dart';
-import 'package:yoloit/features/board/widgets/widget_manifest.dart';
 
 class FakeJsWidgetEngine extends JsWidgetEngine {
-  FakeJsWidgetEngine({
-    required super.widgetId,
-    required super.appDir,
-    required super.onRender,
-    required super.onSetTitle,
-    required super.onStorageUpdate,
-    required super.initialStorage,
-    required super.initialTheme,
-  });
+  FakeJsWidgetEngine({required JsRuntimeConfig config})
+    : _runtimeConfig = config,
+      super(config: config);
+
+  final JsRuntimeConfig _runtimeConfig;
 
   bool disposed = false;
   int runCount = 0;
@@ -32,7 +28,7 @@ class FakeJsWidgetEngine extends JsWidgetEngine {
     disposed = true;
   }
 
-  void emitRender(Map<String, dynamic> tree) => onRender(tree);
+  void emitRender(Map<String, dynamic> tree) => _runtimeConfig.onRender(tree);
 }
 
 BoardPanelInstance _panel(String id, {String widgetId = 'weather'}) {
@@ -68,55 +64,23 @@ void main() {
     isSingleFile: false,
   );
 
-  FakeJsWidgetEngine createEngine({
-    required String widgetId,
-    required String appDir,
-    required void Function(Map<String, dynamic> tree) onRender,
-    required void Function(String title) onSetTitle,
-    required void Function(Map<String, dynamic> storage) onStorageUpdate,
-    required Map<String, dynamic> initialStorage,
-    required Map<String, dynamic> initialTheme,
-  }) {
+  FakeJsWidgetEngine createEngine(JsRuntimeConfig config) {
     factoryCalls++;
-    final engine = FakeJsWidgetEngine(
-      widgetId: widgetId,
-      appDir: appDir,
-      onRender: onRender,
-      onSetTitle: onSetTitle,
-      onStorageUpdate: onStorageUpdate,
-      initialStorage: initialStorage,
-      initialTheme: initialTheme,
-    );
+    final engine = FakeJsWidgetEngine(config: config);
     createdEngines.add(engine);
     return engine;
   }
 
   setUp(() {
+    SharedPreferences.setMockInitialValues({});
     appRegistry = WidgetAppRegistry.testInstance();
     createdEngines = [];
     factoryCalls = 0;
     manager = WidgetEngineManager.testInstance(
       appRegistry: appRegistry,
       manifestFinder: (widgetId) async => manifestFor(widgetId),
-      jsLoader: (_) async => 'console.log("hello")',
-      engineFactory:
-          ({
-            required widgetId,
-            required appDir,
-            required onRender,
-            required onSetTitle,
-            required onStorageUpdate,
-            required initialStorage,
-            required initialTheme,
-          }) => createEngine(
-            widgetId: widgetId,
-            appDir: appDir,
-            onRender: onRender,
-            onSetTitle: onSetTitle,
-            onStorageUpdate: onStorageUpdate,
-            initialStorage: initialStorage,
-            initialTheme: initialTheme,
-          ),
+      jsLoader: (_, __) async => 'console.log("hello")',
+      engineFactory: createEngine,
     );
   });
 

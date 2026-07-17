@@ -1,7 +1,8 @@
 import 'dart:io';
 
 import 'package:flutter/services.dart';
-import 'package:yoloit/features/board/widgets/widget_manifest.dart';
+import 'package:js_widget_runtime/js_widget_runtime.dart';
+import 'package:yoloit/features/board/widgets/widget_file_reader_vm.dart';
 
 /// Discovers and manages custom JS apps installed in
 /// `~/.config/yoloit/apps/`.
@@ -13,6 +14,8 @@ class WidgetRegistryService {
   static final instance = WidgetRegistryService._();
 
   List<WidgetManifest>? _cache;
+
+  final WidgetFileReader _reader = VmWidgetFileReader.instance;
 
   String get appsDir {
     final home = Platform.environment['HOME'] ?? '';
@@ -42,7 +45,7 @@ class WidgetRegistryService {
           : id;
       final dir = Directory(resolved);
       if (await dir.exists()) {
-        final m = await WidgetManifest.fromStorage(_normalize(dir.path));
+        final m = await WidgetManifest.fromStorage(_normalize(dir.path), reader: _reader);
         if (m != null) return m;
       }
       return null;
@@ -71,12 +74,12 @@ class WidgetRegistryService {
       // If source is already inside appsDir (same path), skip copy — already installed.
       if (dest.path == dir.path || dest.path == dir.path.trimRight()) {
         invalidate();
-        return WidgetManifest.fromStorage(_normalize(dest.path));
+        return WidgetManifest.fromStorage(_normalize(dest.path), reader: _reader);
       }
       if (dest.existsSync()) dest.deleteSync(recursive: true);
       await _copyDir(dir, dest);
       invalidate();
-      return WidgetManifest.fromStorage(_normalize(dest.path));
+      return WidgetManifest.fromStorage(_normalize(dest.path), reader: _reader);
     } else if (source == FileSystemEntityType.file &&
         sourcePath.endsWith('.js')) {
       final file = File(sourcePath);
@@ -119,7 +122,7 @@ class WidgetRegistryService {
     final results = <WidgetManifest>[];
     await for (final entity in dir.list()) {
       if (entity is Directory) {
-        final m = await WidgetManifest.fromStorage(_normalize(entity.path));
+        final m = await WidgetManifest.fromStorage(_normalize(entity.path), reader: _reader);
         if (m != null) results.add(m);
       } else if (entity is File && entity.path.endsWith('.js')) {
         results.add(WidgetManifest.fromJsFilePath(_normalize(entity.path)));

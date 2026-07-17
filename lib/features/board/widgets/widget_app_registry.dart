@@ -1,5 +1,5 @@
+import 'package:js_widget_runtime/js_widget_runtime.dart';
 import 'package:yoloit/features/board/widgets/app_cli_utils.dart';
-import 'package:yoloit/features/board/widgets/js_widget_engine.dart';
 
 /// Singleton that tracks currently active [JsWidgetEngine] instances.
 /// [WidgetEngineManager] registers and unregisters engines as panel lifecycles change.

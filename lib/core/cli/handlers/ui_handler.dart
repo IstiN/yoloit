@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:yoloit/core/cli/panel_cli_handler.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
-import 'package:yoloit/features/board/plugins/builtin/ui_view_bindings.dart';
+import 'package:js_widget_runtime/js_widget_runtime.dart';
 import 'package:yoloit/features/board/plugins/builtin/ui_view_tree_normalizer.dart';
 import 'package:yoloit/features/board/plugins/builtin/ui_view_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/ui_view_plugin_base.dart';

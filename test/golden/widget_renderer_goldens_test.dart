@@ -12,8 +12,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golden_toolkit/golden_toolkit.dart';
+import 'package:js_widget_runtime/js_widget_runtime.dart';
 import 'package:yoloit/core/theme/app_theme.dart';
-import 'package:yoloit/features/board/widgets/json_widget_renderer.dart';
 
 // ---------------------------------------------------------------------------
 // Helpers

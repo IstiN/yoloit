@@ -1,5 +1,5 @@
 import 'package:yoloit/core/cli/handlers/ui_handler.dart';
-import 'package:yoloit/features/board/plugins/builtin/ui_view_bindings.dart';
+import 'package:js_widget_runtime/js_widget_runtime.dart';
 import 'package:yoloit/core/remote/yoloitd_models.dart';
 import 'package:yoloit/core/remote/yoloitd_panel_catalog.dart';
 import 'package:yoloit/features/board/plugins/builtin/ui_view_plugin.dart';

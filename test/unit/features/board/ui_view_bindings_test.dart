@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:yoloit/features/board/plugins/builtin/ui_view_bindings.dart';
+import 'package:js_widget_runtime/js_widget_runtime.dart';
 
 void main() {
   test('resolveString replaces storage placeholders', () {

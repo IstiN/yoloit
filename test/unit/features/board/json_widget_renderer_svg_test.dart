@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:yoloit/features/board/widgets/json_widget_renderer.dart';
+import 'package:js_widget_runtime/js_widget_runtime.dart';
 
 void main() {
   testWidgets('svg node renders full markup', (tester) async {

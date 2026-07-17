@@ -1,26 +1,23 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 
+import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:js_widget_runtime/js_widget_runtime.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
-import 'package:yoloit/features/board/widgets/js_widget_engine.dart';
 import 'package:yoloit/features/board/widgets/widget_app_registry.dart';
-import 'package:yoloit/features/board/widgets/widget_manifest.dart';
+import 'package:yoloit/features/board/widgets/widget_file_reader.dart';
 import 'package:yoloit/features/board/widgets/widget_registry_service.dart';
+import 'package:yoloit/features/settings/data/widget_permissions_service.dart';
 
-typedef WidgetEngineFactory =
-    JsWidgetEngine Function({
-      required String widgetId,
-      required String appDir,
-      required void Function(Map<String, dynamic> tree) onRender,
-      required void Function(String title) onSetTitle,
-      required void Function(Map<String, dynamic> storage) onStorageUpdate,
-      required Map<String, dynamic> initialStorage,
-      required Map<String, dynamic> initialTheme,
-    });
+typedef WidgetEngineFactory = JsWidgetEngine Function(JsRuntimeConfig config);
 
 typedef WidgetManifestFinder =
     Future<WidgetManifest?> Function(String widgetId);
-typedef WidgetJsLoader = Future<String?> Function(WidgetManifest manifest);
+typedef WidgetJsLoader =
+    Future<String?> Function(WidgetManifest manifest, WidgetFileReader reader);
 
 class WidgetEngineManager {
   WidgetEngineManager._({
@@ -28,10 +25,12 @@ class WidgetEngineManager {
     WidgetManifestFinder? manifestFinder,
     WidgetJsLoader? jsLoader,
     WidgetAppRegistry? appRegistry,
+    WidgetFileReader? reader,
   }) : _engineFactory = engineFactory,
        _manifestFinder = manifestFinder,
        _jsLoader = jsLoader,
-       _appRegistry = appRegistry ?? WidgetAppRegistry.instance;
+       _appRegistry = appRegistry ?? WidgetAppRegistry.instance,
+       _reader = reader ?? defaultWidgetFileReader;
 
   static final instance = WidgetEngineManager._();
   factory WidgetEngineManager.testInstance({
@@ -39,22 +38,30 @@ class WidgetEngineManager {
     WidgetManifestFinder? manifestFinder,
     WidgetJsLoader? jsLoader,
     WidgetAppRegistry? appRegistry,
+    WidgetFileReader? reader,
   }) => WidgetEngineManager._(
     engineFactory: engineFactory,
     manifestFinder: manifestFinder,
     jsLoader: jsLoader,
     appRegistry: appRegistry,
+    reader: reader,
   );
 
   final WidgetEngineFactory? _engineFactory;
   final WidgetManifestFinder? _manifestFinder;
   final WidgetJsLoader? _jsLoader;
   final WidgetAppRegistry _appRegistry;
+  final WidgetFileReader _reader;
+
+  static const _secureStorage = FlutterSecureStorage(
+    mOptions: MacOsOptions(usesDataProtectionKeychain: false),
+  );
 
   BoardCubit? _cubit;
   void setCubit(BoardCubit cubit) => _cubit = cubit;
 
   final Map<String, _WidgetEngineEntry> _engines = {};
+  final Map<String, Map<String, String>> _envVars = {};
 
   Future<JsWidgetEngine?> getOrCreate({
     required String panelId,
@@ -64,6 +71,7 @@ class WidgetEngineManager {
     void Function(Map<String, dynamic> tree)? onRenderUI,
   }) async {
     if (widgetId.trim().isEmpty) return null;
+    await WidgetPermissionsService.instance.load();
 
     final existing = _engines[panelId];
     if (existing != null) {
@@ -93,6 +101,7 @@ class WidgetEngineManager {
 
     late final _WidgetEngineEntry entry;
     final engine = _createEngine(
+      panelId: panelId,
       widgetId: canonicalId,
       appDir: manifest.appDir,
       initialStorage: Map<String, dynamic>.from(
@@ -106,6 +115,7 @@ class WidgetEngineManager {
       },
       onSetTitle: (title) => _updatePanelTitle(panelId, title),
       onStorageUpdate: (storage) => _updatePanelStorage(panelId, storage),
+      onResolveReady: (resolve) {},
     );
 
     entry = _WidgetEngineEntry(
@@ -149,6 +159,7 @@ class WidgetEngineManager {
   void remove(String panelId) {
     final entry = _engines.remove(panelId);
     if (entry == null) return;
+    _envVars.remove(panelId);
     _appRegistry.unregister(entry.widgetId, engine: entry.engine);
     unawaited(entry.engine.dispose());
   }
@@ -159,9 +170,11 @@ class WidgetEngineManager {
       unawaited(entry.engine.dispose());
     }
     _engines.clear();
+    _envVars.clear();
   }
 
   JsWidgetEngine _createEngine({
+    required String panelId,
     required String widgetId,
     required String appDir,
     required void Function(Map<String, dynamic> tree) onRender,
@@ -169,28 +182,142 @@ class WidgetEngineManager {
     required void Function(Map<String, dynamic> storage) onStorageUpdate,
     required Map<String, dynamic> initialStorage,
     required Map<String, dynamic> initialTheme,
+    required void Function(void Function(String id, dynamic value) resolve)
+        onResolveReady,
   }) {
-    final factory = _engineFactory;
-    if (factory != null) {
-      return factory(
-        widgetId: widgetId,
-        appDir: appDir,
-        onRender: onRender,
-        onSetTitle: onSetTitle,
-        onStorageUpdate: onStorageUpdate,
-        initialStorage: initialStorage,
-        initialTheme: initialTheme,
-      );
-    }
-    return JsWidgetEngine(
+    void Function(String id, dynamic value)? resolve;
+    onResolveReady((id, value) => resolve?.call(id, value));
+
+    final config = JsRuntimeConfig(
       widgetId: widgetId,
       appDir: appDir,
+      initialTheme: initialTheme,
+      initialStorage: initialStorage,
       onRender: onRender,
       onSetTitle: onSetTitle,
       onStorageUpdate: onStorageUpdate,
-      initialStorage: initialStorage,
-      initialTheme: initialTheme,
+      isPermissionAllowed: (capability) {
+        if (capability == 'exec') {
+          return WidgetPermissionsService.instance.isAllowed('exec');
+        }
+        return true;
+      },
+      fetchHandler: (id, url, method, headers) async {
+        if (!WidgetPermissionsService.instance.isAllowed('fetch')) {
+          resolve?.call(id, {
+            '__error': 'fetch is disabled in Settings → Apps & Widgets',
+          });
+          return;
+        }
+        await _handleFetch(resolve, id, url, method, headers);
+      },
+      secretsGetHandler: (id, key) async {
+        final fullKey = '_widget_${widgetId}_$key';
+        try {
+          final val = await _secureStorage.read(key: fullKey);
+          resolve?.call(id, val);
+        } catch (_) {
+          resolve?.call(id, null);
+        }
+      },
+      secretsSetHandler: (id, key, value) async {
+        final fullKey = '_widget_${widgetId}_$key';
+        try {
+          if (value == null) {
+            await _secureStorage.delete(key: fullKey);
+          } else {
+            await _secureStorage.write(key: fullKey, value: value.toString());
+          }
+          resolve?.call(id, true);
+        } catch (_) {
+          resolve?.call(id, false);
+        }
+      },
+      loadAssetHandler: (id, path) async {
+        try {
+          final dir = appDir;
+          if (dir.isEmpty) {
+            resolve?.call(id, null);
+            return;
+          }
+          final file = File(
+            '$dir${Platform.pathSeparator}${path.replaceAll('/', Platform.pathSeparator)}',
+          );
+          if (await file.exists()) {
+            final content = await file.readAsString();
+            resolve?.call(id, content);
+          } else {
+            resolve?.call(id, null);
+          }
+        } catch (e) {
+          debugPrint('[WidgetEngineManager] loadAsset error: $e');
+          resolve?.call(id, null);
+        }
+      },
+      execHandler: (id, cmd) async {
+        if (!WidgetPermissionsService.instance.isAllowed('exec')) {
+          resolve?.call(id, {
+            '__error': 'exec is disabled in Settings → Apps & Widgets',
+          });
+          return;
+        }
+        if (!cmd.startsWith('yoloit ') && cmd != 'yoloit') {
+          resolve?.call(id, {'__error': 'Only yoloit commands are allowed'});
+          return;
+        }
+        try {
+          final yoloitBin = '${Platform.environment['HOME']}/.config/yoloit/yoloit';
+          final cmdArgs = cmd.substring('yoloit'.length).trim().split(
+            RegExp(r'\s+'),
+          );
+          final env = Map<String, String>.from(Platform.environment)
+            ..addAll(_envVars[panelId] ?? const {});
+          final result = await Process.run(
+            yoloitBin,
+            cmdArgs.where((s) => s.isNotEmpty).toList(),
+            environment: env,
+          ).timeout(const Duration(seconds: 30));
+          resolve?.call(id, {
+            'stdout': result.stdout.toString(),
+            'stderr': result.stderr.toString(),
+            'exitCode': result.exitCode,
+          });
+        } catch (e) {
+          resolve?.call(id, {'__error': e.toString()});
+        }
+      },
+      onResolveReady: (resolveFn) {
+        resolve = resolveFn;
+        onResolveReady(resolveFn);
+      },
     );
+
+    final factory = _engineFactory;
+    if (factory != null) return factory(config);
+    return JsWidgetEngine(config: config);
+  }
+
+  Future<void> _handleFetch(
+    void Function(String id, dynamic value)? resolve,
+    String id,
+    String url,
+    String method,
+    Map<String, String> headers,
+  ) async {
+    try {
+      final client = HttpClient();
+      final dartReq = await client.openUrl(method, Uri.parse(url));
+      dartReq.headers.set('User-Agent', 'YoLoIT-Widget/1.0');
+      dartReq.headers.set('Accept', 'application/json');
+      headers.forEach((k, v) => dartReq.headers.set(k, v));
+      final res = await dartReq.close().timeout(const Duration(seconds: 15));
+      final body = await res.transform(const Utf8Decoder()).join();
+      client.close();
+      final result = jsonDecode(body);
+      resolve?.call(id, result);
+    } catch (e) {
+      resolve?.call(id, {'__error': e.toString()});
+    }
   }
 
   Future<WidgetManifest?> _findManifest(String widgetId) {
@@ -201,8 +328,8 @@ class WidgetEngineManager {
 
   Future<String?> _readJs(WidgetManifest manifest) {
     final loader = _jsLoader;
-    if (loader != null) return loader(manifest);
-    return manifest.readJs();
+    if (loader != null) return loader(manifest, _reader);
+    return manifest.readJs(reader: _reader);
   }
 
   Future<void> _updatePanelTitle(String panelId, String title) async {
@@ -246,6 +373,10 @@ class WidgetEngineManager {
       }
     }
     return null;
+  }
+
+  void applyEnvVars(String panelId, Map<String, String> envVars) {
+    _envVars[panelId] = {...envVars};
   }
 }
 

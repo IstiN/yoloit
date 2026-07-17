@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:js_widget_runtime/js_widget_runtime.dart';
 import 'package:yoloit/core/cli/panel_cli_handler.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/theme/theme_manager.dart';
@@ -8,11 +9,8 @@ import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/custom_widget_plugin_base.dart';
 import 'package:yoloit/features/board/services/board_offscreen_renderer.dart';
-import 'package:yoloit/features/board/widgets/js_widget_engine.dart';
-import 'package:yoloit/features/board/widgets/json_widget_renderer.dart';
 import 'package:yoloit/features/board/widgets/widget_app_registry.dart';
 import 'package:yoloit/features/board/widgets/widget_engine_manager.dart';
-import 'package:yoloit/features/board/widgets/widget_manifest.dart';
 import 'package:yoloit/features/board/widgets/widget_registry_service.dart';
 import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
 import 'package:yoloit/features/settings/ui/env_group_picker.dart';
@@ -121,7 +119,15 @@ class _CustomWidgetContentState extends State<CustomWidgetContent> {
     super.dispose();
   }
 
-  void _onThemeChanged() => _engine?.updateTheme(_themeColors());
+  void _onThemeChanged() {
+    final engine = _engine;
+    if (engine != null) {
+      engine.updateTheme(_themeColors());
+      if (mounted) {
+        setState(() => _renderer = _buildRenderer(engine));
+      }
+    }
+  }
 
   Map<String, dynamic> _themeColors() {
     final tm = ThemeManager.instance;
@@ -142,6 +148,23 @@ class _CustomWidgetContentState extends State<CustomWidgetContent> {
     };
   }
 
+  JsonWidgetTheme _jsonWidgetTheme() {
+    final tm = ThemeManager.instance;
+    final scheme = tm.theme.extension<AppColorScheme>();
+    final isDark = tm.isDark;
+    final fallback =
+        isDark
+            ? _customWidgetDarkFallbackColors
+            : _customWidgetLightFallbackColors;
+    return JsonWidgetTheme(
+      primary: scheme?.primary ?? fallback.primary,
+      divider: scheme?.border ?? fallback.border,
+      surface: scheme?.surface ?? fallback.surface,
+      text: scheme?.textPrimary ?? fallback.textPrimary,
+      muted: scheme?.textSecondary ?? fallback.textSecondary,
+    );
+  }
+
   String _hexColor(Color c) {
     final r = (c.r * 255).round();
     final g = (c.g * 255).round();
@@ -154,10 +177,13 @@ class _CustomWidgetContentState extends State<CustomWidgetContent> {
     final custom =
         (state['_customEnvVars'] as Map?)?.cast<String, String>() ?? {};
     if (legacy != null && state['_selectedEnvGroups'] == null) {
-      engine.envVars = {...legacy.cast<String, String>(), ...custom};
+      _engineManager.applyEnvVars(
+        widget.panel.id,
+        {...legacy.cast<String, String>(), ...custom},
+      );
       return;
     }
-    engine.envVars = custom;
+    _engineManager.applyEnvVars(widget.panel.id, custom);
     _applyEnvVarsAsync(state, engine: engine);
   }
 
@@ -179,7 +205,7 @@ class _CustomWidgetContentState extends State<CustomWidgetContent> {
               selectedGroups,
             );
     if (!mounted) return;
-    eng.envVars = {...groupVars, ...custom};
+    _engineManager.applyEnvVars(widget.panel.id, {...groupVars, ...custom});
   }
 
   Future<void> _reloadCurrentWidget() => _load(forceReload: true);
@@ -192,6 +218,7 @@ class _CustomWidgetContentState extends State<CustomWidgetContent> {
 
   JsonWidgetRenderer _buildRenderer(JsWidgetEngine engine) {
     return JsonWidgetRenderer(
+      theme: _jsonWidgetTheme(),
       onEvent: (actionId, payload) {
         unawaited(engine.callEvent(actionId, payload));
       },

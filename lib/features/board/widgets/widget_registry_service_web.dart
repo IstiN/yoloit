@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart';
+import 'package:js_widget_runtime/js_widget_runtime.dart';
 import 'package:yoloit/core/platform/file_storage_adapter.dart';
-import 'package:yoloit/features/board/widgets/widget_manifest.dart';
+import 'package:yoloit/features/board/widgets/widget_file_reader_web.dart';
 import 'package:yoloit/features/board/widgets/widget_remote_source.dart';
 
 /// Discovers and manages custom JS apps stored in [FileStorageAdapter]
@@ -14,7 +15,8 @@ class WidgetRegistryService {
   WidgetRegistryService._({
     FileStorageAdapter? adapter,
     this._remoteSource,
-  }) : _adapter = adapter ?? FileStorageAdapter.instance;
+  }) : _adapter = adapter ?? FileStorageAdapter.instance,
+       _reader = WebWidgetFileReader(adapter: adapter);
 
   static final instance = WidgetRegistryService._();
 
@@ -28,6 +30,7 @@ class WidgetRegistryService {
       );
 
   final FileStorageAdapter _adapter;
+  final WidgetFileReader _reader;
   final WidgetRemoteSource? _remoteSource;
 
   static const _prefix = 'widgets/';
@@ -74,7 +77,7 @@ class WidgetRegistryService {
       await _adapter.writeString(path, entry.value);
     }
     invalidate();
-    return WidgetManifest.fromStorage(base, adapter: _adapter);
+    return WidgetManifest.fromStorage(base, reader: _reader);
   }
 
   /// Remove a widget by id.
@@ -98,7 +101,7 @@ class WidgetRegistryService {
     for (final id in ids) {
       final m = await WidgetManifest.fromStorage(
         '$_prefix$id',
-        adapter: _adapter,
+        reader: _reader,
       );
       if (m != null) results.add(m);
     }

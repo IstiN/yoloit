@@ -1,16 +1,14 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:js_widget_runtime/js_widget_runtime.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/ui_view_actions.dart';
-import 'package:yoloit/features/board/plugins/builtin/ui_view_bindings.dart';
-import 'package:yoloit/features/board/plugins/builtin/ui_view_field_registry.dart';
 import 'package:yoloit/features/board/plugins/builtin/ui_view_plugin_base.dart';
 import 'package:yoloit/features/board/plugins/builtin/ui_view_script_runner.dart';
 import 'package:yoloit/features/board/widgets/app_cli_utils.dart';
-import 'package:yoloit/features/board/widgets/json_widget_renderer.dart';
 
 /// Declarative JSON UI panel — renders a widget tree without a JS app runtime.
 class UiViewPlugin extends UiViewPluginBase {

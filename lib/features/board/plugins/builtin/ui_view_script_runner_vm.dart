@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter_js/flutter_js.dart';
-import 'package:yoloit/features/board/plugins/builtin/ui_view_bindings.dart';
+import 'package:js_widget_runtime/js_widget_runtime.dart';
 import 'package:yoloit/features/board/plugins/builtin/ui_view_script_context.dart';
 
 /// Runs small per-action JavaScript snippets for [board.ui] tap handlers.

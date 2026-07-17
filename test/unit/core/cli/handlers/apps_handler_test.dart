@@ -1,12 +1,11 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:js_widget_runtime/js_widget_runtime.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:yoloit/core/cli/handlers/apps_handler.dart';
-import 'package:yoloit/features/board/widgets/js_widget_engine.dart';
 import 'package:yoloit/features/board/widgets/widget_app_registry.dart';
-import 'package:yoloit/features/board/widgets/widget_manifest.dart';
 import 'package:yoloit/features/board/widgets/widget_registry_service.dart';
 
 class _MockWidgetRegistryService extends Mock implements WidgetRegistryService {}

@@ -1,13 +1,13 @@
 // covers: board.widget.custom (shared content widgets)
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:js_widget_runtime/js_widget_runtime.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/custom_widget_plugin_base.dart';
 import 'package:yoloit/features/board/plugins/builtin/custom_widget_plugin_content.dart';
-import 'package:yoloit/features/board/widgets/js_widget_engine.dart';
 import 'package:yoloit/features/board/widgets/widget_engine_manager.dart';
-import 'package:yoloit/features/board/widgets/widget_manifest.dart';
 
 BoardPanelRenderContext _dummyContext({
   ValueChanged<Map<String, dynamic>>? onUpdateState,
@@ -32,22 +32,15 @@ BoardPanelInstance _panel({Map<String, dynamic> state = const {}}) =>
     );
 
 class _FakeJsWidgetEngine extends JsWidgetEngine {
-  _FakeJsWidgetEngine({
-    required super.widgetId,
-    void Function(Map<String, dynamic> tree)? onRender,
-  }) : _onRender = onRender,
-       super(
-          onRender: onRender ?? (_) {},
-          onSetTitle: (_) {},
-          onStorageUpdate: (_) {},
-          initialStorage: const {},
-        );
+  _FakeJsWidgetEngine({required JsRuntimeConfig config})
+    : _onRender = config.onRender,
+      super(config: config);
 
-  final void Function(Map<String, dynamic> tree)? _onRender;
+  final void Function(Map<String, dynamic> tree) _onRender;
 
   @override
   Future<void> run(String widgetJs) async {
-    _onRender?.call({'type': 'text', 'data': 'Hello from widget'});
+    _onRender({'type': 'text', 'data': 'Hello from widget'});
   }
 
   @override
@@ -58,6 +51,9 @@ class _FakeJsWidgetEngine extends JsWidgetEngine {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  SharedPreferences.setMockInitialValues({});
+
   group('QuickSizeButton', () {
     testWidgets('opens menu and calls onResize with selected size', (
       tester,
@@ -226,9 +222,7 @@ void main() {
       tester,
     ) async {
       final engineManagerWithRender = WidgetEngineManager.testInstance(
-        engineFactory: ({required widgetId, required appDir, required onRender, required onSetTitle, required onStorageUpdate, required initialStorage, required initialTheme}) {
-          return _FakeJsWidgetEngine(widgetId: widgetId, onRender: onRender);
-        },
+        engineFactory: (config) => _FakeJsWidgetEngine(config: config),
         manifestFinder: (id) async => WidgetManifest(
           id: id,
           name: 'Test',
@@ -240,7 +234,7 @@ void main() {
           widgetPath: 'widgets/$id',
           isSingleFile: false,
         ),
-        jsLoader: (manifest) async => '// noop',
+        jsLoader: (manifest, reader) async => '// noop',
       );
 
       await tester.pumpWidget(
@@ -255,7 +249,8 @@ void main() {
         ),
       );
 
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
       expect(find.text('Hello from widget'), findsOneWidget);
     });
   });
