@@ -457,7 +457,7 @@ All nodes are plain JSON objects with a `type` field.
 |------|-----------|-------------|
 | `column` | `children`, `mainAxisAlignment`, `crossAxisAlignment`, `mainAxisSize` | Vertical stack |
 | `row` | `children`, `mainAxisAlignment`, `crossAxisAlignment` | Horizontal stack |
-| `stack` | `children`, `alignment` | Overlapping layers |
+| `stack` | `children`, `alignment`, `fit` (`expand`/`loose`) | Overlapping layers |
 | `center` | `child` | Center child |
 | `padding` | `child`, `padding: [left, top, right, bottom]` | Add padding |
 | `expanded` | `child`, `flex` | Flex expand inside row/column |
@@ -473,7 +473,7 @@ All nodes are plain JSON objects with a `type` field.
 | `text` | `data`, `style` | Text label |
 | `icon` | `name`, `color`, `size` | Material icon by name |
 | `divider` | `color`, `height`, `thickness` | Horizontal line |
-| `image` | `url` or `asset`, `fit`, `width`, `height` | Image |
+| `image` | `url`, `asset:<path>`, `file:<path>`, `external:<id>`, `fit`, `width`, `height` | Image |
 
 ### Containers
 
@@ -508,6 +508,12 @@ All nodes are plain JSON objects with a `type` field.
 | Type | Key props | Description |
 |------|-----------|-------------|
 | `chart` | `data`, `color`, `fillColor`, `strokeWidth`, `height` | Sparkline chart (line graph) |
+| `path` | `path` (SVG path data), `progress`, `color`, `strokeWidth`, `cap`, `join` | SVG path stroke |
+| `absoluteFill` / `fill` | `color`, `child` | Expand to fill parent |
+| `video` | `src`, `autoPlay`, `loop`, `controls`, `fit`, `width`, `height` | Video player (media_kit) |
+| `audio` | `src`, `autoPlay`, `loop`, `title` | Audio player (media_kit) |
+
+**Universal effect props** (any node): `offsetX`, `offsetY`, `scale`, `rotation` (radians), `opacity`, `blur`.
 
 ---
 

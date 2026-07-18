@@ -84,7 +84,7 @@ Or create a `board.widget.custom` panel and pick the widget from the catalog.
 
 ## 2. JavaScript API
 
-The runtime injects a global `yoloit` object.
+The runtime injects a global `jsr` object.
 
 ### Rendering
 
@@ -195,8 +195,20 @@ Every node has a `type`. Common nodes:
 | `scroll` | Wraps a single child in a scroll view |
 | `badge`, `chip`, `circleAvatar` | Material widgets |
 | `animatedContainer`, `animatedOpacity`, `animatedPositioned` | Implicit animations |
+| `path` | `path` (SVG path data), `progress`, `color`, `strokeWidth`, `cap`, `join` |
+| `absoluteFill` / `fill` | Expands to fill parent; `color`, `child` |
+| `video` | `src`, `autoPlay`, `loop`, `controls`, `fit`, `width`, `height` |
+| `audio` | `src`, `autoPlay`, `loop`, `title` |
 
 Colors can be hex strings (`#1e293b`) or named colors (`white`, `red`, ...).
+
+### Universal effect props
+
+Every node accepts: `offsetX`, `offsetY`, `scale`, `rotation` (radians), `opacity`, `blur`.
+
+### Image sources
+
+`image` supports `url`, `asset:<path>`, `file:<path>` and `external:<id>` references.
 
 ---
 
@@ -222,7 +234,7 @@ Add to `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  js_widget_runtime: ^0.2.0
+  js_widget_runtime: ^0.3.0
 ```
 
 Then:

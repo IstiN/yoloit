@@ -9,6 +9,9 @@ import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/custom_widget_plugin_base.dart';
 import 'package:yoloit/features/board/services/board_offscreen_renderer.dart';
+import 'package:yoloit/features/board/widgets/js_widget_image_resolver.dart';
+import 'package:yoloit/features/board/widgets/js_widget_media_kit_audio.dart';
+import 'package:yoloit/features/board/widgets/js_widget_media_kit_video.dart';
 import 'package:yoloit/features/board/widgets/widget_app_registry.dart';
 import 'package:yoloit/features/board/widgets/widget_engine_manager.dart';
 import 'package:yoloit/features/board/widgets/widget_registry_service.dart';
@@ -219,6 +222,11 @@ class _CustomWidgetContentState extends State<CustomWidgetContent> {
   JsonWidgetRenderer _buildRenderer(JsWidgetEngine engine) {
     return JsonWidgetRenderer(
       theme: _jsonWidgetTheme(),
+      customBuilders: {
+        'video': buildMediaKitVideo,
+        'audio': buildMediaKitAudio,
+      },
+      imageResolver: createExternalImageResolver(widget.panel.state),
       onEvent: (actionId, payload) {
         unawaited(engine.callEvent(actionId, payload));
       },
@@ -588,7 +596,7 @@ class CustomWidgetCliHandler extends PanelCliHandler {
           data: {
             'widgetId': widgetId,
             'actionId': actionId,
-            if (exported != null) 'state': exported,
+            'state?': exported,
           },
         );
       case 'snapshot':
@@ -610,7 +618,7 @@ class CustomWidgetCliHandler extends PanelCliHandler {
 }
 
 class QuickSizeButton extends StatelessWidget {
-  const QuickSizeButton({required this.onResize});
+  const QuickSizeButton({super.key, required this.onResize});
   final void Function(double w, double h) onResize;
 
   static const _sizes = [
@@ -666,7 +674,7 @@ class QuickSizeButton extends StatelessWidget {
 }
 
 class EnvGearButton extends StatelessWidget {
-  const EnvGearButton({required this.panel, required this.onUpdate});
+  const EnvGearButton({super.key, required this.panel, required this.onUpdate});
   final BoardPanelInstance panel;
 
   /// Called with (selectedGroupIds, customVars)
