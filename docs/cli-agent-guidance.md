@@ -64,8 +64,8 @@ All commands accept a local path (`.`, `./my-app`, `/abs/path`) OR an installed 
 
 **Critical rules (violations cause failures):**
 - ALWAYS wrap widget.js code in an IIFE: `(function(){ ... })();`
-- ALWAYS call `yoloit.onEvent(handler)` — required even if you handle few events.
-- NEVER hardcode colors — use `yoloit.theme.bg`, `yoloit.theme.text`, etc.
+- ALWAYS call `jsr.onEvent(handler)` — required even if you handle few events.
+- NEVER hardcode colors — use `jsr.theme.bg`, `jsr.theme.text`, etc.
 - After editing widget.js → `yoloit app:reload .` (no Flutter restart needed).
 - `app:install` is only needed for distributing/publishing apps to other users.
 

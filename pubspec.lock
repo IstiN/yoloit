@@ -624,12 +624,11 @@ packages:
   js_widget_runtime:
     dependency: "direct main"
     description:
-      path: "."
-      ref: main
-      resolved-ref: "001c1511827826c6e5347fa5d2fae37683866b3b"
-      url: "https://github.com/IstiN/flutter_js_widget_runtime.git"
-    source: git
-    version: "0.1.0"
+      name: js_widget_runtime
+      sha256: ac6b565801713906748e83388960c4aad69e20c54296c78aa5ec17aaa5bb2423
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.0"
   json_annotation:
     dependency: "direct main"
     description:

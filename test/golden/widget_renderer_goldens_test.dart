@@ -1,7 +1,7 @@
 // Golden tests for the native JS widget rendering pipeline.
 //
 // These tests verify that JsonWidgetRenderer correctly converts JSON trees
-// (as produced by JS widgets via yoloit.render()) into Flutter UI.
+// (as produced by JS widgets via jsr.render()) into Flutter UI.
 //
 // The test covers every widget type used by the 4 built-in example widgets:
 // calculator, crypto, stocks, weather — plus error and picker states.
@@ -297,7 +297,7 @@ Map<String, dynamic> _weatherTree() => {
     };
 
 // ---------------------------------------------------------------------------
-// Error state tree (produced by yoloit.showError)
+// Error state tree (produced by jsr.showError)
 // ---------------------------------------------------------------------------
 
 Map<String, dynamic> _errorTree(String msg) => {

@@ -571,7 +571,7 @@ final List<YoloitCliTool> appTools = <YoloitCliTool>[
     command: 'app:state',
     alias: 'apst',
     description:
-        'Read structured state (yoloit.exportState) and visible text from a running app. '
+        'Read structured state (jsr.exportState) and visible text from a running app. '
         'Preferred over app:snapshot for weather, prices, calculator values.',
     group: 'app',
     humanVariants: const {

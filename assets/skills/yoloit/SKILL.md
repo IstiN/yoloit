@@ -278,7 +278,7 @@ graph LR
 - **`app:help`** — Show CLI commands, events, and examples for a specific app. Call this before app:execute when unsure which events exist.
   - params: id*
   - example: `yoloit app:help weather`
-- **`app:state`** — Read structured state (yoloit.exportState) and visible text from a running app. Preferred over app:snapshot for weather, prices, calculator values.
+- **`app:state`** — Read structured state (jsr.exportState) and visible text from a running app. Preferred over app:snapshot for weather, prices, calculator values.
   - params: id*
   - example: `yoloit app:state weather`
 - **`app:execute`** — Execute a JS event in a running app. Weather city change: set_city '{"city":"Grodno"}' then app:state.

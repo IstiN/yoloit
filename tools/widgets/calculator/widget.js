@@ -62,11 +62,11 @@
       ]},
     };
 
-    yoloit.render({
+    jsr.render({
       type:'padding',padding:[12,12,12,12],
       child:{type:'column',crossAxisAlignment:'stretch',children:[display].concat(rows)},
     });
-    yoloit.exportState({
+    jsr.exportState({
       expression: expr,
       preview: _preview(),
       display: _preview() || '0',
@@ -119,7 +119,7 @@
     }
   }
 
-  yoloit.onEvent(handleEvent);
-  yoloit.panel.setTitle('Calculator');
+  jsr.onEvent(handleEvent);
+  jsr.setTitle('Calculator');
   render();
 })();

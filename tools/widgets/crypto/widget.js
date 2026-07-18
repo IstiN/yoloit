@@ -17,12 +17,12 @@
 
   async function load() {
     _chartCoin = null;
-    yoloit.exportState({ loading: true, view: 'list' });
-    yoloit.render({type:'center',child:{type:'circularProgressIndicator',size:24}});
+    jsr.exportState({ loading: true, view: 'list' });
+    jsr.render({type:'center',child:{type:'circularProgressIndicator',size:24}});
     try {
       var ids = COINS.map(function(c){return c.id;}).join(',');
       var url = 'https://api.coingecko.com/api/v3/simple/price?ids='+ids+'&vs_currencies=usd&include_24hr_change=true';
-      var data = await yoloit.fetchJson(url);
+      var data = await jsr.fetchJson(url);
 
       var now = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
       var rows = COINS.map(function(coin) {
@@ -68,7 +68,7 @@
         };
       });
 
-      yoloit.render({
+      jsr.render({
         type:'column',
         crossAxisAlignment:'stretch',
         children:[
@@ -97,18 +97,18 @@
           change24h: info.usd_24h_change || 0,
         };
       }).filter(function(item) { return item != null; });
-      yoloit.exportState({ loading: false, view: 'list', updatedAt: now, prices: exported });
+      jsr.exportState({ loading: false, view: 'list', updatedAt: now, prices: exported });
     } catch(e) {
-      yoloit.exportState({ loading: false, view: 'list', error: e.message || String(e) });
-      yoloit.showError('Could not load prices:\n'+e.message);
+      jsr.exportState({ loading: false, view: 'list', error: e.message || String(e) });
+      jsr.showError('Could not load prices:\n'+e.message);
     }
   }
 
   async function showChart(coin) {
-    yoloit.render({type:'center',child:{type:'circularProgressIndicator',size:24}});
+    jsr.render({type:'center',child:{type:'circularProgressIndicator',size:24}});
     try {
       var url = 'https://api.coingecko.com/api/v3/coins/'+coin.id+'/market_chart?vs_currency=usd&days=1&interval=hourly';
-      var data = await yoloit.fetchJson(url);
+      var data = await jsr.fetchJson(url);
       // data.prices is [[timestamp, price], ...]
       var prices = data.prices.map(function(p){ return p[1]; });
 
@@ -119,7 +119,7 @@
       var chgColor = chg >= 0 ? '#4ade80' : '#f87171';
       var arrow = chg >= 0 ? '▲' : '▼';
 
-      yoloit.render({
+      jsr.render({
         type:'column', crossAxisAlignment:'stretch',
         children:[
           // Header
@@ -158,7 +158,7 @@
         ]
       });
     } catch(e) {
-      yoloit.showError('Could not load chart:\n'+e.message);
+      jsr.showError('Could not load chart:\n'+e.message);
     }
   }
 
@@ -173,8 +173,8 @@
     }
   }
 
-  yoloit.onEvent(handleEvent);
-  yoloit.panel.setTitle('Crypto Prices');
+  jsr.onEvent(handleEvent);
+  jsr.setTitle('Crypto Prices');
   load();
   setInterval(load, 60 * 1000);
 })();

@@ -19,23 +19,23 @@
   }
 
   async function load() {
-    yoloit.exportState({ loading: true, query: city });
-    yoloit.render({type:'center',child:{type:'circularProgressIndicator',size:24}});
+    jsr.exportState({ loading: true, query: city });
+    jsr.render({type:'center',child:{type:'circularProgressIndicator',size:24}});
     try {
       var url = 'https://wttr.in/' + encodeURIComponent(city) + '?format=j1';
-      var data = await yoloit.fetchJson(url);
+      var data = await jsr.fetchJson(url);
       var cur = data.current_condition[0];
       var area = data.nearest_area[0];
       var areaName = area.areaName[0].value;
       var country = area.country[0].value;
       var icon = iconForDesc(cur.weatherDesc[0].value);
 
-      yoloit.panel.setTitle('Weather — ' + areaName);
+      jsr.setTitle('Weather — ' + areaName);
 
       // Fade out then in on city change
       _visible = true;
 
-      yoloit.render({
+      jsr.render({
         type: 'animatedOpacity',
         opacity: _visible ? 1.0 : 0.0,
         duration: 400,
@@ -88,7 +88,7 @@
           }},
         ]
       }});
-      yoloit.exportState({
+      jsr.exportState({
         loading: false,
         query: city,
         city: areaName,
@@ -101,8 +101,8 @@
         description: cur.weatherDesc[0].value,
       });
     } catch(e) {
-      yoloit.exportState({ loading: false, query: city, error: e.message || String(e) });
-      yoloit.showError('Could not load weather:\n'+e.message);
+      jsr.exportState({ loading: false, query: city, error: e.message || String(e) });
+      jsr.showError('Could not load weather:\n'+e.message);
     }
   }
 
@@ -134,13 +134,13 @@
       if (!newCity) return;
       city = newCity;
       _inputCity = city;
-      await yoloit.storage.set('city', city);
+      await jsr.storage.set('city', city);
       await load();
     }
   }
 
-  yoloit.onEvent(handleEvent);
-  yoloit.storage.get('city').then(function(saved) {
+  jsr.onEvent(handleEvent);
+  jsr.storage.get('city').then(function(saved) {
     if (saved) { city = saved; _inputCity = saved; }
     load();
     setInterval(load, 10 * 60 * 1000);

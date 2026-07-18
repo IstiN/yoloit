@@ -86,8 +86,8 @@ yoloit app:run <id>          # run by manifest id
 | `app:run .` fails silently | YoLoIT not running | Start YoLoIT app |
 | `app:logs .` empty | No console.log called yet | Add `console.log('test')` to widget.js |
 | UI not updating after reload | JS syntax error | Check `app:logs .` for error message |
-| `yoloit.render()` not showing | Missing IIFE wrapper | Wrap all code in `(function(){ ... })()` |
-| Button not working | Missing `yoloit.onEvent` | Always register `yoloit.onEvent(function(id){ ... })` |
+| `jsr.render()` not showing | Missing IIFE wrapper | Wrap all code in `(function(){ ... })()` |
+| Button not working | Missing `jsr.onEvent` | Always register `jsr.onEvent(function(id){ ... })` |
 | bash hangs when writing files | Using heredoc `cat << 'EOF'` | Use `printf '...' > file` or `python3 -c "open(...).write(...)"` |
 
 ---
@@ -98,7 +98,7 @@ A YoLoIT app is a self-contained mini-application that runs on the YoLoIT board 
 - **`widget.js`** — JavaScript code (ES5-compatible) that drives the UI and logic
 - **`manifest.json`** — metadata (id, name, icon, permissions)
 
-Apps run in a sandboxed JavaScript engine (JavaScriptCore on macOS/iOS). They communicate with Flutter via the `yoloit.*` API.
+Apps run in a sandboxed JavaScript engine (JavaScriptCore on macOS/iOS). They communicate with Flutter via the `jsr.*` API.
 
 ---
 
@@ -157,19 +157,19 @@ Large apps can be split into multiple JS files. Use the `files` array in `manife
 
 All files are concatenated in order and evaluated as a single script. Single-file apps (no `files` field) continue to work unchanged.
 
-### `yoloit.include('path')` — Static Inlining
+### `jsr.include('path')` — Static Inlining
 
-You can also inline files inside any JS file using `yoloit.include('relative/path')`. This is a **preprocessor** directive — it is replaced with the file's contents before the JS engine sees the code:
+You can also inline files inside any JS file using `jsr.include('relative/path')`. This is a **preprocessor** directive — it is replaced with the file's contents before the JS engine sees the code:
 
 ```javascript
 // lib/utils.js
-yoloit.include('lib/helpers.js');   // inlined before eval
+jsr.include('lib/helpers.js');   // inlined before eval
 
 function formatDate(ts) { /* ... */ }
 ```
 
 - Paths are relative to the app's folder
-- Supports subdirectories: `yoloit.include('lib/api/client.js')`
+- Supports subdirectories: `jsr.include('lib/api/client.js')`
 - Maximum recursion depth: 5 levels
 - If the file is not found, replaced with a comment (no crash)
 
@@ -184,14 +184,14 @@ Always wrap your app in an IIFE to avoid polluting the global scope:
   // Your app code here
 
   function render() {
-    yoloit.render({ /* UI tree */ });
+    jsr.render({ /* UI tree */ });
   }
 
   function handleEvent(actionId, payload) {
     // Handle button taps, textField submissions, etc.
   }
 
-  yoloit.onEvent(handleEvent);
+  jsr.onEvent(handleEvent);
   render();
 })();
 ```
@@ -200,11 +200,11 @@ Always wrap your app in an IIFE to avoid polluting the global scope:
 
 ## The `yoloit` API
 
-### `yoloit.render(tree)`
+### `jsr.render(tree)`
 Replaces the entire panel UI with a new widget tree (JSON).
 
 ```javascript
-yoloit.render({
+jsr.render({
   type: 'column',
   children: [
     { type: 'text', data: 'Hello World' },
@@ -215,11 +215,11 @@ yoloit.render({
 
 ---
 
-### `yoloit.onEvent(handler)`
+### `jsr.onEvent(handler)`
 Register a handler for all UI events (button taps, textField changes, etc.).
 
 ```javascript
-yoloit.onEvent(function(actionId, payload) {
+jsr.onEvent(function(actionId, payload) {
   if (actionId === 'btn_click') {
     // handle it
   }
@@ -231,18 +231,18 @@ yoloit.onEvent(function(actionId, payload) {
 
 ---
 
-### `yoloit.fetchJson(url, opts)` → Promise
+### `jsr.fetchJson(url, opts)` → Promise
 HTTP fetch via Dart (bypasses CORS, uses native networking).
 
 ```javascript
-yoloit.fetchJson('https://api.example.com/data', {
+jsr.fetchJson('https://api.example.com/data', {
   method: 'GET',           // 'GET' | 'POST' | 'PUT' | 'DELETE'
   headers: { 'Authorization': 'Bearer token' }
 }).then(function(data) {
   // data is already parsed JSON
   render(data);
 }).catch(function(err) {
-  yoloit.showError('Failed: ' + err);
+  jsr.showError('Failed: ' + err);
 });
 ```
 
@@ -250,48 +250,48 @@ Requires `"network": true` in manifest.json.
 
 ---
 
-### `yoloit.storage` — Persistent Storage
+### `jsr.storage` — Persistent Storage
 Per-app persistent storage (survives hot reload, hot restart, app restarts). Plain JSON values.
 
 ```javascript
 // Save a value
-yoloit.storage.set('city', 'London');
-yoloit.storage.set('settings', { theme: 'dark', count: 42 });
+jsr.storage.set('city', 'London');
+jsr.storage.set('settings', { theme: 'dark', count: 42 });
 
 // Read a value (returns a Promise)
-yoloit.storage.get('city').then(function(city) {
+jsr.storage.get('city').then(function(city) {
   if (city) render(city);
 });
 
 // Delete a value
-yoloit.storage.delete('city');
+jsr.storage.delete('city');
 ```
 
 ---
 
-### `yoloit.secrets` — Secure Storage
+### `jsr.secrets` — Secure Storage
 Per-app encrypted secure storage (uses platform Keychain/Keystore). For API keys, tokens, passwords.
 
 ```javascript
 // Save a secret
-yoloit.secrets.set('api_key', 'sk-abc123');
+jsr.secrets.set('api_key', 'sk-abc123');
 
 // Read a secret (returns a Promise)
-yoloit.secrets.get('api_key').then(function(key) {
+jsr.secrets.get('api_key').then(function(key) {
   if (key) makeApiCall(key);
 });
 
 // Delete a secret
-yoloit.secrets.delete('api_key');
+jsr.secrets.delete('api_key');
 ```
 
 ---
 
-### `yoloit.theme` — Current Theme Colors
+### `jsr.theme` — Current Theme Colors
 Reactive theme object. Always use these colors instead of hardcoded hex values so your app respects light/dark mode.
 
 ```javascript
-var t = yoloit.theme;
+var t = jsr.theme;
 // t.isDark   — boolean
 // t.bg       — main background color hex (e.g. '#0f172a')
 // t.surface  — card/panel surface color
@@ -303,32 +303,32 @@ var t = yoloit.theme;
 
 ---
 
-### `yoloit.onThemeChange(callback)`
+### `jsr.onThemeChange(callback)`
 Subscribe to theme changes (when user toggles dark/light mode).
 
 ```javascript
-yoloit.onThemeChange(function(theme) {
-  // theme has same fields as yoloit.theme
+jsr.onThemeChange(function(theme) {
+  // theme has same fields as jsr.theme
   render(); // re-render with new colors
 });
 ```
 
 ---
 
-### `yoloit.panel.setTitle(title)`
+### `jsr.setTitle(title)`
 Update the panel header title.
 
 ```javascript
-yoloit.panel.setTitle('Weather — London');
+jsr.setTitle('Weather — London');
 ```
 
 ---
 
-### `yoloit.exportState(object)`
+### `jsr.exportState(object)`
 Export structured data for `yoloit app:state` (preferred for AI agents).
 
 ```javascript
-yoloit.exportState({
+jsr.exportState({
   loading: false,
   city: 'Moscow',
   tempC: '18',
@@ -341,27 +341,27 @@ Run `yoloit app:help <id>` to print the merged help.
 
 ---
 
-### `yoloit.showError(message)`
+### `jsr.showError(message)`
 Display an error overlay in the panel.
 
 ```javascript
-yoloit.showError('Failed to load data');
+jsr.showError('Failed to load data');
 ```
 
 ---
 
-### `yoloit.loadAsset(path)` → Promise\<string|null\>
+### `jsr.loadAsset(path)` → Promise\<string|null\>
 Reads a file from the app's folder and returns its text content as a string. Returns `null` if the file is not found.
 
 ```javascript
-yoloit.loadAsset('logo.svg').then(function(svgText) {
+jsr.loadAsset('logo.svg').then(function(svgText) {
   if (svgText) {
     // use svgText
   }
 });
 
 // Supports subdirectories
-yoloit.loadAsset('assets/config.json').then(function(json) {
+jsr.loadAsset('assets/config.json').then(function(json) {
   var config = JSON.parse(json);
 });
 ```
@@ -404,11 +404,11 @@ function gameLoop(elapsed) {
 requestAnimationFrame(gameLoop);
 ```
 
-### `yoloit.exec(cmd)` → Promise
+### `jsr.exec(cmd)` → Promise
 Run a yoloit CLI command from the widget. Returns `{stdout, stderr, exitCode}`. **Security: only `yoloit` commands are allowed.**
 
 ```javascript
-var result = await yoloit.exec('yoloit note:add "Hello from widget"');
+var result = await jsr.exec('yoloit note:add "Hello from widget"');
 console.log(result.stdout); // command output
 console.log(result.exitCode); // 0 = success
 ```
@@ -429,14 +429,14 @@ The `gestureDetector` node fires events with coordinates:
 | `onPanEnd` | `{velocityX, velocityY}` |
 
 ```javascript
-yoloit.render({
+jsr.render({
   type: 'gestureDetector',
   onTapDown: 'tap',
   onPanUpdate: 'drag',
   child: {type: 'container', width: 300, height: 200}
 });
 
-yoloit.onEvent(function(action, payload) {
+jsr.onEvent(function(action, payload) {
   if (action === 'drag') {
     playerX = payload.x;
     playerY = payload.y;
@@ -626,10 +626,10 @@ mainAxisSize: 'max' | 'min'
 ```javascript
 (function() {
   var count = 0;
-  var t = yoloit.theme;
+  var t = jsr.theme;
 
   function render() {
-    yoloit.render({
+    jsr.render({
       type: 'center',
       child: {
         type: 'column',
@@ -652,23 +652,23 @@ mainAxisSize: 'max' | 'min'
     });
   }
 
-  yoloit.onEvent(function(actionId) {
+  jsr.onEvent(function(actionId) {
     if (actionId === 'increment') {
       count++;
-      yoloit.storage.set('count', count);
+      jsr.storage.set('count', count);
       render();
     }
   });
 
-  yoloit.onThemeChange(function(theme) {
+  jsr.onThemeChange(function(theme) {
     t = theme;
     render();
   });
 
-  yoloit.panel.setTitle('Counter');
+  jsr.setTitle('Counter');
 
   // Restore saved count
-  yoloit.storage.get('count').then(function(saved) {
+  jsr.storage.get('count').then(function(saved) {
     if (saved !== null) count = saved;
     render();
   });
@@ -685,15 +685,15 @@ mainAxisSize: 'max' | 'min'
   var loading = true;
 
   function render() {
-    var t = yoloit.theme;
+    var t = jsr.theme;
     if (loading) {
-      yoloit.render({
+      jsr.render({
         type: 'center',
         child: { type: 'text', data: 'Loading...', style: { color: t.muted } }
       });
       return;
     }
-    yoloit.render({
+    jsr.render({
       type: 'padding',
       padding: [16, 16, 16, 16],
       child: {
@@ -712,24 +712,24 @@ mainAxisSize: 'max' | 'min'
   function load() {
     loading = true;
     render();
-    yoloit.fetchJson('https://jsonplaceholder.typicode.com/users')
+    jsr.fetchJson('https://jsonplaceholder.typicode.com/users')
       .then(function(users) {
         data = users;
         loading = false;
         render();
       })
       .catch(function(err) {
-        yoloit.showError('Error: ' + err);
+        jsr.showError('Error: ' + err);
         loading = false;
         render();
       });
   }
 
-  yoloit.onEvent(function(actionId) {
+  jsr.onEvent(function(actionId) {
     if (actionId === 'refresh') load();
   });
 
-  yoloit.panel.setTitle('Users');
+  jsr.setTitle('Users');
   load();
 })();
 ```
@@ -816,11 +816,11 @@ yoloit app:run calculator
 
 ## Tips for AI Agents
 
-1. **Always use `yoloit.theme` colors** — never hardcode hex. Users switch dark/light mode.
+1. **Always use `jsr.theme` colors** — never hardcode hex. Users switch dark/light mode.
 2. **Wrap everything in an IIFE** — `(function(){ ... })()` — functions inside are NOT global.
-3. **`yoloit.onEvent` is mandatory** — register it even if you handle few events; the engine uses `yoloit._handler`.
-4. **Storage is async** — `yoloit.storage.get()` returns a Promise. Always use `.then()` before using the value.
-5. **`yoloit.render()` replaces everything** — not additive; always render the complete UI tree.
+3. **`jsr.onEvent` is mandatory** — register it even if you handle few events; the engine uses `jsr._handler`.
+4. **Storage is async** — `jsr.storage.get()` returns a Promise. Always use `.then()` before using the value.
+5. **`jsr.render()` replaces everything** — not additive; always render the complete UI tree.
 6. **After editing `widget.js` → `yoloit app:reload .`** — no Flutter restart needed.
 7. **Network requires manifest flag** — set `"network": true` or `fetchJson` silently fails.
 8. **Timer cleanup** — save `setInterval` IDs and `clearInterval` when done.

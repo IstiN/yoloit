@@ -12,7 +12,7 @@
 
   async function fetchQuote(sym) {
     var url = 'https://query2.finance.yahoo.com/v8/finance/chart/' + sym + '?interval=1d&range=5d';
-    var data = await yoloit.fetchJson(url, {
+    var data = await jsr.fetchJson(url, {
       headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' }
     });
     var meta = data.chart.result[0].meta;
@@ -26,8 +26,8 @@
 
   async function load() {
     _chartSymbol = null;
-    yoloit.exportState({ loading: true, symbols: symbols, view: 'list' });
-    yoloit.render({type:'center',child:{type:'circularProgressIndicator',size:24}});
+    jsr.exportState({ loading: true, symbols: symbols, view: 'list' });
+    jsr.render({type:'center',child:{type:'circularProgressIndicator',size:24}});
     try {
       var quotes = await Promise.all(symbols.map(fetchQuote));
       var now = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
@@ -59,7 +59,7 @@
         };
       });
 
-      yoloit.render({
+      jsr.render({
         type: 'column', crossAxisAlignment: 'stretch',
         children: [
           {type:'padding', padding:[12,12,12,4], child:{
@@ -81,7 +81,7 @@
           }},
         ]
       });
-      yoloit.exportState({
+      jsr.exportState({
         loading: false,
         view: 'list',
         symbols: symbols,
@@ -97,16 +97,16 @@
         }),
       });
     } catch(e) {
-      yoloit.exportState({ loading: false, symbols: symbols, error: e.message || String(e) });
-      yoloit.showError('Could not load stocks:\n' + e.message);
+      jsr.exportState({ loading: false, symbols: symbols, error: e.message || String(e) });
+      jsr.showError('Could not load stocks:\n' + e.message);
     }
   }
 
   async function showChart(sym) {
-    yoloit.render({type:'center',child:{type:'circularProgressIndicator',size:24}});
+    jsr.render({type:'center',child:{type:'circularProgressIndicator',size:24}});
     try {
       var url = 'https://query2.finance.yahoo.com/v8/finance/chart/' + sym + '?interval=5m&range=1d';
-      var data = await yoloit.fetchJson(url, {
+      var data = await jsr.fetchJson(url, {
         headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' }
       });
       var result = data.chart.result[0];
@@ -125,7 +125,7 @@
       var low   = (q.low   && q.low.length)   ? Math.min.apply(null, q.low.filter(function(v){return v!=null;})).toFixed(2)   : '—';
       var close = filtered.length ? filtered[filtered.length-1].toFixed(2) : '—';
 
-      yoloit.render({
+      jsr.render({
         type:'column', crossAxisAlignment:'stretch',
         children:[
           // Header row
@@ -174,7 +174,7 @@
         ]
       });
     } catch(e) {
-      yoloit.showError('Could not load chart:\n' + e.message);
+      jsr.showError('Could not load chart:\n' + e.message);
     }
   }
 
@@ -191,7 +191,7 @@
                       .filter(function(s){ return s.length > 0; });
       if (parsed.length > 0) {
         symbols = parsed;
-        yoloit.storage.set('symbols', symbols);
+        jsr.storage.set('symbols', symbols);
         load();
       }
       return;
@@ -204,9 +204,9 @@
     }
   }
 
-  yoloit.onEvent(handleEvent);
-  yoloit.panel.setTitle('Stocks');
-  yoloit.storage.get('symbols').then(function(saved) {
+  jsr.onEvent(handleEvent);
+  jsr.setTitle('Stocks');
+  jsr.storage.get('symbols').then(function(saved) {
     if (saved && Array.isArray(saved)) symbols = saved;
     load();
     setInterval(load, 5 * 60 * 1000);

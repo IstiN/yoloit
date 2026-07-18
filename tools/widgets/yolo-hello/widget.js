@@ -24,7 +24,7 @@
     var bg = hslToHex(hue, 70, 45);
     var textColor = '#ffffff';
 
-    yoloit.render({
+    jsr.render({
       type: 'center',
       child: {type: 'column', mainAxisSize: 'min', crossAxisAlignment: 'center', children: [
         // Animated bouncing box
@@ -109,7 +109,7 @@
     }
   }
 
-  yoloit.onEvent(handleEvent);
-  yoloit.panel.setTitle('Hello Animated');
+  jsr.onEvent(handleEvent);
+  jsr.setTitle('Hello Animated');
   render();
 })();

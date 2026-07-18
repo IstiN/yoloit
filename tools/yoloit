@@ -1946,7 +1946,7 @@ commands = [{'group': 'app',
   'aliases': []},
  {'group': 'app',
   'name': 'app:state',
-  'description': 'Read structured state (yoloit.exportState) and visible text from a running app. Preferred over app:snapshot for weather, prices, calculator values.',
+  'description': 'Read structured state (jsr.exportState) and visible text from a running app. Preferred over app:snapshot for weather, prices, calculator values.',
   'params': [['id', 'App id', True]],
   'example': 'yoloit app:state weather',
   'aliases': []},
@@ -5165,10 +5165,10 @@ EOF
         cat > "${widget_dir}/widget.js" <<'JSEOF'
 // Network widget template — native Flutter rendering
 (function() {
-  yoloit.panel.setTitle('Network Widget');
+  jsr.setTitle('Network Widget');
 
   function showLoading() {
-    yoloit.render({type: 'center', child: {
+    jsr.render({type: 'center', child: {
       type: 'column', mainAxisSize: 'min', children: [
         {type: 'circularProgressIndicator', size: 24, strokeWidth: 2},
         {type: 'sizedBox', height: 12},
@@ -5179,7 +5179,7 @@ EOF
 
   function showData(data) {
     var text = JSON.stringify(data, null, 2);
-    yoloit.render({
+    jsr.render({
       type: 'padding', padding: [12, 12, 12, 12],
       child: {type: 'text', data: text, style: {color: '#e2e8f0', fontSize: 11, fontFamily: 'monospace'}},
     });
@@ -5188,10 +5188,10 @@ EOF
   async function load() {
     showLoading();
     try {
-      var data = await yoloit.fetchJson('https://httpbin.org/json');
+      var data = await jsr.fetchJson('https://httpbin.org/json');
       showData(data);
     } catch(e) {
-      yoloit.showError(e.message);
+      jsr.showError(e.message);
     }
   }
 
@@ -5204,14 +5204,14 @@ JSEOF
         cat > "${widget_dir}/widget.js" <<'JSEOF'
 // Yoloit boards widget template — native Flutter rendering
 (function() {
-  yoloit.panel.setTitle('Boards');
+  jsr.setTitle('Boards');
 
   async function load() {
-    yoloit.render({type: 'center', child: {type: 'circularProgressIndicator', size: 24}});
+    jsr.render({type: 'center', child: {type: 'circularProgressIndicator', size: 24}});
     try {
-      var data = await yoloit.fetchJson('http://localhost:PORT/api/boards');
+      var data = await jsr.fetchJson('http://localhost:PORT/api/boards');
       var boards = data.boards || [];
-      yoloit.render({
+      jsr.render({
         type: 'column', crossAxisAlignment: 'stretch',
         children: boards.length === 0
           ? [{type: 'center', child: {type: 'text', data: 'No boards', style: {color: '#64748b'}}}]
@@ -5226,7 +5226,7 @@ JSEOF
             }),
       });
     } catch(e) {
-      yoloit.showError(e.message);
+      jsr.showError(e.message);
     }
   }
 
@@ -5238,8 +5238,8 @@ JSEOF
         cat > "${widget_dir}/widget.js" <<'JSEOF'
 // Basic widget template — native Flutter rendering
 (function() {
-  yoloit.panel.setTitle('My Widget');
-  yoloit.render({
+  jsr.setTitle('My Widget');
+  jsr.render({
     type: 'center',
     child: {
       type: 'padding', padding: [24, 24, 24, 24],

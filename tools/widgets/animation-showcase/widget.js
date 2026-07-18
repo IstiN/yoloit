@@ -19,24 +19,24 @@
     var items = demos.map(function(d) {
       return {type:'inkWell', onTap:'go_'+d.id, borderRadius:10,
         child:{type:'animatedContainer', duration:200, curve:'easeOut',
-          decoration:{color: yoloit.theme.surface, borderRadius:10, borderColor: yoloit.theme.border, borderWidth:1},
+          decoration:{color: jsr.theme.surface, borderRadius:10, borderColor: jsr.theme.border, borderWidth:1},
           padding:[12,12,12,12], margin:[0,0,0,8],
           child:{type:'row', crossAxisAlignment:'center', children:[
             {type:'text', data:d.icon, style:{fontSize:24}},
             {type:'sizedBox', width:12},
             {type:'expanded', child:{type:'column', crossAxisAlignment:'start', children:[
-              {type:'text', data:d.title, style:{color: yoloit.theme.text, fontSize:14, fontWeight:'w600'}},
-              {type:'text', data:d.desc, style:{color: yoloit.theme.muted, fontSize:11}},
+              {type:'text', data:d.title, style:{color: jsr.theme.text, fontSize:14, fontWeight:'w600'}},
+              {type:'text', data:d.desc, style:{color: jsr.theme.muted, fontSize:11}},
             ]}},
-            {type:'icon', name:'arrow_forward', size:16, color: yoloit.theme.muted},
+            {type:'icon', name:'arrow_forward', size:16, color: jsr.theme.muted},
           ]},
         },
       };
     });
 
-    yoloit.render({type:'column', crossAxisAlignment:'stretch', children:[
+    jsr.render({type:'column', crossAxisAlignment:'stretch', children:[
       {type:'padding', padding:[12,16,12,8], child:{type:'text', data:'🎬 Animation Demos',
-        style:{color: yoloit.theme.text, fontSize:18, fontWeight:'w700'}}},
+        style:{color: jsr.theme.text, fontSize:18, fontWeight:'w700'}}},
       {type:'expanded', child:{type:'listView', shrinkWrap:false, padding:[12,0,12,12], children:items}},
     ]});
   }
@@ -44,11 +44,11 @@
   // ── Scene: Fade ────────────────────────────────────────────────────────
   var fadeVisible = true;
   function renderFade() {
-    yoloit.render(sceneWrap('Fade In/Out', {
+    jsr.render(sceneWrap('Fade In/Out', {
       type:'column', mainAxisAlignment:'center', crossAxisAlignment:'center', children:[
         {type:'animatedOpacity', duration:500, curve:'easeInOut', opacity: fadeVisible ? 1.0 : 0.0,
           child:{type:'container', width:150, height:150,
-            decoration:{color: yoloit.theme.accent, borderRadius:20},
+            decoration:{color: jsr.theme.accent, borderRadius:20},
             child:{type:'center', child:{type:'text', data:'👻', style:{fontSize:48}}}}},
         {type:'sizedBox', height:24},
         {type:'button', text: fadeVisible ? 'Fade Out' : 'Fade In', onTap:'toggle_fade'},
@@ -65,7 +65,7 @@
   ];
   function renderMorph() {
     var cfg = morphConfigs[morphState];
-    yoloit.render(sceneWrap('Container Morph', {
+    jsr.render(sceneWrap('Container Morph', {
       type:'column', mainAxisAlignment:'center', crossAxisAlignment:'center', children:[
         {type:'animatedContainer', duration:600, curve:'elasticIn',
           width:cfg.w, height:cfg.h,
@@ -75,7 +75,7 @@
         {type:'button', text:'Morph →', onTap:'morph_next'},
         {type:'sizedBox', height:8},
         {type:'text', data:'State: '+(morphState+1)+'/'+morphConfigs.length,
-          style:{color: yoloit.theme.muted, fontSize:11}},
+          style:{color: jsr.theme.muted, fontSize:11}},
       ]
     }));
   }
@@ -83,11 +83,11 @@
   // ── Scene: Bounce ──────────────────────────────────────────────────────
   var ballY = 0, ballVel = 0, ballActive = false;
   function renderBounce() {
-    yoloit.render(sceneWrap('Bouncing Ball', {
+    jsr.render(sceneWrap('Bouncing Ball', {
       type:'column', crossAxisAlignment:'center', children:[
         {type:'sizedBox', height:20},
         {type:'container', width:200, height:200,
-          decoration:{borderColor: yoloit.theme.border, borderWidth:1, borderRadius:12},
+          decoration:{borderColor: jsr.theme.border, borderWidth:1, borderRadius:12},
           child:{type:'stack', children:[
             // Ball
             {type:'animatedPositioned', duration:16, curve:'linear',
@@ -95,7 +95,7 @@
               child:{type:'container', width:40, height:40,
                 decoration:{color:'#f59e0b', borderRadius:20}}},
             // Ground
-            {type:'container', width:200, height:4, decoration:{color: yoloit.theme.border},
+            {type:'container', width:200, height:4, decoration:{color: jsr.theme.border},
               positioned:{left:0, bottom:0}},
           ]}},
         {type:'sizedBox', height:16},
@@ -133,7 +133,7 @@
             style:{color:'#ffffff', fontSize:20, fontWeight:'w700'}}}},
       });
     }
-    yoloit.render(sceneWrap('Card Stack', {
+    jsr.render(sceneWrap('Card Stack', {
       type:'column', crossAxisAlignment:'center', children:[
         {type:'sizedBox', height:16},
         {type:'container', width:260, height:180,
@@ -147,9 +147,9 @@
   // ── Scene: Drag ────────────────────────────────────────────────────────
   var dragX = 100, dragY = 100;
   function renderDrag() {
-    yoloit.render(sceneWrap('Drag & Follow', {
+    jsr.render(sceneWrap('Drag & Follow', {
       type:'container', width:280, height:250,
-      decoration:{borderColor: yoloit.theme.border, borderWidth:1, borderRadius:12},
+      decoration:{borderColor: jsr.theme.border, borderWidth:1, borderRadius:12},
       child:{type:'stack', children:[
         {type:'animatedPositioned', duration:80, curve:'easeOut',
           left: dragX - 25, top: dragY - 25,
@@ -167,7 +167,7 @@
   // ── Scene: Pulse ───────────────────────────────────────────────────────
   var pulseScale = 1.0, pulseGrowing = true, pulseActive = false;
   function renderPulse() {
-    yoloit.render(sceneWrap('Pulse Animation', {
+    jsr.render(sceneWrap('Pulse Animation', {
       type:'column', mainAxisAlignment:'center', crossAxisAlignment:'center', children:[
         {type:'animatedContainer', duration:50, curve:'linear',
           width: 80 * pulseScale, height: 80 * pulseScale,
@@ -204,7 +204,7 @@
     return '#' + f(0) + f(8) + f(4);
   }
   function renderColors() {
-    yoloit.render(sceneWrap('Color Transitions', {
+    jsr.render(sceneWrap('Color Transitions', {
       type:'column', mainAxisAlignment:'center', crossAxisAlignment:'center', children:[
         {type:'animatedContainer', duration:100, curve:'linear',
           width:200, height:120, decoration:{borderRadius:16,
@@ -212,7 +212,7 @@
               begin:'topLeft', end:'bottomRight'}},
           child:{type:'center', child:{type:'text', data:'🌈',style:{fontSize:40}}}},
         {type:'sizedBox', height:16},
-        {type:'text', data:'Hue: '+Math.round(colorHue)+'°', style:{color: yoloit.theme.muted, fontSize:12}},
+        {type:'text', data:'Hue: '+Math.round(colorHue)+'°', style:{color: jsr.theme.muted, fontSize:12}},
         {type:'sizedBox', height:8},
         {type:'button', text: colorActive ? '⏹ Stop' : '▶ Start', onTap:'color_toggle'},
       ]
@@ -232,14 +232,14 @@
         {type:'inkWell', onTap:'go_menu', borderRadius:6,
           child:{type:'padding', padding:[8,6,8,6],
             child:{type:'row', mainAxisSize:'min', children:[
-              {type:'icon', name:'arrow_back', size:16, color: yoloit.theme.accent},
+              {type:'icon', name:'arrow_back', size:16, color: jsr.theme.accent},
               {type:'sizedBox', width:4},
-              {type:'text', data:'Menu', style:{color: yoloit.theme.accent, fontSize:12}},
+              {type:'text', data:'Menu', style:{color: jsr.theme.accent, fontSize:12}},
             ]}}},
         {type:'sizedBox', width:8},
-        {type:'text', data:title, style:{color: yoloit.theme.text, fontSize:14, fontWeight:'w600'}},
+        {type:'text', data:title, style:{color: jsr.theme.text, fontSize:14, fontWeight:'w600'}},
       ]}},
-      {type:'divider', color: yoloit.theme.border},
+      {type:'divider', color: jsr.theme.border},
       {type:'expanded', child:{type:'center', child: content}},
     ]};
   }
@@ -297,7 +297,7 @@
     colorActive = false;
   }
 
-  yoloit.onEvent(handleEvent);
-  yoloit.panel.setTitle('🎬 Animation Showcase');
+  jsr.onEvent(handleEvent);
+  jsr.setTitle('🎬 Animation Showcase');
   renderMenu();
 })();

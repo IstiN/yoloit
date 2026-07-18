@@ -7,7 +7,7 @@ imports the package).
 A widget is just:
 
 * a `manifest.json` with metadata, and
-* a `widget.js` entry file that calls `yoloit.render(tree)` whenever its UI
+* a `widget.js` entry file that calls `jsr.render(tree)` whenever its UI
   should change.
 
 The package is hosted at
@@ -35,10 +35,10 @@ Create a directory, e.g. `~/.config/yoloit/apps/hello/`:
 **widget.js**
 
 ```js
-var name = yoloit.storage.get('name') || 'World';
+var name = jsr.storage.get('name') || 'World';
 
 function render() {
-  yoloit.render({
+  jsr.render({
     type: 'column',
     mainAxisAlignment: 'center',
     crossAxisAlignment: 'center',
@@ -62,9 +62,9 @@ function render() {
 
 function handleEvent(actionId, payload) {
   if (actionId === 'greet') {
-    var live = yoloit.storage.get('nameInput');
+    var live = jsr.storage.get('nameInput');
     name = live || payload.value || name;
-    yoloit.storage.set('name', name);
+    jsr.storage.set('name', name);
     render();
   }
 }
@@ -89,14 +89,14 @@ The runtime injects a global `yoloit` object.
 ### Rendering
 
 ```js
-yoloit.render(tree); // tree is a JSON widget tree (see section 3)
+jsr.render(tree); // tree is a JSON widget tree (see section 3)
 ```
 
 ### Persistent per-panel storage
 
 ```js
-yoloit.storage.get(key);           // returns value or undefined
-yoloit.storage.set(key, value);    // value must be JSON-serialisable
+jsr.storage.get(key);           // returns value or undefined
+jsr.storage.set(key, value);    // value must be JSON-serialisable
 ```
 
 Storage is automatically restored when the widget restarts.
@@ -104,20 +104,20 @@ Storage is automatically restored when the widget restarts.
 ### Theme
 
 ```js
-var t = yoloit.theme; // { isDark, bg, surface, border, accent, text, muted }
+var t = jsr.theme; // { isDark, bg, surface, border, accent, text, muted }
 ```
 
-The runtime pushes a new `theme` object and calls `yoloit._onThemeChange` when
+The runtime pushes a new `theme` object and calls `jsr._onThemeChange` when
 the host theme changes. You can listen to it:
 
 ```js
-yoloit._onThemeChange = function(theme) { render(); };
+jsr._onThemeChange = function(theme) { render(); };
 ```
 
 ### Network
 
 ```js
-var result = await yoloit.fetchJson(url, { method: 'GET', headers: {} });
+var result = await jsr.fetchJson(url, { method: 'GET', headers: {} });
 // result is the parsed JSON, or { __error: '...' } on failure
 ```
 
@@ -126,7 +126,7 @@ Fetch requires the `fetch` permission to be enabled in Settings → Apps & Widge
 ### Running CLI commands
 
 ```js
-var out = await yoloit.exec('yoloit board:list');
+var out = await jsr.exec('yoloit board:list');
 // out = { stdout, stderr, exitCode }
 ```
 
@@ -135,14 +135,14 @@ Exec requires the `exec` permission.
 ### Secure secrets
 
 ```js
-await yoloit.secrets.set('apiKey', 'abc123');
-var key = await yoloit.secrets.get('apiKey');
+await jsr.secrets.set('apiKey', 'abc123');
+var key = await jsr.secrets.get('apiKey');
 ```
 
 ### Loading local assets
 
 ```js
-var svg = await yoloit.loadAsset('assets/icon.svg');
+var svg = await jsr.loadAsset('assets/icon.svg');
 ```
 
 Assets are resolved relative to the widget's directory.
@@ -150,13 +150,13 @@ Assets are resolved relative to the widget's directory.
 ### Panel title
 
 ```js
-yoloit.panel.setTitle('Weather in Berlin');
+jsr.setTitle('Weather in Berlin');
 ```
 
 ### Errors
 
 ```js
-yoloit.showError('Could not load forecast');
+jsr.showError('Could not load forecast');
 ```
 
 ### Timers / animation frames
@@ -222,10 +222,7 @@ Add to `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  js_widget_runtime:
-    git:
-      url: https://github.com/IstiN/flutter_js_widget_runtime.git
-      ref: main
+  js_widget_runtime: ^0.2.0
 ```
 
 Then:
@@ -264,11 +261,11 @@ await engine.run(js);
 
 ## 6. Tips
 
-* Keep widgets small and declarative. Store state in `yoloit.storage`, not in
+* Keep widgets small and declarative. Store state in `jsr.storage`, not in
   closure variables, if you want it to survive reload.
 * Use `handleEvent(actionId, payload)` as the single entry point for user
   actions; the JSON tree's `onTap` fields reference `actionId`s.
-* Prefer `yoloit.fetchJson` over `fetch` — it is proxied through Dart and works
+* Prefer `jsr.fetchJson` over `fetch` — it is proxied through Dart and works
   without CORS inside the desktop app.
 * For expensive work, `await` inside `handleEvent`; the runtime waits for async
   handlers before considering the event done.

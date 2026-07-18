@@ -96,7 +96,7 @@ void main() {
         id: 'counter',
         files: {
           'manifest.json': '{"name":"Counter","icon":"🔢"}',
-          'widget.js': 'yoloit.render({type:"text", data:"0"});',
+          'widget.js': 'jsr.render({type:"text", data:"0"});',
         },
       );
       expect(manifest, isNotNull);

@@ -11,22 +11,22 @@ class WidgetPermissionsService {
     WidgetPermission(
       key: 'exec',
       label: 'CLI Execution',
-      description: 'yoloit.exec() — run yoloit CLI commands from widgets',
+      description: 'jsr.exec() — run yoloit CLI commands from widgets',
     ),
     WidgetPermission(
       key: 'fetch',
       label: 'HTTP Fetch',
-      description: 'yoloit.fetchJson() — make HTTP requests from widgets',
+      description: 'jsr.fetchJson() — make HTTP requests from widgets',
     ),
     WidgetPermission(
       key: 'secrets',
       label: 'Secrets Storage',
-      description: 'yoloit.secrets — read/write encrypted key-value secrets',
+      description: 'jsr.secrets — read/write encrypted key-value secrets',
     ),
     WidgetPermission(
       key: 'storage',
       label: 'Local Storage',
-      description: 'yoloit.storage — read/write persistent panel storage',
+      description: 'jsr.storage — read/write persistent panel storage',
     ),
   ];
 

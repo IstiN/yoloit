@@ -841,7 +841,7 @@ class _EnvDialogState extends State<_EnvDialog> {
               ),
               const SizedBox(height: 4),
               Text(
-                'Overrides group values. Injected into yoloit.exec().',
+                'Overrides group values. Injected into jsr.exec().',
                 style: TextStyle(fontSize: 11, color: muted),
               ),
               const SizedBox(height: 8),

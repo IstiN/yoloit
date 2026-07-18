@@ -81,7 +81,7 @@ Legend: **OK** = matches expectation; **DOC** = works but description unclear; *
 | `app:run` | app:open, widget:open, wg:o | Open an app in a new panel on a board. | OK |
 | `app:screenshot` | — | Save a screenshot of a running app panel to a PNG file | OK |
 | `app:snapshot` | — | Get the JSON render tree of a running app plus extracted text lines. | OK |
-| `app:state` | — | Read structured state (yoloit.exportState) and visible text from a running app. | OK |
+| `app:state` | — | Read structured state (jsr.exportState) and visible text from a running app. | OK |
 | `help` | — | Show CLI help | OK |
 | `reload` | — | Hot reload the running Flutter app | OK |
 | `restart` | — | Hot restart the running Flutter app | OK |
