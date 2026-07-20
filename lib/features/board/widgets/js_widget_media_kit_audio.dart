@@ -1,154 +1,117 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:js_widget_runtime/js_widget_runtime.dart';
 import 'package:media_kit/media_kit.dart';
 
-/// Host-provided custom builder for the `audio` node in the JSON widget tree.
-///
-/// Props:
-/// - `src` (String, required): file path or URL.
-/// - `autoPlay` (bool, default false).
-/// - `loop` (bool, default false).
-/// - `title` (String): optional label shown above the controls.
-Widget buildMediaKitAudio(BuildContext context, Map<String, dynamic> m) {
-  final src = m['src'] as String?;
-  if (src == null || src.isEmpty) {
-    return const Center(child: Icon(Icons.audiotrack_outlined));
-  }
-  return _MediaKitAudioPlayer(
-    src: src,
-    autoPlay: m['autoPlay'] == true,
-    loop: m['loop'] == true,
-    title: m['title'] as String?,
-  );
-}
+/// yoloit implementation of [JsAudioController] backed by `media_kit`.
+class MediaKitAudioController extends JsAudioController {
+  MediaKitAudioController._(this._player);
 
-class _MediaKitAudioPlayer extends StatefulWidget {
-  const _MediaKitAudioPlayer({
-    required this.src,
-    required this.autoPlay,
-    required this.loop,
-    this.title,
-  });
-
-  final String src;
-  final bool autoPlay;
-  final bool loop;
-  final String? title;
-
-  @override
-  State<_MediaKitAudioPlayer> createState() => _MediaKitAudioPlayerState();
-}
-
-class _MediaKitAudioPlayerState extends State<_MediaKitAudioPlayer> {
-  late final Player _player;
+  final Player _player;
+  final _position = StreamController<Duration>.broadcast();
+  final _duration = StreamController<Duration>.broadcast();
+  final _playing = StreamController<bool>.broadcast();
   final List<StreamSubscription<dynamic>> _subs = [];
 
-  Duration _position = Duration.zero;
-  Duration _duration = Duration.zero;
-  bool _isPlaying = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _player = Player();
-    _subs.addAll([
-      _player.stream.position.listen((p) => setState(() => _position = p)),
-      _player.stream.duration.listen((d) => setState(() => _duration = d)),
-      _player.stream.playing.listen((p) => setState(() => _isPlaying = p)),
+  static Future<MediaKitAudioController> create(String src) async {
+    final player = Player();
+    final instance = MediaKitAudioController._(player);
+    instance._subs.addAll([
+      player.stream.position.listen(instance._position.add),
+      player.stream.duration.listen(instance._duration.add),
+      player.stream.playing.listen(instance._playing.add),
     ]);
-    unawaited(_initialize());
-  }
-
-  Future<void> _initialize() async {
-    await _player.open(Media(widget.src));
-    if (widget.loop) {
-      await _player.setPlaylistMode(PlaylistMode.loop);
-    }
-    if (widget.autoPlay) {
-      await _player.play();
-    }
+    await player.open(Media(src));
+    return instance;
   }
 
   @override
-  void dispose() {
-    for (final s in _subs) {
-      s.cancel();
+  Stream<Duration> get positionStream => _position.stream;
+
+  @override
+  Stream<Duration> get durationStream => _duration.stream;
+
+  @override
+  Stream<bool> get playingStream => _playing.stream;
+
+  @override
+  Future<void> play() => _player.play();
+
+  @override
+  Future<void> pause() => _player.pause();
+
+  @override
+  Future<void> seek(Duration position) => _player.seek(position);
+
+  @override
+  Future<void> dispose() async {
+    for (final sub in _subs) {
+      await sub.cancel();
     }
-    unawaited(_player.dispose());
-    super.dispose();
+    await _position.close();
+    await _duration.close();
+    await _playing.close();
+    await _player.dispose();
   }
 
-  Future<void> _toggle() async {
-    if (_isPlaying) {
-      await _player.pause();
-    } else {
-      await _player.play();
-    }
+  /// Returns a [JsAudioController] that initializes itself asynchronously.
+  static JsAudioController async(String src) => _AsyncAudioController(src);
+}
+
+/// Wraps async audio controller creation.
+class _AsyncAudioController extends JsAudioController {
+  _AsyncAudioController(this.src) {
+    _future = MediaKitAudioController.create(src);
+    _future.then((c) {
+      _delegate = c;
+      _ready.complete();
+    });
   }
 
-  Future<void> _seek(double value) async {
-    if (_duration.inMilliseconds > 0) {
-      final target = Duration(
-        milliseconds: (value * _duration.inMilliseconds).round(),
-      );
-      await _player.seek(target);
-    }
-  }
+  final String src;
+  late final Future<MediaKitAudioController> _future;
+  MediaKitAudioController? _delegate;
+  final _ready = Completer<void>();
 
-  String _format(Duration d) {
-    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return '$m:$s';
+  MediaKitAudioController get _require {
+    final d = _delegate;
+    if (d == null) throw StateError('Audio controller not ready');
+    return d;
   }
 
   @override
-  Widget build(BuildContext context) {
-    final progress = _duration.inMilliseconds > 0
-        ? (_position.inMilliseconds / _duration.inMilliseconds)
-            .clamp(0.0, 1.0)
-        : 0.0;
-    return Padding(
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (widget.title?.isNotEmpty == true)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Text(
-                widget.title!,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          Row(
-            children: [
-              IconButton(
-                onPressed: _toggle,
-                icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow),
-              ),
-              Expanded(
-                child: Slider(
-                  value: progress.toDouble(),
-                  onChanged: _seek,
-                ),
-              ),
-              SizedBox(
-                width: 72,
-                child: Text(
-                  '${_format(_position)} / ${_format(_duration)}',
-                  style: const TextStyle(fontSize: 11),
-                  textAlign: TextAlign.end,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
+  Stream<Duration> get positionStream => _delegate?.positionStream ??
+      _future.asStream().asyncExpand((c) => c.positionStream);
+
+  @override
+  Stream<Duration> get durationStream => _delegate?.durationStream ??
+      _future.asStream().asyncExpand((c) => c.durationStream);
+
+  @override
+  Stream<bool> get playingStream => _delegate?.playingStream ??
+      _future.asStream().asyncExpand((c) => c.playingStream);
+
+  @override
+  Future<void> play() async {
+    await _ready.future;
+    return _require.play();
+  }
+
+  @override
+  Future<void> pause() async {
+    await _ready.future;
+    return _require.pause();
+  }
+
+  @override
+  Future<void> seek(Duration position) async {
+    await _ready.future;
+    return _require.seek(position);
+  }
+
+  @override
+  Future<void> dispose() async {
+    if (_delegate != null) return _require.dispose();
+    _future.ignore();
   }
 }

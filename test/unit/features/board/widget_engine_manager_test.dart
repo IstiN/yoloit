@@ -6,10 +6,9 @@ import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/widgets/widget_app_registry.dart';
 import 'package:yoloit/features/board/widgets/widget_engine_manager.dart';
 
-class FakeJsWidgetEngine extends JsWidgetEngine {
-  FakeJsWidgetEngine({required JsRuntimeConfig config})
-    : _runtimeConfig = config,
-      super(config: config);
+class FakeJsWidgetEngineBackend extends JsWidgetEngineBackend {
+  FakeJsWidgetEngineBackend({required JsRuntimeConfig config})
+    : _runtimeConfig = config;
 
   final JsRuntimeConfig _runtimeConfig;
 
@@ -18,15 +17,37 @@ class FakeJsWidgetEngine extends JsWidgetEngine {
   String? lastJs;
 
   @override
-  Future<void> run(String widgetJs) async {
+  Future<void> init() async {}
+
+  @override
+  Future<void> run(
+    String widgetJs, {
+    String? hostBootstrapJs,
+    Map<String, dynamic> initialTheme = const {},
+  }) async {
     runCount++;
     lastJs = widgetJs;
   }
 
   @override
+  Future<void> callEvent(String actionId, [Map<String, dynamic>? payload]) async {}
+
+  @override
+  void updateTheme(Map<String, dynamic> colors) {}
+
+  @override
   Future<void> dispose() async {
     disposed = true;
   }
+
+  @override
+  List<Map<String, dynamic>> flushLogs() => [];
+
+  @override
+  List<Map<String, dynamic>> peekLogs() => [];
+
+  @override
+  Map<String, dynamic>? get exportedState => null;
 
   void emitRender(Map<String, dynamic> tree) => _runtimeConfig.onRender(tree);
 }
@@ -49,7 +70,8 @@ void main() {
 
   late WidgetEngineManager manager;
   late WidgetAppRegistry appRegistry;
-  late List<FakeJsWidgetEngine> createdEngines;
+  late List<JsWidgetEngine> createdEngines;
+  late List<FakeJsWidgetEngineBackend> createdBackends;
   late int factoryCalls;
 
   WidgetManifest manifestFor(String widgetId) => WidgetManifest(
@@ -64,10 +86,12 @@ void main() {
     isSingleFile: false,
   );
 
-  FakeJsWidgetEngine createEngine(JsRuntimeConfig config) {
+  JsWidgetEngine createEngine(JsRuntimeConfig config) {
     factoryCalls++;
-    final engine = FakeJsWidgetEngine(config: config);
+    final backend = FakeJsWidgetEngineBackend(config: config);
+    final engine = JsWidgetEngine(config: config.copyWith(backend: backend));
     createdEngines.add(engine);
+    createdBackends.add(backend);
     return engine;
   }
 
@@ -75,6 +99,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     appRegistry = WidgetAppRegistry.testInstance();
     createdEngines = [];
+    createdBackends = [];
     factoryCalls = 0;
     manager = WidgetEngineManager.testInstance(
       appRegistry: appRegistry,
@@ -117,7 +142,7 @@ void main() {
 
       expect(second, same(first));
       expect(factoryCalls, 1);
-      expect(createdEngines.single.runCount, 1);
+      expect(createdBackends.single.runCount, 1);
     });
 
     test('detach keeps engine alive', () async {
@@ -129,10 +154,11 @@ void main() {
         onRenderUI: renders.add,
       );
       final engine = createdEngines.single;
+      final backend = createdBackends.single;
 
-      engine.emitRender({'type': 'text', 'value': 'first'});
+      backend.emitRender({'type': 'text', 'value': 'first'});
       manager.detach('p1');
-      engine.emitRender({'type': 'text', 'value': 'second'});
+      backend.emitRender({'type': 'text', 'value': 'second'});
 
       expect(manager.engine('p1'), same(engine));
       expect(renders, [
@@ -152,7 +178,8 @@ void main() {
         onRenderUI: firstRenders.add,
       );
       final engine = createdEngines.single;
-      engine.emitRender({'type': 'text', 'value': 'cached'});
+      final backend = createdBackends.single;
+      backend.emitRender({'type': 'text', 'value': 'cached'});
 
       manager.detach('p1');
 
@@ -162,7 +189,7 @@ void main() {
         panel: _panel('p1'),
         onRenderUI: secondRenders.add,
       );
-      engine.emitRender({'type': 'text', 'value': 'live'});
+      backend.emitRender({'type': 'text', 'value': 'live'});
 
       expect(second, same(first));
       expect(firstRenders, [
@@ -180,11 +207,10 @@ void main() {
         widgetId: 'weather',
         panel: _panel('p1'),
       );
-      final engine = createdEngines.single;
 
       manager.remove('p1');
 
-      expect(engine.disposed, isTrue);
+      expect(createdBackends.single.disposed, isTrue);
       expect(manager.engine('p1'), isNull);
       expect(appRegistry.engine('weather'), isNull);
     });
@@ -204,7 +230,7 @@ void main() {
       manager.disposeAll();
 
       expect(manager.activePanelIds, isEmpty);
-      expect(createdEngines.every((engine) => engine.disposed), isTrue);
+      expect(createdBackends.every((backend) => backend.disposed), isTrue);
       expect(appRegistry.activeIds(), isEmpty);
     });
   });

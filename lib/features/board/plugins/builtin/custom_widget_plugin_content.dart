@@ -10,8 +10,7 @@ import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/custom_widget_plugin_base.dart';
 import 'package:yoloit/features/board/services/board_offscreen_renderer.dart';
 import 'package:yoloit/features/board/widgets/js_widget_image_resolver.dart';
-import 'package:yoloit/features/board/widgets/js_widget_media_kit_audio.dart';
-import 'package:yoloit/features/board/widgets/js_widget_media_kit_video.dart';
+import 'package:yoloit/features/board/widgets/js_widget_media_kit_host.dart';
 import 'package:yoloit/features/board/widgets/widget_app_registry.dart';
 import 'package:yoloit/features/board/widgets/widget_engine_manager.dart';
 import 'package:yoloit/features/board/widgets/widget_registry_service.dart';
@@ -222,10 +221,7 @@ class _CustomWidgetContentState extends State<CustomWidgetContent> {
   JsonWidgetRenderer _buildRenderer(JsWidgetEngine engine) {
     return JsonWidgetRenderer(
       theme: _jsonWidgetTheme(),
-      customBuilders: {
-        'video': buildMediaKitVideo,
-        'audio': buildMediaKitAudio,
-      },
+      mediaHost: createYoloitMediaHost(),
       imageResolver: createExternalImageResolver(widget.panel.state),
       onEvent: (actionId, payload) {
         unawaited(engine.callEvent(actionId, payload));

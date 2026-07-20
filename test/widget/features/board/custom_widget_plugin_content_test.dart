@@ -31,23 +31,40 @@ BoardPanelInstance _panel({Map<String, dynamic> state = const {}}) =>
       state: state,
     );
 
-class _FakeJsWidgetEngine extends JsWidgetEngine {
-  _FakeJsWidgetEngine({required JsRuntimeConfig config})
-    : _onRender = config.onRender,
-      super(config: config);
+class _FakeBackend extends JsWidgetEngineBackend {
+  _FakeBackend({required this.onRender});
 
-  final void Function(Map<String, dynamic> tree) _onRender;
+  final void Function(Map<String, dynamic> tree) onRender;
 
   @override
-  Future<void> run(String widgetJs) async {
-    _onRender({'type': 'text', 'data': 'Hello from widget'});
+  Future<void> init() async {}
+
+  @override
+  Future<void> run(
+    String widgetJs, {
+    String? hostBootstrapJs,
+    Map<String, dynamic> initialTheme = const {},
+  }) async {
+    onRender({'type': 'text', 'data': 'Hello from widget'});
   }
 
   @override
   Future<void> callEvent(String actionId, [Map<String, dynamic>? payload]) async {}
 
   @override
+  void updateTheme(Map<String, dynamic> colors) {}
+
+  @override
   Future<void> dispose() async {}
+
+  @override
+  List<Map<String, dynamic>> flushLogs() => [];
+
+  @override
+  List<Map<String, dynamic>> peekLogs() => [];
+
+  @override
+  Map<String, dynamic>? get exportedState => null;
 }
 
 void main() {
@@ -222,7 +239,12 @@ void main() {
       tester,
     ) async {
       final engineManagerWithRender = WidgetEngineManager.testInstance(
-        engineFactory: (config) => _FakeJsWidgetEngine(config: config),
+        engineFactory:
+            (config) => JsWidgetEngine(
+              config: config.copyWith(
+                backend: _FakeBackend(onRender: config.onRender),
+              ),
+            ),
         manifestFinder: (id) async => WidgetManifest(
           id: id,
           name: 'Test',

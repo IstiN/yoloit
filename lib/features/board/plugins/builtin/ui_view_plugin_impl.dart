@@ -10,8 +10,7 @@ import 'package:yoloit/features/board/plugins/builtin/ui_view_plugin_base.dart';
 import 'package:yoloit/features/board/plugins/builtin/ui_view_script_runner.dart';
 import 'package:yoloit/features/board/widgets/app_cli_utils.dart';
 import 'package:yoloit/features/board/widgets/js_widget_image_resolver.dart';
-import 'package:yoloit/features/board/widgets/js_widget_media_kit_audio.dart';
-import 'package:yoloit/features/board/widgets/js_widget_media_kit_video.dart';
+import 'package:yoloit/features/board/widgets/js_widget_media_kit_host.dart';
 
 /// Declarative JSON UI panel — renders a widget tree without a JS app runtime.
 class UiViewPlugin extends UiViewPluginBase {
@@ -31,10 +30,7 @@ class UiViewPlugin extends UiViewPluginBase {
     final fieldRegistry = UiViewFieldRegistry();
     final renderer = JsonWidgetRenderer(
       fieldRegistry: fieldRegistry,
-      customBuilders: {
-        'video': buildMediaKitVideo,
-        'audio': buildMediaKitAudio,
-      },
+      mediaHost: createYoloitMediaHost(),
       imageResolver: createExternalImageResolver(panel.state),
       onEvent: (actionId, payload) {
         if (actionId == '_field') {
@@ -147,10 +143,7 @@ class _UiViewEditorDialogState extends State<_UiViewEditorDialog> {
     _previewFieldRegistry = UiViewFieldRegistry();
     _previewRenderer = JsonWidgetRenderer(
       fieldRegistry: _previewFieldRegistry,
-      customBuilders: {
-        'video': buildMediaKitVideo,
-        'audio': buildMediaKitAudio,
-      },
+      mediaHost: createYoloitMediaHost(),
       imageResolver: createExternalImageResolver(widget.panel.state),
       onEvent: (actionId, payload) {
         setState(() {
