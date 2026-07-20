@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:js_widget_runtime/js_widget_runtime.dart';
-import 'package:yoloit/features/board/plugins/builtin/ui_view_tree_normalizer.dart';
 
 void main() {
   test('normalizer maps React-style types and fields', () {
