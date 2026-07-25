@@ -7,6 +7,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:js_widget_runtime/js_widget_runtime.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
+import 'package:yoloit/features/board/widgets/js_widget_cube_3d_host.dart';
 import 'package:yoloit/features/board/widgets/widget_app_registry.dart';
 import 'package:yoloit/features/board/widgets/widget_file_reader.dart';
 import 'package:yoloit/features/board/widgets/widget_registry_service.dart';
@@ -193,6 +194,7 @@ class WidgetEngineManager {
       appDir: appDir,
       initialTheme: initialTheme,
       initialStorage: initialStorage,
+      js3dHost: createYoloitCube3dHost(),
       onRender: onRender,
       onSetTitle: onSetTitle,
       onStorageUpdate: onStorageUpdate,
