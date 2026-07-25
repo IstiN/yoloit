@@ -153,6 +153,7 @@ class WidgetRegistryService {
       'yolo-hello',
       'animation-showcase',
       '3d-showcase',
+      '3d-glb-showcase',
     ];
     for (final name in examples) {
       final base = '$_prefix$name';

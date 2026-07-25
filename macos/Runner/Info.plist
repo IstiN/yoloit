@@ -42,5 +42,9 @@
 	<string>YoLoIT uses the microphone for local ASR voice input in chat panels.</string>
 	<key>NSScreenCaptureUsageDescription</key>
 	<string>YoLoIT captures system audio so the Audio Recorder panel can record calls and other sound playing through your speakers or headphones.</string>
+	<key>FLTEnableImpeller</key>
+	<true/>
+	<key>FLTEnableFlutterGPU</key>
+	<true/>
 </dict>
 </plist>

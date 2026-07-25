@@ -51,6 +51,10 @@
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>YoLoIT uses the microphone to record audio notes and calls.</string>
+	<key>FLTEnableImpeller</key>
+	<true/>
+	<key>FLTEnableFlutterGPU</key>
+	<true/>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

@@ -87,6 +87,8 @@ dependencies:
   http: ^1.3.0
   web: ^1.1.1
   flutter_cube: ^0.1.1
+  flame: ^1.38.0
+  flame_3d: ^0.3.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -131,6 +133,7 @@ flutter:
   assets:
     - assets/images/
     - assets/icon/
+    - assets/models/
     - assets/prompts/
     - assets/config/
     - assets/command_catalog/
@@ -150,6 +153,8 @@ flutter:
     - tools/widgets/animation-showcase/widget.js
     - tools/widgets/3d-showcase/manifest.json
     - tools/widgets/3d-showcase/widget.js
+    - tools/widgets/3d-glb-showcase/manifest.json
+    - tools/widgets/3d-glb-showcase/widget.js
     - docs/app-development-skill.md
     - assets/skills/yoloit/SKILL.md
     - third_party/flutter_local_models/registry/models/

@@ -1,0 +1,341 @@
+import 'dart:async';
+
+import 'package:flame/game.dart';
+import 'package:flame_3d/camera.dart';
+import 'package:flame_3d/components.dart';
+import 'package:flame_3d/game.dart';
+import 'package:flame_3d/graphics.dart';
+import 'package:flame_3d/model.dart';
+import 'package:flame_3d/parser.dart';
+import 'package:flutter/material.dart';
+import 'package:js_widget_runtime/js_widget_runtime.dart';
+
+/// Creates a [Js3dHost] implementation backed by `flame_3d`.
+///
+/// Supports GLB/GLTF/OBJ models with animations and lighting. This host
+/// requires Impeller + Flutter GPU, so it only runs on Android, iOS, and
+/// macOS. On other platforms the panel shows a fallback message.
+Js3dHost createYoloitFlame3dHost() => Flame3dHost.instance;
+
+/// {@template flame3d_host}
+/// A [Js3dHost] that drives a `flame_3d` scene from JS commands.
+/// {@endtemplate}
+class Flame3dHost extends Js3dHost {
+  Flame3dHost._();
+
+  /// Singleton instance shared by the JS bridge and the widget renderer.
+  static final Flame3dHost instance = Flame3dHost._();
+
+  bool _gpuInitialized = false;
+
+  Future<void> _ensureGpu() async {
+    if (_gpuInitialized) return;
+    await GpuBackend.initialize();
+    _gpuInitialized = true;
+  }
+
+  @override
+  Js3dController createController(
+    String sceneId,
+    Map<String, dynamic> config,
+  ) =>
+      Flame3dController(sceneId, config, this);
+
+  @override
+  Widget build(
+    BuildContext context,
+    Js3dController controller,
+    Map<String, dynamic> config,
+  ) {
+    final c = controller as Flame3dController;
+    return ListenableBuilder(
+      listenable: c,
+      builder: (context, _) {
+        if (c.error != null) {
+          return _ErrorWidget(message: c.error!);
+        }
+        final game = c.game;
+        if (game == null) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        return ClipRect(
+          child: GameWidget(game: game),
+        );
+      },
+    );
+  }
+}
+
+/// {@template flame3d_controller}
+/// A [Js3dController] implementation that backs a `flame_3d` scene.
+/// {@endtemplate}
+class Flame3dController extends Js3dController {
+  Flame3dController(this.sceneId, this.config, this._host);
+
+  final String sceneId;
+  final Map<String, dynamic> config;
+  final Flame3dHost _host;
+
+  YoloitFlame3dGame? game;
+  String? error;
+
+  /// Test helper exposing whether the game was created.
+  @visibleForTesting
+  bool get hasGame => game != null;
+
+  @override
+  void apply(Js3dCommand command) {
+    final payload = command.payload ?? {};
+    final modelId =
+        (payload['modelId'] as String?) ?? command.modelId ?? 'default';
+
+    switch (command.kind) {
+      case 'addModel':
+        _initGameIfNeeded();
+        game?.loadModel(
+          modelId: modelId,
+          src: payload['src'] as String?,
+          position: payload['position'] as List?,
+          rotation: payload['rotation'] as List?,
+          scale: payload['scale'] as List?,
+        );
+      case 'removeModel':
+        game?.removeModel(modelId);
+      case 'setTransform':
+        game?.setTransform(
+          modelId,
+          position: payload['position'] as List?,
+          rotation: payload['rotation'] as List?,
+          scale: payload['scale'] as List?,
+        );
+      case 'playAnimation':
+        final axis = payload['axis'] as String? ?? 'y';
+        final speed = (payload['speed'] as num?)?.toDouble() ?? 1.0;
+        game?.setRotation(modelId, axis, speed);
+      case 'stopAnimation':
+        game?.stopRotation(modelId);
+      case 'setCamera':
+        _applyCamera(payload);
+      case 'setLight':
+        _applyLight(payload);
+    }
+    notifyListeners();
+  }
+
+  void _initGameIfNeeded() {
+    if (game != null || error != null) return;
+    _host._ensureGpu().then((_) {
+      if (game != null) return;
+      game = YoloitFlame3dGame(config);
+      notifyListeners();
+    }).catchError((Object e) {
+      error = 'flame_3d unavailable: $e';
+      notifyListeners();
+    });
+  }
+
+  void _applyCamera(Map<String, dynamic>? cam) {
+    final camera = game?.camera;
+    if (cam == null || camera is! CameraComponent3D) return;
+    _readVec3(cam['position'] as List?)?.let(camera.position.setFrom);
+    _readVec3(cam['target'] as List?)?.let(camera.target.setFrom);
+    _readVec3(cam['up'] as List?)
+        ?.let((Vector3 v) => camera.up.setFrom(v));
+    final fov = (cam['fov'] as num?)?.toDouble();
+    if (fov != null) camera.fovY = fov;
+  }
+
+  void _applyLight(Map<String, dynamic>? light) {
+    // Runtime light mutation is not exposed by flame_3d; lights are configured
+    // once when the game loads.
+  }
+
+  @override
+  void dispose() {
+    game?.dispose();
+    super.dispose();
+  }
+}
+
+/// {@template yoloit_flame3d_game}
+/// A small [FlameGame3D] that loads a single GLB/GLTF/OBJ model and rotates it.
+/// {@endtemplate}
+class YoloitFlame3dGame extends FlameGame3D<World3D, CameraComponent3D> {
+  YoloitFlame3dGame(this.config)
+    : super(
+        world: World3D(),
+        camera: CameraComponent3D(
+          position: Vector3(0, 0, 8),
+          target: Vector3.zero(),
+          fovY: 60,
+        ),
+      );
+
+  final Map<String, dynamic> config;
+  final Map<String, ModelComponent> _models = {};
+  final Map<String, _Rotation> _rotations = {};
+
+  @override
+  FutureOr<void> onLoad() async {
+    await super.onLoad();
+
+    final cameraConfig = config['camera'] as Map<String, dynamic>?;
+    if (cameraConfig != null) {
+      _readVec3(cameraConfig['position'] as List?)
+          ?.let(camera.position.setFrom);
+      _readVec3(cameraConfig['target'] as List?)?.let(camera.target.setFrom);
+      final fov = (cameraConfig['fov'] as num?)?.toDouble();
+      if (fov != null) camera.fovY = fov;
+    }
+
+    final lightConfig = config['light'] as Map<String, dynamic>?;
+    world.addAll([
+      LightComponent.ambient(
+        color: _parseColor(lightConfig?['color'] as String? ?? '#ffffff'),
+        intensity: (lightConfig?['ambient'] as num?)?.toDouble() ?? 0.4,
+      ),
+      LightComponent.point(
+        position: _readVec3(lightConfig?['position'] as List?) ??
+            Vector3(5, 10, 5),
+        color: _parseColor(lightConfig?['color'] as String? ?? '#ffffff'),
+        intensity: (lightConfig?['diffuse'] as num?)?.toDouble() ?? 0.8,
+      ),
+    ]);
+  }
+
+  Future<void> loadModel({
+    required String modelId,
+    required String? src,
+    List<dynamic>? position,
+    List<dynamic>? rotation,
+    List<dynamic>? scale,
+  }) async {
+    if (src == null || src.isEmpty) return;
+
+    removeModel(modelId);
+
+    final model = await ModelParser.parse(src);
+    final component = ModelComponent(
+      model: model,
+      position: _readVec3(position) ?? Vector3.zero(),
+      rotation: _quaternionFromEuler(_readVec3(rotation) ?? Vector3.zero()),
+      scale: _readVec3(scale) ?? Vector3.all(1),
+    );
+    _models[modelId] = component;
+    world.add(component);
+  }
+
+  void removeModel(String modelId) {
+    final existing = _models.remove(modelId);
+    if (existing != null) {
+      world.remove(existing);
+    }
+    _rotations.remove(modelId);
+  }
+
+  void setTransform(
+    String modelId, {
+    List<dynamic>? position,
+    List<dynamic>? rotation,
+    List<dynamic>? scale,
+  }) {
+    final model = _models[modelId];
+    if (model == null) return;
+    _readVec3(position)?.let(model.position.setFrom);
+    _readVec3(rotation)?.let((Vector3 v) {
+      model.rotation.setFrom(_quaternionFromEuler(v));
+    });
+    _readVec3(scale)?.let(model.scale.setFrom);
+  }
+
+  void setRotation(String modelId, String axis, double speed) {
+    if (!_models.containsKey(modelId)) return;
+    _rotations[modelId] = _Rotation(axis: axis, speed: speed);
+  }
+
+  void stopRotation(String modelId) {
+    _rotations.remove(modelId);
+  }
+
+  @override
+  void update(double dt) {
+    super.update(dt);
+    for (final entry in _rotations.entries) {
+      final model = _models[entry.key];
+      if (model == null) continue;
+      final rot = entry.value;
+      final axis = switch (rot.axis) {
+        'x' => Vector3(1, 0, 0),
+        'y' => Vector3(0, 1, 0),
+        'z' || _ => Vector3(0, 0, 1),
+      };
+      final delta = rot.speed * dt * 360 * degrees2Radians;
+      final q = Quaternion.axisAngle(axis, delta);
+      model.rotation.setFrom(model.rotation * q);
+    }
+  }
+}
+
+class _Rotation {
+  _Rotation({required this.axis, required this.speed});
+  final String axis;
+  final double speed;
+}
+
+class _ErrorWidget extends StatelessWidget {
+  const _ErrorWidget({required this.message});
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Text(
+          message,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: Color.fromARGB(255, 239, 68, 68),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+Color _parseColor(String value) {
+  var hex = value.trim();
+  if (hex.startsWith('#')) hex = hex.substring(1);
+  if (hex.length == 6) {
+    final rgb = int.tryParse(hex, radix: 16);
+    if (rgb != null) {
+      return Color.fromARGB(
+        255,
+        (rgb >> 16) & 0xff,
+        (rgb >> 8) & 0xff,
+        rgb & 0xff,
+      );
+    }
+  }
+  return const Color.fromARGB(255, 59, 130, 246);
+}
+
+Vector3? _readVec3(List<dynamic>? value) {
+  if (value == null || value.length < 3) return null;
+  return Vector3(
+    (value[0] as num).toDouble(),
+    (value[1] as num).toDouble(),
+    (value[2] as num).toDouble(),
+  );
+}
+
+Quaternion _quaternionFromEuler(Vector3 eulerDegrees) {
+  final yaw = eulerDegrees.y * degrees2Radians;
+  final pitch = eulerDegrees.x * degrees2Radians;
+  final roll = eulerDegrees.z * degrees2Radians;
+  return Quaternion.euler(pitch, yaw, roll);
+}
+
+extension _Vector3Let on Vector3 {
+  void let(void Function(Vector3) action) => action(this);
+}

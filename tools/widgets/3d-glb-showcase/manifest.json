@@ -1,0 +1,24 @@
+{
+  "id": "3d-glb-showcase",
+  "name": "3D GLB Showcase",
+  "description": "High-quality GLB model viewer powered by flame_3d with PBR lighting",
+  "version": "1.0.0",
+  "icon": "🧊",
+  "allowedCommands": [],
+  "network": false,
+  "cli": {
+    "summary": "GLB/GLTF 3D model viewer demo",
+    "events": [
+      { "id": "toggle_rotation", "description": "Start/stop auto rotation" },
+      { "id": "set_speed", "description": "Set rotation speed" }
+    ],
+    "read": {
+      "state": "yoloit app:state 3d-glb-showcase",
+      "snapshot": "yoloit app:snapshot 3d-glb-showcase"
+    },
+    "examples": [
+      "yoloit app:run 3d-glb-showcase",
+      "yoloit app:execute 3d-glb-showcase toggle_rotation"
+    ]
+  }
+}
