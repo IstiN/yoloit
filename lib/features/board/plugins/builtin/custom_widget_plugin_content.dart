@@ -220,6 +220,10 @@ class _CustomWidgetContentState extends State<CustomWidgetContent> {
   }
 
   JsonWidgetRenderer _buildRenderer(JsWidgetEngine engine) {
+    debugPrint(
+      '[CustomWidgetContent] building renderer panel=${widget.panel.id} '
+      'widgetId=$_widgetId',
+    );
     return JsonWidgetRenderer(
       theme: _jsonWidgetTheme(),
       mediaHost: createYoloitMediaHost(),

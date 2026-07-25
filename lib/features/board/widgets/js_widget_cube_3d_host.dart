@@ -24,8 +24,10 @@ class Cube3dHost extends Js3dHost {
   Js3dController createController(
     String sceneId,
     Map<String, dynamic> config,
-  ) =>
-      Cube3dController(sceneId, config);
+  ) {
+    debugPrint('[Cube3dHost] createController sceneId=$sceneId config=$config');
+    return Cube3dController(sceneId, config);
+  }
 
   @override
   Widget build(
@@ -34,6 +36,10 @@ class Cube3dHost extends Js3dHost {
     Map<String, dynamic> config,
   ) {
     final c = controller as Cube3dController;
+    debugPrint(
+      '[Cube3dHost] build sceneId=${c.sceneId} '
+      'config=${config.keys.toList()}',
+    );
     return ListenableBuilder(
       listenable: c,
       builder: (context, _) => cube.Cube(
@@ -73,6 +79,10 @@ class Cube3dController extends Js3dController {
 
   void onSceneCreated(cube.Scene scene) {
     if (_disposed) return;
+    debugPrint(
+      '[Cube3dController] onSceneCreated sceneId=$sceneId '
+      'pending=${_pending.length}',
+    );
     _scene = scene;
     _applyCamera(config['camera'] as Map<String, dynamic>?);
     _applyLight(config['light'] as Map<String, dynamic>?);
@@ -86,6 +96,10 @@ class Cube3dController extends Js3dController {
 
   @override
   void apply(Js3dCommand command) {
+    debugPrint(
+      '[Cube3dController] apply sceneId=$sceneId kind=${command.kind} '
+      'modelId=${command.modelId} sceneReady=${_scene != null}',
+    );
     if (_scene == null) {
       _pending.add(command);
       return;

@@ -195,7 +195,13 @@ class WidgetEngineManager {
       initialTheme: initialTheme,
       initialStorage: initialStorage,
       js3dHost: createYoloitCube3dHost(),
-      onRender: onRender,
+      onRender: (tree) {
+        debugPrint(
+          '[WidgetEngineManager] onRender widgetId=$widgetId '
+          'hasScene3d=${_treeHasScene3d(tree)}',
+        );
+        onRender(tree);
+      },
       onSetTitle: onSetTitle,
       onStorageUpdate: onStorageUpdate,
       isPermissionAllowed: (capability) {
@@ -379,6 +385,24 @@ class WidgetEngineManager {
 
   void applyEnvVars(String panelId, Map<String, String> envVars) {
     _envVars[panelId] = {...envVars};
+  }
+
+  static bool _treeHasScene3d(Map<String, dynamic> tree) {
+    final type = tree['type'] as String?;
+    if (type == 'scene3d') return true;
+    final children = tree['children'];
+    if (children is List) {
+      for (final child in children) {
+        if (child is Map<String, dynamic> && _treeHasScene3d(child)) {
+          return true;
+        }
+      }
+    }
+    final child = tree['child'];
+    if (child is Map<String, dynamic>) {
+      return _treeHasScene3d(child);
+    }
+    return false;
   }
 }
 
