@@ -388,10 +388,6 @@
     "reason": "Run panel requires native host and desktop app run session logic; yoloitd run endpoints are not used by CLI run:* commands"
   },
   {
-    "command": "kanban:paste",
-    "reason": "Action/endpoint not implemented by headless yoloitd"
-  },
-  {
     "command": "kanban:send-card-to-chat",
     "reason": "Action/endpoint not implemented by headless yoloitd"
   },

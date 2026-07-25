@@ -20,9 +20,57 @@ _runtime_home() {
   fi
 }
 
+# Global flags extracted by _parse_global_flags before command dispatch.
+YOLOIT_ARG_BOARD=""
+YOLOIT_ARG_PANEL=""
+
+# Extract --board/-b and --panel/-p flags from the argument list so that
+# agents and skill examples can use either positional or flag syntax.
+# Remaining arguments are left in YOLOIT_ARG_REMAINING.
+_parse_global_flags() {
+  YOLOIT_ARG_BOARD=""
+  YOLOIT_ARG_PANEL=""
+  YOLOIT_ARG_REMAINING=()
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --board|-b)
+        YOLOIT_ARG_BOARD="${2:-}"
+        shift 2 || shift
+        ;;
+      --panel|-p)
+        YOLOIT_ARG_PANEL="${2:-}"
+        shift 2 || shift
+        ;;
+      --board=*)
+        YOLOIT_ARG_BOARD="${1#*=}"
+        shift
+        ;;
+      --panel=*)
+        YOLOIT_ARG_PANEL="${1#*=}"
+        shift
+        ;;
+      *)
+        YOLOIT_ARG_REMAINING+=("$1")
+        shift
+        ;;
+    esac
+  done
+}
+
+# Return an explicit panel hint: positional hint wins, then --panel global flag.
+_global_panel_hint() {
+  local hint="${1:-}"
+  if [[ -n "$hint" ]]; then
+    printf '%s' "$hint"
+  else
+    printf '%s' "${YOLOIT_ARG_PANEL:-}"
+  fi
+}
+
 _board() {
   local val="${1:-}"
   if [[ -n "$val" ]]; then echo "$val"; return; fi
+  if [[ -n "${YOLOIT_ARG_BOARD:-}" ]]; then echo "$YOLOIT_ARG_BOARD"; return; fi
   # Prefer the running app's focused board so "current board" matches what the
   # user is looking at in the UI. Fall back to state.json only when the app is
   # unreachable (offline / not running).
@@ -1721,7 +1769,7 @@ commands = [{'group': 'app',
   'aliases': ['k:ls']},
  {'group': 'kanban',
   'name': 'kanban:paste',
-  'description': 'Create a kanban card from text — board and panel optional (alias: k:p)k:p',
+  'description': 'Create a kanban card from text — board and panel optional (alias: k:p)',
   'params': [['text', 'Card text (first line becomes title)', True],
              ['[column]', 'Column index or title (default first)', False],
              ['[panel]', 'Panel title', False],
@@ -1730,7 +1778,7 @@ commands = [{'group': 'app',
   'aliases': ['k:p']},
  {'group': 'kanban',
   'name': 'kanban:send-card-to-chat',
-  'description': 'Send a kanban card to a chat panelk:sc',
+  'description': 'Send a kanban card to a chat panel',
   'params': [['board', 'Board id or name', True],
              ['panel', 'Kanban panel id or title', True],
              ['cardId', 'Card id', True]],
@@ -2357,6 +2405,7 @@ _require_board() {
 # Returns panel id (raw, not encoded)
 _smart_panel() {
   local bid=$1 type=$2 hint="${3:-}"
+  hint=$(_global_panel_hint "$hint")
   local panels_json existing=""
   panels_json=$(_get "/boards/${bid}/panels" 2>/dev/null)
   # Match by title hint first
@@ -2413,6 +2462,14 @@ for p in d.get('panels') or []:
 _dispatch() {
 local cmd="${1:-help}"
 shift || true
+# Extract --board/--panel flags before positional parsing so both skill and
+# agent-style invocations work transparently.
+_parse_global_flags "$@"
+if [[ ${#YOLOIT_ARG_REMAINING[@]} -gt 0 ]]; then
+  set -- "${YOLOIT_ARG_REMAINING[@]}"
+else
+  set --
+fi
 
 case "$cmd" in
   runtime)
@@ -4849,7 +4906,7 @@ PYEOF
     if [[ "$col" =~ ^[0-9]+$ ]]; then
       colIdx="$col"
     else
-      colIdx=$(python3 -c "import json,sys; data=json.load(sys.stdin); cols=data['data']['columns']; print(next((i for i,c in enumerate(cols) if c==sys.argv[1]), 0))" "$col" <<< "$(curl -s "http://127.0.0.1:${_port}/api/boards/${bid}/panels/${pid}/action" -H 'Content-Type: application/json' -d '{"action":"cards"}')")
+      colIdx=$(python3 -c "import json,sys; data=json.load(sys.stdin); cols=data['data']['columns']; print(next((i for i,c in enumerate(cols) if c==sys.argv[1]), 0))" "$col" <<< "$(_post "/boards/${bid}/panels/${pid}/action" '{"action":"cards"}')")
     fi
     _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"paste\",\"text\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$text"),\"columnIndex\":$colIdx}" | python3 -m json.tool 2>/dev/null
     ;;

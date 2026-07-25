@@ -160,14 +160,14 @@ final List<YoloitCliTool> autoTools = <YoloitCliTool>[
   ),
   YoloitCliTool(
     command: 'kanban:paste',
-    description: 'Create a kanban card from text — board and panel optional (alias: k:p)k:p',
+    description: 'Create a kanban card from text — board and panel optional (alias: k:p)',
     aliases: const ['k:p'],
     group: 'kanban',
     params: <YoloitCliToolParam>[toolParam('text', 'Card text (first line becomes title)', required: true), toolParam('column', 'Column index or title (default first)', required: false), panelParam(), boardParam()],
   ),
   YoloitCliTool(
     command: 'kanban:send-card-to-chat',
-    description: 'Send a kanban card to a chat panelk:sc',
+    description: 'Send a kanban card to a chat panel',
     aliases: const ['k:sc'],
     group: 'kanban',
     params: <YoloitCliToolParam>[boardParam(), panelParam(), toolParam('cardid', 'Card id', required: true)],

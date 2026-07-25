@@ -851,10 +851,10 @@ graph LR
 - **`kanban:cards`** *(aliases: k:ls)* — List kanban cards — board and panel optional (alias: k:ls)
   - params: [panel], [board]
   - example: `yoloit kanban:cards`
-- **`kanban:paste`** *(aliases: k:p)* — Create a kanban card from text — board and panel optional (alias: k:p)k:p
+- **`kanban:paste`** *(aliases: k:p)* — Create a kanban card from text — board and panel optional (alias: k:p)
   - params: text*, [column], [panel], [board]
   - example: `yoloit kanban:paste "Fix bug\nDescription here"`
-- **`kanban:send-card-to-chat`** — Send a kanban card to a chat panelk:sc
+- **`kanban:send-card-to-chat`** — Send a kanban card to a chat panel
   - params: board*, panel*, cardId*
   - example: `yoloit kanban:send-card-to-chat "My Board" "Kanban" card_123`
 

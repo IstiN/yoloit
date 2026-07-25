@@ -1,4 +1,4 @@
-// covers: board, board:current, board:use, board:snapshot, board:diagram, boards:snapshot, note, note:add, note:create, note:append, note:wrap, note:nowrap, code:get, shape:get, shape:set, sticky:get, sticky:set, sticky:append, sticky:color, frame:create, checklist:uncheck, checklist:remove, checklist:rename, kanban:columns, kanban:rename-column, kanban:remove-column, kanban:move-card, kanban:remove-card, kanban:update-card
+// covers: board, board:current, board:use, board:snapshot, board:diagram, boards:snapshot, note, note:add, note:create, note:append, note:wrap, note:nowrap, code:get, shape:get, shape:set, sticky:get, sticky:set, sticky:append, sticky:color, frame:create, checklist:uncheck, checklist:remove, checklist:rename, kanban:columns, kanban:rename-column, kanban:remove-column, kanban:move-card, kanban:remove-card, kanban:update-card, kanban:paste
 
 import 'dart:io';
 
@@ -284,12 +284,34 @@ void main() {
       final columnList = (columns['data'] as Map<String, dynamic>)['columns'] as List<dynamic>;
       expect(columnList, isNotEmpty);
 
+      // Flag-style board/panel args should work identically to positional args.
+      final columnsByFlag = await cli.json([
+        'kanban:columns',
+        '--board',
+        'Kanban Edit Board',
+        '--panel',
+        'Tasks',
+      ]);
+      expect(columnsByFlag['ok'], isTrue);
+      final columnListByFlag = (columnsByFlag['data'] as Map<String, dynamic>)['columns'] as List<dynamic>;
+      expect(columnListByFlag, equals(columnList));
+
       await cli.json([
         'kanban:add-column',
         'Kanban Edit Board',
         'Tasks',
         'Done',
       ]);
+
+      // Regression test: kanban:paste used to reference an undefined _port variable.
+      final pasted = await cli.json([
+        'kanban:paste',
+        'Pasted card\nDescription line',
+        'Todo',
+        'Tasks',
+        'Kanban Edit Board',
+      ]);
+      expect(pasted['ok'], isTrue);
 
       final renamed = await cli.json([
         'kanban:rename-column',
@@ -335,7 +357,7 @@ void main() {
       ]);
       final cardsData = cards['data'] as Map<String, dynamic>;
       final cardList = cardsData['cards'] as List<dynamic>;
-      expect(cardList, hasLength(1));
+      expect(cardList, hasLength(2));
 
       final removedCol = await cli.json([
         'kanban:remove-column',

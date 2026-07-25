@@ -1,5 +1,6 @@
-import 'package:yoloit/core/cli/handlers/ui_handler.dart';
 import 'package:js_widget_runtime/js_widget_runtime.dart';
+
+import 'package:yoloit/core/cli/handlers/ui_handler.dart';
 import 'package:yoloit/core/remote/yoloitd_models.dart';
 import 'package:yoloit/core/remote/yoloitd_panel_catalog.dart';
 import 'package:yoloit/features/board/plugins/builtin/ui_view_plugin.dart';
@@ -216,8 +217,8 @@ RemotePanelActionResult _sticky(
       }
       return RemotePanelActionResult(
         stateUpdate: {
-          if (color != null) 'color': color,
-          if (textColor != null) 'textColor': textColor,
+          'color?': color,
+          'textColor?': textColor,
           if (args['fontSize'] != null) 'fontSize': args['fontSize'],
         },
       );
@@ -341,6 +342,24 @@ RemotePanelActionResult _kanban(
         ..._pick(args, ['title', 'description', 'color']),
       };
       return RemotePanelActionResult(stateUpdate: {'cards': cards});
+    case 'paste':
+      final text = args['text']?.toString();
+      if (text == null || text.trim().isEmpty) return _missing('text');
+      final lines = text.trim().split('\n');
+      final title = lines.first.trim();
+      final description = lines.skip(1).join('\n').trim();
+      final columnIndex = _int(args['columnIndex'], fallback: 0)
+          .clamp(0, columns.length - 1);
+      cards.add({
+        'id': _timestampId('card'),
+        'title': title.length > 120 ? '${title.substring(0, 120)}…' : title,
+        'description': description,
+        'columnIndex': columnIndex,
+      });
+      return RemotePanelActionResult(
+        stateUpdate: {'cards': cards},
+        data: {'columnIndex': columnIndex},
+      );
   }
   return _unknown(action);
 }
