@@ -11,14 +11,23 @@ import 'package:vector_math/vector_math_64.dart' hide Colors;
 /// Supports procedural primitives (`cube`, `sphere`, `torus`) and Wavefront
 /// `.obj` assets/files. This host works on all Flutter platforms because
 /// `flutter_cube` renders with a [CustomPainter] instead of platform views.
-Js3dHost createYoloitCube3dHost() => const Cube3dHost();
+Js3dHost createYoloitCube3dHost() => Cube3dHost.instance;
 
 /// {@template cube3d_host}
 /// A [Js3dHost] that drives a `flutter_cube` scene from JS commands.
+///
+/// The runtime creates one controller when JS calls `jsr.scene3d.create()` and
+/// a second controller when the `scene3d` node is rendered. Because both sides
+/// must mutate the same scene, this host caches controllers by [sceneId] and
+/// returns the same instance to both the JS bridge and the widget renderer.
 /// {@endtemplate}
 class Cube3dHost extends Js3dHost {
-  /// {@macro cube3d_host}
-  const Cube3dHost();
+  Cube3dHost._();
+
+  /// Singleton instance shared by the JS bridge and the widget renderer.
+  static final Cube3dHost instance = Cube3dHost._();
+
+  final Map<String, Cube3dController> _controllers = {};
 
   @override
   Js3dController createController(
@@ -26,7 +35,22 @@ class Cube3dHost extends Js3dHost {
     Map<String, dynamic> config,
   ) {
     debugPrint('[Cube3dHost] createController sceneId=$sceneId config=$config');
-    return Cube3dController(sceneId, config);
+    final existing = _controllers[sceneId];
+    if (existing != null && !existing._disposed) {
+      existing._addRef();
+      debugPrint('[Cube3dHost] reusing existing controller sceneId=$sceneId');
+      return existing;
+    }
+    final controller = Cube3dController._(sceneId, config);
+    _controllers[sceneId] = controller;
+    return controller;
+  }
+
+  void _release(Cube3dController controller) {
+    if (controller._releaseRef() == 0) {
+      _controllers.remove(controller.sceneId);
+      controller._disposeInternal();
+    }
   }
 
   @override
@@ -57,8 +81,7 @@ class Cube3dHost extends Js3dHost {
 /// abstract [Js3dController] interface.
 /// {@endtemplate}
 class Cube3dController extends Js3dController {
-  /// {@macro cube3d_controller}
-  Cube3dController(this.sceneId, this.config);
+  Cube3dController._(this.sceneId, this.config);
 
   final String sceneId;
   final Map<String, dynamic> config;
@@ -69,6 +92,10 @@ class Cube3dController extends Js3dController {
   final Map<String, _Animation> _animations = {};
   Timer? _animationTimer;
   bool _disposed = false;
+  int _refCount = 1;
+
+  void _addRef() => _refCount++;
+  int _releaseRef() => --_refCount;
 
   /// Test helpers exposing internal controller state.
   @visibleForTesting
@@ -260,6 +287,10 @@ class Cube3dController extends Js3dController {
 
   @override
   void dispose() {
+    Cube3dHost.instance._release(this);
+  }
+
+  void _disposeInternal() {
     _disposed = true;
     _animationTimer?.cancel();
     super.dispose();
