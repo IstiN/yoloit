@@ -34,11 +34,9 @@ class Cube3dHost extends Js3dHost {
     String sceneId,
     Map<String, dynamic> config,
   ) {
-    debugPrint('[Cube3dHost] createController sceneId=$sceneId config=$config');
     final existing = _controllers[sceneId];
     if (existing != null && !existing._disposed) {
       existing._addRef();
-      debugPrint('[Cube3dHost] reusing existing controller sceneId=$sceneId');
       return existing;
     }
     final controller = Cube3dController._(sceneId, config);
@@ -60,10 +58,6 @@ class Cube3dHost extends Js3dHost {
     Map<String, dynamic> config,
   ) {
     final c = controller as Cube3dController;
-    debugPrint(
-      '[Cube3dHost] build sceneId=${c.sceneId} '
-      'config=${config.keys.toList()}',
-    );
     return ListenableBuilder(
       listenable: c,
       builder: (context, _) => cube.Cube(
@@ -106,10 +100,6 @@ class Cube3dController extends Js3dController {
 
   void onSceneCreated(cube.Scene scene) {
     if (_disposed) return;
-    debugPrint(
-      '[Cube3dController] onSceneCreated sceneId=$sceneId '
-      'pending=${_pending.length}',
-    );
     _scene = scene;
     _applyCamera(config['camera'] as Map<String, dynamic>?);
     _applyLight(config['light'] as Map<String, dynamic>?);
@@ -123,10 +113,6 @@ class Cube3dController extends Js3dController {
 
   @override
   void apply(Js3dCommand command) {
-    debugPrint(
-      '[Cube3dController] apply sceneId=$sceneId kind=${command.kind} '
-      'modelId=${command.modelId} sceneReady=${_scene != null}',
-    );
     if (_scene == null) {
       _pending.add(command);
       return;
@@ -222,10 +208,11 @@ class Cube3dController extends Js3dController {
   }
 
   void _applyMaterialColor(cube.Object obj, Color color) {
+    // flutter_cube material channels are in the 0-1 range, not 0-255.
     final v = Vector3(
-      (color.r * 255).roundToDouble(),
-      (color.g * 255).roundToDouble(),
-      (color.b * 255).roundToDouble(),
+      color.red / 255,
+      color.green / 255,
+      color.blue / 255,
     );
     obj.mesh.material.diffuse = v;
     obj.mesh.material.ambient = v * 0.2;
@@ -371,32 +358,76 @@ cube.Mesh _cubeMesh() {
   return cube.Mesh(vertices: vertices, indices: indices);
 }
 
-cube.Mesh _sphereMesh({int segments = 24, int rings = 16}) {
-  final vertices = <Vector3>[];
-  final indices = <cube.Polygon>[];
-  for (var r = 0; r <= rings; r++) {
-    final theta = r * pi / rings;
-    final sinTheta = sin(theta);
-    final cosTheta = cos(theta);
-    for (var s = 0; s <= segments; s++) {
-      final phi = s * 2 * pi / segments;
-      vertices.add(
-        Vector3(
-          sinTheta * cos(phi),
-          cosTheta,
-          sinTheta * sin(phi),
-        ),
-      );
-    }
+cube.Mesh _sphereMesh({int subdivisions = 2}) {
+  // Build an icosphere: no degenerate pole triangles, smooth uniform faces.
+  const phi = 1.618033988749895; // golden ratio
+  final vertices = <Vector3>[
+    Vector3(-1, phi, 0).normalized(),
+    Vector3(1, phi, 0).normalized(),
+    Vector3(-1, -phi, 0).normalized(),
+    Vector3(1, -phi, 0).normalized(),
+    Vector3(0, -1, phi).normalized(),
+    Vector3(0, 1, phi).normalized(),
+    Vector3(0, -1, -phi).normalized(),
+    Vector3(0, 1, -phi).normalized(),
+    Vector3(phi, 0, -1).normalized(),
+    Vector3(phi, 0, 1).normalized(),
+    Vector3(-phi, 0, -1).normalized(),
+    Vector3(-phi, 0, 1).normalized(),
+  ];
+  var faces = <_Face>[
+    _Face(0, 11, 5),
+    _Face(0, 5, 1),
+    _Face(0, 1, 7),
+    _Face(0, 7, 10),
+    _Face(0, 10, 11),
+    _Face(1, 5, 9),
+    _Face(5, 11, 4),
+    _Face(11, 10, 2),
+    _Face(10, 7, 6),
+    _Face(7, 1, 8),
+    _Face(3, 9, 4),
+    _Face(3, 4, 2),
+    _Face(3, 2, 6),
+    _Face(3, 6, 8),
+    _Face(3, 8, 9),
+    _Face(4, 9, 5),
+    _Face(2, 4, 11),
+    _Face(6, 2, 10),
+    _Face(8, 6, 7),
+    _Face(9, 8, 1),
+  ];
+
+  final midCache = <_MidKey, int>{};
+  int mid(int a, int b) {
+    final key = a < b ? _MidKey(a, b) : _MidKey(b, a);
+    final cached = midCache[key];
+    if (cached != null) return cached;
+    final m = ((vertices[a] + vertices[b]) * 0.5).normalized();
+    vertices.add(m);
+    final index = vertices.length - 1;
+    midCache[key] = index;
+    return index;
   }
-  for (var r = 0; r < rings; r++) {
-    for (var s = 0; s < segments; s++) {
-      final a = r * (segments + 1) + s;
-      final b = a + segments + 1;
-      indices.add(cube.Polygon(a, b, a + 1));
-      indices.add(cube.Polygon(b, b + 1, a + 1));
+
+  for (var s = 0; s < subdivisions; s++) {
+    final next = <_Face>[];
+    for (final f in faces) {
+      final a = mid(f.i0, f.i1);
+      final b = mid(f.i1, f.i2);
+      final c = mid(f.i2, f.i0);
+      next
+        ..add(_Face(f.i0, a, c))
+        ..add(_Face(f.i1, b, a))
+        ..add(_Face(f.i2, c, b))
+        ..add(_Face(a, b, c));
     }
+    faces = next;
   }
+
+  final indices = faces
+      .map((f) => cube.Polygon(f.i0, f.i1, f.i2))
+      .toList();
   return cube.Mesh(vertices: vertices, indices: indices);
 }
 
@@ -424,9 +455,30 @@ cube.Mesh _torusMesh({int majorSegments = 32, int minorSegments = 16, double maj
     for (var j = 0; j < minorSegments; j++) {
       final a = i * (minorSegments + 1) + j;
       final b = a + minorSegments + 1;
-      indices.add(cube.Polygon(a, b, a + 1));
-      indices.add(cube.Polygon(b, b + 1, a + 1));
+      // Winding produces outward-facing normals.
+      indices.add(cube.Polygon(a, a + 1, b));
+      indices.add(cube.Polygon(b, a + 1, b + 1));
     }
   }
   return cube.Mesh(vertices: vertices, indices: indices);
+}
+
+class _Face {
+  _Face(this.i0, this.i1, this.i2);
+  final int i0;
+  final int i1;
+  final int i2;
+}
+
+class _MidKey {
+  _MidKey(this.a, this.b);
+  final int a;
+  final int b;
+
+  @override
+  bool operator ==(Object other) =>
+      other is _MidKey && other.a == a && other.b == b;
+
+  @override
+  int get hashCode => Object.hash(a, b);
 }
