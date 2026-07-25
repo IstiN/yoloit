@@ -118,6 +118,29 @@ void main() {
       controller.dispose();
     });
 
+    test('controller creates city primitive with many faces', () {
+      final controller = createYoloitCube3dHost().createController(
+        's1',
+        <String, dynamic>{},
+      ) as Cube3dController;
+
+      controller.onSceneCreated(cube.Scene());
+      controller.apply(
+        const Js3dCommand(
+          kind: 'addModel',
+          sceneId: 's1',
+          modelId: 'city',
+          payload: {'primitive': 'city'},
+        ),
+      );
+
+      final city = controller.object('city')!;
+      expect(city.mesh.indices.length, greaterThan(100));
+      expect(city.backfaceCulling, isTrue);
+
+      controller.dispose();
+    });
+
   });
 }
 

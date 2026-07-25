@@ -8,9 +8,10 @@ import 'package:vector_math/vector_math_64.dart' hide Colors;
 
 /// Creates a [Js3dHost] implementation backed by `flutter_cube`.
 ///
-/// Supports procedural primitives (`cube`, `sphere`, `torus`) and Wavefront
-/// `.obj` assets/files. This host works on all Flutter platforms because
-/// `flutter_cube` renders with a [CustomPainter] instead of platform views.
+/// Supports procedural primitives (`cube`, `sphere`, `torus`, `city`) and
+/// Wavefront `.obj` assets/files. This host works on all Flutter platforms
+/// because `flutter_cube` renders with a [CustomPainter] instead of platform
+/// views.
 Js3dHost createYoloitCube3dHost() => Cube3dHost.instance;
 
 /// {@template cube3d_host}
@@ -184,7 +185,9 @@ class Cube3dController extends Js3dController {
       rotation: _vec3(rotation) ?? Vector3.zero(),
       scale: _vec3(scale) ?? Vector3.all(1),
       mesh: mesh,
-      backfaceCulling: false,
+      // All procedural primitives are closed solids viewed from the outside;
+      // culling back faces avoids off-by-one pixel artifacts at silhouette edges.
+      backfaceCulling: true,
       lighting: true,
     );
 
@@ -326,6 +329,8 @@ cube.Mesh _primitiveMesh(String primitive, Color color) {
       return _sphereMesh();
     case 'torus':
       return _torusMesh();
+    case 'city':
+      return _cityMesh();
     case 'cube':
     default:
       return _cubeMesh();
@@ -461,6 +466,92 @@ cube.Mesh _torusMesh({int majorSegments = 32, int minorSegments = 16, double maj
     }
   }
   return cube.Mesh(vertices: vertices, indices: indices);
+}
+
+cube.Mesh _cityMesh({int grid = 6, double cell = 0.35, double gap = 0.12}) {
+  // Deterministic pseudo-random heights so the city looks the same every run.
+  double hash(int x, int z) {
+    var v = (x * 374761393 + z * 668265263).toDouble().abs();
+    v = (v * (v * v * 1274126177 % 0x7fffffff)) % 0x7fffffff;
+    return v / 0x7fffffff;
+  }
+
+  final vertices = <Vector3>[];
+  final indices = <cube.Polygon>[];
+  final offset = (grid - 1) * (cell + gap) / 2;
+
+  for (var x = 0; x < grid; x++) {
+    for (var z = 0; z < grid; z++) {
+      // Leave a cross of roads/parks empty for visual structure.
+      if (x == grid ~/ 2 || z == grid ~/ 2) continue;
+      final h = 0.2 + hash(x, z) * 0.9;
+      final px = x * (cell + gap) - offset;
+      final pz = z * (cell + gap) - offset;
+      _addBox(vertices, indices, Vector3(px, h / 2, pz), cell, h, cell);
+    }
+  }
+
+  // Add a flat ground slab so the city doesn't float in space.
+  _addBox(
+    vertices,
+    indices,
+    Vector3(0, -0.02, 0),
+    grid * (cell + gap),
+    0.04,
+    grid * (cell + gap),
+  );
+  return cube.Mesh(vertices: vertices, indices: indices);
+}
+
+void _addBox(
+  List<Vector3> vertices,
+  List<cube.Polygon> indices,
+  Vector3 center,
+  double width,
+  double height,
+  double depth,
+) {
+  final base = vertices.length;
+  final hx = width / 2;
+  final hy = height / 2;
+  final hz = depth / 2;
+  vertices.addAll([
+    // Front
+    center + Vector3(-hx, -hy, hz),
+    center + Vector3(hx, -hy, hz),
+    center + Vector3(hx, hy, hz),
+    center + Vector3(-hx, hy, hz),
+    // Back
+    center + Vector3(hx, -hy, -hz),
+    center + Vector3(-hx, -hy, -hz),
+    center + Vector3(-hx, hy, -hz),
+    center + Vector3(hx, hy, -hz),
+    // Top
+    center + Vector3(-hx, hy, hz),
+    center + Vector3(hx, hy, hz),
+    center + Vector3(hx, hy, -hz),
+    center + Vector3(-hx, hy, -hz),
+    // Bottom
+    center + Vector3(-hx, -hy, -hz),
+    center + Vector3(hx, -hy, -hz),
+    center + Vector3(hx, -hy, hz),
+    center + Vector3(-hx, -hy, hz),
+    // Right
+    center + Vector3(hx, -hy, hz),
+    center + Vector3(hx, -hy, -hz),
+    center + Vector3(hx, hy, -hz),
+    center + Vector3(hx, hy, hz),
+    // Left
+    center + Vector3(-hx, -hy, -hz),
+    center + Vector3(-hx, -hy, hz),
+    center + Vector3(-hx, hy, hz),
+    center + Vector3(-hx, hy, -hz),
+  ]);
+  for (var i = 0; i < 6; i++) {
+    final o = base + i * 4;
+    indices.add(cube.Polygon(o, o + 1, o + 2));
+    indices.add(cube.Polygon(o, o + 2, o + 3));
+  }
 }
 
 class _Face {

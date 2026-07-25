@@ -11,7 +11,10 @@
   function init() {
     jsr.scene3d.create(sceneId, {
       camera: { position: [0, 0, -8], target: [0, 0, 0], fov: 60 },
-      light: { position: [8, 10, 8], color: '#ffffff', ambient: 0.15, diffuse: 0.85 }
+      // Higher ambient light makes flat shading less harsh; flutter_cube does
+      // not cast real shadows, so a strong ambient term avoids "glitchy" dark
+      // faces on the cube/torus/city.
+      light: { position: [5, 8, 5], color: '#ffffff', ambient: 0.4, diffuse: 0.7 }
     });
     addModel();
     if (rotating) jsr.scene3d.playAnimation(sceneId, modelId, { axis: 'y', speed: speed });
@@ -19,11 +22,15 @@
   }
 
   function addModel() {
+    var scale = [2, 2, 2];
+    if (shape === 'torus' || shape === 'city') {
+      scale = [1.4, 1.4, 1.4];
+    }
     jsr.scene3d.addModel(sceneId, {
       modelId: modelId,
       primitive: shape,
       color: color,
-      scale: shape === 'torus' ? [1.4, 1.4, 1.4] : [2, 2, 2]
+      scale: scale
     });
   }
 
@@ -146,7 +153,9 @@
                   { type: 'sizedBox', width: 8 },
                   shapeButton('Sphere', 'sphere'),
                   { type: 'sizedBox', width: 8 },
-                  shapeButton('Torus', 'torus')
+                  shapeButton('Torus', 'torus'),
+                  { type: 'sizedBox', width: 8 },
+                  shapeButton('City', 'city')
                 ]
               },
               { type: 'sizedBox', height: 12 },
@@ -158,17 +167,29 @@
               { type: 'sizedBox', height: 12 },
               {
                 type: 'row',
+                crossAxisAlignment: 'center',
                 children: [
                   {
                     type: 'expanded',
                     child: {
-                      type: 'slider',
-                      value: speed,
-                      min: 0,
-                      max: 3,
-                      divisions: 30,
-                      onChanged: 'set_speed',
-                      label: 'Speed'
+                      type: 'column',
+                      crossAxisAlignment: 'stretch',
+                      mainAxisSize: 'min',
+                      children: [
+                        {
+                          type: 'text',
+                          data: 'Rotation speed: ' + speed.toFixed(1) + 'x',
+                          style: { fontSize: 12, color: jsr.theme.text }
+                        },
+                        {
+                          type: 'slider',
+                          value: speed,
+                          min: 0,
+                          max: 3,
+                          divisions: 30,
+                          onChanged: 'set_speed'
+                        }
+                      ]
                     }
                   },
                   { type: 'sizedBox', width: 8 },
