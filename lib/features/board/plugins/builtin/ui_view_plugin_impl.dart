@@ -9,6 +9,7 @@ import 'package:yoloit/features/board/plugins/builtin/ui_view_actions.dart';
 import 'package:yoloit/features/board/plugins/builtin/ui_view_plugin_base.dart';
 import 'package:yoloit/features/board/plugins/builtin/ui_view_script_runner.dart';
 import 'package:yoloit/features/board/widgets/app_cli_utils.dart';
+import 'package:yoloit/features/board/widgets/js_widget_cube_3d_host.dart';
 import 'package:yoloit/features/board/widgets/js_widget_image_resolver.dart';
 import 'package:yoloit/features/board/widgets/js_widget_media_kit_host.dart';
 
@@ -31,6 +32,7 @@ class UiViewPlugin extends UiViewPluginBase {
     final renderer = JsonWidgetRenderer(
       fieldRegistry: fieldRegistry,
       mediaHost: createYoloitMediaHost(),
+      js3dHost: createYoloitCube3dHost(),
       imageResolver: createExternalImageResolver(panel.state),
       onEvent: (actionId, payload) {
         if (actionId == '_field') {
@@ -144,6 +146,7 @@ class _UiViewEditorDialogState extends State<_UiViewEditorDialog> {
     _previewRenderer = JsonWidgetRenderer(
       fieldRegistry: _previewFieldRegistry,
       mediaHost: createYoloitMediaHost(),
+      js3dHost: createYoloitCube3dHost(),
       imageResolver: createExternalImageResolver(widget.panel.state),
       onEvent: (actionId, payload) {
         setState(() {
