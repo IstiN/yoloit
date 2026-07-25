@@ -9,6 +9,7 @@ import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/custom_widget_plugin_base.dart';
 import 'package:yoloit/features/board/services/board_offscreen_renderer.dart';
+import 'package:yoloit/features/board/widgets/js_widget_cube_3d_host.dart';
 import 'package:yoloit/features/board/widgets/js_widget_image_resolver.dart';
 import 'package:yoloit/features/board/widgets/js_widget_media_kit_host.dart';
 import 'package:yoloit/features/board/widgets/widget_app_registry.dart';
@@ -222,6 +223,7 @@ class _CustomWidgetContentState extends State<CustomWidgetContent> {
     return JsonWidgetRenderer(
       theme: _jsonWidgetTheme(),
       mediaHost: createYoloitMediaHost(),
+      js3dHost: createYoloitCube3dHost(),
       imageResolver: createExternalImageResolver(widget.panel.state),
       onEvent: (actionId, payload) {
         unawaited(engine.callEvent(actionId, payload));
