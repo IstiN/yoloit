@@ -101,7 +101,19 @@ class Cube3dController extends Js3dController {
 
   void onSceneCreated(cube.Scene scene) {
     if (_disposed) return;
+
+    // If the Cube widget was rebuilt (e.g. after a JS re-render), flutter_cube
+    // gives us a brand new Scene. Migrate existing objects so animation and
+    // speed changes keep working instead of driving a detached scene.
+    final oldScene = _scene;
     _scene = scene;
+    if (oldScene != null && oldScene != scene && _objects.isNotEmpty) {
+      for (final obj in _objects.values) {
+        oldScene.world.remove(obj);
+        scene.world.add(obj);
+      }
+    }
+
     _applyCamera(config['camera'] as Map<String, dynamic>?);
     _applyLight(config['light'] as Map<String, dynamic>?);
     for (final cmd in _pending) {

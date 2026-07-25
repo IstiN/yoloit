@@ -1,3 +1,4 @@
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_cube/flutter_cube.dart' as cube;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:js_widget_runtime/js_widget_runtime.dart';
@@ -139,6 +140,52 @@ void main() {
       expect(city.backfaceCulling, isTrue);
 
       controller.dispose();
+    });
+
+    test('animation speed changes rotation rate', () {
+      fakeAsync((async) {
+        final controller = createYoloitCube3dHost().createController(
+          's1',
+          <String, dynamic>{},
+        ) as Cube3dController;
+
+        controller.onSceneCreated(cube.Scene());
+        controller.apply(
+          const Js3dCommand(
+            kind: 'addModel',
+            sceneId: 's1',
+            modelId: 'box',
+            payload: {'primitive': 'cube'},
+          ),
+        );
+        controller.apply(
+          const Js3dCommand(
+            kind: 'playAnimation',
+            sceneId: 's1',
+            modelId: 'box',
+            payload: {'axis': 'y', 'speed': 1.0},
+          ),
+        );
+
+        async.elapse(const Duration(milliseconds: 100));
+        final rot1 = controller.object('box')!.rotation.y;
+
+        controller.apply(
+          const Js3dCommand(
+            kind: 'playAnimation',
+            sceneId: 's1',
+            modelId: 'box',
+            payload: {'axis': 'y', 'speed': 3.0},
+          ),
+        );
+        async.elapse(const Duration(milliseconds: 100));
+        final rot2 = controller.object('box')!.rotation.y;
+
+        // Speed tripled, so the second 100ms interval should rotate ~3x more.
+        expect(rot2 - rot1, closeTo(rot1 * 3, 15.0));
+
+        controller.dispose();
+      });
     });
 
   });
