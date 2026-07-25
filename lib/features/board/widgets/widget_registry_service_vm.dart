@@ -147,6 +147,7 @@ class WidgetRegistryService {
       'calculator',
       'yolo-hello',
       'animation-showcase',
+      '3d-showcase',
     ];
     for (final name in examples) {
       final dest = Directory(

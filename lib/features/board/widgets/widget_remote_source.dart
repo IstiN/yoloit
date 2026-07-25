@@ -30,6 +30,7 @@ class WidgetRemoteSource {
     'calculator',
     'yolo-hello',
     'animation-showcase',
+    '3d-showcase',
   ];
 
   /// Fetches [name] from the remote source and returns a map of relative file
