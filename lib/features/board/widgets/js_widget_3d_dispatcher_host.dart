@@ -57,9 +57,21 @@ class YoloitJs3dDispatcherHost extends Js3dHost {
     String sceneId,
     Map<String, dynamic> config,
   ) {
+    // The JS bridge and the widget renderer each call createController for the
+    // same sceneId but with different configs (bridge carries engine/src,
+    // renderer carries width/height). Return the first-created controller so
+    // both sides mutate and observe the same host instance.
+    final existing = _controllers[sceneId];
+    if (existing != null) {
+      return existing;
+    }
     final host = selectHost(config);
     final inner = host.createController(sceneId, config);
-    final wrapper = _HostedController(host: host, controller: inner);
+    final wrapper = _HostedController(
+      host: host,
+      controller: inner,
+      onDispose: () => _controllers.remove(sceneId),
+    );
     _controllers[sceneId] = wrapper;
     return wrapper;
   }
@@ -80,18 +92,24 @@ class YoloitJs3dDispatcherHost extends Js3dHost {
 /// selected host. It also forwards [notifyListeners] so the renderer rebuilds
 /// when the inner controller changes.
 class _HostedController extends Js3dController {
-  _HostedController({required this.host, required this.controller}) {
+  _HostedController({
+    required this.host,
+    required this.controller,
+    required this.onDispose,
+  }) {
     controller.addListener(notifyListeners);
   }
 
   final Js3dHost host;
   final Js3dController controller;
+  final VoidCallback onDispose;
 
   @override
   void apply(Js3dCommand command) => controller.apply(command);
 
   @override
   void dispose() {
+    onDispose();
     controller.removeListener(notifyListeners);
     controller.dispose();
     super.dispose();

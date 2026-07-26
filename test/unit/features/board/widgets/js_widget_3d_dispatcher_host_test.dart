@@ -55,6 +55,26 @@ void main() {
       expect(inner.applied.length, 1);
       expect(inner.applied.first.kind, 'addModel');
     });
+
+    test('returns same controller for same sceneId regardless of config', () {
+      final host = createYoloitJs3dHost() as YoloitJs3dDispatcherHost;
+
+      final bridgeController = host.createController(
+        'glb-demo',
+        <String, dynamic>{
+          'engine': 'flame',
+          'camera': <String, dynamic>{'position': [0.0, 0.0, -8.0]},
+        },
+      );
+      final rendererController = host.createController(
+        'glb-demo',
+        <String, dynamic>{'width': 320, 'height': 320},
+      );
+
+      expect(identical(bridgeController, rendererController), isTrue);
+
+      bridgeController.dispose();
+    });
   });
 }
 
