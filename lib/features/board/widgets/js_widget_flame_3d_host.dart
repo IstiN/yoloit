@@ -90,7 +90,9 @@ class Flame3dHost extends Js3dHost {
           return const Center(child: CircularProgressIndicator());
         }
         return ClipRect(
-          child: GameWidget(game: game),
+          // Board panels live inside InteractiveViewer; a repaint boundary
+          // would detach the 3D surface from the transformed canvas.
+          child: GameWidget(game: game, addRepaintBoundary: false),
         );
       },
     );
@@ -266,6 +268,8 @@ class YoloitFlame3dGame extends FlameGame3D<World3D, CameraComponent3D> {
   @override
   FutureOr<void> onLoad() async {
     await super.onLoad();
+    debugPrint('[Flame3dGame] onLoad cameraPos=${camera.position} '
+        'cameraTarget=${camera.target}');
 
     final cameraConfig = config['camera'] as Map<String, dynamic>?;
     if (cameraConfig != null) {
@@ -362,6 +366,13 @@ class YoloitFlame3dGame extends FlameGame3D<World3D, CameraComponent3D> {
   @override
   void update(double dt) {
     super.update(dt);
+    if (_models.isNotEmpty && _rotations.isNotEmpty) {
+      debugPrint(
+        '[Flame3dGame] update models=${_models.keys.toList()} '
+        'rotations=${_rotations.keys.toList()} '
+        'cameraPos=${camera.position} cameraTarget=${camera.target}',
+      );
+    }
     for (final entry in _rotations.entries) {
       final model = _models[entry.key];
       if (model == null) continue;
