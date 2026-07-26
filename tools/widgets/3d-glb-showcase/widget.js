@@ -13,7 +13,7 @@
     });
     jsr.scene3d.addModel(sceneId, {
       modelId: modelId,
-      src: 'assets/models/DamagedHelmet.glb',
+      src: 'models/DamagedHelmet.glb',
       scale: [2, 2, 2]
     });
     if (rotating) {

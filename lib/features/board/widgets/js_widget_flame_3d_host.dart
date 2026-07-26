@@ -78,20 +78,60 @@ class Flame3dController extends Js3dController {
 
   YoloitFlame3dGame? game;
   String? error;
+  final List<Js3dCommand> _pending = [];
+  bool _initializing = false;
 
   /// Test helper exposing whether the game was created.
   @visibleForTesting
   bool get hasGame => game != null;
 
+  /// Test helper exposing how many commands are queued before the game loads.
+  @visibleForTesting
+  int get pendingLength => _pending.length;
+
   @override
   void apply(Js3dCommand command) {
+    if (game == null && error == null) {
+      _pending.add(command);
+      _initGameIfNeeded();
+      return;
+    }
+    if (game == null) return;
+    _apply(command);
+    notifyListeners();
+  }
+
+  void _initGameIfNeeded() {
+    if (_initializing || game != null || error != null) return;
+    _initializing = true;
+    _host._ensureGpu().then((_) async {
+      if (game != null) return;
+      game = YoloitFlame3dGame(
+        config,
+        onError: (message) {
+          error = message;
+          notifyListeners();
+        },
+      );
+      for (final cmd in _pending) {
+        _apply(cmd);
+      }
+      _pending.clear();
+      notifyListeners();
+    }).catchError((Object e) {
+      error = 'flame_3d unavailable: $e';
+      _pending.clear();
+      notifyListeners();
+    });
+  }
+
+  void _apply(Js3dCommand command) {
     final payload = command.payload ?? {};
     final modelId =
         (payload['modelId'] as String?) ?? command.modelId ?? 'default';
 
     switch (command.kind) {
       case 'addModel':
-        _initGameIfNeeded();
         game?.loadModel(
           modelId: modelId,
           src: payload['src'] as String?,
@@ -119,19 +159,6 @@ class Flame3dController extends Js3dController {
       case 'setLight':
         _applyLight(payload);
     }
-    notifyListeners();
-  }
-
-  void _initGameIfNeeded() {
-    if (game != null || error != null) return;
-    _host._ensureGpu().then((_) {
-      if (game != null) return;
-      game = YoloitFlame3dGame(config);
-      notifyListeners();
-    }).catchError((Object e) {
-      error = 'flame_3d unavailable: $e';
-      notifyListeners();
-    });
   }
 
   void _applyCamera(Map<String, dynamic>? cam) {
@@ -161,8 +188,10 @@ class Flame3dController extends Js3dController {
 /// A small [FlameGame3D] that loads a single GLB/GLTF/OBJ model and rotates it.
 /// {@endtemplate}
 class YoloitFlame3dGame extends FlameGame3D<World3D, CameraComponent3D> {
-  YoloitFlame3dGame(this.config)
-    : super(
+  YoloitFlame3dGame(
+    this.config, {
+    this.onError,
+  }) : super(
         world: World3D(),
         camera: CameraComponent3D(
           position: Vector3(0, 0, 8),
@@ -172,6 +201,7 @@ class YoloitFlame3dGame extends FlameGame3D<World3D, CameraComponent3D> {
       );
 
   final Map<String, dynamic> config;
+  final void Function(String)? onError;
   final Map<String, ModelComponent> _models = {};
   final Map<String, _Rotation> _rotations = {};
 
@@ -214,15 +244,21 @@ class YoloitFlame3dGame extends FlameGame3D<World3D, CameraComponent3D> {
 
     removeModel(modelId);
 
-    final model = await ModelParser.parse(src);
-    final component = ModelComponent(
-      model: model,
-      position: _readVec3(position) ?? Vector3.zero(),
-      rotation: _quaternionFromEuler(_readVec3(rotation) ?? Vector3.zero()),
-      scale: _readVec3(scale) ?? Vector3.all(1),
-    );
-    _models[modelId] = component;
-    world.add(component);
+    try {
+      final model = await ModelParser.parse(src);
+      final component = ModelComponent(
+        model: model,
+        position: _readVec3(position) ?? Vector3.zero(),
+        rotation: _quaternionFromEuler(_readVec3(rotation) ?? Vector3.zero()),
+        scale: _readVec3(scale) ?? Vector3.all(1),
+      );
+      _models[modelId] = component;
+      world.add(component);
+    } catch (e) {
+      final message = 'Failed to load model "$src": $e';
+      debugPrint('[Flame3dGame] $message');
+      onError?.call(message);
+    }
   }
 
   void removeModel(String modelId) {
@@ -249,7 +285,6 @@ class YoloitFlame3dGame extends FlameGame3D<World3D, CameraComponent3D> {
   }
 
   void setRotation(String modelId, String axis, double speed) {
-    if (!_models.containsKey(modelId)) return;
     _rotations[modelId] = _Rotation(axis: axis, speed: speed);
   }
 
