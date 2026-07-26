@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:js_widget_runtime/js_widget_runtime.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
@@ -403,8 +404,14 @@ class BoardOverviewPanelContent extends StatelessWidget {
         if (!supportsRender) {
           child = _buildHeadlessMockup(context, panel, plugin);
         } else {
-          child = _PreviewSafePanelShell(
-            child: plugin.buildContent(context, panel, _renderContext(context)),
+          // Mark previews as headless so shared engine-backed content (e.g.
+          // scene3d GameWidget) renders a placeholder instead of stealing the
+          // single attachment from the live panel on the board canvas.
+          child = ScrollConfiguration(
+            behavior: const HeadlessScrollBehavior(),
+            child: _PreviewSafePanelShell(
+              child: plugin.buildContent(context, panel, _renderContext(context)),
+            ),
           );
         }
 

@@ -3,8 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:golden_toolkit/golden_toolkit.dart';
 import 'package:js_widget_runtime/js_widget_runtime.dart';
 import 'package:yoloit/core/theme/app_theme.dart';
-import 'package:yoloit/features/board/widgets/js_widget_cube_3d_host.dart';
-import 'package:yoloit/features/board/widgets/js_widget_flame_3d_host.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
