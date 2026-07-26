@@ -26,6 +26,8 @@ class Flame3dHost extends Js3dHost {
   /// Singleton instance shared by the JS bridge and the widget renderer.
   static final Flame3dHost instance = Flame3dHost._();
 
+  final Map<String, Flame3dController> _controllers = {};
+
   bool _gpuInitialized = false;
 
   Future<void> _ensureGpu() async {
@@ -38,8 +40,25 @@ class Flame3dHost extends Js3dHost {
   Js3dController createController(
     String sceneId,
     Map<String, dynamic> config,
-  ) =>
-      Flame3dController(sceneId, config, this);
+  ) {
+    final existing = _controllers[sceneId];
+    if (existing != null && !existing._disposed) {
+      existing._addRef();
+      return existing;
+    }
+    final controller = Flame3dController(sceneId, config, this);
+    _controllers[sceneId] = controller;
+    return controller;
+  }
+
+  bool _release(Flame3dController controller) {
+    if (controller._releaseRef() == 0) {
+      _controllers.remove(controller.sceneId);
+      controller._disposeInternal();
+      return true;
+    }
+    return false;
+  }
 
   @override
   Widget build(
@@ -80,6 +99,11 @@ class Flame3dController extends Js3dController {
   String? error;
   final List<Js3dCommand> _pending = [];
   bool _initializing = false;
+  bool _disposed = false;
+  int _refCount = 1;
+
+  void _addRef() => _refCount++;
+  int _releaseRef() => --_refCount;
 
   /// Test helper exposing whether the game was created.
   @visibleForTesting
@@ -91,6 +115,7 @@ class Flame3dController extends Js3dController {
 
   @override
   void apply(Js3dCommand command) {
+    if (_disposed) return;
     if (game == null && error == null) {
       _pending.add(command);
       _initGameIfNeeded();
@@ -102,13 +127,14 @@ class Flame3dController extends Js3dController {
   }
 
   void _initGameIfNeeded() {
-    if (_initializing || game != null || error != null) return;
+    if (_disposed || _initializing || game != null || error != null) return;
     _initializing = true;
     _host._ensureGpu().then((_) async {
-      if (game != null) return;
+      if (_disposed || game != null) return;
       game = YoloitFlame3dGame(
         config,
         onError: (message) {
+          if (_disposed) return;
           error = message;
           notifyListeners();
         },
@@ -117,8 +143,9 @@ class Flame3dController extends Js3dController {
         _apply(cmd);
       }
       _pending.clear();
-      notifyListeners();
+      if (!_disposed) notifyListeners();
     }).catchError((Object e) {
+      if (_disposed) return;
       error = 'flame_3d unavailable: $e';
       _pending.clear();
       notifyListeners();
@@ -179,8 +206,15 @@ class Flame3dController extends Js3dController {
 
   @override
   void dispose() {
+    final lastReference = _host._release(this);
+    if (lastReference) {
+      super.dispose();
+    }
+  }
+
+  void _disposeInternal() {
+    _disposed = true;
     game?.dispose();
-    super.dispose();
   }
 }
 

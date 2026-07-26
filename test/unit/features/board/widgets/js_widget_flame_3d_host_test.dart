@@ -108,5 +108,35 @@ void main() {
         controller.dispose();
       });
     });
+
+    test('shares controller by sceneId between JS bridge and renderer', () {
+      fakeAsync((async) {
+        final first = Flame3dHost.instance.createController(
+          'shared',
+          <String, dynamic>{},
+        );
+        final second = Flame3dHost.instance.createController(
+          'shared',
+          <String, dynamic>{},
+        );
+        expect(identical(first, second), isTrue);
+
+        first.apply(
+          const Js3dCommand(
+            kind: 'addModel',
+            sceneId: 'shared',
+            modelId: 'helmet',
+          ),
+        );
+        expect((second as Flame3dController).pendingLength, 1);
+
+        first.dispose();
+        // One reference remains, so the controller is still alive.
+        expect(second.pendingLength, 1);
+
+        second.dispose();
+        async.elapse(const Duration(seconds: 1));
+      });
+    });
   });
 }
