@@ -5029,8 +5029,25 @@ PYEOF
       widget_id="$raw_id"
     fi
     board_arg="${1:-}"; panel_arg="${2:-$(basename "$widget_id")}"
-    bid=$(_require_board "$board_arg")
-    panel_id=$(_smart_panel "$bid" "board.widget.custom" "$panel_arg")
+    bid=$(_encode "$(_require_board "$board_arg")")
+    # Reuse an existing widget panel only when its title/id matches the hint —
+    # never hijack an unrelated widget panel. New panels are created with
+    # widgetId in the initial state because the server rejects empty
+    # board.widget.custom shells.
+    panel_id=""
+    panels_json=$(_get "/boards/${bid}/panels" 2>/dev/null)
+    panel_id=$(python3 -c "
+import json, sys
+d = json.loads(sys.stdin.read() or '{}')
+hint = sys.argv[1].lower()
+for p in d.get('panels') or []:
+    if not p.get('hidden') and p.get('type','') == 'board.widget.custom' and (p.get('title','').lower() == hint or p.get('id','').lower() == hint):
+        print(p.get('id','')); break
+" "$panel_arg" <<<"$panels_json" 2>/dev/null)
+    if [[ -z "$panel_id" ]]; then
+      widget_id_json=$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$widget_id")
+      panel_id=$(_auto_panel "$bid" "board.widget.custom" "$panel_arg" "{\"widgetId\":${widget_id_json}}")
+    fi
     if [[ -z "$panel_id" ]]; then
       echo "❌ Failed to create panel on board" >&2; exit 1
     fi
