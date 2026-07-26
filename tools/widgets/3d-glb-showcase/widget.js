@@ -1,6 +1,6 @@
 // 3D GLB Showcase — high-quality model viewer powered by flame_3d.
 (function() {
-  var sceneId = 'glb-demo';
+  var sceneId = 'glb-' + (jsr.instanceId || 'demo');
   var modelId = 'helmet';
   var rotating = true;
   var speed = 0.5;

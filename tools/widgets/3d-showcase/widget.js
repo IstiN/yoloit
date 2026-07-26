@@ -1,6 +1,6 @@
 // 3D Showcase — procedural primitives powered by flutter_cube
 (function() {
-  var sceneId = 'demo';
+  var sceneId = 'demo-' + (jsr.instanceId || 'demo');
   var modelId = 'shape';
   var shape = 'cube';
   var color = '#3b82f6';

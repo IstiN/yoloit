@@ -190,6 +190,7 @@ class WidgetEngineManager {
 
     final config = JsRuntimeConfig(
       widgetId: widgetId,
+      instanceId: panelId,
       appDir: appDir,
       initialTheme: initialTheme,
       initialStorage: initialStorage,
