@@ -75,27 +75,7 @@ class Flame3dHost extends Js3dHost {
     Map<String, dynamic> config,
   ) {
     final c = controller as Flame3dController;
-    return ListenableBuilder(
-      listenable: c,
-      builder: (context, _) {
-        debugPrint(
-          '[Flame3dHost] build sceneId=${c.sceneId} '
-          'hasGame=${c.game != null} error=${c.error}',
-        );
-        if (c.error != null) {
-          return _ErrorWidget(message: c.error!);
-        }
-        final game = c.game;
-        if (game == null) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        return ClipRect(
-          // Board panels live inside InteractiveViewer; a repaint boundary
-          // would detach the 3D surface from the transformed canvas.
-          child: GameWidget(game: game, addRepaintBoundary: false),
-        );
-      },
-    );
+    return _Flame3dGameWidget(controller: c);
   }
 }
 
@@ -260,6 +240,8 @@ class YoloitFlame3dGame extends FlameGame3D<World3D, CameraComponent3D> {
         ),
       );
 
+
+
   final Map<String, dynamic> config;
   final void Function(String)? onError;
   final Map<String, ModelComponent> _models = {};
@@ -268,8 +250,6 @@ class YoloitFlame3dGame extends FlameGame3D<World3D, CameraComponent3D> {
   @override
   FutureOr<void> onLoad() async {
     await super.onLoad();
-    debugPrint('[Flame3dGame] onLoad cameraPos=${camera.position} '
-        'cameraTarget=${camera.target}');
 
     final cameraConfig = config['camera'] as Map<String, dynamic>?;
     if (cameraConfig != null) {
@@ -281,16 +261,24 @@ class YoloitFlame3dGame extends FlameGame3D<World3D, CameraComponent3D> {
     }
 
     final lightConfig = config['light'] as Map<String, dynamic>?;
+    final ambientIntensity =
+        (lightConfig?['ambient'] as num?)?.toDouble() ?? 0.4;
+    final diffuseIntensity =
+        (lightConfig?['diffuse'] as num?)?.toDouble() ?? 0.8;
+    debugPrint(
+      '[Flame3dGame] adding lights ambient=$ambientIntensity '
+      'diffuse=$diffuseIntensity',
+    );
     world.addAll([
       LightComponent.ambient(
         color: _parseColor(lightConfig?['color'] as String? ?? '#ffffff'),
-        intensity: (lightConfig?['ambient'] as num?)?.toDouble() ?? 0.4,
+        intensity: ambientIntensity,
       ),
       LightComponent.point(
         position: _readVec3(lightConfig?['position'] as List?) ??
             Vector3(5, 10, 5),
         color: _parseColor(lightConfig?['color'] as String? ?? '#ffffff'),
-        intensity: (lightConfig?['diffuse'] as num?)?.toDouble() ?? 0.8,
+        intensity: diffuseIntensity,
       ),
     ]);
   }
@@ -366,13 +354,6 @@ class YoloitFlame3dGame extends FlameGame3D<World3D, CameraComponent3D> {
   @override
   void update(double dt) {
     super.update(dt);
-    if (_models.isNotEmpty && _rotations.isNotEmpty) {
-      debugPrint(
-        '[Flame3dGame] update models=${_models.keys.toList()} '
-        'rotations=${_rotations.keys.toList()} '
-        'cameraPos=${camera.position} cameraTarget=${camera.target}',
-      );
-    }
     for (final entry in _rotations.entries) {
       final model = _models[entry.key];
       if (model == null) continue;
@@ -395,6 +376,8 @@ class _Rotation {
   final double speed;
 }
 
+
+
 class _ErrorWidget extends StatelessWidget {
   const _ErrorWidget({required this.message});
   final String message;
@@ -413,6 +396,65 @@ class _ErrorWidget extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// A widget that owns the [GameWidget] lifecycle for a [Flame3dController].
+///
+/// Keeping [GameWidget] in a single persistent child avoids the
+/// "game instance can only be attached to one widget at a time" error that
+/// occurs when [ListenableBuilder] recreates the game widget on every
+/// controller notification.
+class _Flame3dGameWidget extends StatefulWidget {
+  const _Flame3dGameWidget({required this.controller});
+
+  final Flame3dController controller;
+
+  @override
+  State<_Flame3dGameWidget> createState() => _Flame3dGameWidgetState();
+}
+
+class _Flame3dGameWidgetState extends State<_Flame3dGameWidget> {
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_onControllerChanged);
+  }
+
+  @override
+  void didUpdateWidget(covariant _Flame3dGameWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller.removeListener(_onControllerChanged);
+      widget.controller.addListener(_onControllerChanged);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onControllerChanged);
+    super.dispose();
+  }
+
+  void _onControllerChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = widget.controller;
+    debugPrint(
+      '[Flame3dHost] build sceneId=${c.sceneId} '
+      'hasGame=${c.game != null} error=${c.error}',
+    );
+    if (c.error != null) {
+      return _ErrorWidget(message: c.error!);
+    }
+    final game = c.game;
+    if (game == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    return GameWidget(game: game, addRepaintBoundary: false);
   }
 }
 

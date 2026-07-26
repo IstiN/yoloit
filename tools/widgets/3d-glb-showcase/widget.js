@@ -8,8 +8,8 @@
   function init() {
     jsr.scene3d.create(sceneId, {
       engine: 'flame',
-      camera: { position: [0, 0, -8], target: [0, 0, 0], fov: 60 },
-      light: { position: [5, 8, 5], ambient: 0.3, diffuse: 0.8 }
+      camera: { position: [0, 0, 8], target: [0, 0, 0], fov: 60 },
+      light: { position: [5, 8, 5], ambient: 5.0, diffuse: 2.0 }
     });
     jsr.scene3d.addModel(sceneId, {
       modelId: modelId,
