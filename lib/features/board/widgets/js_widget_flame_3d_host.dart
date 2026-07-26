@@ -75,7 +75,10 @@ class Flame3dHost extends Js3dHost {
     Map<String, dynamic> config,
   ) {
     final c = controller as Flame3dController;
-    return _Flame3dGameWidget(controller: c);
+    return _Flame3dGameWidget(
+      key: ValueKey(c.sceneId),
+      controller: c,
+    );
   }
 }
 
@@ -406,7 +409,7 @@ class _ErrorWidget extends StatelessWidget {
 /// occurs when [ListenableBuilder] recreates the game widget on every
 /// controller notification.
 class _Flame3dGameWidget extends StatefulWidget {
-  const _Flame3dGameWidget({required this.controller});
+  const _Flame3dGameWidget({super.key, required this.controller});
 
   final Flame3dController controller;
 
