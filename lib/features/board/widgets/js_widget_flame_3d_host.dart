@@ -7,8 +7,10 @@ import 'package:flame_3d/game.dart';
 import 'package:flame_3d/graphics.dart';
 import 'package:flame_3d/model.dart';
 import 'package:flame_3d/parser.dart';
+import 'package:flame_3d/resources.dart';
 import 'package:flutter/material.dart';
 import 'package:js_widget_runtime/js_widget_runtime.dart';
+import 'package:yoloit/features/board/services/board_offscreen_renderer.dart';
 
 /// Creates a [Js3dHost] implementation backed by `flame_3d`.
 ///
@@ -99,6 +101,22 @@ class Flame3dController extends Js3dController {
   bool _disposed = false;
   int _refCount = 1;
 
+  /// The game instance currently claimed by a mounted [GameWidget].
+  ///
+  /// A [FlameGame3D] can only be attached to one [GameWidget] at a time, but
+  /// the same scene can be rendered in several places simultaneously (the
+  /// visible panel and the offscreen board capture/minimap). The first widget
+  /// to build claims the game; the others render a placeholder until it is
+  /// released.
+  YoloitFlame3dGame? gameWidgetOwner;
+
+  /// Releases the current game-widget claim and notifies listeners so a
+  /// waiting widget can rebuild and claim the game.
+  void releaseGameWidgetClaim() {
+    gameWidgetOwner = null;
+    notifyListeners();
+  }
+
   void _addRef() => _refCount++;
   int _releaseRef() => --_refCount;
 
@@ -113,10 +131,6 @@ class Flame3dController extends Js3dController {
   @override
   void apply(Js3dCommand command) {
     if (_disposed) return;
-    debugPrint(
-      '[Flame3dController] apply sceneId=$sceneId kind=${command.kind} '
-      'hasGame=${game != null} error=$error pending=${_pending.length}',
-    );
     if (game == null && error == null) {
       _pending.add(command);
       _initGameIfNeeded();
@@ -249,6 +263,7 @@ class YoloitFlame3dGame extends FlameGame3D<World3D, CameraComponent3D> {
   final void Function(String)? onError;
   final Map<String, ModelComponent> _models = {};
   final Map<String, _Rotation> _rotations = {};
+  final Set<String> _loadingModels = {};
 
   @override
   FutureOr<void> onLoad() async {
@@ -294,16 +309,23 @@ class YoloitFlame3dGame extends FlameGame3D<World3D, CameraComponent3D> {
     List<dynamic>? scale,
   }) async {
     if (src == null || src.isEmpty) return;
-
-    removeModel(modelId);
+    // The same scene can be driven by more than one JS engine (visible panel
+    // + offscreen board capture), so addModel may arrive twice in parallel.
+    // Without a guard both calls see an empty _models map before either parse
+    // finishes and add two components — one rotating, one static.
+    if (!_loadingModels.add(modelId)) return;
 
     debugPrint('[Flame3dGame] loadModel modelId=$modelId src=$src');
     try {
+      removeModel(modelId);
       final model = await ModelParser.parse(src);
       debugPrint(
         '[Flame3dGame] model parsed modelId=$modelId '
         'nodes=${model.nodes.length} animations=${model.animations.length}',
       );
+      _applyMaterialFixups(model);
+      // Remove again in case a parallel add slipped in during the await.
+      removeModel(modelId);
       final component = ModelComponent(
         model: model,
         position: _readVec3(position) ?? Vector3.zero(),
@@ -320,6 +342,8 @@ class YoloitFlame3dGame extends FlameGame3D<World3D, CameraComponent3D> {
       final message = 'Failed to load model "$src": $e';
       debugPrint('[Flame3dGame] $message');
       onError?.call(message);
+    } finally {
+      _loadingModels.remove(modelId);
     }
   }
 
@@ -329,6 +353,25 @@ class YoloitFlame3dGame extends FlameGame3D<World3D, CameraComponent3D> {
       world.remove(existing);
     }
     _rotations.remove(modelId);
+  }
+
+  /// Work around the flame_3d GLB parser, which defaults every material to
+  /// `metallic: 1.0` and ignores the `metallicRoughnessTexture`. A fully
+  /// metallic surface has no diffuse response, so with our simple
+  /// ambient+point lighting it renders black. Clamping metallic to 0 makes
+  /// models shade with diffuse lighting instead.
+  void _applyMaterialFixups(Model model) {
+    for (final node in model.nodes.values) {
+      final mesh = node.mesh;
+      if (mesh == null) continue;
+      for (final surface in mesh.surfaces) {
+        final material = surface.material;
+        if (material is SpatialMaterial) {
+          material.metallic = 0.0;
+          material.roughness = 1.0;
+        }
+      }
+    }
   }
 
   void setTransform(
@@ -418,6 +461,8 @@ class _Flame3dGameWidget extends StatefulWidget {
 }
 
 class _Flame3dGameWidgetState extends State<_Flame3dGameWidget> {
+  bool _ownsGame = false;
+
   @override
   void initState() {
     super.initState();
@@ -428,6 +473,7 @@ class _Flame3dGameWidgetState extends State<_Flame3dGameWidget> {
   void didUpdateWidget(covariant _Flame3dGameWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.controller != widget.controller) {
+      _releaseClaim(oldWidget.controller);
       oldWidget.controller.removeListener(_onControllerChanged);
       widget.controller.addListener(_onControllerChanged);
     }
@@ -435,8 +481,18 @@ class _Flame3dGameWidgetState extends State<_Flame3dGameWidget> {
 
   @override
   void dispose() {
+    _releaseClaim(widget.controller);
     widget.controller.removeListener(_onControllerChanged);
     super.dispose();
+  }
+
+  void _releaseClaim(Flame3dController controller) {
+    if (_ownsGame) {
+      _ownsGame = false;
+      // Let other widgets (e.g. the visible panel after the offscreen capture
+      // finishes) rebuild and claim the game.
+      scheduleMicrotask(controller.releaseGameWidgetClaim);
+    }
   }
 
   void _onControllerChanged() {
@@ -446,16 +502,31 @@ class _Flame3dGameWidgetState extends State<_Flame3dGameWidget> {
   @override
   Widget build(BuildContext context) {
     final c = widget.controller;
-    debugPrint(
-      '[Flame3dHost] build sceneId=${c.sceneId} '
-      'hasGame=${c.game != null} error=${c.error}',
-    );
     if (c.error != null) {
       return _ErrorWidget(message: c.error!);
     }
     final game = c.game;
     if (game == null) {
       return const Center(child: CircularProgressIndicator());
+    }
+    // The same game instance can only be attached to one GameWidget, but the
+    // scene may render in several places at once: the visible panel and the
+    // offscreen board capture (overview PNG). The offscreen tree is wrapped in
+    // a HeadlessScrollBehavior — never claim or attach the game there, so the
+    // visible panel always owns it.
+    if (ScrollConfiguration.of(context) is HeadlessScrollBehavior) {
+      return const SizedBox.shrink();
+    }
+    if (!_ownsGame) {
+      final owner = c.gameWidgetOwner;
+      if (owner == null || !identical(owner, game)) {
+        // Unclaimed, or the previous claim points to a stale game instance.
+        c.gameWidgetOwner = game;
+        _ownsGame = true;
+      }
+    }
+    if (!_ownsGame) {
+      return const SizedBox.shrink();
     }
     return GameWidget(game: game, addRepaintBoundary: false);
   }
