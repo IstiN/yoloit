@@ -74,7 +74,7 @@ dependencies:
   media_kit_video: ^2.0.1
   media_kit_libs_video: ^1.0.5
   record: ^7.1.1
-  js_widget_runtime: ^0.4.19
+  js_widget_runtime: ^0.4.20
   local_models_sdk:
     path: third_party/flutter_local_models/packages/local_models_sdk
   local_models_flutter:

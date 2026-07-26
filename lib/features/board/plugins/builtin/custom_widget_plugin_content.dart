@@ -335,7 +335,13 @@ class _CustomWidgetContentState extends State<CustomWidgetContent> {
     if (tree == null) {
       return const Center(child: CircularProgressIndicator(strokeWidth: 2));
     }
-    return ClipRect(child: _renderer!.build(tree, context));
+    // JsKeyboardCapture wires jsr.onKey: claims focus on first tap inside the
+    // panel and forwards key events to the engine unless a text field is
+    // focused. Without it keystrokes never reach the JS widget on boards.
+    return JsKeyboardCapture(
+      onEvent: (payload) => _engine?.dispatchHostEvent('key', payload),
+      child: ClipRect(child: _renderer!.build(tree, context)),
+    );
   }
 }
 

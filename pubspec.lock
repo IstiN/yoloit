@@ -678,10 +678,10 @@ packages:
     dependency: "direct main"
     description:
       name: js_widget_runtime
-      sha256: fa9f223e521052691d269e780d5342a8babc5404ca9c56332fe6a103fa0d760b
+      sha256: "1e581462c09fb26d70b70dbb4128a9aaf752b7c4cf9bbeec7f4a3ac4d3be32a6"
       url: "https://pub.dev"
     source: hosted
-    version: "0.4.19"
+    version: "0.4.20"
   json_annotation:
     dependency: "direct main"
     description:
