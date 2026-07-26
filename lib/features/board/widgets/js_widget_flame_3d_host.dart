@@ -44,10 +44,18 @@ class Flame3dHost extends Js3dHost {
     final existing = _controllers[sceneId];
     if (existing != null && !existing._disposed) {
       existing._addRef();
+      debugPrint(
+        '[Flame3dHost] reuse controller sceneId=$sceneId '
+        'refCount=${existing._refCount}',
+      );
       return existing;
     }
     final controller = Flame3dController(sceneId, config, this);
     _controllers[sceneId] = controller;
+    debugPrint(
+      '[Flame3dHost] create controller sceneId=$sceneId '
+      'configKeys=${config.keys.toList()}',
+    );
     return controller;
   }
 
@@ -70,6 +78,10 @@ class Flame3dHost extends Js3dHost {
     return ListenableBuilder(
       listenable: c,
       builder: (context, _) {
+        debugPrint(
+          '[Flame3dHost] build sceneId=${c.sceneId} '
+          'hasGame=${c.game != null} error=${c.error}',
+        );
         if (c.error != null) {
           return _ErrorWidget(message: c.error!);
         }
@@ -116,6 +128,10 @@ class Flame3dController extends Js3dController {
   @override
   void apply(Js3dCommand command) {
     if (_disposed) return;
+    debugPrint(
+      '[Flame3dController] apply sceneId=$sceneId kind=${command.kind} '
+      'hasGame=${game != null} error=$error pending=${_pending.length}',
+    );
     if (game == null && error == null) {
       _pending.add(command);
       _initGameIfNeeded();
@@ -129,13 +145,16 @@ class Flame3dController extends Js3dController {
   void _initGameIfNeeded() {
     if (_disposed || _initializing || game != null || error != null) return;
     _initializing = true;
+    debugPrint('[Flame3dController] init game sceneId=$sceneId');
     _host._ensureGpu().then((_) async {
       if (_disposed || game != null) return;
+      debugPrint('[Flame3dController] game created sceneId=$sceneId');
       game = YoloitFlame3dGame(
         config,
         onError: (message) {
           if (_disposed) return;
           error = message;
+          debugPrint('[Flame3dController] error sceneId=$sceneId: $message');
           notifyListeners();
         },
       );
@@ -147,6 +166,7 @@ class Flame3dController extends Js3dController {
     }).catchError((Object e) {
       if (_disposed) return;
       error = 'flame_3d unavailable: $e';
+      debugPrint('[Flame3dController] init error sceneId=$sceneId: $e');
       _pending.clear();
       notifyListeners();
     });
@@ -159,6 +179,10 @@ class Flame3dController extends Js3dController {
 
     switch (command.kind) {
       case 'addModel':
+        debugPrint(
+          '[Flame3dController] addModel sceneId=$sceneId modelId=$modelId '
+          'src=${payload['src']}',
+        );
         game?.loadModel(
           modelId: modelId,
           src: payload['src'] as String?,
@@ -278,8 +302,13 @@ class YoloitFlame3dGame extends FlameGame3D<World3D, CameraComponent3D> {
 
     removeModel(modelId);
 
+    debugPrint('[Flame3dGame] loadModel modelId=$modelId src=$src');
     try {
       final model = await ModelParser.parse(src);
+      debugPrint(
+        '[Flame3dGame] model parsed modelId=$modelId '
+        'nodes=${model.nodes.length} animations=${model.animations.length}',
+      );
       final component = ModelComponent(
         model: model,
         position: _readVec3(position) ?? Vector3.zero(),
@@ -288,6 +317,10 @@ class YoloitFlame3dGame extends FlameGame3D<World3D, CameraComponent3D> {
       );
       _models[modelId] = component;
       world.add(component);
+      debugPrint(
+        '[Flame3dGame] model added modelId=$modelId '
+        'worldChildren=${world.children.length}',
+      );
     } catch (e) {
       final message = 'Failed to load model "$src": $e';
       debugPrint('[Flame3dGame] $message');

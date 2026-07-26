@@ -63,6 +63,10 @@ class YoloitJs3dDispatcherHost extends Js3dHost {
     // both sides mutate and observe the same host instance.
     final existing = _controllers[sceneId];
     if (existing != null) {
+      debugPrint(
+        '[YoloitJs3dDispatcher] reuse controller sceneId=$sceneId '
+        'host=${existing.host.runtimeType}',
+      );
       return existing;
     }
     final host = selectHost(config);
@@ -73,6 +77,10 @@ class YoloitJs3dDispatcherHost extends Js3dHost {
       onDispose: () => _controllers.remove(sceneId),
     );
     _controllers[sceneId] = wrapper;
+    debugPrint(
+      '[YoloitJs3dDispatcher] create controller sceneId=$sceneId '
+      'host=${host.runtimeType} configKeys=${config.keys.toList()}',
+    );
     return wrapper;
   }
 
