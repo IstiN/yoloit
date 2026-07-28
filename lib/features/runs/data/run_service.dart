@@ -219,10 +219,36 @@ class RunService {
   void stop(String sessionId) {
     final name = _sessionTmux[sessionId];
     if (name != null) {
-      final tmux = _tmuxPath ?? 'tmux';
-      Process.run(tmux, ['kill-session', '-t', name]);
+      unawaited(_stopTmuxSession(name));
     }
     _cleanup(sessionId);
+  }
+
+  /// Gracefully stops the run inside tmux session [name].
+  ///
+  /// Sends Ctrl+C (SIGINT) to the pane's foreground job first so tools like
+  /// `flutter_tools` can shut down cleanly: kill their own children
+  /// (`flutter_tester`) and remove their temp dirs. A bare `kill-session`
+  /// only SIGHUPs the pane shell — grandchildren get orphaned (PPID 1) and
+  /// leak ~200 MB temp dirs and GPU resources. `kill-session` remains as a
+  /// fallback when the job ignores SIGINT.
+  Future<void> _stopTmuxSession(String name) async {
+    final tmux = _tmuxPath ?? 'tmux';
+    try {
+      await Process.run(tmux, ['send-keys', '-t', name, 'C-c']);
+      // flutter exits on SIGINT, the wrapper shell then writes the exit
+      // marker and terminates, ending the tmux session by itself.
+      for (var i = 0; i < 20; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 250));
+        final check = await Process.run(tmux, ['has-session', '-t', name]);
+        if (check.exitCode != 0) return; // session gone — clean exit
+      }
+    } catch (_) {
+      // Fall through to the hard kill.
+    }
+    try {
+      await Process.run(tmux, ['kill-session', '-t', name]);
+    } catch (_) {}
   }
 
   void sendHotReload(String sessionId) => _sendKeys(sessionId, 'r');
