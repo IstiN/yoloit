@@ -46,6 +46,23 @@ import 'package:yoloit/features/board/widgets/widget_engine_manager.dart';
 import 'package:yoloit/features/templates/data/template_service.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_cubit.dart';
 
+part 'cli_server_api_routes.dart';
+
+/// Signature of a YAML bulk-operation handler in
+/// [CliServer._yamlOperationHandlers]. `op` is the resolved operation name
+/// (used by handlers shared across several ops, e.g. `link.*` and
+/// `board.undo`/`board.redo`).
+typedef _YamlOperationHandler =
+    Future<Map<String, dynamic>> Function(
+      BoardCubit cubit,
+      BoardDocument board,
+      Map<String, String> refs,
+      Map<String, BoardPanelInstance> pendingPanels,
+      Map<String, dynamic> raw,
+      String op, {
+      required int index,
+    });
+
 /// Local HTTP server that exposes YoLoIT board functionality via a REST-like
 /// API on `localhost`. A companion CLI script (`tools/yoloit`) communicates
 /// with this server so that boards, panels and their content can be managed
@@ -293,114 +310,15 @@ class CliServer {
     final cubit = _cubit;
     if (cubit == null) return cliError('Board cubit not available');
 
-    // GET /api/vmservice → return VM service WebSocket URI for hot reload
-    if (path.length == 1 && path[0] == 'vmservice' && method == 'GET') {
-      _writeVmServiceFile(); // refresh
-      final f = File(_vmServiceFilePath);
-      final uri = f.existsSync() ? f.readAsStringSync().trim() : '';
-      return cliJson({'vmServiceWsUri': uri, 'ok': uri.isNotEmpty});
+    final ctx = _ApiRouteContext(
+      method: method,
+      path: path,
+      request: request,
+      cubit: cubit,
+    );
+    for (final route in _apiRoutes) {
+      if (_apiRouteMatches(route, method, path)) return route.handler(ctx);
     }
-
-    // GET /api/catalog → command catalog with humanVariants for router model
-    if (path.length == 1 && path[0] == 'catalog' && method == 'GET') {
-      final yamlVariants = await YoloitCliToolCatalog.loadYamlVariants();
-      return shelf.Response.ok(
-        YoloitCliToolCatalog.catalogJson(yamlVariants),
-        headers: {'content-type': 'application/json'},
-      );
-    }
-
-    // /api/yolochat/...
-    if (path.isNotEmpty && path[0] == 'yolochat') {
-      return _handleYoloChat(method, path.sublist(1), request, cubit);
-    }
-
-    // /api/cloud-providers/...
-    if (path.isNotEmpty && path[0] == 'cloud-providers') {
-      return _handleCloudProviders(method, path.sublist(1), request);
-    }
-
-    // /api/voice-settings/...
-    if (path.isNotEmpty && path[0] == 'voice-settings') {
-      return _handleVoiceSettings(method, path.sublist(1), request);
-    }
-
-    if (path.isNotEmpty && path[0] == 'agents') {
-      return _handleAgents(method, path.sublist(1), request);
-    }
-
-    // /api/theme/...
-    if (path.isNotEmpty && path[0] == 'theme') {
-      return _handleTheme(method, path.sublist(1), request);
-    }
-
-    if (path.isNotEmpty && path[0] == 'drawings') {
-      return _handleDrawings(method, path.sublist(1), request, cubit);
-    }
-
-    if (path.isNotEmpty && path[0] == 'search') {
-      return _handleSearch(method, path.sublist(1), request, cubit);
-    }
-
-    // GET /api/active-board → active board details (or first board)
-    if (path.length == 1 && path[0] == 'active-board' && method == 'GET') {
-      final board = cubit.state.activeBoard ?? cubit.state.boards.firstOrNull;
-      if (board == null) return cliJson({'board': null});
-      return cliJson({
-        'board': {
-          'id': board.id,
-          'name': board.name,
-          'panelCount': board.panels.length,
-          'defaultFolder': board.defaultFolder,
-        },
-      });
-    }
-
-    // GET /api/templates
-    if (path.length == 1 && path[0] == 'templates' && method == 'GET') {
-      return _listTemplates();
-    }
-
-    // GET /api/templates/:id
-    if (path.length == 2 && path[0] == 'templates' && method == 'GET') {
-      return _templateDetails(path[1]);
-    }
-
-    // POST /api/templates/sync
-    if (path.length == 1 && path[0] == 'templates' && method == 'POST') {
-      return _syncTemplates(request);
-    }
-
-    // GET /api/boards
-    if (path.length == 1 && path[0] == 'boards' && method == 'GET') {
-      return _listBoards(cubit, request);
-    }
-
-    // POST /api/boards  { name: "...", templateId?, templateParams? }
-    if (path.length == 1 && path[0] == 'boards' && method == 'POST') {
-      final body = await cliReadJsonBody(request);
-      return _createBoard(cubit, body);
-    }
-
-    // /api/boards/:boardIdOrName/...
-    if (path.length >= 2 && path[0] == 'boards') {
-      final board = findBoard(cubit, path[1]);
-      if (board == null) return cliNotFound('Board not found: ${path[1]}');
-
-      final sub = path.sublist(2);
-      return _handleBoard(method, sub, board, cubit, request);
-    }
-
-    // /api/widgets
-    if (path.isNotEmpty && path[0] == 'widgets') {
-      return _handleWidgets(method, path.sublist(1), request);
-    }
-
-    // /api/apps
-    if (path.isNotEmpty && path[0] == 'apps') {
-      return _handleApps(method, path.sublist(1), request);
-    }
-
     return cliNotFound('Unknown route');
   }
 
@@ -599,20 +517,19 @@ class CliServer {
     final templates = await BoardTemplateService.instance.loadAll();
     return cliJson({
       'ok': true,
-      'templates':
-          templates
-              .map(
-                (t) => {
-                  'id': t.id,
-                  'name': t.name,
-                  'icon': t.icon,
-                  'author': t.author,
-                  'description': t.description,
-                  'parameterCount': t.parameters.length,
-                  'sourceId': t.sourceId,
-                },
-              )
-              .toList(),
+      'templates': templates
+          .map(
+            (t) => {
+              'id': t.id,
+              'name': t.name,
+              'icon': t.icon,
+              'author': t.author,
+              'description': t.description,
+              'parameterCount': t.parameters.length,
+              'sourceId': t.sourceId,
+            },
+          )
+          .toList(),
     });
   }
 
@@ -642,9 +559,7 @@ class CliServer {
     if (sourceId != null && sourceId.isNotEmpty) {
       // Sync a single source if requested.
       final sources = await BoardTemplateService.instance.loadAll();
-      final source = sources
-          .where((s) => s.sourceId == sourceId)
-          .firstOrNull;
+      final source = sources.where((s) => s.sourceId == sourceId).firstOrNull;
       if (source == null) {
         return cliNotFound('Template source not found: $sourceId');
       }
@@ -663,8 +578,9 @@ class CliServer {
   shelf.Response _listBoards(BoardCubit cubit, shelf.Request request) {
     final includeArchived =
         request.url.queryParameters['includeArchived'] == 'true';
-    final boards =
-        includeArchived ? cubit.state.boards : cubit.state.activeBoards;
+    final boards = includeArchived
+        ? cubit.state.boards
+        : cubit.state.activeBoards;
     final active = cubit.state.activeBoardId;
     return cliJson({
       'boards': boards.map((b) => _boardSummary(b, activeId: active)).toList(),
@@ -689,9 +605,10 @@ class CliServer {
     Map<String, dynamic> body,
   ) async {
     final name = body['name'] as String? ?? 'New Board';
-    final templateId = body['templateId'] as String? ??
-        body['template'] as String?;
-    final templateParams = _map(body['templateParams'] ?? body['params']) ??
+    final templateId =
+        body['templateId'] as String? ?? body['template'] as String?;
+    final templateParams =
+        _map(body['templateParams'] ?? body['params']) ??
         const <String, dynamic>{};
 
     if (templateId != null && templateId.isNotEmpty) {
@@ -922,10 +839,7 @@ class CliServer {
     return cliJson({'ok': true});
   }
 
-  Future<shelf.Response> _undoBoard(
-    BoardCubit cubit,
-    BoardDocument board,
-  ) {
+  Future<shelf.Response> _undoBoard(BoardCubit cubit, BoardDocument board) {
     return boardHistoryShelfResponse(
       action: () => cubit.undoLatestPanelHistory(board.id),
       onApplied: cliScheduleRebuild,
@@ -938,10 +852,7 @@ class CliServer {
     );
   }
 
-  Future<shelf.Response> _redoBoard(
-    BoardCubit cubit,
-    BoardDocument board,
-  ) {
+  Future<shelf.Response> _redoBoard(BoardCubit cubit, BoardDocument board) {
     return boardHistoryShelfResponse(
       action: () => cubit.redoLatestPanelHistory(board.id),
       onApplied: cliScheduleRebuild,
@@ -973,8 +884,7 @@ class CliServer {
 
     if (typeId == 'board.widget.custom') {
       final rawState = body['state'];
-      final widgetId =
-          rawState is Map ? rawState['widgetId'] as String? : null;
+      final widgetId = rawState is Map ? rawState['widgetId'] as String? : null;
       if (widgetId == null || widgetId.trim().isEmpty) {
         return cliError(
           'Use app:run <app-path-or-id> to open a widget app. '
@@ -987,26 +897,20 @@ class CliServer {
     final w = (body['width'] as num?)?.toDouble() ?? plugin.defaultSize.width;
     final h = (body['height'] as num?)?.toDouble() ?? plugin.defaultSize.height;
     final hasExplicitState = body['state'] is Map;
-    final state =
-        hasExplicitState
-            ? CliTextArgumentResolver.resolvePanelState(
-              Map<String, dynamic>.from(body['state'] as Map),
-            )
-            : _initialPanelStateForBoard(plugin.initialState, typeId, board);
+    final state = hasExplicitState
+        ? CliTextArgumentResolver.resolvePanelState(
+            Map<String, dynamic>.from(body['state'] as Map),
+          )
+        : _initialPanelStateForBoard(plugin.initialState, typeId, board);
     final hasCustomPosition = body['x'] is num || body['y'] is num;
-    final bounds =
-        !hasCustomPosition
-            ? _nextAvailableBoundsFor(
-              board,
-              preferredWidth: w,
-              preferredHeight: h,
-            )
-            : BoardPanelBounds(
-              x: (body['x'] as num?)?.toDouble() ?? 100,
-              y: (body['y'] as num?)?.toDouble() ?? 100,
-              width: w,
-              height: h,
-            );
+    final bounds = !hasCustomPosition
+        ? _nextAvailableBoundsFor(board, preferredWidth: w, preferredHeight: h)
+        : BoardPanelBounds(
+            x: (body['x'] as num?)?.toDouble() ?? 100,
+            y: (body['y'] as num?)?.toDouble() ?? 100,
+            width: w,
+            height: h,
+          );
 
     final panelId = 'p-${DateTime.now().millisecondsSinceEpoch}';
     final panel = BoardPanelInstance(
@@ -1070,10 +974,9 @@ class CliServer {
 
   void _warnIfActionHelpIncomplete(PanelCliHandler handler) {
     if (_warnedActionHelpTypes.contains(handler.typeId)) return;
-    final missing =
-        handler.supportedActions
-            .where((action) => !handler.actionHelp.containsKey(action))
-            .toList();
+    final missing = handler.supportedActions
+        .where((action) => !handler.actionHelp.containsKey(action))
+        .toList();
     if (missing.isEmpty) return;
     _warnedActionHelpTypes.add(handler.typeId);
     developer.log(
@@ -1276,9 +1179,10 @@ class CliServer {
       final config = AudioRecorderConfig.fromState(mergedState);
       if (mergedState['isRecording'] == true) {
         final systemSource =
-            (config.captureSystemAudio && SystemAudioBridge.instance.isSupported)
-                ? SystemAudioSource()
-                : null;
+            (config.captureSystemAudio &&
+                SystemAudioBridge.instance.isSupported)
+            ? SystemAudioSource()
+            : null;
         await AudioRecordingManager.instance.start(
           panelId: panel.id,
           boardId: board.id,
@@ -1288,12 +1192,7 @@ class CliServer {
         await AudioRecordingManager.instance.stop(panel.id);
       }
     }
-    await _maybeAutoSizeMarkdownNote(
-      cubit,
-      board,
-      panel,
-      state: mergedState,
-    );
+    await _maybeAutoSizeMarkdownNote(cubit, board, panel, state: mergedState);
   }
 
   Future<void> _maybeAutoSizeMarkdownNote(
@@ -1348,14 +1247,17 @@ class CliServer {
     await cubit.updateViewport(vp, boardId: board.id);
     cliScheduleRebuild();
     final bounds = boundingBoxOfPanels(panels);
-    return _viewportJson(vp, extra: {
-      'bounds': {
-        'minX': bounds.minX,
-        'minY': bounds.minY,
-        'maxX': bounds.maxX,
-        'maxY': bounds.maxY,
+    return _viewportJson(
+      vp,
+      extra: {
+        'bounds': {
+          'minX': bounds.minX,
+          'minY': bounds.minY,
+          'maxX': bounds.maxX,
+          'maxY': bounds.maxY,
+        },
       },
-    });
+    );
   }
 
   // ── Arrange implementation ─────────────────────────────────────────────
@@ -1381,19 +1283,81 @@ class CliServer {
     final panels = board.panels.where((p) => !p.hidden).toList();
     if (panels.isEmpty) return cliError('No panels to arrange');
 
-    // Build adjacency: fromId → [toId]
+    final graph = _arrangeLinkGraph(board);
+    // Collect all panel IDs in the linked graph
+    final linkedIds = {...graph.children.keys, ...graph.hasIncoming};
+    final unlinked = panels.where((p) => !linkedIds.contains(p.id)).toList();
+
+    final root = _arrangeRoot(
+      board,
+      panels,
+      linkedIds,
+      graph.hasIncoming,
+      rootHint,
+    );
+    final positions = _arrangePositions(root, graph.children);
+
+    // Find max panel size for spacing calculations
+    final maxW = panels
+        .map((p) => p.bounds.width)
+        .reduce((a, b) => a > b ? a : b);
+    final maxH = panels
+        .map((p) => p.bounds.height)
+        .reduce((a, b) => a > b ? a : b);
+
+    final moves = _arrangeMoves(
+      positions,
+      unlinked,
+      direction: direction,
+      maxW: maxW,
+      maxH: maxH,
+      hSpacing: hSpacing,
+      vSpacing: vSpacing,
+    );
+
+    // Apply all position updates
+    for (final entry in moves.entries) {
+      final panelId = entry.key;
+      final (x, y) = entry.value;
+      await cubit.updatePanel(
+        panelId,
+        (p) => p.copyWith(
+          bounds: p.bounds.copyWith(x: x, y: y),
+        ),
+        boardId: board.id,
+      );
+    }
+    cliScheduleRebuild();
+
+    return cliJson({
+      'ok': true,
+      'arranged': moves.length,
+      'layout': 'tree',
+      'direction': direction,
+    });
+  }
+
+  /// Builds adjacency: fromId → [toId], plus the set of panels with an
+  /// incoming link.
+  ({Map<String, List<String>> children, Set<String> hasIncoming})
+  _arrangeLinkGraph(BoardDocument board) {
     final children = <String, List<String>>{};
     final hasIncoming = <String>{};
     for (final link in board.links) {
       children.putIfAbsent(link.fromPanelId, () => []).add(link.toPanelId);
       hasIncoming.add(link.toPanelId);
     }
+    return (children: children, hasIncoming: hasIncoming);
+  }
 
-    // Collect all panel IDs in the linked graph
-    final linkedIds = {...children.keys, ...hasIncoming};
-    final unlinked = panels.where((p) => !linkedIds.contains(p.id)).toList();
-
-    // Determine root: hint → no-incoming node → first panel
+  /// Determines root: hint → no-incoming node → first panel.
+  BoardPanelInstance _arrangeRoot(
+    BoardDocument board,
+    List<BoardPanelInstance> panels,
+    Set<String> linkedIds,
+    Set<String> hasIncoming,
+    String? rootHint,
+  ) {
     BoardPanelInstance? root;
     if (rootHint != null) {
       root = findPanel(board, rootHint);
@@ -1402,8 +1366,14 @@ class CliServer {
       (p) => linkedIds.contains(p.id) && !hasIncoming.contains(p.id),
       orElse: () => panels.first,
     );
+    return root;
+  }
 
-    // BFS to compute (depth, siblingIndex) for each node
+  /// BFS to compute (depth, siblingIndex) for each node.
+  Map<String, (int depth, int index)> _arrangePositions(
+    BoardPanelInstance root,
+    Map<String, List<String>> children,
+  ) {
     final positions = <String, (int depth, int index)>{};
     final siblingCount = <int, int>{}; // depth → next sibling index
     final queue = <String>[root.id];
@@ -1422,16 +1392,20 @@ class CliServer {
         queue.add(kid);
       }
     }
+    return positions;
+  }
 
-    // Find max panel size for spacing calculations
-    final maxW = panels
-        .map((p) => p.bounds.width)
-        .reduce((a, b) => a > b ? a : b);
-    final maxH = panels
-        .map((p) => p.bounds.height)
-        .reduce((a, b) => a > b ? a : b);
-
-    // Assign x/y based on depth/index and direction
+  /// Assigns x/y to every positioned node based on depth/index and direction,
+  /// then places unlinked panels below the tree.
+  Map<String, (double x, double y)> _arrangeMoves(
+    Map<String, (int depth, int index)> positions,
+    List<BoardPanelInstance> unlinked, {
+    required String direction,
+    required double maxW,
+    required double maxH,
+    required double hSpacing,
+    required double vSpacing,
+  }) {
     const originX = 80.0;
     const originY = 80.0;
 
@@ -1453,35 +1427,16 @@ class CliServer {
 
     // Also arrange unlinked panels below the tree
     if (unlinked.isNotEmpty) {
-      final treeMaxY =
-          moves.values.isEmpty
-              ? originY
-              : moves.values.map((v) => v.$2).reduce((a, b) => a > b ? a : b);
+      final treeMaxY = moves.values.isEmpty
+          ? originY
+          : moves.values.map((v) => v.$2).reduce((a, b) => a > b ? a : b);
       final startY = treeMaxY + maxH + vSpacing * 2;
       for (var i = 0; i < unlinked.length; i++) {
         final x = originX + i * (maxW + hSpacing);
         moves[unlinked[i].id] = (x, startY);
       }
     }
-
-    // Apply all position updates
-    for (final entry in moves.entries) {
-      final panelId = entry.key;
-      final (x, y) = entry.value;
-      await cubit.updatePanel(
-        panelId,
-        (p) => p.copyWith(bounds: p.bounds.copyWith(x: x, y: y)),
-        boardId: board.id,
-      );
-    }
-    cliScheduleRebuild();
-
-    return cliJson({
-      'ok': true,
-      'arranged': moves.length,
-      'layout': 'tree',
-      'direction': direction,
-    });
+    return moves;
   }
 
   // ── Grid view implementation ─────────────────────────────────────────────
@@ -1533,8 +1488,9 @@ class CliServer {
     }
 
     cliScheduleRebuild();
-    final updated =
-        cubit.state.boards.where((b) => b.id == board.id).firstOrNull;
+    final updated = cubit.state.boards
+        .where((b) => b.id == board.id)
+        .firstOrNull;
     return cliJson({
       'ok': true,
       'gridMode': (updated ?? board).gridMode.toJson(),
@@ -1600,10 +1556,9 @@ class CliServer {
         final panelId = _string(result['panelId']);
         if (panelId != null) {
           currentBoard = currentBoard.copyWith(
-            panels:
-                currentBoard.panels
-                    .where((panel) => panel.id != panelId)
-                    .toList(),
+            panels: currentBoard.panels
+                .where((panel) => panel.id != panelId)
+                .toList(),
           );
         }
       }
@@ -1646,145 +1601,207 @@ class CliServer {
       return {'ok': false, 'error': 'Missing "op" field'};
     }
 
-    switch (op) {
-      case 'panel.create':
-        return _yamlCreatePanel(
-          cubit,
-          board,
-          refs,
-          pendingPanels,
-          raw,
-          index: index,
-        );
-      case 'panel.update':
-        return _yamlUpdatePanel(
-          cubit,
-          board,
-          refs,
-          pendingPanels,
-          raw,
-          index: index,
-        );
-      case 'panel.move':
-        return _yamlMovePanel(
-          cubit,
-          board,
-          refs,
-          pendingPanels,
-          raw,
-          index: index,
-        );
-      case 'panel.resize':
-        return _yamlResizePanel(
-          cubit,
-          board,
-          refs,
-          pendingPanels,
-          raw,
-          index: index,
-        );
-      case 'panel.delete':
-        return _yamlDeletePanel(
-          cubit,
-          board,
-          refs,
-          pendingPanels,
-          raw,
-          index: index,
-        );
-      case 'panel.focus':
-        return _yamlFocusPanel(
-          cubit,
-          board,
-          refs,
-          pendingPanels,
-          raw,
-          index: index,
-        );
-      case 'panel.color':
-        return _yamlColorPanel(
-          cubit,
-          board,
-          refs,
-          pendingPanels,
-          raw,
-          index: index,
-        );
-      case 'panel.hide':
-      case 'panel.show':
-        return _yamlHideShowPanel(
-          cubit,
-          board,
-          refs,
-          pendingPanels,
-          raw,
-          hidden: op == 'panel.hide',
-          index: index,
-        );
-      case 'panel.action':
-        return _yamlPanelAction(
-          cubit,
-          board,
-          refs,
-          pendingPanels,
-          raw,
-          index: index,
-        );
-
-      case 'link.create':
-        return _yamlCreateLink(
-          cubit,
-          board,
-          refs,
-          pendingPanels,
-          raw,
-          index: index,
-        );
-      case 'link.delete':
-        return _yamlDeleteLink(
-          cubit,
-          board,
-          refs,
-          pendingPanels,
-          raw,
-          index: index,
-        );
-      case 'link.update':
-      case 'link.style':
-      case 'link.color':
-        return _yamlUpdateLink(
-          cubit,
-          board,
-          refs,
-          pendingPanels,
-          raw,
-          op,
-          index: index,
-        );
-
-      case 'board.focus':
-        await cubit.setActiveBoard(board.id);
-        return {'ok': true, 'message': 'Board focused'};
-      case 'board.fit':
-        return _yamlFitBoard(cubit, board, raw, index: index);
-      case 'board.zoom':
-        return _yamlZoomBoard(cubit, board, raw, index: index);
-      case 'board.translate':
-        return _yamlTranslateBoard(cubit, board, raw, index: index);
-      case 'board.arrange':
-        return _yamlArrangeBoard(cubit, board, raw, index: index);
-      case 'board.undo':
-      case 'board.redo':
-        return yamlBoardHistoryOp(
-          cubit: cubit,
-          board: board,
-          op: op,
-          onApplied: cliScheduleRebuild,
-        );
-      default:
-        return {'ok': false, 'error': 'Unknown op "$op"'};
+    final handler = _yamlOperationHandlers[op];
+    if (handler == null) {
+      return {'ok': false, 'error': 'Unknown op "$op"'};
     }
+    return handler(cubit, board, refs, pendingPanels, raw, op, index: index);
   }
+
+  /// YAML bulk-operation dispatch table. Keys mirror the original switch
+  /// cases (`panel.hide`/`panel.show` shared a case with `hidden` derived
+  /// from the op; `link.update`/`link.style`/`link.color` and
+  /// `board.undo`/`board.redo` forwarded the op itself).
+  late final Map<String, _YamlOperationHandler> _yamlOperationHandlers = {
+    'panel.create':
+        (cubit, board, refs, pendingPanels, raw, op, {required index}) =>
+            _yamlCreatePanel(
+              cubit,
+              board,
+              refs,
+              pendingPanels,
+              raw,
+              index: index,
+            ),
+    'panel.update':
+        (cubit, board, refs, pendingPanels, raw, op, {required index}) =>
+            _yamlUpdatePanel(
+              cubit,
+              board,
+              refs,
+              pendingPanels,
+              raw,
+              index: index,
+            ),
+    'panel.move':
+        (cubit, board, refs, pendingPanels, raw, op, {required index}) =>
+            _yamlMovePanel(
+              cubit,
+              board,
+              refs,
+              pendingPanels,
+              raw,
+              index: index,
+            ),
+    'panel.resize':
+        (cubit, board, refs, pendingPanels, raw, op, {required index}) =>
+            _yamlResizePanel(
+              cubit,
+              board,
+              refs,
+              pendingPanels,
+              raw,
+              index: index,
+            ),
+    'panel.delete':
+        (cubit, board, refs, pendingPanels, raw, op, {required index}) =>
+            _yamlDeletePanel(
+              cubit,
+              board,
+              refs,
+              pendingPanels,
+              raw,
+              index: index,
+            ),
+    'panel.focus':
+        (cubit, board, refs, pendingPanels, raw, op, {required index}) =>
+            _yamlFocusPanel(
+              cubit,
+              board,
+              refs,
+              pendingPanels,
+              raw,
+              index: index,
+            ),
+    'panel.color':
+        (cubit, board, refs, pendingPanels, raw, op, {required index}) =>
+            _yamlColorPanel(
+              cubit,
+              board,
+              refs,
+              pendingPanels,
+              raw,
+              index: index,
+            ),
+    'panel.hide':
+        (cubit, board, refs, pendingPanels, raw, op, {required index}) =>
+            _yamlHideShowPanel(
+              cubit,
+              board,
+              refs,
+              pendingPanels,
+              raw,
+              hidden: true,
+              index: index,
+            ),
+    'panel.show':
+        (cubit, board, refs, pendingPanels, raw, op, {required index}) =>
+            _yamlHideShowPanel(
+              cubit,
+              board,
+              refs,
+              pendingPanels,
+              raw,
+              hidden: false,
+              index: index,
+            ),
+    'panel.action':
+        (cubit, board, refs, pendingPanels, raw, op, {required index}) =>
+            _yamlPanelAction(
+              cubit,
+              board,
+              refs,
+              pendingPanels,
+              raw,
+              index: index,
+            ),
+    'link.create':
+        (cubit, board, refs, pendingPanels, raw, op, {required index}) =>
+            _yamlCreateLink(
+              cubit,
+              board,
+              refs,
+              pendingPanels,
+              raw,
+              index: index,
+            ),
+    'link.delete':
+        (cubit, board, refs, pendingPanels, raw, op, {required index}) =>
+            _yamlDeleteLink(
+              cubit,
+              board,
+              refs,
+              pendingPanels,
+              raw,
+              index: index,
+            ),
+    'link.update':
+        (cubit, board, refs, pendingPanels, raw, op, {required index}) =>
+            _yamlUpdateLink(
+              cubit,
+              board,
+              refs,
+              pendingPanels,
+              raw,
+              op,
+              index: index,
+            ),
+    'link.style':
+        (cubit, board, refs, pendingPanels, raw, op, {required index}) =>
+            _yamlUpdateLink(
+              cubit,
+              board,
+              refs,
+              pendingPanels,
+              raw,
+              op,
+              index: index,
+            ),
+    'link.color':
+        (cubit, board, refs, pendingPanels, raw, op, {required index}) =>
+            _yamlUpdateLink(
+              cubit,
+              board,
+              refs,
+              pendingPanels,
+              raw,
+              op,
+              index: index,
+            ),
+    'board.focus':
+        (cubit, board, refs, pendingPanels, raw, op, {required index}) async {
+          await cubit.setActiveBoard(board.id);
+          return {'ok': true, 'message': 'Board focused'};
+        },
+    'board.fit':
+        (cubit, board, refs, pendingPanels, raw, op, {required index}) =>
+            _yamlFitBoard(cubit, board, raw, index: index),
+    'board.zoom':
+        (cubit, board, refs, pendingPanels, raw, op, {required index}) =>
+            _yamlZoomBoard(cubit, board, raw, index: index),
+    'board.translate':
+        (cubit, board, refs, pendingPanels, raw, op, {required index}) =>
+            _yamlTranslateBoard(cubit, board, raw, index: index),
+    'board.arrange':
+        (cubit, board, refs, pendingPanels, raw, op, {required index}) =>
+            _yamlArrangeBoard(cubit, board, raw, index: index),
+    'board.undo':
+        (cubit, board, refs, pendingPanels, raw, op, {required index}) =>
+            yamlBoardHistoryOp(
+              cubit: cubit,
+              board: board,
+              op: op,
+              onApplied: cliScheduleRebuild,
+            ),
+    'board.redo':
+        (cubit, board, refs, pendingPanels, raw, op, {required index}) =>
+            yamlBoardHistoryOp(
+              cubit: cubit,
+              board: board,
+              op: op,
+              onApplied: cliScheduleRebuild,
+            ),
+  };
 
   Future<Map<String, dynamic>> _yamlCreatePanel(
     BoardCubit cubit,
@@ -1838,6 +1855,24 @@ class CliServer {
       return _yamlPanelNotFoundError(raw, refs, pendingPanels);
     }
 
+    final updates = _yamlPanelFieldUpdates(raw, panel);
+    _yamlPanelGeometryUpdates(raw, panel, updates);
+
+    if (updates.isNotEmpty) {
+      await _applyYamlPanelUpdates(cubit, board, panel, updates);
+    }
+    if (_bool(raw['focus']) == true) {
+      await _focusPanelOnBoard(cubit, board, panel.id);
+    }
+    return {'ok': true, 'panelId': panel.id};
+  }
+
+  /// Collects scalar field updates (title/flags/color/params/state/zIndex)
+  /// from a `panel.update` YAML operation.
+  Map<String, dynamic> _yamlPanelFieldUpdates(
+    Map<String, dynamic> raw,
+    BoardPanelInstance panel,
+  ) {
     final updates = <String, dynamic>{};
     if (raw.containsKey('title')) {
       updates['title'] = _string(raw['title']) ?? panel.title;
@@ -1864,6 +1899,16 @@ class CliServer {
     if (raw.containsKey('zIndex')) {
       updates['zIndex'] = _int(raw['zIndex']) ?? panel.zIndex;
     }
+    return updates;
+  }
+
+  /// Collects geometry updates (position/size) from a `panel.update` YAML
+  /// operation into [updates].
+  void _yamlPanelGeometryUpdates(
+    Map<String, dynamic> raw,
+    BoardPanelInstance panel,
+    Map<String, dynamic> updates,
+  ) {
     if (raw.containsKey('x') || raw.containsKey('y')) {
       final x = _double(raw['x']) ?? panel.bounds.x;
       final y = _double(raw['y']) ?? panel.bounds.y;
@@ -1876,14 +1921,6 @@ class CliServer {
       updates['width'] = w;
       updates['height'] = h;
     }
-
-    if (updates.isNotEmpty) {
-      await _applyYamlPanelUpdates(cubit, board, panel, updates);
-    }
-    if (_bool(raw['focus']) == true) {
-      await _focusPanelOnBoard(cubit, board, panel.id);
-    }
-    return {'ok': true, 'panelId': panel.id};
   }
 
   Future<void> _applyYamlPanelUpdates(
@@ -2087,13 +2124,12 @@ class CliServer {
     final action = _string(raw['action']);
     if (action == null) return {'ok': false, 'error': 'Missing "action"'};
 
-    final body =
-        <String, dynamic>{...raw}
-          ..remove('op')
-          ..remove('panel')
-          ..remove('panelId')
-          ..remove('panelRef')
-          ..remove('ref');
+    final body = <String, dynamic>{...raw}
+      ..remove('op')
+      ..remove('panel')
+      ..remove('panelId')
+      ..remove('panelRef')
+      ..remove('ref');
     body['action'] = action;
 
     final handler = _panelHandlers[panel.type];
@@ -2351,18 +2387,16 @@ class CliServer {
   // Search helpers moved to search_handler.dart
 
   String? _string(dynamic value) => value?.toString();
-  double? _double(dynamic value) =>
-      value is num
-          ? value.toDouble()
-          : double.tryParse(value?.toString() ?? '');
+  double? _double(dynamic value) => value is num
+      ? value.toDouble()
+      : double.tryParse(value?.toString() ?? '');
   int? _int(dynamic value) =>
       value is num ? value.toInt() : int.tryParse(value?.toString() ?? '');
   bool? _bool(dynamic value) =>
       value is bool ? value : (value?.toString().toLowerCase() == 'true');
-  Map<String, dynamic>? _map(dynamic value) =>
-      value is Map
-          ? Map<String, dynamic>.from(_yamlToDart(value) as Map)
-          : null;
+  Map<String, dynamic>? _map(dynamic value) => value is Map
+      ? Map<String, dynamic>.from(_yamlToDart(value) as Map)
+      : null;
   Color? _color(dynamic value) =>
       value == null ? null : parseColor(value.toString());
   String _nextBulkId(String prefix) =>
@@ -2385,19 +2419,18 @@ class CliServer {
   shelf.Response _listPanelTypes() {
     final plugins = BoardPluginRegistry.instance.all;
     return cliJson({
-      'types':
-          plugins
-              .map(
-                (p) => {
-                  'typeId': p.typeId,
-                  'name': p.displayName,
-                  'defaultSize': {
-                    'w': p.defaultSize.width.toInt(),
-                    'h': p.defaultSize.height.toInt(),
-                  },
-                },
-              )
-              .toList(),
+      'types': plugins
+          .map(
+            (p) => {
+              'typeId': p.typeId,
+              'name': p.displayName,
+              'defaultSize': {
+                'w': p.defaultSize.width.toInt(),
+                'h': p.defaultSize.height.toInt(),
+              },
+            },
+          )
+          .toList(),
     });
   }
 
@@ -2426,18 +2459,17 @@ class CliServer {
 
   shelf.Response _listLinks(BoardDocument board) {
     return cliJson({
-      'links':
-          board.links
-              .map(
-                (l) => {
-                  'id': l.id,
-                  'from': l.fromPanelId,
-                  'to': l.toPanelId,
-                  'style': l.style.name,
-                  'geometry': l.geometry.name,
-                },
-              )
-              .toList(),
+      'links': board.links
+          .map(
+            (l) => {
+              'id': l.id,
+              'from': l.fromPanelId,
+              'to': l.toPanelId,
+              'style': l.style.name,
+              'geometry': l.geometry.name,
+            },
+          )
+          .toList(),
     });
   }
 
@@ -2505,13 +2537,15 @@ class CliServer {
 
   int _nextZIndexForBoard(BoardDocument board) =>
       board.panels.fold<int>(
-            0,
-            (value, panel) => panel.zIndex > value ? panel.zIndex : value,
-          ) +
-          1;
+        0,
+        (value, panel) => panel.zIndex > value ? panel.zIndex : value,
+      ) +
+      1;
 
-  Map<String, dynamic> _simplePanelNotFoundResult() =>
-      const {'ok': false, 'error': 'Panel not found'};
+  Map<String, dynamic> _simplePanelNotFoundResult() => const {
+    'ok': false,
+    'error': 'Panel not found',
+  };
 
   Map<String, dynamic> _yamlPanelNotFoundError(
     Map<String, dynamic> raw,
@@ -2528,10 +2562,7 @@ class CliServer {
     'pending': pendingPanels.keys.toList(),
   };
 
-  BoardLinkStyle _linkStyleFromString(
-    String? value,
-    BoardLinkStyle fallback,
-  ) =>
+  BoardLinkStyle _linkStyleFromString(String? value, BoardLinkStyle fallback) =>
       BoardLinkStyle.values.firstWhere(
         (s) => s.name == value,
         orElse: () => fallback,
@@ -2540,11 +2571,10 @@ class CliServer {
   BoardLinkGeometry _linkGeometryFromString(
     String? value,
     BoardLinkGeometry fallback,
-  ) =>
-      BoardLinkGeometry.values.firstWhere(
-        (g) => g.name == value,
-        orElse: () => fallback,
-      );
+  ) => BoardLinkGeometry.values.firstWhere(
+    (g) => g.name == value,
+    orElse: () => fallback,
+  );
 
   Color? _parseLinkColor(String? value, Color fallback) =>
       value == null ? fallback : parseColor(value) ?? fallback;
@@ -2563,14 +2593,11 @@ class CliServer {
   BoardViewport _fitBoardViewportFromBody(
     BoardDocument board,
     Map<String, dynamic> body,
-  ) =>
-      fitBoardViewport(
-        board,
-        viewportWidth:
-            (body['viewportWidth'] as num?)?.toDouble() ?? 1280.0,
-        viewportHeight:
-            (body['viewportHeight'] as num?)?.toDouble() ?? 800.0,
-      );
+  ) => fitBoardViewport(
+    board,
+    viewportWidth: (body['viewportWidth'] as num?)?.toDouble() ?? 1280.0,
+    viewportHeight: (body['viewportHeight'] as num?)?.toDouble() ?? 800.0,
+  );
 
   Future<BoardViewport> _updateBoardViewport(
     BoardCubit cubit,
@@ -2592,16 +2619,15 @@ class CliServer {
   shelf.Response _viewportJson(
     BoardViewport vp, {
     Map<String, dynamic>? extra,
-  }) =>
-      cliJson({
-        'ok': true,
-        'viewport': {
-          'scale': vp.scale,
-          'x': vp.translation.dx,
-          'y': vp.translation.dy,
-        },
-        ...?extra,
-      });
+  }) => cliJson({
+    'ok': true,
+    'viewport': {
+      'scale': vp.scale,
+      'x': vp.translation.dx,
+      'y': vp.translation.dy,
+    },
+    ...?extra,
+  });
 
   // parseColor moved to server_helpers.dart
 
@@ -2647,6 +2673,12 @@ class CliServer {
     List<String> path,
     shelf.Request request,
   ) async {
-    return handleTheme(method, path, request, json: cliJson, notFound: cliNotFound);
+    return handleTheme(
+      method,
+      path,
+      request,
+      json: cliJson,
+      notFound: cliNotFound,
+    );
   }
 }

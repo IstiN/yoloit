@@ -210,30 +210,17 @@ abstract class CliProviderBase extends ChatProvider {
     final passDefault = passDefaultArgs && (configObj?.passDefaultArgs ?? true);
 
     // 1. Build base args (model, session, custom args, …).
-    final baseArgs = <String>[];
-    if (passDefault) {
-      if (!(configObj?.disableModel ?? false) && config.model.isNotEmpty) {
-        baseArgs.addAll(['--model', config.model]);
-      }
-      if (passSessionArgs && !isFirstMessage) {
-        final sessionId = _sessionIds[config.sessionName];
-        if (sessionId != null && sessionId.isNotEmpty) {
-          baseArgs.addAll(['--session', sessionId]);
-        }
-      }
-      baseArgs.addAll(config.customArgs);
-    }
+    final baseArgs = _buildBaseArgs(
+      passDefault: passDefault,
+      configObj: configObj,
+      config: config,
+      isFirstMessage: isFirstMessage,
+    );
 
     // 3. Resolve executable & working dir.
-    var rawCommand = configObj?.launchCommand.trim() ?? '';
-    if (rawCommand.isEmpty || rawCommand == defaultLaunchCommand) {
-      rawCommand = AgentConfigService.defaultBoardChatCommand(
-        configObj?.streamAdapter ?? defaultLaunchCommand,
-      );
-    }
-    final cmdParts = splitCommand(rawCommand);
-    final executable = cmdParts.isNotEmpty ? cmdParts[0] : defaultLaunchCommand;
-    final extraCmdArgs = cmdParts.length > 1 ? cmdParts.sublist(1) : <String>[];
+    final launch = _resolveLaunchCommand(configObj);
+    final executable = launch.executable;
+    final extraCmdArgs = launch.extraCmdArgs;
     final workingDir = resolveWorkingDir(config.workingDir);
 
     // 2. Let subclass tweak args (now with extraCmdArgs visible).
@@ -257,133 +244,58 @@ abstract class CliProviderBase extends ChatProvider {
     assert(() { debugPrint('$debugPrefix cwd: $workingDir'); return true; }());
 
     // Debug log file for CLI output (always available for user to copy).
-    final logFileName =
-        'yoloit_cli_${agentId}_${DateTime.now().millisecondsSinceEpoch}.log';
-    final logFile = File('/tmp/$logFileName');
-    IOSink? logSink;
-    try {
-      logSink = logFile.openWrite();
-      logSink.writeln('Command: $executable ${args.join(' ')}');
-      logSink.writeln('Cwd: $workingDir');
-      logSink.writeln('---');
-    } catch (_) {
-      logSink = null;
-    }
+    final (logFile, logSink) = _openLogSink(executable, args, workingDir);
 
     // 4. Start process.
     try {
-      final extraEnv = await GlobalEnvGroupsService.instance
-          .resolveSelectedGroups(config.envGroupIds);
-      final baseEnv = {...Platform.environment, ...extraEnv};
-      final hookEnv = await buildEnvironment(baseEnv: baseEnv, config: config);
-      final process = await _processStarter(
+      final process = await _startSessionProcess(
         executable,
         args,
-        workingDirectory: workingDir,
-        environment: {
-          ...baseEnv,
-          'PATH': PlatformShell.instance.enrichedPath(baseEnv['PATH'] ?? ''),
-          ...hookEnv,
-        },
+        workingDir,
+        config,
+        runtimeContext,
+        controller,
       );
-
-      _processes[config.sessionName] = process;
-      registerChatProcessResource(
-        process: process,
-        providerId: agentId,
-        config: config,
-        runtimeContext: runtimeContext,
-      );
-
-      unawaited(
-        process.stdin.close().catchError((Object error) {
-          assert(() { debugPrint('$debugPrefix Failed to close stdin: $error'); return true; }());
-        }),
-      );
-
-      onProcessStarted(process, config.sessionName, controller);
 
       // 5. Stdout listener with line buffering.
       final buffer = StringBuffer();
       final stdoutDone = Completer<void>();
-      process.stdout
-          .transform(utf8.decoder)
-          .listen(
-            (chunk) {
-              logSink?.write(chunk);
-              buffer.write(chunk);
-              final lines = buffer.toString().split('\n');
-              buffer.clear();
-              buffer.write(lines.removeLast());
-              for (final line in lines) {
-                _dispatchLine(line, config.sessionName, controller);
-              }
-            },
-            onError: (Object error) {
-              if (!controller.isClosed) controller.addError(error);
-              if (!stdoutDone.isCompleted) stdoutDone.complete();
-            },
-            onDone: () {
-              if (!stdoutDone.isCompleted) stdoutDone.complete();
-            },
-          );
+      _attachStdoutListener(
+        process,
+        config.sessionName,
+        controller,
+        buffer,
+        stdoutDone,
+        logSink,
+      );
 
       // 6. Stderr listener.
       final stderrBuffer = StringBuffer();
       final stderrDone = Completer<void>();
-      process.stderr
-          .transform(utf8.decoder)
-          .listen(
-            (chunk) {
-              logSink?.write('[STDERR] $chunk');
-              stderrBuffer.write(chunk);
-              onStderrChunk(chunk, config.sessionName, controller);
-            },
-            onDone: () {
-              if (!stderrDone.isCompleted) stderrDone.complete();
-            },
-            onError: (_) {
-              if (!stderrDone.isCompleted) stderrDone.complete();
-            },
-          );
+      _attachStderrListener(
+        process,
+        config.sessionName,
+        controller,
+        stderrBuffer,
+        stderrDone,
+        logSink,
+      );
 
       // 7. Wait for exit.
       final exitCode = await process.exitCode;
       await stdoutDone.future;
       await stderrDone.future;
 
-      final remaining = buffer.toString().trim();
-      if (remaining.isNotEmpty) {
-        _dispatchLine(remaining, config.sessionName, controller);
-      }
-
-      logSink?.writeln('---');
-      logSink?.writeln('Exit code: $exitCode');
-      await logSink?.close();
-      debugPrint('$debugPrefix CLI log: ${logFile.path}');
-
-      onProcessExited(
-        exitCode,
-        stderrBuffer.toString().trim(),
-        config.sessionName,
-        controller,
+      await _finalizeProcess(
+        process: process,
+        exitCode: exitCode,
+        sessionName: config.sessionName,
+        controller: controller,
+        buffer: buffer,
+        stderrBuffer: stderrBuffer,
+        logSink: logSink,
+        logFile: logFile,
       );
-
-      if (exitCode != 0 && !controller.isClosed) {
-        final stderr = stderrBuffer.toString().trim();
-        controller.addError(
-          stderr.isNotEmpty
-              ? stderr
-              : '$agentId exited with code $exitCode',
-        );
-      }
-
-      if (_processes[config.sessionName] == process) {
-        _processes.remove(config.sessionName);
-      }
-      unregisterChatProcessResource(process);
-      await onBeforeControllerClose(config.sessionName);
-      await controller.close();
     } catch (error, stack) {
       assert(() { debugPrint('$debugPrefix Failed to start process: $error'); return true; }());
       assert(() { debugPrint('$debugPrefix Stack: $stack'); return true; }());
@@ -394,6 +306,204 @@ abstract class CliProviderBase extends ChatProvider {
       await onBeforeControllerClose(config.sessionName);
       await controller.close();
     }
+  }
+
+  List<String> _buildBaseArgs({
+    required bool passDefault,
+    required AgentConfig? configObj,
+    required ChatSessionConfig config,
+    required bool isFirstMessage,
+  }) {
+    final baseArgs = <String>[];
+    if (passDefault) {
+      if (!(configObj?.disableModel ?? false) && config.model.isNotEmpty) {
+        baseArgs.addAll(['--model', config.model]);
+      }
+      if (passSessionArgs && !isFirstMessage) {
+        final sessionId = _sessionIds[config.sessionName];
+        if (sessionId != null && sessionId.isNotEmpty) {
+          baseArgs.addAll(['--session', sessionId]);
+        }
+      }
+      baseArgs.addAll(config.customArgs);
+    }
+    return baseArgs;
+  }
+
+  ({String executable, List<String> extraCmdArgs}) _resolveLaunchCommand(
+    AgentConfig? configObj,
+  ) {
+    var rawCommand = configObj?.launchCommand.trim() ?? '';
+    if (rawCommand.isEmpty || rawCommand == defaultLaunchCommand) {
+      rawCommand = AgentConfigService.defaultBoardChatCommand(
+        configObj?.streamAdapter ?? defaultLaunchCommand,
+      );
+    }
+    final cmdParts = splitCommand(rawCommand);
+    final executable = cmdParts.isNotEmpty ? cmdParts[0] : defaultLaunchCommand;
+    final extraCmdArgs = cmdParts.length > 1 ? cmdParts.sublist(1) : <String>[];
+    return (executable: executable, extraCmdArgs: extraCmdArgs);
+  }
+
+  (File, IOSink?) _openLogSink(
+    String executable,
+    List<String> args,
+    String workingDir,
+  ) {
+    final logFileName =
+        'yoloit_cli_${agentId}_${DateTime.now().millisecondsSinceEpoch}.log';
+    final logFile = File('/tmp/$logFileName');
+    try {
+      // ignore: close_sinks - closed by _finalizeProcess after the CLI exits.
+      final logSink = logFile.openWrite();
+      logSink.writeln('Command: $executable ${args.join(' ')}');
+      logSink.writeln('Cwd: $workingDir');
+      logSink.writeln('---');
+      return (logFile, logSink);
+    } catch (_) {
+      return (logFile, null);
+    }
+  }
+
+  Future<Process> _startSessionProcess(
+    String executable,
+    List<String> args,
+    String workingDir,
+    ChatSessionConfig config,
+    ChatRuntimeContext? runtimeContext,
+    StreamController<ChatEvent> controller,
+  ) async {
+    final extraEnv = await GlobalEnvGroupsService.instance
+        .resolveSelectedGroups(config.envGroupIds);
+    final baseEnv = {...Platform.environment, ...extraEnv};
+    final hookEnv = await buildEnvironment(baseEnv: baseEnv, config: config);
+    final process = await _processStarter(
+      executable,
+      args,
+      workingDirectory: workingDir,
+      environment: {
+        ...baseEnv,
+        'PATH': PlatformShell.instance.enrichedPath(baseEnv['PATH'] ?? ''),
+        ...hookEnv,
+      },
+    );
+
+    _processes[config.sessionName] = process;
+    registerChatProcessResource(
+      process: process,
+      providerId: agentId,
+      config: config,
+      runtimeContext: runtimeContext,
+    );
+
+    unawaited(
+      process.stdin.close().catchError((Object error) {
+        assert(() { debugPrint('$debugPrefix Failed to close stdin: $error'); return true; }());
+      }),
+    );
+
+    onProcessStarted(process, config.sessionName, controller);
+    return process;
+  }
+
+  void _attachStdoutListener(
+    Process process,
+    String sessionName,
+    StreamController<ChatEvent> controller,
+    StringBuffer buffer,
+    Completer<void> stdoutDone,
+    IOSink? logSink,
+  ) {
+    process.stdout
+        .transform(utf8.decoder)
+        .listen(
+          (chunk) {
+            logSink?.write(chunk);
+            buffer.write(chunk);
+            final lines = buffer.toString().split('\n');
+            buffer.clear();
+            buffer.write(lines.removeLast());
+            for (final line in lines) {
+              _dispatchLine(line, sessionName, controller);
+            }
+          },
+          onError: (Object error) {
+            if (!controller.isClosed) controller.addError(error);
+            if (!stdoutDone.isCompleted) stdoutDone.complete();
+          },
+          onDone: () {
+            if (!stdoutDone.isCompleted) stdoutDone.complete();
+          },
+        );
+  }
+
+  void _attachStderrListener(
+    Process process,
+    String sessionName,
+    StreamController<ChatEvent> controller,
+    StringBuffer stderrBuffer,
+    Completer<void> stderrDone,
+    IOSink? logSink,
+  ) {
+    process.stderr
+        .transform(utf8.decoder)
+        .listen(
+          (chunk) {
+            logSink?.write('[STDERR] $chunk');
+            stderrBuffer.write(chunk);
+            onStderrChunk(chunk, sessionName, controller);
+          },
+          onDone: () {
+            if (!stderrDone.isCompleted) stderrDone.complete();
+          },
+          onError: (_) {
+            if (!stderrDone.isCompleted) stderrDone.complete();
+          },
+        );
+  }
+
+  Future<void> _finalizeProcess({
+    required Process process,
+    required int exitCode,
+    required String sessionName,
+    required StreamController<ChatEvent> controller,
+    required StringBuffer buffer,
+    required StringBuffer stderrBuffer,
+    required IOSink? logSink,
+    required File logFile,
+  }) async {
+    final remaining = buffer.toString().trim();
+    if (remaining.isNotEmpty) {
+      _dispatchLine(remaining, sessionName, controller);
+    }
+
+    logSink?.writeln('---');
+    logSink?.writeln('Exit code: $exitCode');
+    await logSink?.close();
+    debugPrint('$debugPrefix CLI log: ${logFile.path}');
+
+    onProcessExited(
+      exitCode,
+      stderrBuffer.toString().trim(),
+      sessionName,
+      controller,
+    );
+
+    if (exitCode != 0 && !controller.isClosed) {
+      final stderr = stderrBuffer.toString().trim();
+      controller.addError(
+        stderr.isNotEmpty
+            ? stderr
+            : '$agentId exited with code $exitCode',
+      );
+    }
+
+    if (_processes[sessionName] == process) {
+      _processes.remove(sessionName);
+    }
+    unregisterChatProcessResource(process);
+    await onBeforeControllerClose(sessionName);
+    await controller.close();
   }
 
   void _dispatchLine(

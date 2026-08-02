@@ -361,124 +361,171 @@ class KimiCliProvider extends CliProviderBase {
 
     switch (eventType) {
       case 'step.begin':
-        return [
-          ChatEvent(
-            type: ChatEventType.assistantMessageStart,
-            rawType: 'kimi.wire.step_begin',
-            id: 'kimi-step-${event['uuid']}',
-            data: {'messageId': 'kimi-step-${event['uuid']}'},
-          ),
-        ];
-
+        return _wireStepBegin(event);
       case 'content.part':
-        final part = event['part'] as Map<String, dynamic>?;
-        if (part == null) return const [];
-        final partType = part['type'] as String?;
-
-        if (partType == 'think') {
-          final think = part['think'] as String? ?? '';
-          if (think.isEmpty) return const [];
-
-          final delta = state.lastWirePartType != 'think'
-              ? '> $think\n'
-              : '$think\n';
-          state.lastWirePartType = 'think';
-          debugPrint(
-            '$debugPrefix [$sessionName] Wire think '
-            '[${state.currentTurnId ?? "?"}]: '
-            '${think.substring(0, think.length.clamp(0, 60))}...',
-          );
-
-          return [
-            ChatEvent(
-              type: ChatEventType.assistantDelta,
-              rawType: 'kimi.wire.think',
-              id: 'kimi-think-${event['uuid']}',
-              data: {'deltaContent': delta},
-            ),
-          ];
-        } else if (partType == 'text') {
-          final text = part['text'] as String? ?? '';
-          if (text.isEmpty) return const [];
-
-          final delta = state.lastWirePartType == 'think'
-              ? '\n$text'
-              : text;
-          state.lastWirePartType = 'text';
-          debugPrint(
-            '$debugPrefix [$sessionName] Wire text '
-            '[${state.currentTurnId ?? "?"}]: '
-            '${text.substring(0, text.length.clamp(0, 60))}...',
-          );
-
-          return [
-            ChatEvent(
-              type: ChatEventType.assistantDelta,
-              rawType: 'kimi.wire.text',
-              id: 'kimi-text-${event['uuid']}',
-              data: {'deltaContent': delta},
-            ),
-          ];
-        }
-        return const [];
-
+        return _wireContentPart(event, state, sessionName);
       case 'tool.call':
-        final toolCallId = event['toolCallId'] as String? ?? '';
-        final name = event['name'] as String? ?? '';
-        final args = event['args'] as Map<String, dynamic>? ?? {};
-        if (toolCallId.isNotEmpty && name.isNotEmpty) {
-          state.toolCallNames[toolCallId] = name;
-        }
-        return [
-          ChatEvent(
-            type: ChatEventType.toolStart,
-            rawType: 'kimi.wire.tool_call',
-            id: toolCallId,
-            data: {
-              'toolCallId': toolCallId,
-              'toolName': name,
-              'arguments': args,
-            },
-          ),
-        ];
-
+        return _wireToolCall(event, state);
       case 'tool.result':
-        final toolCallId = event['toolCallId'] as String? ?? '';
-        final result = event['result'] as Map<String, dynamic>?;
-        final output = result?['output'] as String? ?? '';
-        final resolvedToolName = state.toolCallNames[toolCallId] ?? '';
-        return [
-          ChatEvent(
-            type: ChatEventType.toolComplete,
-            rawType: 'kimi.wire.tool_result',
-            id: toolCallId,
-            data: {
-              'toolCallId': toolCallId,
-              'toolName': resolvedToolName,
-              'success': true,
-              'result': {'content': output},
-            },
-          ),
-        ];
-
+        return _wireToolResult(event, state);
       case 'step.end':
-        state.lastWirePartType = '';
-        return [
-          ChatEvent(
-            type: ChatEventType.assistantMessage,
-            rawType: 'kimi.wire.step_end',
-            id: 'kimi-end-${event['uuid']}',
-            data: {
-              'messageId': 'kimi-end-${event['uuid']}',
-              // Intentionally omit 'content' so that consumers fall back to
-              // their accumulated _streamingContent via ??
-            },
-          ),
-        ];
-
+        return _wireStepEnd(event, state);
       default:
         return const [];
     }
+  }
+
+  List<ChatEvent> _wireStepBegin(Map<String, dynamic> event) {
+    return [
+      ChatEvent(
+        type: ChatEventType.assistantMessageStart,
+        rawType: 'kimi.wire.step_begin',
+        id: 'kimi-step-${event['uuid']}',
+        data: {'messageId': 'kimi-step-${event['uuid']}'},
+      ),
+    ];
+  }
+
+  List<ChatEvent> _wireContentPart(
+    Map<String, dynamic> event,
+    _KimiSessionState state,
+    String sessionName,
+  ) {
+    final part = event['part'] as Map<String, dynamic>?;
+    if (part == null) return const [];
+    final partType = part['type'] as String?;
+
+    if (partType == 'think') {
+      return _wireThinkPart(event, part, state, sessionName);
+    }
+    if (partType == 'text') {
+      return _wireTextPart(event, part, state, sessionName);
+    }
+    return const [];
+  }
+
+  List<ChatEvent> _wireThinkPart(
+    Map<String, dynamic> event,
+    Map<String, dynamic> part,
+    _KimiSessionState state,
+    String sessionName,
+  ) {
+    final think = part['think'] as String? ?? '';
+    if (think.isEmpty) return const [];
+
+    final delta = state.lastWirePartType != 'think'
+        ? '> $think\n'
+        : '$think\n';
+    state.lastWirePartType = 'think';
+    debugPrint(
+      '$debugPrefix [$sessionName] Wire think '
+      '[${state.currentTurnId ?? "?"}]: '
+      '${think.substring(0, think.length.clamp(0, 60))}...',
+    );
+
+    return [
+      ChatEvent(
+        type: ChatEventType.assistantDelta,
+        rawType: 'kimi.wire.think',
+        id: 'kimi-think-${event['uuid']}',
+        data: {'deltaContent': delta},
+      ),
+    ];
+  }
+
+  List<ChatEvent> _wireTextPart(
+    Map<String, dynamic> event,
+    Map<String, dynamic> part,
+    _KimiSessionState state,
+    String sessionName,
+  ) {
+    final text = part['text'] as String? ?? '';
+    if (text.isEmpty) return const [];
+
+    final delta = state.lastWirePartType == 'think'
+        ? '\n$text'
+        : text;
+    state.lastWirePartType = 'text';
+    debugPrint(
+      '$debugPrefix [$sessionName] Wire text '
+      '[${state.currentTurnId ?? "?"}]: '
+      '${text.substring(0, text.length.clamp(0, 60))}...',
+    );
+
+    return [
+      ChatEvent(
+        type: ChatEventType.assistantDelta,
+        rawType: 'kimi.wire.text',
+        id: 'kimi-text-${event['uuid']}',
+        data: {'deltaContent': delta},
+      ),
+    ];
+  }
+
+  List<ChatEvent> _wireToolCall(
+    Map<String, dynamic> event,
+    _KimiSessionState state,
+  ) {
+    final toolCallId = event['toolCallId'] as String? ?? '';
+    final name = event['name'] as String? ?? '';
+    final args = event['args'] as Map<String, dynamic>? ?? {};
+    if (toolCallId.isNotEmpty && name.isNotEmpty) {
+      state.toolCallNames[toolCallId] = name;
+    }
+    return [
+      ChatEvent(
+        type: ChatEventType.toolStart,
+        rawType: 'kimi.wire.tool_call',
+        id: toolCallId,
+        data: {
+          'toolCallId': toolCallId,
+          'toolName': name,
+          'arguments': args,
+        },
+      ),
+    ];
+  }
+
+  List<ChatEvent> _wireToolResult(
+    Map<String, dynamic> event,
+    _KimiSessionState state,
+  ) {
+    final toolCallId = event['toolCallId'] as String? ?? '';
+    final result = event['result'] as Map<String, dynamic>?;
+    final output = result?['output'] as String? ?? '';
+    final resolvedToolName = state.toolCallNames[toolCallId] ?? '';
+    return [
+      ChatEvent(
+        type: ChatEventType.toolComplete,
+        rawType: 'kimi.wire.tool_result',
+        id: toolCallId,
+        data: {
+          'toolCallId': toolCallId,
+          'toolName': resolvedToolName,
+          'success': true,
+          'result': {'content': output},
+        },
+      ),
+    ];
+  }
+
+  List<ChatEvent> _wireStepEnd(
+    Map<String, dynamic> event,
+    _KimiSessionState state,
+  ) {
+    state.lastWirePartType = '';
+    return [
+      ChatEvent(
+        type: ChatEventType.assistantMessage,
+        rawType: 'kimi.wire.step_end',
+        id: 'kimi-end-${event['uuid']}',
+        data: {
+          'messageId': 'kimi-end-${event['uuid']}',
+          // Intentionally omit 'content' so that consumers fall back to
+          // their accumulated _streamingContent via ??
+        },
+      ),
+    ];
   }
 
   // ---------------------------------------------------------------------------
@@ -498,28 +545,7 @@ class KimiCliProvider extends CliProviderBase {
     if (state.wireJsonlAvailable) {
       if (role == 'assistant') {
         // Still extract tool_calls as a safety net.
-        final toolCalls = _extractToolCalls(json['tool_calls']);
-        final events = <ChatEvent>[];
-        for (final tc in toolCalls) {
-          final tcId = tc['toolCallId'] as String? ?? '';
-          final tcName = tc['name'] as String? ?? '';
-          if (tcId.isNotEmpty && tcName.isNotEmpty) {
-            state.toolCallNames[tcId] = tcName;
-          }
-          events.add(
-            ChatEvent(
-              type: ChatEventType.toolStart,
-              rawType: 'kimi.tool_call.start',
-              id: tcId,
-              data: {
-                'toolCallId': tcId,
-                'toolName': tcName,
-                'arguments': tc['arguments'],
-              },
-            ),
-          );
-        }
-        return events;
+        return _toolStartEvents(_extractToolCalls(json['tool_calls']), state);
       }
 
       if (role == 'tool') {
@@ -529,66 +555,97 @@ class KimiCliProvider extends CliProviderBase {
 
     // Fallback: full stream-json parsing when wire.jsonl is not available.
     if (role == 'assistant') {
-      final content = _extractText(json['content']);
-      final toolCalls = _extractToolCalls(json['tool_calls']);
-      final id = 'kimi-${DateTime.now().microsecondsSinceEpoch}';
-      final events = <ChatEvent>[];
-
-      for (final tc in toolCalls) {
-        final tcId = tc['toolCallId'] as String? ?? '';
-        final tcName = tc['name'] as String? ?? '';
-        if (tcId.isNotEmpty && tcName.isNotEmpty) {
-          state.toolCallNames[tcId] = tcName;
-        }
-        events.add(
-          ChatEvent(
-            type: ChatEventType.toolStart,
-            rawType: 'kimi.tool_call.start',
-            id: tcId,
-            data: {
-              'toolCallId': tcId,
-              'toolName': tcName,
-              'arguments': tc['arguments'],
-            },
-          ),
-        );
-      }
-
-      events.add(
-        ChatEvent(
-          type: ChatEventType.assistantMessage,
-          rawType: 'kimi.assistant',
-          id: id,
-          data: {
-            'messageId': id,
-            'content': content,
-            if (toolCalls.isNotEmpty) 'toolRequests': toolCalls,
-          },
-        ),
-      );
-      return events;
+      return _parseAssistantLine(json, state);
     }
 
     if (role == 'tool') {
-      final content = _extractText(json['content']);
-      final toolCallId = json['tool_call_id'] as String? ?? '';
-      final isError = content.contains('<system>ERROR:');
-      final resolvedToolName = state.toolCallNames[toolCallId] ?? '';
-      return [
-        ChatEvent(
-          type: ChatEventType.toolComplete,
-          rawType: 'kimi.tool',
-          id: toolCallId,
-          data: {
-            'toolCallId': toolCallId,
-            'toolName': resolvedToolName,
-            'success': !isError,
-            'result': {'content': content},
-          },
-        ),
-      ];
+      return _parseToolLine(json, state);
     }
 
+    return _parseMetaLine(json, role, sessionName);
+  }
+
+  /// Builds toolStart events from extracted tool calls, recording the
+  /// tool call names on [state] for later result resolution.
+  List<ChatEvent> _toolStartEvents(
+    List<Map<String, dynamic>> toolCalls,
+    _KimiSessionState state,
+  ) {
+    final events = <ChatEvent>[];
+    for (final tc in toolCalls) {
+      final tcId = tc['toolCallId'] as String? ?? '';
+      final tcName = tc['name'] as String? ?? '';
+      if (tcId.isNotEmpty && tcName.isNotEmpty) {
+        state.toolCallNames[tcId] = tcName;
+      }
+      events.add(
+        ChatEvent(
+          type: ChatEventType.toolStart,
+          rawType: 'kimi.tool_call.start',
+          id: tcId,
+          data: {
+            'toolCallId': tcId,
+            'toolName': tcName,
+            'arguments': tc['arguments'],
+          },
+        ),
+      );
+    }
+    return events;
+  }
+
+  List<ChatEvent> _parseAssistantLine(
+    Map<String, dynamic> json,
+    _KimiSessionState state,
+  ) {
+    final content = _extractText(json['content']);
+    final toolCalls = _extractToolCalls(json['tool_calls']);
+    final id = 'kimi-${DateTime.now().microsecondsSinceEpoch}';
+    final events = _toolStartEvents(toolCalls, state);
+
+    events.add(
+      ChatEvent(
+        type: ChatEventType.assistantMessage,
+        rawType: 'kimi.assistant',
+        id: id,
+        data: {
+          'messageId': id,
+          'content': content,
+          if (toolCalls.isNotEmpty) 'toolRequests': toolCalls,
+        },
+      ),
+    );
+    return events;
+  }
+
+  List<ChatEvent> _parseToolLine(
+    Map<String, dynamic> json,
+    _KimiSessionState state,
+  ) {
+    final content = _extractText(json['content']);
+    final toolCallId = json['tool_call_id'] as String? ?? '';
+    final isError = content.contains('<system>ERROR:');
+    final resolvedToolName = state.toolCallNames[toolCallId] ?? '';
+    return [
+      ChatEvent(
+        type: ChatEventType.toolComplete,
+        rawType: 'kimi.tool',
+        id: toolCallId,
+        data: {
+          'toolCallId': toolCallId,
+          'toolName': resolvedToolName,
+          'success': !isError,
+          'result': {'content': content},
+        },
+      ),
+    ];
+  }
+
+  List<ChatEvent> _parseMetaLine(
+    Map<String, dynamic> json,
+    String? role,
+    String sessionName,
+  ) {
     // System notification (no role field).
     if (json['category'] is String || json['severity'] is String) {
       final title = json['title'] as String? ?? '';

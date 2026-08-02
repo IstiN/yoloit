@@ -1,9 +1,18 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:yoloit/core/cli/panel_cli_handler.dart';
 import 'package:yoloit/features/board/audio_recorder/transcription_service.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/builtin/audio_recorder_plugin.dart';
+
+/// Signature of an audio-recorder action handler: the CLI arguments plus the
+/// panel whose state is being read/updated.
+typedef _AudioActionHandler =
+    FutureOr<CliActionResult> Function(
+      Map<String, dynamic> args,
+      BoardPanelInstance panel,
+    );
 
 /// CLI handler for Audio Recorder panels (`board.audio_recorder`).
 ///
@@ -44,200 +53,221 @@ class AudioRecorderCliHandler extends PanelCliHandler {
     };
   }
 
+  Map<String, _AudioActionHandler> get _actionHandlers => {
+    'start': _handleStart,
+    'stop': _handleStop,
+    'list': _handleList,
+    'get': _handleGet,
+    'set-folder': _handleSetFolder,
+    'set-config': _handleSetConfig,
+    'delete': _handleDelete,
+    'transcribe': _handleTranscribe,
+  };
+
   @override
   Future<CliActionResult> handleAction(
     String action,
     Map<String, dynamic> args,
     BoardPanelInstance panel,
   ) async {
-    switch (action) {
-      case 'start':
-        return const CliActionResult(
-          message: 'Recording started',
-          stateUpdate: {'isRecording': true},
-        );
-
-      case 'stop':
-        return const CliActionResult(
-          message: 'Recording stopped',
-          stateUpdate: {'isRecording': false},
-        );
-
-      case 'list': {
-        final recordings = _recordings(panel);
-        return CliActionResult(
-          data: {'recordings': recordings, 'total': recordings.length},
-        );
-      }
-
-      case 'get':
-        return CliActionResult(data: getContent(panel));
-
-      case 'set-folder': {
-        final folder = args['folder'] as String?;
-        if (folder == null) {
-          return const CliActionResult(
-            ok: false,
-            message: 'Missing "folder"',
-          );
-        }
-        final updated = AudioRecorderConfig.fromState(
-          panel.state,
-        ).copyWith(saveFolder: folder);
-        return CliActionResult(
-          message: 'Save folder set to $folder',
-          stateUpdate: {AudioRecorderConfig.configKey: updated.toJson()},
-        );
-      }
-
-      case 'set-config': {
-        final updated = AudioRecorderConfig.fromState(panel.state).copyWith(
-          captureSystemAudio: _parseBool(args['captureSystemAudio']),
-          captureMicrophone: _parseBool(args['captureMicrophone']),
-          format: args.containsKey('format') ? args['format']?.toString() : null,
-        );
-        return CliActionResult(
-          message: 'Config updated',
-          stateUpdate: {AudioRecorderConfig.configKey: updated.toJson()},
-        );
-      }
-
-      case 'delete': {
-        final id = args['id'] as String?;
-        final name = args['name'] as String?;
-        if (id == null && name == null) {
-          return const CliActionResult(
-            ok: false,
-            message: 'Missing "id" or "name"',
-          );
-        }
-        final recordings =
-            _recordings(panel)
-                .whereType<Map<dynamic, dynamic>>()
-                .map((e) => Map<String, dynamic>.from(e))
-                .toList();
-        Map<String, dynamic>? removed;
-        final remaining = <Map<String, dynamic>>[];
-        for (final rec in recordings) {
-          final matches =
-              (id != null && rec['id'] == id) ||
-              (name != null && rec['name'] == name);
-          if (matches && removed == null) {
-            removed = rec;
-          } else {
-            remaining.add(rec);
-          }
-        }
-        if (removed == null) {
-          return const CliActionResult(
-            ok: false,
-            message: 'Recording not found',
-          );
-        }
-        final path = removed['path'] as String?;
-        if (path != null && path.isNotEmpty) {
-          // Best-effort: the CLI server only runs on desktop runtimes that
-          // have a local filesystem, so importing dart:io here is safe.
-          try {
-            File(path).deleteSync();
-          } catch (_) {
-            // Ignore — the entry is removed from state regardless.
-          }
-        }
-        return CliActionResult(
-          message: 'Deleted ${removed['name'] ?? removed['id']}',
-          stateUpdate: {'recordings': remaining},
-        );
-      }
-
-      case 'transcribe': {
-        final recordings =
-            _recordings(panel)
-                .whereType<Map<dynamic, dynamic>>()
-                .map((e) => Map<String, dynamic>.from(e))
-                .toList();
-        if (recordings.isEmpty) {
-          return const CliActionResult(
-            ok: false,
-            message: 'No recordings to transcribe',
-          );
-        }
-        final id = args['id'] as String?;
-        final Map<String, dynamic> recording;
-        if (id != null) {
-          final matches = recordings.where((r) => r['id'] == id).toList();
-          if (matches.isEmpty) {
-            return CliActionResult(
-              ok: false,
-              message: 'Recording not found: $id',
-            );
-          }
-          recording = matches.first;
-        } else {
-          recording = recordings.last;
-        }
-        final path = recording['path'] as String?;
-        if (path == null || path.isEmpty) {
-          return const CliActionResult(
-            ok: false,
-            message: 'Recording has no file path',
-          );
-        }
-        final TranscriptResult result;
-        try {
-          result = await TranscriptionService.current.transcribeFile(
-            path,
-            mode: args['mode'] as String?,
-          );
-        } catch (e) {
-          return CliActionResult(ok: false, message: 'Transcription failed: $e');
-        }
-        final sep = Platform.pathSeparator;
-        final fileName = path.split(sep).last;
-        final baseName =
-            fileName.endsWith('.wav')
-                ? fileName.substring(0, fileName.length - 4)
-                : fileName;
-        final name = recording['name'] as String? ?? baseName;
-        final mdPath = '${File(path).parent.path}$sep$baseName.md';
-        try {
-          File(
-            mdPath,
-          ).writeAsStringSync('# Transcript — $name\n\n${result.text}\n');
-        } catch (e) {
-          return CliActionResult(
-            ok: false,
-            message: 'Failed to write transcript: $e',
-          );
-        }
-        final recordingId = recording['id'] as String? ?? baseName;
-        final existing =
-            (panel.state['transcripts'] as Map<dynamic, dynamic>?)?.map(
-              (key, value) => MapEntry(key.toString(), value),
-            ) ??
-            <String, dynamic>{};
-        final updated = Map<String, dynamic>.from(existing);
-        updated[recordingId] = <String, dynamic>{
-          'mdPath': mdPath,
-          'chars': result.text.length,
-          'mode': result.modeUsed,
-          'createdAt': DateTime.now().millisecondsSinceEpoch,
-        };
-        return CliActionResult(
-          data: <String, dynamic>{
-            'mdPath': mdPath,
-            'chars': result.text.length,
-            'modeUsed': result.modeUsed,
-            'recordingId': recordingId,
-          },
-          stateUpdate: {'transcripts': updated},
-          message: 'Transcript saved to $mdPath',
-        );
-      }
-
-      default:
-        return CliActionResult(ok: false, message: 'Unknown action: $action');
+    final handler = _actionHandlers[action];
+    if (handler == null) {
+      return CliActionResult(ok: false, message: 'Unknown action: $action');
     }
+    return handler(args, panel);
+  }
+
+  CliActionResult _handleStart(
+    Map<String, dynamic> args,
+    BoardPanelInstance panel,
+  ) => const CliActionResult(
+    message: 'Recording started',
+    stateUpdate: {'isRecording': true},
+  );
+
+  CliActionResult _handleStop(
+    Map<String, dynamic> args,
+    BoardPanelInstance panel,
+  ) => const CliActionResult(
+    message: 'Recording stopped',
+    stateUpdate: {'isRecording': false},
+  );
+
+  CliActionResult _handleList(
+    Map<String, dynamic> args,
+    BoardPanelInstance panel,
+  ) {
+    final recordings = _recordings(panel);
+    return CliActionResult(
+      data: {'recordings': recordings, 'total': recordings.length},
+    );
+  }
+
+  CliActionResult _handleGet(
+    Map<String, dynamic> args,
+    BoardPanelInstance panel,
+  ) => CliActionResult(data: getContent(panel));
+
+  CliActionResult _handleSetFolder(
+    Map<String, dynamic> args,
+    BoardPanelInstance panel,
+  ) {
+    final folder = args['folder'] as String?;
+    if (folder == null) {
+      return const CliActionResult(ok: false, message: 'Missing "folder"');
+    }
+    final updated = AudioRecorderConfig.fromState(
+      panel.state,
+    ).copyWith(saveFolder: folder);
+    return CliActionResult(
+      message: 'Save folder set to $folder',
+      stateUpdate: {AudioRecorderConfig.configKey: updated.toJson()},
+    );
+  }
+
+  CliActionResult _handleSetConfig(
+    Map<String, dynamic> args,
+    BoardPanelInstance panel,
+  ) {
+    final updated = AudioRecorderConfig.fromState(panel.state).copyWith(
+      captureSystemAudio: _parseBool(args['captureSystemAudio']),
+      captureMicrophone: _parseBool(args['captureMicrophone']),
+      format: args.containsKey('format') ? args['format']?.toString() : null,
+    );
+    return CliActionResult(
+      message: 'Config updated',
+      stateUpdate: {AudioRecorderConfig.configKey: updated.toJson()},
+    );
+  }
+
+  CliActionResult _handleDelete(
+    Map<String, dynamic> args,
+    BoardPanelInstance panel,
+  ) {
+    final id = args['id'] as String?;
+    final name = args['name'] as String?;
+    if (id == null && name == null) {
+      return const CliActionResult(
+        ok: false,
+        message: 'Missing "id" or "name"',
+      );
+    }
+    final recordings = _recordings(panel)
+        .whereType<Map<dynamic, dynamic>>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+    Map<String, dynamic>? removed;
+    final remaining = <Map<String, dynamic>>[];
+    for (final rec in recordings) {
+      final matches =
+          (id != null && rec['id'] == id) ||
+          (name != null && rec['name'] == name);
+      if (matches && removed == null) {
+        removed = rec;
+      } else {
+        remaining.add(rec);
+      }
+    }
+    if (removed == null) {
+      return const CliActionResult(ok: false, message: 'Recording not found');
+    }
+    final path = removed['path'] as String?;
+    if (path != null && path.isNotEmpty) {
+      // Best-effort: the CLI server only runs on desktop runtimes that
+      // have a local filesystem, so importing dart:io here is safe.
+      try {
+        File(path).deleteSync();
+      } catch (_) {
+        // Ignore — the entry is removed from state regardless.
+      }
+    }
+    return CliActionResult(
+      message: 'Deleted ${removed['name'] ?? removed['id']}',
+      stateUpdate: {'recordings': remaining},
+    );
+  }
+
+  Future<CliActionResult> _handleTranscribe(
+    Map<String, dynamic> args,
+    BoardPanelInstance panel,
+  ) async {
+    final recordings = _recordings(panel)
+        .whereType<Map<dynamic, dynamic>>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+    if (recordings.isEmpty) {
+      return const CliActionResult(
+        ok: false,
+        message: 'No recordings to transcribe',
+      );
+    }
+    final id = args['id'] as String?;
+    final Map<String, dynamic> recording;
+    if (id != null) {
+      final matches = recordings.where((r) => r['id'] == id).toList();
+      if (matches.isEmpty) {
+        return CliActionResult(ok: false, message: 'Recording not found: $id');
+      }
+      recording = matches.first;
+    } else {
+      recording = recordings.last;
+    }
+    final path = recording['path'] as String?;
+    if (path == null || path.isEmpty) {
+      return const CliActionResult(
+        ok: false,
+        message: 'Recording has no file path',
+      );
+    }
+    final TranscriptResult result;
+    try {
+      result = await TranscriptionService.current.transcribeFile(
+        path,
+        mode: args['mode'] as String?,
+      );
+    } catch (e) {
+      return CliActionResult(ok: false, message: 'Transcription failed: $e');
+    }
+    final sep = Platform.pathSeparator;
+    final fileName = path.split(sep).last;
+    final baseName = fileName.endsWith('.wav')
+        ? fileName.substring(0, fileName.length - 4)
+        : fileName;
+    final name = recording['name'] as String? ?? baseName;
+    final mdPath = '${File(path).parent.path}$sep$baseName.md';
+    try {
+      File(
+        mdPath,
+      ).writeAsStringSync('# Transcript — $name\n\n${result.text}\n');
+    } catch (e) {
+      return CliActionResult(
+        ok: false,
+        message: 'Failed to write transcript: $e',
+      );
+    }
+    final recordingId = recording['id'] as String? ?? baseName;
+    final existing =
+        (panel.state['transcripts'] as Map<dynamic, dynamic>?)?.map(
+          (key, value) => MapEntry(key.toString(), value),
+        ) ??
+        <String, dynamic>{};
+    final updated = Map<String, dynamic>.from(existing);
+    updated[recordingId] = <String, dynamic>{
+      'mdPath': mdPath,
+      'chars': result.text.length,
+      'mode': result.modeUsed,
+      'createdAt': DateTime.now().millisecondsSinceEpoch,
+    };
+    return CliActionResult(
+      data: <String, dynamic>{
+        'mdPath': mdPath,
+        'chars': result.text.length,
+        'modeUsed': result.modeUsed,
+        'recordingId': recordingId,
+      },
+      stateUpdate: {'transcripts': updated},
+      message: 'Transcript saved to $mdPath',
+    );
   }
 
   @override
@@ -272,10 +302,7 @@ class AudioRecorderCliHandler extends PanelCliHandler {
     ),
     'delete': const CliActionHelp(
       description: 'Delete a recording entry (and its file) by id or name',
-      params: {
-        'id': 'Recording id',
-        'name': 'Recording file name',
-      },
+      params: {'id': 'Recording id', 'name': 'Recording file name'},
     ),
     'transcribe': const CliActionHelp(
       description:

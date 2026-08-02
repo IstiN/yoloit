@@ -172,53 +172,15 @@ class CopilotCliProvider extends ChatProvider {
 
     final args = <String>[];
     if (passDefault) {
-      if (!(configObj?.disableModel ?? false)) {
-        args.addAll(['--model', config.model]);
-      }
-
-      // Reasoning effort
-      if (config.reasoningEffort != null) {
-        args.addAll(['--reasoning-effort', config.reasoningEffort!]);
-      }
-
-      // Autopilot mode
-      if (config.autopilot) {
-        args.addAll([
-          '--autopilot',
-          '--max-autopilot-continues',
-          '${config.maxAutopilotContinues}',
-        ]);
-      }
-
-      // Agent mode
-      if (config.mode != null && config.mode!.isNotEmpty) {
-        args.addAll(['--mode', config.mode!]);
-      }
-
-      // Session name/resume — copilot binary rejects double quotes in --name.
-      // Also normalize typographic quotes to avoid provider-side validation errors.
-      final safeSessionName = config.sessionName.replaceAll(
-        RegExp(r'["""]'),
-        "'",
+      args.addAll(
+        _buildDefaultArgs(
+          config: config,
+          isFirstMessage: isFirstMessage,
+          attachments: attachments,
+          disableModel: configObj?.disableModel ?? false,
+          resumeOverrideId: resumeOverrideId,
+        ),
       );
-      final resumeKey =
-          resumeOverrideId ??
-          _sessionIds[config.sessionName] ??
-          safeSessionName;
-      final useResume = !isFirstMessage;
-      if (!useResume) {
-        args.addAll(['--name', safeSessionName]);
-      } else {
-        args.addAll(['--resume', resumeKey]);
-      }
-
-      // Attachments
-      for (final path in attachments) {
-        args.addAll(['--attachment', path]);
-      }
-
-      // Custom args
-      args.addAll(config.customArgs);
     }
 
     final effectiveMessage =
@@ -233,16 +195,9 @@ class CopilotCliProvider extends ChatProvider {
     // Prompt
     args.addAll(['-p', effectiveMessage]);
 
-    var rawCommand = configObj?.launchCommand.trim() ?? '';
-    if (rawCommand.isEmpty ||
-        rawCommand == 'copilot' ||
-        rawCommand == 'copilot --allow-all') {
-      rawCommand = AgentConfigService.defaultBoardChatCommand(
-        configObj?.streamAdapter ?? 'copilot',
-      );
-    }
-
-    final cmdParts = CliProviderBase.splitCommand(rawCommand);
+    final cmdParts = CliProviderBase.splitCommand(
+      _resolveRawCommand(configObj),
+    );
     final executable = cmdParts.isNotEmpty ? cmdParts[0] : 'copilot';
     final extraCmdArgs =
         cmdParts.length > 1
@@ -258,30 +213,12 @@ class CopilotCliProvider extends ChatProvider {
     assert(() { debugPrint('[CopilotCli] cwd: $workingDir'); return true; }());
 
     try {
-      final extraEnv = await GlobalEnvGroupsService.instance
-          .resolveSelectedGroups(config.envGroupIds);
-      final baseEnv = {...Platform.environment, ...extraEnv};
-      final yoloitBin = CliYoloitResolver.resolve();
-      final enrichedPath = CliYoloitResolver.buildSessionPath(
-        baseEnv['PATH'] ?? '',
-        yoloitBin: yoloitBin,
-      );
-      final process = await _processStarter(
+      final process = await _startSessionProcess(
         executable,
         [...extraCmdArgs, ...args],
-        workingDirectory: workingDir,
-        environment: {
-          ...baseEnv,
-          'PATH': enrichedPath,
-          if (yoloitBin != null) 'YOLOIT_BIN': yoloitBin,
-        },
-      );
-      _processes[config.sessionName] = process;
-      registerChatProcessResource(
-        process: process,
-        providerId: agentId,
-        config: config,
-        runtimeContext: runtimeContext,
+        workingDir,
+        config,
+        runtimeContext,
       );
 
       // Merge sub-agent events (from events.jsonl) into the main stream.
@@ -299,69 +236,11 @@ class CopilotCliProvider extends ChatProvider {
       final buffer = StringBuffer();
 
       final stdoutDone = Completer<void>();
-      process.stdout
-          .transform(utf8.decoder)
-          .listen(
-            (chunk) {
-              buffer.write(chunk);
-              final lines = buffer.toString().split('\n');
-              // Keep the last incomplete line in the buffer
-              buffer.clear();
-              buffer.write(lines.removeLast());
-
-              for (final line in lines) {
-                final trimmed = line.trim();
-                if (trimmed.isEmpty) continue;
-                try {
-                  final json = jsonDecode(trimmed) as Map<String, dynamic>;
-                  if (json['type'] == 'result' && json['sessionId'] is String) {
-                    _sessionIds[config.sessionName] =
-                        json['sessionId'] as String;
-                  }
-                  final event = ChatEvent.fromJson(json);
-                  controller.add(event);
-                } catch (e) {
-                  assert(() { debugPrint('[CopilotCli] Failed to parse line: $trimmed'); return true; }());
-                  assert(() { debugPrint('[CopilotCli] Error: $e'); return true; }());
-                }
-              }
-            },
-            onError: (Object error) {
-              assert(() { debugPrint('[CopilotCli] stdout error: $error'); return true; }());
-              if (!controller.isClosed) {
-                controller.addError(error);
-              }
-              if (!stdoutDone.isCompleted) {
-                stdoutDone.complete();
-              }
-            },
-            onDone: () {
-              if (!stdoutDone.isCompleted) {
-                stdoutDone.complete();
-              }
-            },
-          );
+      _attachStdoutListener(process, config, controller, buffer, stdoutDone);
 
       final stderrBuf = StringBuffer();
       final stderrDone = Completer<void>();
-      process.stderr
-          .transform(utf8.decoder)
-          .listen(
-            (chunk) {
-              assert(() { debugPrint('[CopilotCli] stderr: $chunk'); return true; }());
-              stderrBuf.write(chunk);
-            },
-            onError: (_) {
-              if (!stderrDone.isCompleted) {
-                stderrDone.complete();
-              }
-            },
-            onDone: () {
-              if (!stderrDone.isCompleted) {
-                stderrDone.complete();
-              }
-            },
-          );
+      _attachStderrListener(process, stderrBuf, stderrDone);
 
       final exitCode = await process.exitCode;
       await stdoutDone.future;
@@ -372,82 +251,27 @@ class CopilotCliProvider extends ChatProvider {
       final remaining = buffer.toString().trim();
       if (remaining.isNotEmpty) {
         try {
-          final json = jsonDecode(remaining) as Map<String, dynamic>;
-          if (json['type'] == 'result' && json['sessionId'] is String) {
-            _sessionIds[config.sessionName] = json['sessionId'] as String;
-          }
-          controller.add(ChatEvent.fromJson(json));
+          _emitJsonLine(remaining, config.sessionName, controller);
         } catch (_) {}
       }
 
       // If process exited with error and no events were emitted, surface stderr
       if (exitCode != 0) {
-        final errText = stderrBuf.toString().trim();
-        final recoveredSessionId =
-            recoveryAttempted ? null : _recoverLatestSessionId(errText);
-        if (recoveredSessionId != null) {
-          _sessionIds[config.sessionName] = recoveredSessionId;
-          assert(() {
-            debugPrint(
-            '[CopilotCli] Recovering ambiguous session name '
-            '"${config.sessionName}" with session ID $recoveredSessionId',
-          );
-            return true;
-          }());
-          if (_processes[config.sessionName] == process) {
-            _processes.remove(config.sessionName);
-          }
-          unregisterChatProcessResource(process);
-          await subAgentSub?.cancel();
-          await subAgentWatcher?.dispose();
-          await _runProcess(
-            message: message,
-            config: config,
-            isFirstMessage: isFirstMessage,
-            attachments: attachments,
-            runtimeContext: runtimeContext,
-            controller: controller,
-            resumeOverrideId: recoveredSessionId,
-            recoveryAttempted: true,
-          );
-          return;
-        }
-        final shouldCreateReplacementSession =
-            !recoveryAttempted &&
-            !isFirstMessage &&
-            _isMissingCopilotSessionError(errText);
-        if (shouldCreateReplacementSession) {
-          _sessionIds.remove(config.sessionName);
-          assert(() {
-            debugPrint(
-            '[CopilotCli] Resume target for "${config.sessionName}" is stale; '
-            'creating a replacement named session.',
-          );
-            return true;
-          }());
-          if (_processes[config.sessionName] == process) {
-            _processes.remove(config.sessionName);
-          }
-          unregisterChatProcessResource(process);
-          await subAgentSub?.cancel();
-          await subAgentWatcher?.dispose();
-          await _runProcess(
-            message: message,
-            config: config,
-            isFirstMessage: true,
-            attachments: attachments,
-            runtimeContext: runtimeContext,
-            controller: controller,
-            recoveryAttempted: true,
-          );
-          return;
-        }
-        controller.addError(
-          errText.isNotEmpty
-              ? errText
-              : 'Copilot session resume failed (exit code $exitCode). '
-                  'Start a new session if this one is no longer restorable.',
+        final retried = await _handleExitError(
+          process: process,
+          exitCode: exitCode,
+          errText: stderrBuf.toString().trim(),
+          message: message,
+          config: config,
+          isFirstMessage: isFirstMessage,
+          attachments: attachments,
+          runtimeContext: runtimeContext,
+          controller: controller,
+          recoveryAttempted: recoveryAttempted,
+          subAgentSub: subAgentSub,
+          subAgentWatcher: subAgentWatcher,
         );
+        if (retried) return;
       }
 
       // Only remove if this is still the active process (not replaced by a newer one)
@@ -464,6 +288,294 @@ class CopilotCliProvider extends ChatProvider {
       controller.addError(e);
       await controller.close();
     }
+  }
+
+  List<String> _buildDefaultArgs({
+    required ChatSessionConfig config,
+    required bool isFirstMessage,
+    required List<String> attachments,
+    required bool disableModel,
+    required String? resumeOverrideId,
+  }) {
+    final args = <String>[];
+    if (!disableModel) {
+      args.addAll(['--model', config.model]);
+    }
+
+    // Reasoning effort
+    if (config.reasoningEffort != null) {
+      args.addAll(['--reasoning-effort', config.reasoningEffort!]);
+    }
+
+    // Autopilot mode
+    if (config.autopilot) {
+      args.addAll([
+        '--autopilot',
+        '--max-autopilot-continues',
+        '${config.maxAutopilotContinues}',
+      ]);
+    }
+
+    // Agent mode
+    if (config.mode != null && config.mode!.isNotEmpty) {
+      args.addAll(['--mode', config.mode!]);
+    }
+
+    // Session name/resume — copilot binary rejects double quotes in --name.
+    // Also normalize typographic quotes to avoid provider-side validation errors.
+    final safeSessionName = config.sessionName.replaceAll(
+      RegExp(r'["""]'),
+      "'",
+    );
+    final resumeKey =
+        resumeOverrideId ??
+        _sessionIds[config.sessionName] ??
+        safeSessionName;
+    final useResume = !isFirstMessage;
+    if (!useResume) {
+      args.addAll(['--name', safeSessionName]);
+    } else {
+      args.addAll(['--resume', resumeKey]);
+    }
+
+    // Attachments
+    for (final path in attachments) {
+      args.addAll(['--attachment', path]);
+    }
+
+    // Custom args
+    args.addAll(config.customArgs);
+    return args;
+  }
+
+  String _resolveRawCommand(AgentConfig? configObj) {
+    var rawCommand = configObj?.launchCommand.trim() ?? '';
+    if (rawCommand.isEmpty ||
+        rawCommand == 'copilot' ||
+        rawCommand == 'copilot --allow-all') {
+      rawCommand = AgentConfigService.defaultBoardChatCommand(
+        configObj?.streamAdapter ?? 'copilot',
+      );
+    }
+    return rawCommand;
+  }
+
+  Future<Process> _startSessionProcess(
+    String executable,
+    List<String> args,
+    String workingDir,
+    ChatSessionConfig config,
+    ChatRuntimeContext? runtimeContext,
+  ) async {
+    final extraEnv = await GlobalEnvGroupsService.instance
+        .resolveSelectedGroups(config.envGroupIds);
+    final baseEnv = {...Platform.environment, ...extraEnv};
+    final yoloitBin = CliYoloitResolver.resolve();
+    final enrichedPath = CliYoloitResolver.buildSessionPath(
+      baseEnv['PATH'] ?? '',
+      yoloitBin: yoloitBin,
+    );
+    final process = await _processStarter(
+      executable,
+      args,
+      workingDirectory: workingDir,
+      environment: {
+        ...baseEnv,
+        'PATH': enrichedPath,
+        if (yoloitBin != null) 'YOLOIT_BIN': yoloitBin,
+      },
+    );
+    _processes[config.sessionName] = process;
+    registerChatProcessResource(
+      process: process,
+      providerId: agentId,
+      config: config,
+      runtimeContext: runtimeContext,
+    );
+    return process;
+  }
+
+  void _emitJsonLine(
+    String trimmed,
+    String sessionName,
+    StreamController<ChatEvent> controller,
+  ) {
+    final json = jsonDecode(trimmed) as Map<String, dynamic>;
+    if (json['type'] == 'result' && json['sessionId'] is String) {
+      _sessionIds[sessionName] = json['sessionId'] as String;
+    }
+    controller.add(ChatEvent.fromJson(json));
+  }
+
+  void _attachStdoutListener(
+    Process process,
+    ChatSessionConfig config,
+    StreamController<ChatEvent> controller,
+    StringBuffer buffer,
+    Completer<void> stdoutDone,
+  ) {
+    process.stdout
+        .transform(utf8.decoder)
+        .listen(
+          (chunk) {
+            buffer.write(chunk);
+            final lines = buffer.toString().split('\n');
+            // Keep the last incomplete line in the buffer
+            buffer.clear();
+            buffer.write(lines.removeLast());
+
+            for (final line in lines) {
+              final trimmed = line.trim();
+              if (trimmed.isEmpty) continue;
+              try {
+                _emitJsonLine(trimmed, config.sessionName, controller);
+              } catch (e) {
+                assert(() { debugPrint('[CopilotCli] Failed to parse line: $trimmed'); return true; }());
+                assert(() { debugPrint('[CopilotCli] Error: $e'); return true; }());
+              }
+            }
+          },
+          onError: (Object error) {
+            assert(() { debugPrint('[CopilotCli] stdout error: $error'); return true; }());
+            if (!controller.isClosed) {
+              controller.addError(error);
+            }
+            if (!stdoutDone.isCompleted) {
+              stdoutDone.complete();
+            }
+          },
+          onDone: () {
+            if (!stdoutDone.isCompleted) {
+              stdoutDone.complete();
+            }
+          },
+        );
+  }
+
+  void _attachStderrListener(
+    Process process,
+    StringBuffer stderrBuf,
+    Completer<void> stderrDone,
+  ) {
+    process.stderr
+        .transform(utf8.decoder)
+        .listen(
+          (chunk) {
+            assert(() { debugPrint('[CopilotCli] stderr: $chunk'); return true; }());
+            stderrBuf.write(chunk);
+          },
+          onError: (_) {
+            if (!stderrDone.isCompleted) {
+              stderrDone.complete();
+            }
+          },
+          onDone: () {
+            if (!stderrDone.isCompleted) {
+              stderrDone.complete();
+            }
+          },
+        );
+  }
+
+  /// Handles a non-zero exit: attempts session-recovery retries and surfaces
+  /// stderr when no retry is possible.
+  ///
+  /// Returns true when the message was retried via a recursive [_runProcess]
+  /// call (the caller must return without touching the controller).
+  Future<bool> _handleExitError({
+    required Process process,
+    required int exitCode,
+    required String errText,
+    required String message,
+    required ChatSessionConfig config,
+    required bool isFirstMessage,
+    required List<String> attachments,
+    required ChatRuntimeContext? runtimeContext,
+    required StreamController<ChatEvent> controller,
+    required bool recoveryAttempted,
+    required StreamSubscription<ChatEvent>? subAgentSub,
+    required SubAgentEventWatcher? subAgentWatcher,
+  }) async {
+    final recoveredSessionId =
+        recoveryAttempted ? null : _recoverLatestSessionId(errText);
+    if (recoveredSessionId != null) {
+      _sessionIds[config.sessionName] = recoveredSessionId;
+      assert(() {
+        debugPrint(
+        '[CopilotCli] Recovering ambiguous session name '
+        '"${config.sessionName}" with session ID $recoveredSessionId',
+      );
+        return true;
+      }());
+      await _cleanupBeforeRetry(
+        process,
+        config.sessionName,
+        subAgentSub,
+        subAgentWatcher,
+      );
+      await _runProcess(
+        message: message,
+        config: config,
+        isFirstMessage: isFirstMessage,
+        attachments: attachments,
+        runtimeContext: runtimeContext,
+        controller: controller,
+        resumeOverrideId: recoveredSessionId,
+        recoveryAttempted: true,
+      );
+      return true;
+    }
+    final shouldCreateReplacementSession =
+        !recoveryAttempted &&
+        !isFirstMessage &&
+        _isMissingCopilotSessionError(errText);
+    if (shouldCreateReplacementSession) {
+      _sessionIds.remove(config.sessionName);
+      assert(() {
+        debugPrint(
+        '[CopilotCli] Resume target for "${config.sessionName}" is stale; '
+        'creating a replacement named session.',
+      );
+        return true;
+      }());
+      await _cleanupBeforeRetry(
+        process,
+        config.sessionName,
+        subAgentSub,
+        subAgentWatcher,
+      );
+      await _runProcess(
+        message: message,
+        config: config,
+        isFirstMessage: true,
+        attachments: attachments,
+        runtimeContext: runtimeContext,
+        controller: controller,
+        recoveryAttempted: true,
+      );
+      return true;
+    }
+    controller.addError(
+      errText.isNotEmpty
+          ? errText
+          : 'Copilot session resume failed (exit code $exitCode). '
+              'Start a new session if this one is no longer restorable.',
+    );
+    return false;
+  }
+
+  Future<void> _cleanupBeforeRetry(
+    Process process,
+    String sessionName,
+    StreamSubscription<ChatEvent>? subAgentSub,
+    SubAgentEventWatcher? subAgentWatcher,
+  ) async {
+    if (_processes[sessionName] == process) {
+      _processes.remove(sessionName);
+    }
+    unregisterChatProcessResource(process);
+    await subAgentSub?.cancel();
+    await subAgentWatcher?.dispose();
   }
 
   @override

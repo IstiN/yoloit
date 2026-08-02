@@ -172,6 +172,26 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       duration: const Duration(milliseconds: 1200),
     );
     _initConfig();
+    _initToolCallSettings();
+    _initSession();
+    _restoreDraftState();
+    _listenToKanbanCardEvents();
+    _refreshOpencodeModels();
+    _restoreSessionMessages();
+    _initScrollController();
+    _restoreProviderSessionIds();
+    _reattachSessionUICallbacks();
+    _registerSessionListeners();
+    _restoreInitialScrollPosition();
+
+    _consumeCliPendingMessage();
+    widget.controller?._attach(
+      startMic: _handleMicInput,
+      focusInput: () => _inputFocusNode.requestFocus(),
+    );
+  }
+
+  void _initToolCallSettings() {
     ToolCallSettingsService.instance.load().then((_) {
       if (!mounted) return;
       _handleIgnoredToolsChanged();
@@ -179,22 +199,29 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     ToolCallSettingsService.instance.ignoredToolsListenable.addListener(
       _handleIgnoredToolsChanged,
     );
-    // Get or create session from manager — provider survives widget lifecycle.
+  }
+
+  /// Get or create session from manager — provider survives widget lifecycle.
+  void _initSession() {
     _session = ChatSessionManager.instance.getOrCreate(
       widget.panel.id,
       _config,
     );
     _provider = _session!.provider;
+  }
 
-    // Restore draft text from persisted panel state (survives board switches
-    // and app restarts). Each panel has its own state, so this is safe in
-    // tests and avoids leaking draft text through the shared session manager.
+  /// Restore draft text from persisted panel state (survives board switches
+  /// and app restarts). Each panel has its own state, so this is safe in
+  /// tests and avoids leaking draft text through the shared session manager.
+  void _restoreDraftState() {
     _inputController.text = widget.panel.state['draftText'] as String? ?? '';
 
     // Restore a queued follow-up draft if one was set while the agent was busy.
     _pendingFollowUp = widget.panel.state['_followUpDraft'] as String?;
+  }
 
-    // Listen for kanban cards being sent to this chat panel.
+  /// Listen for kanban cards being sent to this chat panel.
+  void _listenToKanbanCardEvents() {
     _kanbanToChatSub = BoardEventBus.instance
         .on<KanbanCardToChatEvent>()
         .where((e) => e.targetPanelId == widget.panel.id)
@@ -203,17 +230,21 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
           _inputFocusNode.requestFocus();
           _persistDraftText();
         });
+  }
 
-    // If opencode provider, refresh models and rebuild setup view once loaded.
+  /// If opencode provider, refresh models and rebuild setup view once loaded.
+  void _refreshOpencodeModels() {
     if (_provider is OpencodeProvider) {
       (_provider as OpencodeProvider).refreshModelsFromModelsDev().then((_) {
         if (mounted) setState(() {});
       });
     }
+  }
 
-    // Restore messages from the session (source of truth).
-    // The session accumulates messages via _handleCoreEvent even when
-    // the widget is detached, so it always has the latest state.
+  /// Restore messages from the session (source of truth).
+  /// The session accumulates messages via _handleCoreEvent even when
+  /// the widget is detached, so it always has the latest state.
+  void _restoreSessionMessages() {
     if (_session!.messages.isNotEmpty) {
       _messages.clear();
       _messages.addAll(_session!.messages);
@@ -251,11 +282,13 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         _session!.restoreLastUsage(Map<String, dynamic>.from(savedUsage));
       }
     }
+  }
 
-    // Create scroll controller with an initial offset so the list starts at
-    // the correct position without a visible jump after the first frame.
-    // double.maxFinite is clamped to maxScrollExtent on the first layout,
-    // effectively starting at the bottom for non-empty chats.
+  /// Create scroll controller with an initial offset so the list starts at
+  /// the correct position without a visible jump after the first frame.
+  /// double.maxFinite is clamped to maxScrollExtent on the first layout,
+  /// effectively starting at the bottom for non-empty chats.
+  void _initScrollController() {
     final savedOffset =
         _session?.savedScrollOffset ??
         PanelScrollMemory.read(widget.panel.state);
@@ -270,8 +303,10 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         widget.onUpdateState(state);
       },
     );
+  }
 
-    // Restore sessionID for opencode
+  /// Restore sessionID for opencode/copilot/cursor providers.
+  void _restoreProviderSessionIds() {
     if (_config.provider == 'opencode') {
       if (_session!.opencodeSessionId != null) {
         _opencodeSessionId = _session!.opencodeSessionId;
@@ -299,9 +334,11 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         _session!.restoreCursorSessionId(_cursorSessionId);
       }
     }
+  }
 
-    // Re-attach UI callbacks if the session is still processing
-    // (e.g. widget disposed mid-stream, now re-mounting)
+  /// Re-attach UI callbacks if the session is still processing
+  /// (e.g. widget disposed mid-stream, now re-mounting)
+  void _reattachSessionUICallbacks() {
     if (_session!.isProcessing) {
       _isSending = true;
       _setProcessing(true);
@@ -366,13 +403,18 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         },
       );
     }
+  }
+
+  void _registerSessionListeners() {
     // Register processing notifier for board-level glow
     ChatPanelWidget.processingNotifiers[widget.panel.id] = processingNotifier;
     // Subscribe to session ChangeNotifier so CLI-driven changes
     // (sendMessage called headlessly) update the UI automatically.
     _session?.addListener(_onSessionChanged);
+  }
 
-    // Restore scroll position now that _session and _messages are finalised.
+  /// Restore scroll position now that _session and _messages are finalised.
+  void _restoreInitialScrollPosition() {
     if (_messages.isNotEmpty) {
       if (_session!.isProcessing) {
         _scrollToBottom(animate: false);
@@ -380,12 +422,6 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         _restoreScrollOffset();
       }
     }
-
-    _consumeCliPendingMessage();
-    widget.controller?._attach(
-      startMic: _handleMicInput,
-      focusInput: () => _inputFocusNode.requestFocus(),
-    );
   }
 
   @override
@@ -470,7 +506,13 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     } else {
       _config = const ChatSessionConfig(sessionName: '', workingDir: '');
     }
-    // Restore saved messages
+    _restoreSavedMessages();
+    _restoreSavedUsage();
+    _restoreSavedProviderSessionIds(raw);
+  }
+
+  /// Restore saved messages from persisted panel state.
+  void _restoreSavedMessages() {
     final savedMessages = widget.panel.state['messages'];
     if (savedMessages is List) {
       for (final m in savedMessages) {
@@ -486,13 +528,20 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         }
       }
     }
-    // Restore last usage
+  }
+
+  /// Restore last usage from persisted panel state.
+  void _restoreSavedUsage() {
     final savedUsage = widget.panel.state['lastUsage'];
     if (savedUsage is Map) {
       _lastUsage = ChatTokenUsage.fromJson(
         Map<String, dynamic>.from(savedUsage),
       );
     }
+  }
+
+  /// Restore provider session IDs from persisted panel state (or config).
+  void _restoreSavedProviderSessionIds(Object? raw) {
     // Restore opencode session ID
     if (_config.provider == 'opencode') {
       final savedSessionId =
@@ -1065,25 +1114,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     final text = overrideText?.trim() ?? _inputController.text.trim();
     if (text.isEmpty) return;
 
-    // Handle /model command
-    if (text == '/model') {
-      _inputController.clear();
-      _showModelPicker(context);
-      return;
-    }
-
-    // Handle /context command — just clear input, the picker is shown inline
-    if (text == '/context') {
-      _inputController.clear();
-      return;
-    }
-
-    // Handle /yolo command — keep the input so the user can pick panels, then
-    // the actual mentions are resolved when the message is sent.
-    if (text == '/yolo' || text == '.yolo') {
-      _hideYoloSlash();
-      return;
-    }
+    if (_handleSlashCommand(text)) return;
 
     // If the agent is busy, queue this text as the next follow-up instead of
     // trying to send it now. The user can edit or cancel it from the banner.
@@ -1107,21 +1138,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     }
 
     // If currently processing, stop the current stream first
-    if (_isProcessing) {
-      await _session!.stopStreaming();
-      if (!mounted) return;
-      // Sync finalized messages from session
-      _messages
-        ..clear()
-        ..addAll(_session!.messages);
-      setState(() {
-        _streamingContent = '';
-        _streamingMessageId = null;
-        _assistantInsertIndex = null;
-        _activeToolCalls.clear();
-        _ignoredToolCallIds.clear();
-      });
-    }
+    if (!await _stopActiveStreamBeforeSend()) return;
 
     _assistantInsertIndex = _messages.length;
 
@@ -1132,21 +1149,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     final focusPanelSummary = await _focusPanelSummary();
 
     // Capture board snapshot if enabled
-    String? snapshotPath;
-    String? snapshotBase64;
-    final snapshotEnabled = await SessionPrefs.isBoardSnapshotEnabled();
-    if (snapshotEnabled) {
-      final screenshotSvc = BoardScreenshotService.instance;
-      final isCloudProvider =
-          _session!.provider.imageMode == ChatImageMode.base64;
-      if (isCloudProvider) {
-        snapshotBase64 = await screenshotSvc.captureBase64(pixelRatio: 0.5);
-      } else {
-        snapshotPath = await screenshotSvc.captureJpegFile(pixelRatio: 0.5);
-      }
-      // Clean up old snapshots in the background
-      screenshotSvc.cleanupOldSnapshots();
-    }
+    final (snapshotPath, snapshotBase64) = await _captureBoardSnapshot();
 
     // Route through the session — it owns the stream subscription.
     // When this widget is disposed, the session keeps processing events.
@@ -1169,67 +1172,8 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         boardCubit: context.read<BoardCubit>(),
       ),
       onEvent: _handleEvent,
-      onError: (Object error) {
-        if (!mounted) return;
-        setState(() {
-          _isSending = false;
-          _setProcessing(false);
-          _assistantInsertIndex = null;
-          _messages
-            ..clear()
-            ..addAll(_session!.messages);
-        });
-        _persistMessages();
-        _scrollToBottom();
-      },
-      onDone: () {
-        if (!mounted) return;
-        // Persist opencode session ID after first message completes
-        if (_config.provider == 'opencode') {
-          final sid = _provider.getSessionId(_config.sessionName);
-          if (sid != null && sid != _opencodeSessionId) {
-            _opencodeSessionId = sid;
-            widget.onUpdateState({
-              ...widget.panel.state,
-              'opencodeSessionId': sid,
-            });
-          }
-        }
-        if (_config.provider == 'copilot') {
-          final sid = _provider.getSessionId(_config.sessionName);
-          if (sid != null && sid != _copilotSessionId) {
-            _copilotSessionId = sid;
-            widget.onUpdateState({
-              ...widget.panel.state,
-              'copilotSessionId': sid,
-            });
-          }
-        }
-        setState(() {
-          _isSending = false;
-          _setProcessing(false);
-          // Sync final messages from session (includes finalized streaming)
-          _messages
-            ..clear()
-            ..addAll(_session!.messages);
-          _streamingContent = '';
-          _streamingMessageId = null;
-          _assistantInsertIndex = null;
-          _markAllActiveToolCallsCompleted();
-        });
-        _persistMessages();
-        _scrollToBottom();
-        // Play macOS system sound on completion
-        _playCompletionSound();
-
-        // Auto-send any queued follow-up message now that the turn is done.
-        final followUp = _pendingFollowUp;
-        if (followUp != null && followUp.trim().isNotEmpty) {
-          setState(() => _pendingFollowUp = null);
-          _persistFollowUpState();
-          unawaited(_sendMessage(overrideText: followUp.trim()));
-        }
-      },
+      onError: _handleSendError,
+      onDone: _handleSendDone,
     );
 
     if (!ok) {
@@ -1252,14 +1196,168 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     _scrollToBottom();
   }
 
+  /// Handles bare slash commands (/model, /context, /yolo).
+  /// Returns true when the input was consumed and no message should be sent.
+  bool _handleSlashCommand(String text) {
+    // Handle /model command
+    if (text == '/model') {
+      _inputController.clear();
+      _showModelPicker(context);
+      return true;
+    }
+
+    // Handle /context command — just clear input, the picker is shown inline
+    if (text == '/context') {
+      _inputController.clear();
+      return true;
+    }
+
+    // Handle /yolo command — keep the input so the user can pick panels, then
+    // the actual mentions are resolved when the message is sent.
+    if (text == '/yolo' || text == '.yolo') {
+      _hideYoloSlash();
+      return true;
+    }
+    return false;
+  }
+
+  /// If currently processing, stop the current stream first.
+  /// Returns false when the widget was unmounted mid-await (abort the send).
+  Future<bool> _stopActiveStreamBeforeSend() async {
+    if (_isProcessing) {
+      await _session!.stopStreaming();
+      if (!mounted) return false;
+      // Sync finalized messages from session
+      _messages
+        ..clear()
+        ..addAll(_session!.messages);
+      setState(() {
+        _streamingContent = '';
+        _streamingMessageId = null;
+        _assistantInsertIndex = null;
+        _activeToolCalls.clear();
+        _ignoredToolCallIds.clear();
+      });
+    }
+    return true;
+  }
+
+  /// Capture board snapshot if enabled.
+  /// Returns (snapshotPath, snapshotBase64) — only one is set, per provider.
+  Future<(String?, String?)> _captureBoardSnapshot() async {
+    String? snapshotPath;
+    String? snapshotBase64;
+    final snapshotEnabled = await SessionPrefs.isBoardSnapshotEnabled();
+    if (snapshotEnabled) {
+      final screenshotSvc = BoardScreenshotService.instance;
+      final isCloudProvider =
+          _session!.provider.imageMode == ChatImageMode.base64;
+      if (isCloudProvider) {
+        snapshotBase64 = await screenshotSvc.captureBase64(pixelRatio: 0.5);
+      } else {
+        snapshotPath = await screenshotSvc.captureJpegFile(pixelRatio: 0.5);
+      }
+      // Clean up old snapshots in the background
+      screenshotSvc.cleanupOldSnapshots();
+    }
+    return (snapshotPath, snapshotBase64);
+  }
+
+  void _handleSendError(Object error) {
+    if (!mounted) return;
+    setState(() {
+      _isSending = false;
+      _setProcessing(false);
+      _assistantInsertIndex = null;
+      _messages
+        ..clear()
+        ..addAll(_session!.messages);
+    });
+    _persistMessages();
+    _scrollToBottom();
+  }
+
+  void _handleSendDone() {
+    if (!mounted) return;
+    // Persist opencode session ID after first message completes
+    if (_config.provider == 'opencode') {
+      final sid = _provider.getSessionId(_config.sessionName);
+      if (sid != null && sid != _opencodeSessionId) {
+        _opencodeSessionId = sid;
+        widget.onUpdateState({
+          ...widget.panel.state,
+          'opencodeSessionId': sid,
+        });
+      }
+    }
+    if (_config.provider == 'copilot') {
+      final sid = _provider.getSessionId(_config.sessionName);
+      if (sid != null && sid != _copilotSessionId) {
+        _copilotSessionId = sid;
+        widget.onUpdateState({
+          ...widget.panel.state,
+          'copilotSessionId': sid,
+        });
+      }
+    }
+    setState(() {
+      _isSending = false;
+      _setProcessing(false);
+      // Sync final messages from session (includes finalized streaming)
+      _messages
+        ..clear()
+        ..addAll(_session!.messages);
+      _streamingContent = '';
+      _streamingMessageId = null;
+      _assistantInsertIndex = null;
+      _markAllActiveToolCallsCompleted();
+    });
+    _persistMessages();
+    _scrollToBottom();
+    // Play macOS system sound on completion
+    _playCompletionSound();
+
+    // Auto-send any queued follow-up message now that the turn is done.
+    final followUp = _pendingFollowUp;
+    if (followUp != null && followUp.trim().isNotEmpty) {
+      setState(() => _pendingFollowUp = null);
+      _persistFollowUpState();
+      unawaited(_sendMessage(overrideText: followUp.trim()));
+    }
+  }
+
   void _playCompletionSound() {
     unawaited(playChatCompletionSound());
   }
 
   void _handleEvent(ChatEvent event) {
-    // Persist provider session IDs as soon as the provider captures them
-    // (which happens on the first event). Doing it here — rather than only in
-    // onDone — means the ID survives a board switch that happens mid-message.
+    _captureProviderSessionIds();
+    _eventHandlers[event.type]?.call(event);
+  }
+
+  /// Event-type → handler dispatch table.
+  ///
+  /// sessionStatus / userMessage / assistantTurnStart / assistantTurnEnd /
+  /// unknown are intentionally absent (no-op).
+  late final Map<ChatEventType, void Function(ChatEvent)> _eventHandlers = {
+    ChatEventType.assistantMessageStart: _onAssistantMessageStart,
+    ChatEventType.assistantDelta: _onAssistantDelta,
+    ChatEventType.assistantMessage: _onAssistantMessage,
+    ChatEventType.toolStart: _onToolStartEvent,
+    ChatEventType.toolComplete: _onToolCompleteEvent,
+    ChatEventType.result: _onResultEvent,
+    ChatEventType.askUser: _onAskUserEvent,
+    ChatEventType.subagentStarted: _onSubagentStarted,
+    ChatEventType.subagentToolStart: _onSubagentToolStart,
+    ChatEventType.subagentToolComplete: _onSubagentToolComplete,
+    ChatEventType.subagentMessage: _onSubagentMessage,
+    ChatEventType.subagentCompleted: _onSubagentCompleted,
+  };
+
+  /// Persist provider session IDs as soon as the provider captures them
+  /// (which happens on the first event). Doing it here — rather than only in
+  /// onDone — means the ID survives a board switch that happens mid-message.
+  void _captureProviderSessionIds() {
     if (_config.provider == 'opencode' && _opencodeSessionId == null) {
       final sid = _provider.getSessionId(_config.sessionName);
       if (sid != null) {
@@ -1281,262 +1379,259 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         widget.onUpdateState({...widget.panel.state, 'cursorSessionId': sid});
       }
     }
+  }
 
-    switch (event.type) {
-      case ChatEventType.assistantMessageStart:
-        setState(() {
-          _streamingMessageId = event.messageId;
-          _streamingContent = '';
-          _assistantInsertIndex ??= _messages.length;
-        });
+  void _onAssistantMessageStart(ChatEvent event) {
+    setState(() {
+      _streamingMessageId = event.messageId;
+      _streamingContent = '';
+      _assistantInsertIndex ??= _messages.length;
+    });
+  }
 
-      case ChatEventType.assistantDelta:
-        final delta = event.deltaContent;
-        if (delta != null) {
-          setState(() {
-            _streamingContent += delta;
-          });
-          _scrollToBottom();
-        }
-
-      case ChatEventType.assistantMessage:
-        setState(() {
-          // Sync from session to avoid duplicates with _onSessionChanged.
-          _messages..clear()..addAll(_session!.messages);
-          _streamingMessageId = null;
-          _streamingContent = '';
-          _assistantInsertIndex = null;
-          _markAllActiveToolCallsCompleted();
-          _totalOutputTokens = _session!.totalOutputTokens;
-        });
-        _scrollToBottom();
-
-      case ChatEventType.toolStart:
-        final toolCallId = event.toolCallId ?? '';
-        final toolName = _resolveToolName(event.toolName);
-        if (_isIgnoredToolCall(toolName)) {
-          if (toolCallId.isNotEmpty) {
-            _ignoredToolCallIds.add(toolCallId);
-          }
-          break;
-        }
-        setState(() {
-          _assistantInsertIndex ??= _messages.length;
-          _activeToolCalls[toolCallId] = ChatToolCall(
-            toolCallId: toolCallId,
-            toolName: toolName,
-            arguments: event.toolArguments ?? {},
-            isRunning: true,
-          );
-        });
-        _scrollToBottom();
-
-      case ChatEventType.toolComplete:
-        var toolCallId = event.data['toolCallId'] as String? ?? '';
-        if (toolCallId.isEmpty && _activeToolCalls.length == 1) {
-          toolCallId = _activeToolCalls.keys.first;
-        }
-        if (toolCallId.isNotEmpty && _ignoredToolCallIds.remove(toolCallId)) {
-          break;
-        }
-        final success = event.data['success'] as bool? ?? true;
-        final resultContent = event.toolResultContent ?? '';
-        final toolArguments =
-            _activeToolCalls[toolCallId]?.arguments ??
-            event.toolArguments ??
-            {};
-        final toolName = _resolveToolName(
-          _activeToolCalls[toolCallId]?.toolName ?? event.toolName,
-          content: resultContent,
-        );
-        final changedFiles = _extractChangedFiles(
-          toolName: toolName,
-          resultContent: resultContent,
-          arguments: toolArguments,
-        );
-        if (_isIgnoredToolCall(toolName)) {
-          setState(() {
-            _activeToolCalls.remove(toolCallId);
-          });
-          break;
-        }
-        // Notify any open file preview panels to refresh their content.
-        for (final path in changedFiles) {
-          BoardEventBus.instance.fileModified(path);
-        }
-        setState(() {
-          // Sync from session to avoid duplicates with _onSessionChanged,
-          // then patch changedFiles metadata that _handleCoreEvent doesn't capture.
-          _messages..clear()..addAll(_session!.messages);
-          final idx = _messages.indexWhere(
-            (m) => m.role == ChatRole.tool && m.toolCallId == toolCallId,
-          );
-          if (idx != -1) {
-            final existing = _messages[idx];
-            _messages[idx] = existing.copyWith(
-              metadata: {
-                ...?existing.metadata,
-                'success': success,
-                if (changedFiles.isNotEmpty) 'changedFiles': changedFiles,
-              },
-            );
-          }
-          _activeToolCalls.remove(toolCallId);
-          if (_activeToolCalls.isEmpty) {
-            _markAllActiveToolCallsCompleted();
-          }
-        });
-        _scrollToBottom();
-
-      case ChatEventType.result:
-        final usage = event.usageData;
-        if (usage != null) {
-          final codeChanges = usage['codeChanges'] as Map<String, dynamic>?;
-          final outputTokens = (usage['outputTokens'] as num?)?.toInt() ?? 0;
-          setState(() {
-            // Accumulate output tokens (providers like cursor report them only at result)
-            if (outputTokens > 0) {
-              _totalOutputTokens += outputTokens;
-            }
-            _lastUsage = ChatTokenUsage(
-              outputTokens: outputTokens,
-              premiumRequests: (usage['premiumRequests'] as num?)?.toInt() ?? 0,
-              totalApiDurationMs:
-                  (usage['totalApiDurationMs'] as num?)?.toInt() ?? 0,
-              sessionDurationMs:
-                  (usage['sessionDurationMs'] as num?)?.toInt() ?? 0,
-              linesAdded: (codeChanges?['linesAdded'] as num?)?.toInt() ?? 0,
-              linesRemoved:
-                  (codeChanges?['linesRemoved'] as num?)?.toInt() ?? 0,
-            );
-            // Sync from session to keep _messages consistent.
-            _messages..clear()..addAll(_session!.messages);
-            _totalOutputTokens = _session!.totalOutputTokens;
-          });
-        }
-
-      case ChatEventType.askUser:
-        final question = event.data['question'] as String? ?? '';
-        final choicesRaw = event.data['choices'];
-        final choices =
-            choicesRaw is List ? choicesRaw.cast<String>() : <String>[];
-        final allowFreeform = event.data['allowFreeform'] as bool? ?? true;
-        if (question.isNotEmpty) {
-          setState(() {
-            _messages.add(
-              ChatMessage(
-                id: 'ask-${DateTime.now().millisecondsSinceEpoch}',
-                role: ChatRole.system,
-                content: question,
-                timestamp: DateTime.now(),
-                metadata: {
-                  'type': 'ask_user',
-                  'choices': choices,
-                  'allowFreeform': allowFreeform,
-                },
-              ),
-            );
-          });
-          _scrollToBottom();
-        }
-      case ChatEventType.sessionStatus:
-      case ChatEventType.userMessage:
-      case ChatEventType.assistantTurnStart:
-      case ChatEventType.assistantTurnEnd:
-      case ChatEventType.unknown:
-        break;
-
-      // ── Sub-agent panel events ────────────────────────────────────────────
-      case ChatEventType.subagentStarted:
-        final agentId = event.agentId ?? event.toolCallId ?? '';
-        if (agentId.isEmpty) break;
-        // Deduplicate: ignore if we already have this agent (event can fire >1×)
-        if (_subAgents.containsKey(agentId)) break;
-        final agentName = event.agentName ?? 'Agent';
-        final agentDesc = event.agentDescription ?? '';
-        final state = SubAgentRunState(
-          agentId: agentId,
-          agentName: agentName,
-          agentDescription: agentDesc,
-        );
-        setState(() => _subAgents[agentId] = state);
-        // Create a linked board panel (to the right, with arrow) for the agent log
-        unawaited(_createAgentLogPanel(agentId, agentName, agentDesc));
-
-      case ChatEventType.subagentToolStart:
-        final agentId = event.agentId ?? '';
-        final state = _subAgents[agentId];
-        if (state == null) break;
-        setState(() {
-          state.events.add(
-            SubAgentEvent(
-              type: 'tool_start',
-              toolName: event.toolName ?? '',
-              timestamp: event.timestamp ?? DateTime.now(),
-            ),
-          );
-        });
-        unawaited(_updateAgentPanel(agentId));
-
-      case ChatEventType.subagentToolComplete:
-        final agentId = event.agentId ?? '';
-        final state = _subAgents[agentId];
-        if (state == null) break;
-        final toolName =
-            event.toolName ?? event.data['toolName'] as String? ?? '';
-        final success = event.data['success'] as bool? ?? true;
-        final resultContent = event.toolResultContent ?? '';
-        setState(() {
-          state.events.add(
-            SubAgentEvent(
-              type: success ? 'tool_complete' : 'tool_error',
-              toolName: toolName,
-              content:
-                  resultContent.length > 120
-                      ? '${resultContent.substring(0, 120)}…'
-                      : resultContent,
-              timestamp: event.timestamp ?? DateTime.now(),
-            ),
-          );
-        });
-        unawaited(_updateAgentPanel(agentId));
-
-      case ChatEventType.subagentMessage:
-        final agentId = event.agentId ?? '';
-        final state = _subAgents[agentId];
-        if (state == null) break;
-        final content = event.messageContent ?? '';
-        if (content.isEmpty) break;
-        setState(() {
-          state.events.add(
-            SubAgentEvent(
-              type: 'message',
-              content:
-                  content.length > 300
-                      ? '${content.substring(0, 300)}…'
-                      : content,
-              timestamp: event.timestamp ?? DateTime.now(),
-            ),
-          );
-        });
-        unawaited(_updateAgentPanel(agentId));
-
-      case ChatEventType.subagentCompleted:
-        final agentId = event.agentId ?? event.toolCallId ?? '';
-        final state = _subAgents[agentId];
-        if (state == null) break;
-        setState(() {
-          state.isRunning = false;
-          // Also mark the outer task tool call as completed so it leaves
-          // the running-tools card. The CLI stdout may not emit toolComplete
-          // for the task tool itself — subagentCompleted is the signal.
-          final existing = _activeToolCalls[agentId];
-          if (existing != null && existing.isRunning) {
-            _activeToolCalls[agentId] = existing.copyWith(isRunning: false);
-          }
-        });
-        unawaited(_updateAgentPanel(agentId));
+  void _onAssistantDelta(ChatEvent event) {
+    final delta = event.deltaContent;
+    if (delta != null) {
+      setState(() {
+        _streamingContent += delta;
+      });
+      _scrollToBottom();
     }
+  }
+
+  void _onAssistantMessage(ChatEvent event) {
+    setState(() {
+      // Sync from session to avoid duplicates with _onSessionChanged.
+      _messages..clear()..addAll(_session!.messages);
+      _streamingMessageId = null;
+      _streamingContent = '';
+      _assistantInsertIndex = null;
+      _markAllActiveToolCallsCompleted();
+      _totalOutputTokens = _session!.totalOutputTokens;
+    });
+    _scrollToBottom();
+  }
+
+  void _onToolStartEvent(ChatEvent event) {
+    final toolCallId = event.toolCallId ?? '';
+    final toolName = _resolveToolName(event.toolName);
+    if (_isIgnoredToolCall(toolName)) {
+      if (toolCallId.isNotEmpty) {
+        _ignoredToolCallIds.add(toolCallId);
+      }
+      return;
+    }
+    setState(() {
+      _assistantInsertIndex ??= _messages.length;
+      _activeToolCalls[toolCallId] = ChatToolCall(
+        toolCallId: toolCallId,
+        toolName: toolName,
+        arguments: event.toolArguments ?? {},
+        isRunning: true,
+      );
+    });
+    _scrollToBottom();
+  }
+
+  void _onToolCompleteEvent(ChatEvent event) {
+    var toolCallId = event.data['toolCallId'] as String? ?? '';
+    if (toolCallId.isEmpty && _activeToolCalls.length == 1) {
+      toolCallId = _activeToolCalls.keys.first;
+    }
+    if (toolCallId.isNotEmpty && _ignoredToolCallIds.remove(toolCallId)) {
+      return;
+    }
+    final success = event.data['success'] as bool? ?? true;
+    final resultContent = event.toolResultContent ?? '';
+    final toolArguments =
+        _activeToolCalls[toolCallId]?.arguments ?? event.toolArguments ?? {};
+    final toolName = _resolveToolName(
+      _activeToolCalls[toolCallId]?.toolName ?? event.toolName,
+      content: resultContent,
+    );
+    final changedFiles = _extractChangedFiles(
+      toolName: toolName,
+      resultContent: resultContent,
+      arguments: toolArguments,
+    );
+    if (_isIgnoredToolCall(toolName)) {
+      setState(() {
+        _activeToolCalls.remove(toolCallId);
+      });
+      return;
+    }
+    // Notify any open file preview panels to refresh their content.
+    for (final path in changedFiles) {
+      BoardEventBus.instance.fileModified(path);
+    }
+    setState(() {
+      // Sync from session to avoid duplicates with _onSessionChanged,
+      // then patch changedFiles metadata that _handleCoreEvent doesn't capture.
+      _messages..clear()..addAll(_session!.messages);
+      final idx = _messages.indexWhere(
+        (m) => m.role == ChatRole.tool && m.toolCallId == toolCallId,
+      );
+      if (idx != -1) {
+        final existing = _messages[idx];
+        _messages[idx] = existing.copyWith(
+          metadata: {
+            ...?existing.metadata,
+            'success': success,
+            if (changedFiles.isNotEmpty) 'changedFiles': changedFiles,
+          },
+        );
+      }
+      _activeToolCalls.remove(toolCallId);
+      if (_activeToolCalls.isEmpty) {
+        _markAllActiveToolCallsCompleted();
+      }
+    });
+    _scrollToBottom();
+  }
+
+  void _onResultEvent(ChatEvent event) {
+    final usage = event.usageData;
+    if (usage != null) {
+      final codeChanges = usage['codeChanges'] as Map<String, dynamic>?;
+      final outputTokens = (usage['outputTokens'] as num?)?.toInt() ?? 0;
+      setState(() {
+        // Accumulate output tokens (providers like cursor report them only at result)
+        if (outputTokens > 0) {
+          _totalOutputTokens += outputTokens;
+        }
+        _lastUsage = ChatTokenUsage(
+          outputTokens: outputTokens,
+          premiumRequests: (usage['premiumRequests'] as num?)?.toInt() ?? 0,
+          totalApiDurationMs:
+              (usage['totalApiDurationMs'] as num?)?.toInt() ?? 0,
+          sessionDurationMs: (usage['sessionDurationMs'] as num?)?.toInt() ?? 0,
+          linesAdded: (codeChanges?['linesAdded'] as num?)?.toInt() ?? 0,
+          linesRemoved: (codeChanges?['linesRemoved'] as num?)?.toInt() ?? 0,
+        );
+        // Sync from session to keep _messages consistent.
+        _messages..clear()..addAll(_session!.messages);
+        _totalOutputTokens = _session!.totalOutputTokens;
+      });
+    }
+  }
+
+  void _onAskUserEvent(ChatEvent event) {
+    final question = event.data['question'] as String? ?? '';
+    final choicesRaw = event.data['choices'];
+    final choices = choicesRaw is List ? choicesRaw.cast<String>() : <String>[];
+    final allowFreeform = event.data['allowFreeform'] as bool? ?? true;
+    if (question.isNotEmpty) {
+      setState(() {
+        _messages.add(
+          ChatMessage(
+            id: 'ask-${DateTime.now().millisecondsSinceEpoch}',
+            role: ChatRole.system,
+            content: question,
+            timestamp: DateTime.now(),
+            metadata: {
+              'type': 'ask_user',
+              'choices': choices,
+              'allowFreeform': allowFreeform,
+            },
+          ),
+        );
+      });
+      _scrollToBottom();
+    }
+  }
+
+  // ── Sub-agent panel events ────────────────────────────────────────────────
+
+  void _onSubagentStarted(ChatEvent event) {
+    final agentId = event.agentId ?? event.toolCallId ?? '';
+    if (agentId.isEmpty) return;
+    // Deduplicate: ignore if we already have this agent (event can fire >1×)
+    if (_subAgents.containsKey(agentId)) return;
+    final agentName = event.agentName ?? 'Agent';
+    final agentDesc = event.agentDescription ?? '';
+    final state = SubAgentRunState(
+      agentId: agentId,
+      agentName: agentName,
+      agentDescription: agentDesc,
+    );
+    setState(() => _subAgents[agentId] = state);
+    // Create a linked board panel (to the right, with arrow) for the agent log
+    unawaited(_createAgentLogPanel(agentId, agentName, agentDesc));
+  }
+
+  void _onSubagentToolStart(ChatEvent event) {
+    final agentId = event.agentId ?? '';
+    final state = _subAgents[agentId];
+    if (state == null) return;
+    setState(() {
+      state.events.add(
+        SubAgentEvent(
+          type: 'tool_start',
+          toolName: event.toolName ?? '',
+          timestamp: event.timestamp ?? DateTime.now(),
+        ),
+      );
+    });
+    unawaited(_updateAgentPanel(agentId));
+  }
+
+  void _onSubagentToolComplete(ChatEvent event) {
+    final agentId = event.agentId ?? '';
+    final state = _subAgents[agentId];
+    if (state == null) return;
+    final toolName = event.toolName ?? event.data['toolName'] as String? ?? '';
+    final success = event.data['success'] as bool? ?? true;
+    final resultContent = event.toolResultContent ?? '';
+    setState(() {
+      state.events.add(
+        SubAgentEvent(
+          type: success ? 'tool_complete' : 'tool_error',
+          toolName: toolName,
+          content:
+              resultContent.length > 120
+                  ? '${resultContent.substring(0, 120)}…'
+                  : resultContent,
+          timestamp: event.timestamp ?? DateTime.now(),
+        ),
+      );
+    });
+    unawaited(_updateAgentPanel(agentId));
+  }
+
+  void _onSubagentMessage(ChatEvent event) {
+    final agentId = event.agentId ?? '';
+    final state = _subAgents[agentId];
+    if (state == null) return;
+    final content = event.messageContent ?? '';
+    if (content.isEmpty) return;
+    setState(() {
+      state.events.add(
+        SubAgentEvent(
+          type: 'message',
+          content:
+              content.length > 300 ? '${content.substring(0, 300)}…' : content,
+          timestamp: event.timestamp ?? DateTime.now(),
+        ),
+      );
+    });
+    unawaited(_updateAgentPanel(agentId));
+  }
+
+  void _onSubagentCompleted(ChatEvent event) {
+    final agentId = event.agentId ?? event.toolCallId ?? '';
+    final state = _subAgents[agentId];
+    if (state == null) return;
+    setState(() {
+      state.isRunning = false;
+      // Also mark the outer task tool call as completed so it leaves
+      // the running-tools card. The CLI stdout may not emit toolComplete
+      // for the task tool itself — subagentCompleted is the signal.
+      final existing = _activeToolCalls[agentId];
+      if (existing != null && existing.isRunning) {
+        _activeToolCalls[agentId] = existing.copyWith(isRunning: false);
+      }
+    });
+    unawaited(_updateAgentPanel(agentId));
   }
 
   // ── Sub-agent panel helpers ───────────────────────────────────────────────
@@ -1748,11 +1843,6 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
 
   Widget _buildInputBar() {
     final colors = context.appColors;
-    final textColor =
-        Theme.of(context).textTheme.bodyMedium?.color ??
-        Theme.of(context).colorScheme.onSurface;
-    final hintColor =
-        context.appColors.textMuted.withAlpha(153);
     final changedFiles = _collectChangedFilesForStrip();
     return Container(
       margin: EdgeInsets.zero,
@@ -1767,280 +1857,334 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (_pendingFollowUp != null && _pendingFollowUp!.isNotEmpty) ...[
-            ChatFollowUpBanner(
-              text: _pendingFollowUp!,
-              onEdit: () {
-                _inputController.text = _pendingFollowUp!;
-                _inputController.selection = TextSelection.collapsed(
-                  offset: _inputController.text.length,
-                );
-                setState(() => _pendingFollowUp = null);
-                _persistFollowUpState();
-                _inputFocusNode.requestFocus();
-              },
-              onCancel: () {
-                setState(() => _pendingFollowUp = null);
-                _persistFollowUpState();
-              },
-            ),
-            const SizedBox(height: 8),
-          ],
-          if (changedFiles.isNotEmpty) ...[
-            ChatChangedFilesStrip(
-              files: changedFiles,
-              onOpenFile: _openInPreviewPanel,
-            ),
-            const SizedBox(height: 8),
-          ],
-          if (_isPlainSlash) ...[
-            ChatSlashChips(
-              commands: _filteredSlashCommands,
-              onSelect: (cmd) {
-                _inputController.text = '${cmd.triggers.first} ';
-                _inputController.selection = TextSelection.collapsed(
-                  offset: _inputController.text.length,
-                );
-                if (cmd.id == 'model') {
-                  setState(() {
-                    _isModelSlash = true;
-                    _modelQuery = '';
-                    _modelSelectedIndex = 0;
-                  });
-                } else if (cmd.id == 'yolo') {
-                  setState(() => _isYoloSlash = true);
-                }
-              },
-            ),
-            const SizedBox(height: 8),
-          ],
-          if (_isModelSlash) ...[
-            ChatModelSuggestions(
-              models: _filteredModels,
-              selectedIndex: _modelSelectedIndex,
-              currentModelId: _config.model,
-              scrollController: _modelScrollCtrl,
-              onSelect: _selectModelFromSlash,
-            ),
-            const SizedBox(height: 8),
-          ],
-          if (_isContextSlash) ...[
-            ChatContextToggles(
-              cliHelp: _ctxCliHelp,
-              boardSnapshot: _ctxBoardSnapshot,
-              boardPanelsJson: _ctxBoardPanelsJson,
-              systemPrompt: _ctxSystemPrompt,
-              onCliHelpChanged: (v) async {
-                await SessionPrefs.saveInjectCliHelpEnabled(v);
-                CliGuidanceService.instance.clearCache();
-                if (!mounted) return;
-                setState(() => _ctxCliHelp = v);
-              },
-              onBoardSnapshotChanged: (v) async {
-                await SessionPrefs.saveBoardSnapshotEnabled(v);
-                if (!mounted) return;
-                setState(() => _ctxBoardSnapshot = v);
-              },
-              onBoardPanelsJsonChanged: (v) {
-                setState(() => _ctxBoardPanelsJson = v);
-              },
-              onSystemPromptChanged: (v) {
-                setState(() => _ctxSystemPrompt = v);
-              },
-            ),
-            const SizedBox(height: 8),
-          ],
-          if (_isYoloSlash) ...[
-            ChatPanelSuggestions(
-              panels: _currentBoardForPanel()?.panels ?? [],
-              selectedIds: _selectedYoloPanelIds,
-              onSelect: _toggleYoloPanel,
-            ),
-            const SizedBox(height: 8),
-          ],
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              // Model selector (bottom-left)
-              Builder(
-                builder:
-                    (btnContext) => ChatActionButton(
-                      icon: Icons.auto_awesome,
-                      onTap: () => _showModelPicker(btnContext),
-                      backgroundColor: colors.surfaceElevated,
-                      iconColor: colors.terminalPrompt,
-                    ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Focus(
-                  onKeyEvent: (node, event) {
-                    if (event is! KeyDownEvent) {
-                      return KeyEventResult.ignored;
-                    }
-
-                    if (_isModelSlash) {
-                      final isUp =
-                          event.logicalKey == LogicalKeyboardKey.arrowUp;
-                      final isDown =
-                          event.logicalKey == LogicalKeyboardKey.arrowDown;
-                      final isEnter =
-                          event.logicalKey == LogicalKeyboardKey.enter ||
-                          event.logicalKey == LogicalKeyboardKey.numpadEnter;
-                      final isEscape =
-                          event.logicalKey == LogicalKeyboardKey.escape;
-                      final isTab = event.logicalKey == LogicalKeyboardKey.tab;
-
-                      if (isTab && _filteredModels.isNotEmpty) {
-                        // Tab: select highlighted model
-                        _selectModelFromSlash(
-                          _filteredModels[_modelSelectedIndex].id,
-                        );
-                        return KeyEventResult.handled;
-                      }
-
-                      if (isUp || isDown) {
-                        final delta = isDown ? 1 : -1;
-                        final next = (_modelSelectedIndex + delta).clamp(
-                          0,
-                          _filteredModels.length - 1,
-                        );
-                        if (next == _modelSelectedIndex) {
-                          return KeyEventResult.handled;
-                        }
-                        setState(() {
-                          _modelSelectedIndex = next;
-                        });
-                        WidgetsBinding.instance.addPostFrameCallback(
-                          (_) => _scrollToModelSelection(),
-                        );
-                        return KeyEventResult.handled;
-                      }
-
-                      if (isEnter &&
-                          !HardwareKeyboard.instance.isShiftPressed &&
-                          _filteredModels.isNotEmpty) {
-                        _selectModelFromSlash(
-                          _filteredModels[_modelSelectedIndex].id,
-                        );
-                        return KeyEventResult.handled;
-                      }
-
-                      if (isEscape) {
-                        _hideModelSlash();
-                        return KeyEventResult.handled;
-                      }
-                    }
-
-                    if (_isPlainSlash) {
-                      final isTab = event.logicalKey == LogicalKeyboardKey.tab;
-                      if (isTab) {
-                        _autoCompleteSlash();
-                        return KeyEventResult.handled;
-                      }
-                      if (event.logicalKey == LogicalKeyboardKey.escape) {
-                        _hideModelSlash();
-                        return KeyEventResult.handled;
-                      }
-                    }
-
-                    if (_isYoloSlash &&
-                        event.logicalKey == LogicalKeyboardKey.escape) {
-                      _hideYoloSlash();
-                      return KeyEventResult.handled;
-                    }
-
-                    // Enter (without Shift) → send
-                    final isEnter =
-                        event.logicalKey == LogicalKeyboardKey.enter ||
-                        event.logicalKey == LogicalKeyboardKey.numpadEnter;
-                    if (isEnter && !HardwareKeyboard.instance.isShiftPressed) {
-                      _sendMessage();
-                      return KeyEventResult.handled;
-                    }
-                    // Cmd+V (macOS) or Ctrl+V → smart paste
-                    final isCmd = HardwareKeyboard.instance.isMetaPressed;
-                    final isCtrl = HardwareKeyboard.instance.isControlPressed;
-                    if (event.logicalKey == LogicalKeyboardKey.keyV &&
-                        (isCmd || isCtrl)) {
-                      _handleSmartPaste();
-                      return KeyEventResult.handled;
-                    }
-                    return KeyEventResult.ignored;
-                  },
-                  child: TextField(
-                    controller: _inputController,
-                    focusNode: _inputFocusNode,
-                    onChanged: _onInputChanged,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: textColor,
-                      height: 1.4,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: _isProcessing ? 'Agent working…' : 'Message…',
-                      hintStyle: TextStyle(fontSize: 13, color: hintColor),
-                      filled: true,
-                      fillColor: colors.surfaceElevated,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide.none,
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide.none,
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide(
-                          color: colors.terminalPrompt,
-                          width: 0.8,
-                        ),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 10,
-                      ),
-                      isDense: true,
-                    ),
-                    maxLines: 4,
-                    minLines: 1,
-                  ),
-                ),
-              ),
-              if (_micHandler.isAvailable) ...[
-                const SizedBox(width: 6),
-                ChatActionButton(
-                  icon:
-                      _isRecordingMic
-                          ? Icons.mic_rounded
-                          : (_isTranscribingMic
-                              ? Icons.hourglass_top_rounded
-                              : Icons.mic_none),
-                  onTap: _isTranscribingMic ? null : _handleMicInput,
-                  backgroundColor: colors.surfaceElevated,
-                  iconColor:
-                      _isRecordingMic
-                          ? Theme.of(context).colorScheme.error
-                          : colors.terminalPrompt,
-                  iconSize: 15,
-                ),
-              ],
-              const SizedBox(width: 6),
-              ChatActionButton(
-                icon: _isSending ? Icons.stop_rounded : Icons.arrow_upward,
-                onTap: _isSending ? _stopStreaming : _sendMessage,
-                backgroundColor:
-                    _isSending
-                        ? Theme.of(context).colorScheme.error
-                        : colors.terminalPrompt,
-                iconColor: Theme.of(context).colorScheme.onPrimary,
-                iconSize: 16,
-              ),
-            ],
-          ),
+          if (_pendingFollowUp != null && _pendingFollowUp!.isNotEmpty)
+            ..._buildFollowUpBannerSection(),
+          if (changedFiles.isNotEmpty)
+            ..._buildChangedFilesSection(changedFiles),
+          if (_isPlainSlash) ..._buildSlashChipsSection(),
+          if (_isModelSlash) ..._buildModelSuggestionsSection(),
+          if (_isContextSlash) ..._buildContextTogglesSection(),
+          if (_isYoloSlash) ..._buildYoloSuggestionsSection(),
+          _buildInputRow(colors),
         ],
       ),
+    );
+  }
+
+  List<Widget> _buildFollowUpBannerSection() {
+    return [
+      ChatFollowUpBanner(
+        text: _pendingFollowUp!,
+        onEdit: () {
+          _inputController.text = _pendingFollowUp!;
+          _inputController.selection = TextSelection.collapsed(
+            offset: _inputController.text.length,
+          );
+          setState(() => _pendingFollowUp = null);
+          _persistFollowUpState();
+          _inputFocusNode.requestFocus();
+        },
+        onCancel: () {
+          setState(() => _pendingFollowUp = null);
+          _persistFollowUpState();
+        },
+      ),
+      const SizedBox(height: 8),
+    ];
+  }
+
+  List<Widget> _buildChangedFilesSection(List<String> changedFiles) {
+    return [
+      ChatChangedFilesStrip(
+        files: changedFiles,
+        onOpenFile: _openInPreviewPanel,
+      ),
+      const SizedBox(height: 8),
+    ];
+  }
+
+  List<Widget> _buildSlashChipsSection() {
+    return [
+      ChatSlashChips(
+        commands: _filteredSlashCommands,
+        onSelect: (cmd) {
+          _inputController.text = '${cmd.triggers.first} ';
+          _inputController.selection = TextSelection.collapsed(
+            offset: _inputController.text.length,
+          );
+          if (cmd.id == 'model') {
+            setState(() {
+              _isModelSlash = true;
+              _modelQuery = '';
+              _modelSelectedIndex = 0;
+            });
+          } else if (cmd.id == 'yolo') {
+            setState(() => _isYoloSlash = true);
+          }
+        },
+      ),
+      const SizedBox(height: 8),
+    ];
+  }
+
+  List<Widget> _buildModelSuggestionsSection() {
+    return [
+      ChatModelSuggestions(
+        models: _filteredModels,
+        selectedIndex: _modelSelectedIndex,
+        currentModelId: _config.model,
+        scrollController: _modelScrollCtrl,
+        onSelect: _selectModelFromSlash,
+      ),
+      const SizedBox(height: 8),
+    ];
+  }
+
+  List<Widget> _buildContextTogglesSection() {
+    return [
+      ChatContextToggles(
+        cliHelp: _ctxCliHelp,
+        boardSnapshot: _ctxBoardSnapshot,
+        boardPanelsJson: _ctxBoardPanelsJson,
+        systemPrompt: _ctxSystemPrompt,
+        onCliHelpChanged: (v) async {
+          await SessionPrefs.saveInjectCliHelpEnabled(v);
+          CliGuidanceService.instance.clearCache();
+          if (!mounted) return;
+          setState(() => _ctxCliHelp = v);
+        },
+        onBoardSnapshotChanged: (v) async {
+          await SessionPrefs.saveBoardSnapshotEnabled(v);
+          if (!mounted) return;
+          setState(() => _ctxBoardSnapshot = v);
+        },
+        onBoardPanelsJsonChanged: (v) {
+          setState(() => _ctxBoardPanelsJson = v);
+        },
+        onSystemPromptChanged: (v) {
+          setState(() => _ctxSystemPrompt = v);
+        },
+      ),
+      const SizedBox(height: 8),
+    ];
+  }
+
+  List<Widget> _buildYoloSuggestionsSection() {
+    return [
+      ChatPanelSuggestions(
+        panels: _currentBoardForPanel()?.panels ?? [],
+        selectedIds: _selectedYoloPanelIds,
+        onSelect: _toggleYoloPanel,
+      ),
+      const SizedBox(height: 8),
+    ];
+  }
+
+  Widget _buildInputRow(AppColorScheme colors) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        // Model selector (bottom-left)
+        Builder(
+          builder:
+              (btnContext) => ChatActionButton(
+                icon: Icons.auto_awesome,
+                onTap: () => _showModelPicker(btnContext),
+                backgroundColor: colors.surfaceElevated,
+                iconColor: colors.terminalPrompt,
+              ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(child: _buildInputTextField()),
+        if (_micHandler.isAvailable) ..._buildMicButton(colors),
+        const SizedBox(width: 6),
+        _buildSendButton(colors),
+      ],
+    );
+  }
+
+  Widget _buildInputTextField() {
+    final colors = context.appColors;
+    final textColor =
+        Theme.of(context).textTheme.bodyMedium?.color ??
+        Theme.of(context).colorScheme.onSurface;
+    final hintColor = context.appColors.textMuted.withAlpha(153);
+    return Focus(
+      onKeyEvent: _handleInputKeyEvent,
+      child: TextField(
+        controller: _inputController,
+        focusNode: _inputFocusNode,
+        onChanged: _onInputChanged,
+        style: TextStyle(
+          fontSize: 13,
+          color: textColor,
+          height: 1.4,
+        ),
+        decoration: InputDecoration(
+          hintText: _isProcessing ? 'Agent working…' : 'Message…',
+          hintStyle: TextStyle(fontSize: 13, color: hintColor),
+          filled: true,
+          fillColor: colors.surfaceElevated,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide(
+              color: colors.terminalPrompt,
+              width: 0.8,
+            ),
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 10,
+          ),
+          isDense: true,
+        ),
+        maxLines: 4,
+        minLines: 1,
+      ),
+    );
+  }
+
+  KeyEventResult _handleInputKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) {
+      return KeyEventResult.ignored;
+    }
+
+    if (_isModelSlash) {
+      final result = _handleModelSlashKeyEvent(event);
+      if (result != null) return result;
+    }
+
+    if (_isPlainSlash) {
+      final result = _handlePlainSlashKeyEvent(event);
+      if (result != null) return result;
+    }
+
+    if (_isYoloSlash && event.logicalKey == LogicalKeyboardKey.escape) {
+      _hideYoloSlash();
+      return KeyEventResult.handled;
+    }
+
+    // Enter (without Shift) → send
+    final isEnter =
+        event.logicalKey == LogicalKeyboardKey.enter ||
+        event.logicalKey == LogicalKeyboardKey.numpadEnter;
+    if (isEnter && !HardwareKeyboard.instance.isShiftPressed) {
+      _sendMessage();
+      return KeyEventResult.handled;
+    }
+    // Cmd+V (macOS) or Ctrl+V → smart paste
+    final isCmd = HardwareKeyboard.instance.isMetaPressed;
+    final isCtrl = HardwareKeyboard.instance.isControlPressed;
+    if (event.logicalKey == LogicalKeyboardKey.keyV && (isCmd || isCtrl)) {
+      _handleSmartPaste();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
+  /// Key handling while the /model suggestion list is open.
+  /// Returns null when the key was not consumed.
+  KeyEventResult? _handleModelSlashKeyEvent(KeyEvent event) {
+    final isUp = event.logicalKey == LogicalKeyboardKey.arrowUp;
+    final isDown = event.logicalKey == LogicalKeyboardKey.arrowDown;
+    final isEnter =
+        event.logicalKey == LogicalKeyboardKey.enter ||
+        event.logicalKey == LogicalKeyboardKey.numpadEnter;
+    final isEscape = event.logicalKey == LogicalKeyboardKey.escape;
+    final isTab = event.logicalKey == LogicalKeyboardKey.tab;
+
+    if (isTab && _filteredModels.isNotEmpty) {
+      // Tab: select highlighted model
+      _selectModelFromSlash(_filteredModels[_modelSelectedIndex].id);
+      return KeyEventResult.handled;
+    }
+
+    if (isUp || isDown) {
+      final delta = isDown ? 1 : -1;
+      final next = (_modelSelectedIndex + delta).clamp(
+        0,
+        _filteredModels.length - 1,
+      );
+      if (next == _modelSelectedIndex) {
+        return KeyEventResult.handled;
+      }
+      setState(() {
+        _modelSelectedIndex = next;
+      });
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _scrollToModelSelection(),
+      );
+      return KeyEventResult.handled;
+    }
+
+    if (isEnter &&
+        !HardwareKeyboard.instance.isShiftPressed &&
+        _filteredModels.isNotEmpty) {
+      _selectModelFromSlash(_filteredModels[_modelSelectedIndex].id);
+      return KeyEventResult.handled;
+    }
+
+    if (isEscape) {
+      _hideModelSlash();
+      return KeyEventResult.handled;
+    }
+    return null;
+  }
+
+  /// Key handling while the plain slash command chips are open.
+  /// Returns null when the key was not consumed.
+  KeyEventResult? _handlePlainSlashKeyEvent(KeyEvent event) {
+    final isTab = event.logicalKey == LogicalKeyboardKey.tab;
+    if (isTab) {
+      _autoCompleteSlash();
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.escape) {
+      _hideModelSlash();
+      return KeyEventResult.handled;
+    }
+    return null;
+  }
+
+  List<Widget> _buildMicButton(AppColorScheme colors) {
+    return [
+      const SizedBox(width: 6),
+      ChatActionButton(
+        icon:
+            _isRecordingMic
+                ? Icons.mic_rounded
+                : (_isTranscribingMic
+                    ? Icons.hourglass_top_rounded
+                    : Icons.mic_none),
+        onTap: _isTranscribingMic ? null : _handleMicInput,
+        backgroundColor: colors.surfaceElevated,
+        iconColor:
+            _isRecordingMic
+                ? Theme.of(context).colorScheme.error
+                : colors.terminalPrompt,
+        iconSize: 15,
+      ),
+    ];
+  }
+
+  Widget _buildSendButton(AppColorScheme colors) {
+    return ChatActionButton(
+      icon: _isSending ? Icons.stop_rounded : Icons.arrow_upward,
+      onTap: _isSending ? _stopStreaming : _sendMessage,
+      backgroundColor:
+          _isSending
+              ? Theme.of(context).colorScheme.error
+              : colors.terminalPrompt,
+      iconColor: Theme.of(context).colorScheme.onPrimary,
+      iconSize: 16,
     );
   }
 

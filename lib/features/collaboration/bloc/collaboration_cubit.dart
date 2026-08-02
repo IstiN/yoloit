@@ -776,112 +776,170 @@ class CollaborationCubit extends Cubit<CollaborationState> {
 
   // ── Host: client messages ─────────────────────────────────────────────────
 
+  /// Message-type → handler registry for [SyncMessage]s received from
+  /// connected clients.  Unknown types are ignored (previous `default: break;`
+  /// behaviour).
+  late final Map<String, void Function(String, SyncMessage)>
+      _clientMessageHandlers = {
+    SyncMessage.kHello: _handleHello,
+    SyncMessage.kDeltaMove: _handleDeltaMove,
+    SyncMessage.kDeltaResize: _handleDeltaResize,
+    SyncMessage.kDeltaToggle: _handleDeltaToggle,
+    SyncMessage.kTerminalInput: _handleTerminalInput,
+    'workspace_create': _handleWorkspaceCreate,
+    'ws_add_folder': _handleWsAddFolder,
+    'ws_create_session': _handleWsCreateSession,
+    'run_start': _handleRunStart,
+    'run_stop': _handleRunStop,
+    'run_restart': _handleRunRestart,
+    'file_select': _handleFileSelect,
+    'tree_toggle': _handleTreeToggle,
+    'tree_select': _handleTreeSelect,
+    'editor_switch_tab': _handleEditorSwitchTab,
+    'editor_save': _handleEditorSave,
+    'editor_content_update': _handleEditorContentUpdate,
+    'session_start': _handleSessionStart,
+  };
+
   void _onClientMessage(String clientId, SyncMessage msg) {
-    switch (msg.type) {
-      case SyncMessage.kHello:
-        // Accept both wrapped {"payload":{"id":..}} and flat {"id":..} hello.
-        final id =
-            (msg.payload['id'] as String?) ??
-            (msg.senderId.isNotEmpty ? msg.senderId : clientId);
-        final name  = (msg.payload['name']  as String?) ?? 'Remote';
-        final color = (msg.payload['color'] as String?) ?? '#60A5FA';
-        final peers = Map<String, PeerInfo>.from(state.peers)
-          ..[id] = PeerInfo(id: id, name: name, color: color);
-        emit(state.copyWith(peers: peers, peerCount: peers.length));
-        // Populate mind map from workspace/terminal state if not yet done,
-        // then send the full snapshot to the newly connected client.
-        _sendSnapshotAfterPopulate(clientId);
-      case SyncMessage.kDeltaMove:
-        _applyMove(msg.payload);
-      case SyncMessage.kDeltaResize:
-        _applyResize(msg.payload);
-      case SyncMessage.kDeltaToggle:
-        _applyToggle(msg.payload);
-      case SyncMessage.kTerminalInput:
-        // Forward keyboard input from browser guest to the actual PTY.
-        final nodeId = msg.payload['id'] as String? ?? '';
-        final data = msg.payload['data'] as String? ?? '';
-        final sessionId = resolveTerminalSessionId(
-          nodeId,
-          mindMapCubit.state.nodes,
-        );
-        if (sessionId.isNotEmpty && data.isNotEmpty) {
-          onTerminalInput?.call(sessionId, data);
-        }
-      case 'workspace_create':
-        if (onCreateWorkspace != null) {
-          _runAction(() => onCreateWorkspace!(msg.payload));
-        }
-      case 'ws_add_folder':
-        final nodeId = msg.payload['id'] as String? ?? '';
-        final folderPath = msg.payload['path'] as String?;
-        if (nodeId.isNotEmpty && onAddFolder != null) {
-          _runAction(() => onAddFolder!(nodeId, path: folderPath));
-        }
-      case 'ws_create_session':
-        final nodeId = msg.payload['id'] as String? ?? '';
-        if (nodeId.isNotEmpty && onCreateSession != null) {
-          _runAction(() => onCreateSession!(nodeId));
-        }
-      case 'run_start':
-        final nodeId = msg.payload['id'] as String? ?? '';
-        if (nodeId.isNotEmpty && onRunStart != null) {
-          _runAction(() => onRunStart!(nodeId));
-        }
-      case 'run_stop':
-        final nodeId = msg.payload['id'] as String? ?? '';
-        if (nodeId.isNotEmpty && onRunStop != null) {
-          _runAction(() => onRunStop!(nodeId));
-        }
-      case 'run_restart':
-        final nodeId = msg.payload['id'] as String? ?? '';
-        if (nodeId.isNotEmpty && onRunRestart != null) {
-          _runAction(() => onRunRestart!(nodeId));
-        }
-      case 'file_select':
-        final nodeId = msg.payload['id'] as String? ?? '';
-        final path = msg.payload['path'] as String? ?? '';
-        if (nodeId.isNotEmpty && path.isNotEmpty && onFileSelect != null) {
-          _runRemoteAction(() => onFileSelect!(nodeId, path));
-        }
-      case 'tree_toggle':
-        final nodeId = msg.payload['id'] as String? ?? '';
-        final path = msg.payload['path'] as String? ?? '';
-        if (nodeId.isNotEmpty && path.isNotEmpty && onTreeToggle != null) {
-          _runRemoteAction(() => onTreeToggle!(nodeId, path));
-        }
-      case 'tree_select':
-        final nodeId = msg.payload['id'] as String? ?? '';
-        final path = msg.payload['path'] as String? ?? '';
-        if (nodeId.isNotEmpty && path.isNotEmpty && onTreeSelect != null) {
-          _runRemoteAction(() => onTreeSelect!(nodeId, path));
-        }
-      case 'editor_switch_tab':
-        final nodeId = msg.payload['id'] as String? ?? '';
-        final tabIndex = msg.payload['tabIndex'] as int?;
-        if (nodeId.isNotEmpty &&
-            tabIndex != null &&
-            onEditorSwitchTab != null) {
-          _runAction(() => onEditorSwitchTab!(nodeId, tabIndex));
-        }
-      case 'editor_save':
-        final nodeId = msg.payload['id'] as String? ?? '';
-        if (nodeId.isNotEmpty && onEditorSave != null) {
-          _runRemoteAction(() => onEditorSave!(nodeId));
-        }
-      case 'editor_content_update':
-        final nodeId = msg.payload['id'] as String? ?? '';
-        final content = msg.payload['content'] as String? ?? '';
-        if (nodeId.isNotEmpty && onEditorContentUpdate != null) {
-          _runRemoteAction(() => onEditorContentUpdate!(nodeId, content));
-        }
-      case 'session_start':
-        final nodeId = msg.payload['id'] as String? ?? '';
-        if (nodeId.isNotEmpty && onSessionStart != null) {
-          _runAction(() => onSessionStart!(nodeId));
-        }
-      default:
-        break;
+    _clientMessageHandlers[msg.type]?.call(clientId, msg);
+  }
+
+  void _handleHello(String clientId, SyncMessage msg) {
+    // Accept both wrapped {"payload":{"id":..}} and flat {"id":..} hello.
+    final id =
+        (msg.payload['id'] as String?) ??
+        (msg.senderId.isNotEmpty ? msg.senderId : clientId);
+    final name  = (msg.payload['name']  as String?) ?? 'Remote';
+    final color = (msg.payload['color'] as String?) ?? '#60A5FA';
+    final peers = Map<String, PeerInfo>.from(state.peers)
+      ..[id] = PeerInfo(id: id, name: name, color: color);
+    emit(state.copyWith(peers: peers, peerCount: peers.length));
+    // Populate mind map from workspace/terminal state if not yet done,
+    // then send the full snapshot to the newly connected client.
+    _sendSnapshotAfterPopulate(clientId);
+  }
+
+  void _handleDeltaMove(String clientId, SyncMessage msg) {
+    _applyMove(msg.payload);
+  }
+
+  void _handleDeltaResize(String clientId, SyncMessage msg) {
+    _applyResize(msg.payload);
+  }
+
+  void _handleDeltaToggle(String clientId, SyncMessage msg) {
+    _applyToggle(msg.payload);
+  }
+
+  void _handleTerminalInput(String clientId, SyncMessage msg) {
+    // Forward keyboard input from browser guest to the actual PTY.
+    final nodeId = msg.payload['id'] as String? ?? '';
+    final data = msg.payload['data'] as String? ?? '';
+    final sessionId = resolveTerminalSessionId(
+      nodeId,
+      mindMapCubit.state.nodes,
+    );
+    if (sessionId.isNotEmpty && data.isNotEmpty) {
+      onTerminalInput?.call(sessionId, data);
+    }
+  }
+
+  void _handleWorkspaceCreate(String clientId, SyncMessage msg) {
+    if (onCreateWorkspace != null) {
+      _runAction(() => onCreateWorkspace!(msg.payload));
+    }
+  }
+
+  void _handleWsAddFolder(String clientId, SyncMessage msg) {
+    final nodeId = msg.payload['id'] as String? ?? '';
+    final folderPath = msg.payload['path'] as String?;
+    if (nodeId.isNotEmpty && onAddFolder != null) {
+      _runAction(() => onAddFolder!(nodeId, path: folderPath));
+    }
+  }
+
+  void _handleWsCreateSession(String clientId, SyncMessage msg) {
+    final nodeId = msg.payload['id'] as String? ?? '';
+    if (nodeId.isNotEmpty && onCreateSession != null) {
+      _runAction(() => onCreateSession!(nodeId));
+    }
+  }
+
+  void _handleRunStart(String clientId, SyncMessage msg) {
+    final nodeId = msg.payload['id'] as String? ?? '';
+    if (nodeId.isNotEmpty && onRunStart != null) {
+      _runAction(() => onRunStart!(nodeId));
+    }
+  }
+
+  void _handleRunStop(String clientId, SyncMessage msg) {
+    final nodeId = msg.payload['id'] as String? ?? '';
+    if (nodeId.isNotEmpty && onRunStop != null) {
+      _runAction(() => onRunStop!(nodeId));
+    }
+  }
+
+  void _handleRunRestart(String clientId, SyncMessage msg) {
+    final nodeId = msg.payload['id'] as String? ?? '';
+    if (nodeId.isNotEmpty && onRunRestart != null) {
+      _runAction(() => onRunRestart!(nodeId));
+    }
+  }
+
+  void _handleFileSelect(String clientId, SyncMessage msg) {
+    final nodeId = msg.payload['id'] as String? ?? '';
+    final path = msg.payload['path'] as String? ?? '';
+    if (nodeId.isNotEmpty && path.isNotEmpty && onFileSelect != null) {
+      _runRemoteAction(() => onFileSelect!(nodeId, path));
+    }
+  }
+
+  void _handleTreeToggle(String clientId, SyncMessage msg) {
+    final nodeId = msg.payload['id'] as String? ?? '';
+    final path = msg.payload['path'] as String? ?? '';
+    if (nodeId.isNotEmpty && path.isNotEmpty && onTreeToggle != null) {
+      _runRemoteAction(() => onTreeToggle!(nodeId, path));
+    }
+  }
+
+  void _handleTreeSelect(String clientId, SyncMessage msg) {
+    final nodeId = msg.payload['id'] as String? ?? '';
+    final path = msg.payload['path'] as String? ?? '';
+    if (nodeId.isNotEmpty && path.isNotEmpty && onTreeSelect != null) {
+      _runRemoteAction(() => onTreeSelect!(nodeId, path));
+    }
+  }
+
+  void _handleEditorSwitchTab(String clientId, SyncMessage msg) {
+    final nodeId = msg.payload['id'] as String? ?? '';
+    final tabIndex = msg.payload['tabIndex'] as int?;
+    if (nodeId.isNotEmpty &&
+        tabIndex != null &&
+        onEditorSwitchTab != null) {
+      _runAction(() => onEditorSwitchTab!(nodeId, tabIndex));
+    }
+  }
+
+  void _handleEditorSave(String clientId, SyncMessage msg) {
+    final nodeId = msg.payload['id'] as String? ?? '';
+    if (nodeId.isNotEmpty && onEditorSave != null) {
+      _runRemoteAction(() => onEditorSave!(nodeId));
+    }
+  }
+
+  void _handleEditorContentUpdate(String clientId, SyncMessage msg) {
+    final nodeId = msg.payload['id'] as String? ?? '';
+    final content = msg.payload['content'] as String? ?? '';
+    if (nodeId.isNotEmpty && onEditorContentUpdate != null) {
+      _runRemoteAction(() => onEditorContentUpdate!(nodeId, content));
+    }
+  }
+
+  void _handleSessionStart(String clientId, SyncMessage msg) {
+    final nodeId = msg.payload['id'] as String? ?? '';
+    if (nodeId.isNotEmpty && onSessionStart != null) {
+      _runAction(() => onSessionStart!(nodeId));
     }
   }
 

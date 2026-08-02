@@ -45,6 +45,9 @@ import 'package:yoloit/features/settings/data/local_ai_models_service.dart';
 import 'package:yoloit/features/settings/ui/settings_page.dart';
 import 'package:yoloit/ui/components/typography/caption.dart';
 
+part 'yolo_assistant_widget_send.dart';
+part 'yolo_assistant_widget_voice.dart';
+
 class YoloAssistantController {
   Future<void> Function()? _startMic;
   Future<void> Function({bool sendAfterTranscription})? _stopMic;
@@ -362,405 +365,26 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
 
   Future<void> _sendMessage({bool mirrorToOverlay = false}) async {
     if (_isGeneratingReply) return;
-    final rawText = _inputController.text.trim();
-    // Allow empty rawText only when audio content is pending.
-    final audioContent = _pendingAudioContent;
-    _pendingAudioContent = null;
-    if (rawText.isEmpty && audioContent == null) return;
-    _inputController.clear();
-
-    // When sending audio directly to LLM: no voice-prefix, show mic icon in chat.
-    // For transcribed voice: prepend ASR context for the LLM.
-    final String text;
-    final String displayContent;
-    if (audioContent != null) {
-      // Audio sent directly — display mic icon, no prefix for LLM history
-      // (audio IS the content).
-      displayContent = '🎤 Voice message';
-      text = displayContent; // stored in history for display only
-    } else if (mirrorToOverlay) {
-      text =
-          '[Voice message — transcribed via speech recognition, '
-          'may contain recognition errors]\n$rawText';
-      displayContent = text;
-    } else {
-      text = rawText;
-      displayContent = text;
-    }
-
-    final msgs = _messages;
-    final userMessageId = 'msg-${DateTime.now().millisecondsSinceEpoch}';
-    final assistantMessageId =
-        'msg-${DateTime.now().millisecondsSinceEpoch + 1}';
-    msgs.add({
-      'id': userMessageId,
-      'role': 'user',
-      'content': displayContent,
-      'timestamp': DateTime.now().toIso8601String(),
-    });
-    msgs.add({
-      'id': assistantMessageId,
-      'role': 'assistant',
-      'content': '',
-      'timestamp': DateTime.now().toIso8601String(),
-    });
-    _receivedAssistantToken = false;
-    // For overlay display: show mic icon when audio sent directly.
-    final overlayPrompt = audioContent != null ? '🎤 Voice message' : rawText;
-    _updateState({
-      'messages': msgs,
-      if (mirrorToOverlay) ...{
-        'voiceDraft': '',
-        'voicePrompt': overlayPrompt,
-        'voiceResponse': '',
-        'assistantStatus': 'processing',
-        'voiceOverlayHidden': false,
-      },
-    });
-    _scrollToBottom();
-
-    setState(() {
-      _isGeneratingReply = true;
-      _isCancelled = false;
-    });
-    if (mirrorToOverlay) {
-      _syncOverlayState(
-        draftOverride: '',
-        forcedStatus: 'processing',
-        responseOverride: '',
-        promptOverride: overlayPrompt,
-        hiddenOverride: false,
-      );
-    }
-
-    final asrDebug = mirrorToOverlay ? _pendingAsrDebug : null;
-    _pendingAsrDebug = null;
-    final asrConversionMs = _pendingAsrConversionMs;
-    _pendingAsrConversionMs = null;
-
-    // ── Debug session ──────────────────────────────────────────────────────
-    final dbg = <String, dynamic>{
-      'id': 'dbg-${DateTime.now().millisecondsSinceEpoch}',
-      'userMessage': text,
-      'requestAt': DateTime.now().toIso8601String(),
-      'toolCalls': <Map<String, dynamic>>[],
-      if (asrDebug != null)
-        'asr': {
-          ...asrDebug,
-          if (asrConversionMs != null) 'conversionMs': asrConversionMs,
-        },
-    };
-    _activeDebugSession = dbg;
+    final ctx = _beginSendMessage(mirrorToOverlay: mirrorToOverlay);
+    if (ctx == null) return;
 
     try {
-      _messageDraft = msgs;
+      _messageDraft = ctx.messages;
       final runtimeContext = await _runtimeContext();
-      final calledTools = <String>[];
-      final overlayToolLogs = <String>[];
-      // Maps toolCallId → startAt ISO string for accurate per-tool timing.
-      final pendingToolStarts = <String, String>{};
-
-      // Create or reuse the wrapped executor (persistent across messages).
-      _wrappedExecutor ??= AssistantToolExecutor(
-        delegate: _toolExecutor,
-        assistantPanelId: widget.panel.id,
-        assistantPanelTitle: widget.panel.title,
-        targetPanelId: _targetPanelId,
-        onFocusPanel: (focusArgs) async {
-          await _toolExecutor.invoke(
-            'yoloit_panel_focus',
-            focusArgs,
-            runtimeContext: await _runtimeContext(),
-          );
-        },
-      );
-      // Update per-message mutable state on the executor.
-      _wrappedExecutor!.userMessage =
-          audioContent != null && rawText.isNotEmpty ? rawText : text;
-      _wrappedExecutor!.lastTargetNotePanelId = _lastTargetNotePanelId;
-      _wrappedExecutor!.onToolCompleted = (
-        String toolCommand,
-        Map<String, Object?> arguments,
-        String result,
-        bool success,
-      ) {
-        calledTools.add(toolCommand);
-        final short = _compactToolResult(toolCommand, result, success);
-        // Replace the matching ⏳ running entry instead of appending, so the
-        // overlay shows ✅/❌ in-place rather than showing both states at once.
-        final runningIdx = overlayToolLogs.lastIndexWhere(
-          (e) => e.startsWith('⏳ running:'),
-        );
-        final doneEntry = success ? '✅ $short' : '❌ $short';
-        if (runningIdx >= 0) {
-          overlayToolLogs[runningIdx] = doneEntry;
-        } else {
-          overlayToolLogs.add(doneEntry);
-        }
-        final statePatch = _toolTargetPatchIfNeeded(
-          toolCommand: toolCommand,
-          arguments: arguments,
-          result: result,
-        );
-        if (statePatch.isNotEmpty) {
-          _updateState(statePatch);
-        }
-        if (mirrorToOverlay && mounted) {
-          _syncOverlayState(
-            draftOverride: '',
-            forcedStatus: 'responding',
-            responseOverride: _composeOverlayResponse('', overlayToolLogs),
-            promptOverride: overlayPrompt,
-            hiddenOverride: false,
-          );
-        }
-        (dbg['toolCalls'] as List<Map<String, dynamic>>).add({
-          'name': toolCommand,
-          'arguments': arguments,
-          'result': result,
-          'success': success,
-          'startAt':
-              pendingToolStarts.remove(toolCommand) ??
-              DateTime.now().toIso8601String(),
-          'endAt': DateTime.now().toIso8601String(),
-        });
-      };
-
-      // Pick provider: cloud or local based on user settings.
-      // Provider is reused across messages to preserve history.
-      final providerPref =
-          await CloudLlmSettingsService.instance.loadAssistantProviderType();
-      String providerType;
-      if (providerPref == 'cloud') {
-        final cloudConfig =
-            await CloudLlmSettingsService.instance.loadActiveConfig();
-        if (cloudConfig != null) {
-          providerType = 'cloud:${cloudConfig.id}';
-        } else {
-          final configs =
-              await CloudLlmSettingsService.instance.loadConfigs();
-          if (configs.isNotEmpty) {
-            providerType = 'cloud:${configs.first.id}';
-          } else {
-            providerType = 'cloud:openrouter';
-          }
-        }
-      } else {
-        providerType = 'local';
-      }
-
-      // Re-create provider only if type changed or first use.
-      if (_chatProvider == null || _chatProviderType != providerType) {
-        _chatProvider?.dispose();
-        if (providerType.startsWith('cloud:')) {
-          final configId = providerType.substring(6);
-          final cloudConfig =
-              await CloudLlmSettingsService.instance.loadConfigById(
-                configId,
-              ) ??
-              await CloudLlmSettingsService.instance.loadActiveConfig();
-          if (cloudConfig != null) {
-            _chatProvider = CloudLlmProvider(
-              config: cloudConfig,
-              toolExecutor: _wrappedExecutor!,
-            );
-          } else {
-            _chatProvider = CloudLlmProvider.deferred(configId: configId);
-          }
-        } else {
-          _chatProvider = LocalLlmProvider(toolExecutor: _wrappedExecutor!);
-        }
-        _chatProviderType = providerType;
-      }
-      final provider = _chatProvider!;
-
-      final config = ChatSessionConfig(
-        sessionName: '__yolo_badge_assistant__',
-        workingDir: Directory.current.path,
-        provider: providerType,
-        disabledLocalToolNames: _disabledLocalToolNames,
-      );
-
-      dbg['promptSentAt'] = DateTime.now().toIso8601String();
-      // Record model info for display in debug timings.
-      if (providerType.startsWith('cloud:')) {
-        final cfg = (_chatProvider as CloudLlmProvider).config;
-        if (cfg != null) {
-          dbg['modelId'] = cfg.model;
-          dbg['modelProvider'] = cfg.name;
-          dbg['modelBaseUrl'] = cfg.baseUrl;
-        }
-      } else {
-        dbg['modelId'] = 'local (MLX)';
-        dbg['modelProvider'] = 'local';
-      }
-      var emitted = '';
-      var firstTokenReceived = false;
-
-      await for (final event in provider.sendMessage(
-        message: text,
-        config: config,
-        isFirstMessage: msgs.where((m) => m['role'] == 'user').length <= 1,
+      _prepareToolExecutor(ctx);
+      final providerType = await _resolveAssistantProviderType();
+      final provider = await _ensureChatProvider(providerType);
+      await _streamAssistantReply(
+        ctx,
+        provider: provider,
+        providerType: providerType,
         runtimeContext: runtimeContext,
-        audioContentOverride: audioContent,
-      )) {
-        if (_isCancelled) break;
-
-        switch (event.type) {
-          case ChatEventType.assistantDelta:
-            final delta = event.data['deltaContent'] as String? ?? '';
-            if (delta.isEmpty) continue;
-            if (!firstTokenReceived && delta.trim().isNotEmpty) {
-              firstTokenReceived = true;
-              dbg['firstTokenAt'] = DateTime.now().toIso8601String();
-            }
-            emitted += delta;
-            if (mounted) {
-              _replaceAssistantMessageContent(
-                assistantMessageId: assistantMessageId,
-                content: emitted.trim(),
-                mirrorToOverlay: mirrorToOverlay,
-                overlayToolLogs: overlayToolLogs,
-              );
-            }
-          case ChatEventType.toolStart:
-            final toolName = event.data['toolName'] as String? ?? '';
-            final toolCallId = event.data['toolCallId'] as String? ?? toolName;
-            final args = event.data['arguments'] as Map<String, Object?>? ?? {};
-            // Capture TTFT from prompt to first LLM response (text OR tool call).
-            if (!firstTokenReceived) {
-              firstTokenReceived = true;
-              dbg['firstTokenAt'] = DateTime.now().toIso8601String();
-            }
-            // Record start time so onToolCompleted can compute accurate duration.
-            // Store under function name, toolCallId, AND CLI command so the
-            // lookup in onToolCompleted (keyed by CLI command) succeeds.
-            final now = DateTime.now().toIso8601String();
-            pendingToolStarts[toolName] = now;
-            pendingToolStarts[toolCallId] = now;
-            final cliCmd =
-                YoloitCliToolCatalog.byFunctionName(toolName)?.command;
-            if (cliCmd != null) pendingToolStarts[cliCmd] = now;
-            overlayToolLogs.add('⏳ running: $toolName');
-            if (mirrorToOverlay && mounted) {
-              _syncOverlayState(
-                draftOverride: '',
-                forcedStatus: 'responding',
-                responseOverride: _composeOverlayResponse('', overlayToolLogs),
-                promptOverride: overlayPrompt,
-                hiddenOverride: false,
-              );
-            }
-            _appendToolMessage(
-              callId:
-                  event.data['toolCallId'] as String? ??
-                  'tool-${DateTime.now().microsecondsSinceEpoch}',
-              toolName: toolName,
-              arguments: Map<String, Object?>.from(args),
-              result: '⏳ running…',
-              success: true,
-            );
-          case ChatEventType.toolComplete:
-            final tcId = event.data['toolCallId'] as String? ?? '';
-            final tcResult =
-                event.data['result'] as Map<String, dynamic>? ?? {};
-            final tcSuccess = event.data['success'] as bool? ?? true;
-            final tcToolName = event.data['toolName'] as String? ?? '';
-            final tcContent = tcResult['content'] as String? ?? '';
-            // Update the existing tool message with actual result.
-            _updateToolMessage(
-              callId: tcId,
-              toolName: tcToolName,
-              result: tcContent,
-              success: tcSuccess,
-            );
-          case ChatEventType.assistantMessage:
-            final content = event.data['content'] as String? ?? '';
-            if (content.isNotEmpty) {
-              final cleaned = _cleanAssistantToolEchoes(content, calledTools);
-              if (mounted) {
-                _replaceAssistantMessageContent(
-                  assistantMessageId: assistantMessageId,
-                  content: cleaned,
-                  mirrorToOverlay: mirrorToOverlay,
-                  overlayToolLogs: overlayToolLogs,
-                );
-              }
-            }
-          case ChatEventType.result:
-            dbg['completedAt'] = DateTime.now().toIso8601String();
-            final usage = event.data['usage'] as Map<String, dynamic>? ?? {};
-            dbg['usage'] = usage;
-          default:
-            break;
-        }
-      }
-
-      dbg['completedAt'] ??= DateTime.now().toIso8601String();
-
-      // Final cleanup of the displayed content.
-      final cleanedFinal = _cleanAssistantToolEchoes(
-        emitted.trim(),
-        calledTools,
       );
-      if (mounted && cleanedFinal.isNotEmpty) {
-        _replaceAssistantMessageContent(
-          assistantMessageId: assistantMessageId,
-          content: cleanedFinal,
-          mirrorToOverlay: mirrorToOverlay,
-          overlayToolLogs: overlayToolLogs,
-        );
-      }
-      if (mirrorToOverlay) {
-        // Use clean text only (no tool logs) so the card crossfades from
-        // the tools-call view to the final answer without duplicating the logs.
-        _syncOverlayState(
-          draftOverride: '',
-          forcedStatus: 'output',
-          responseOverride: cleanedFinal,
-          promptOverride: overlayPrompt,
-          hiddenOverride: false,
-        );
-      }
-      dbg['cleanedResponse'] = cleanedFinal;
+      _finalizeAssistantReply(ctx);
     } catch (e) {
-      dbg['error'] = '$e';
-      dbg['completedAt'] = DateTime.now().toIso8601String();
-      _replaceAssistantMessageContent(
-        assistantMessageId: assistantMessageId,
-        content: _formatAssistantError(e),
-        mirrorToOverlay: mirrorToOverlay,
-        overlayToolLogs: const [],
-      );
-      if (mirrorToOverlay) {
-        _syncOverlayState(
-          draftOverride: '',
-          forcedStatus: 'output',
-          responseOverride: _formatAssistantError(e),
-          promptOverride: overlayPrompt,
-          hiddenOverride: false,
-        );
-      }
+      _handleSendMessageError(ctx, e);
     } finally {
-      _debugSessions.add(dbg);
-      if (_debugSessions.length > 20) _debugSessions.removeAt(0);
-      _activeDebugSession = null;
-      _messageDraft = null;
-      // Persist messages to history after each exchange.
-      _persistToHistory();
-      if (mounted) {
-        setState(() {
-          _isGeneratingReply = false;
-          _isCancelled = false;
-        });
-        // When mirrorToOverlay, the try/catch already set the overlay to
-        // 'output' + hidden=false.  Do NOT call _syncOverlayState here —
-        // widget.panel still holds the STALE state (pre-_updateState rebuild),
-        // so re-computing the status would overwrite 'output' with 'idle'.
-        if (!mirrorToOverlay) {
-          _syncOverlayState(hiddenOverride: _voiceOverlayHidden);
-        }
-      }
+      _cleanupAfterSendMessage(dbg: ctx.dbg, mirrorToOverlay: mirrorToOverlay);
     }
   }
 
@@ -883,31 +507,9 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
     required Map<String, Object?> arguments,
     required String result,
   }) {
-    try {
-      final decoded = jsonDecode(result);
-      if (decoded is Map && decoded['ok'] == false) return const {};
-    } catch (_) {}
+    if (_toolResultReportedFailure(result)) return const {};
     if (toolCommand == 'panel:create') {
-      final type = '${arguments['type'] ?? ''}'.trim();
-      if (type != 'board.note.markdown') return const {};
-      try {
-        final decoded = jsonDecode(result);
-        if (decoded is! Map) return const {};
-        final stdout = decoded['stdout'];
-        final payload = stdout is String ? jsonDecode(stdout) : decoded;
-        if (payload is! Map) return const {};
-        final panel = payload['panel'];
-        if (panel is! Map) return const {};
-        final id = '${panel['id'] ?? ''}'.trim();
-        final title = '${panel['title'] ?? id}'.trim();
-        if (id.isEmpty) return const {};
-        return {
-          'lastTargetNotePanelId': id,
-          'lastTargetNotePanelTitle': title.isEmpty ? id : title,
-        };
-      } catch (_) {
-        return const {};
-      }
+      return _panelCreateTargetPatch(arguments: arguments, result: result);
     }
     if (toolCommand == 'note' || toolCommand?.startsWith('note:') == true) {
       final panel = '${arguments['panel'] ?? ''}'.trim();
@@ -918,6 +520,40 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
       };
     }
     return const {};
+  }
+
+  bool _toolResultReportedFailure(String result) {
+    try {
+      final decoded = jsonDecode(result);
+      if (decoded is Map && decoded['ok'] == false) return true;
+    } catch (_) {}
+    return false;
+  }
+
+  Map<String, dynamic> _panelCreateTargetPatch({
+    required Map<String, Object?> arguments,
+    required String result,
+  }) {
+    final type = '${arguments['type'] ?? ''}'.trim();
+    if (type != 'board.note.markdown') return const {};
+    try {
+      final decoded = jsonDecode(result);
+      if (decoded is! Map) return const {};
+      final stdout = decoded['stdout'];
+      final payload = stdout is String ? jsonDecode(stdout) : decoded;
+      if (payload is! Map) return const {};
+      final panel = payload['panel'];
+      if (panel is! Map) return const {};
+      final id = '${panel['id'] ?? ''}'.trim();
+      final title = '${panel['title'] ?? id}'.trim();
+      if (id.isEmpty) return const {};
+      return {
+        'lastTargetNotePanelId': id,
+        'lastTargetNotePanelTitle': title.isEmpty ? id : title,
+      };
+    } catch (_) {
+      return const {};
+    }
   }
 
   String _cleanAssistantToolEchoes(String content, List<String> calledTools) {
@@ -1812,55 +1448,12 @@ $messagesJson
     final textColor =
         Theme.of(context).textTheme.bodyMedium?.color ??
         Theme.of(context).colorScheme.onSurface;
-    final codeBg = colors.surface;
     if (isTool) {
-      final success = msg['success'] as bool? ?? true;
-      final toolName = msg['toolName'] as String? ?? 'tool';
-      final args = compactPromptJson(msg['arguments'], 420);
-      final rawResult = msg['rawResult'] as String?;
-      final result = compactToolResultForPrompt(rawResult);
-      return Align(
-        alignment: Alignment.centerLeft,
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 520),
-          margin: const EdgeInsets.symmetric(vertical: 4),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          decoration: BoxDecoration(
-            color:
-                success
-                    ? colors.accentGreen.withAlpha(20)
-                    : Theme.of(context).colorScheme.error.withAlpha(24),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color:
-                  success
-                      ? colors.accentGreen.withAlpha(85)
-                      : Theme.of(context).colorScheme.error.withAlpha(80),
-            ),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(
-                success
-                    ? Icons.build_circle_outlined
-                    : Icons.error_outline_rounded,
-                size: 16,
-                color:
-                    success
-                        ? colors.accentGreen
-                        : Theme.of(context).colorScheme.error,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: SelectableText(
-                  '$toolName\nargs: $args\n$content\nresult: $result',
-                  style: TextStyle(fontSize: 11, color: textColor, height: 1.4),
-                ),
-              ),
-            ],
-          ),
-        ),
+      return _buildToolMessageBubble(
+        msg,
+        colors,
+        textColor: textColor,
+        content: content,
       );
     }
 
@@ -1882,78 +1475,167 @@ $messagesJson
             constraints: BoxConstraints(maxWidth: containsMermaid ? 740 : 460),
             margin: const EdgeInsets.symmetric(vertical: 2),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              gradient:
-                  isUser
-                      ? LinearGradient(
-                        colors: [colors.accentBlue, colors.primary],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      )
-                      : null,
-              color: isUser ? null : colors.surfaceElevated,
-              borderRadius:
-                  isUser
-                      ? const BorderRadius.only(
-                        topLeft: Radius.circular(16),
-                        topRight: Radius.circular(16),
-                        bottomLeft: Radius.circular(16),
-                        bottomRight: Radius.circular(4),
-                      )
-                      : const BorderRadius.only(
-                        topLeft: Radius.circular(4),
-                        topRight: Radius.circular(16),
-                        bottomLeft: Radius.circular(16),
-                        bottomRight: Radius.circular(16),
-                      ),
+            decoration: _messageBubbleDecoration(
+              isUser: isUser,
+              colors: colors,
             ),
-            child:
-                showThinking
-                    ? AssistantThinkingIndicator(
-                      color:
-                          Theme.of(context).textTheme.bodyMedium?.color ??
-                          Theme.of(context).colorScheme.onSurface,
-                    )
-                    : isUser
-                    ? SelectableText(
-                      displayContent,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: colors.textPrimary,
-                        height: 1.4,
-                      ),
-                    )
-                    : containsMermaid
-                    ? RepaintBoundary(
-                      child: MarkdownDocumentPreview(content: content),
-                    )
-                    : RepaintBoundary(
-                      child: MarkdownBody(
-                        data: content,
-                        styleSheet: MarkdownStyleSheet(
-                          p: TextStyle(
-                            fontSize: 13,
-                            color: textColor,
-                            height: 1.5,
-                          ),
-                          a: TextStyle(
-                            fontSize: 13,
-                            color: colors.primary,
-                            decoration: TextDecoration.underline,
-                          ),
-                          code: TextStyle(
-                            fontSize: 11.5,
-                            color: colors.terminalPrompt,
-                            backgroundColor: codeBg,
-                          ),
-                          codeblockDecoration: BoxDecoration(
-                            color: codeBg,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: colors.border),
-                          ),
-                        ),
-                      ),
-                    ),
+            child: _buildMessageBubbleContent(
+              colors: colors,
+              isUser: isUser,
+              showThinking: showThinking,
+              containsMermaid: containsMermaid,
+              displayContent: displayContent,
+              content: content,
+              textColor: textColor,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildToolMessageBubble(
+    Map<String, dynamic> msg,
+    AppColorScheme colors, {
+    required Color textColor,
+    required String content,
+  }) {
+    final success = msg['success'] as bool? ?? true;
+    final toolName = msg['toolName'] as String? ?? 'tool';
+    final args = compactPromptJson(msg['arguments'], 420);
+    final rawResult = msg['rawResult'] as String?;
+    final result = compactToolResultForPrompt(rawResult);
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 520),
+        margin: const EdgeInsets.symmetric(vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color:
+              success
+                  ? colors.accentGreen.withAlpha(20)
+                  : Theme.of(context).colorScheme.error.withAlpha(24),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color:
+                success
+                    ? colors.accentGreen.withAlpha(85)
+                    : Theme.of(context).colorScheme.error.withAlpha(80),
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              success
+                  ? Icons.build_circle_outlined
+                  : Icons.error_outline_rounded,
+              size: 16,
+              color:
+                  success
+                      ? colors.accentGreen
+                      : Theme.of(context).colorScheme.error,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: SelectableText(
+                '$toolName\nargs: $args\n$content\nresult: $result',
+                style: TextStyle(fontSize: 11, color: textColor, height: 1.4),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  BoxDecoration _messageBubbleDecoration({
+    required bool isUser,
+    required AppColorScheme colors,
+  }) {
+    return BoxDecoration(
+      gradient:
+          isUser
+              ? LinearGradient(
+                colors: [colors.accentBlue, colors.primary],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              )
+              : null,
+      color: isUser ? null : colors.surfaceElevated,
+      borderRadius:
+          isUser
+              ? const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
+                bottomLeft: Radius.circular(16),
+                bottomRight: Radius.circular(4),
+              )
+              : const BorderRadius.only(
+                topLeft: Radius.circular(4),
+                topRight: Radius.circular(16),
+                bottomLeft: Radius.circular(16),
+                bottomRight: Radius.circular(16),
+              ),
+    );
+  }
+
+  Widget _buildMessageBubbleContent({
+    required AppColorScheme colors,
+    required bool isUser,
+    required bool showThinking,
+    required bool containsMermaid,
+    required String displayContent,
+    required String content,
+    required Color textColor,
+  }) {
+    final codeBg = colors.surface;
+    if (showThinking) {
+      return AssistantThinkingIndicator(
+        color:
+            Theme.of(context).textTheme.bodyMedium?.color ??
+            Theme.of(context).colorScheme.onSurface,
+      );
+    }
+    if (isUser) {
+      return SelectableText(
+        displayContent,
+        style: TextStyle(
+          fontSize: 13,
+          color: colors.textPrimary,
+          height: 1.4,
+        ),
+      );
+    }
+    if (containsMermaid) {
+      return RepaintBoundary(
+        child: MarkdownDocumentPreview(content: content),
+      );
+    }
+    return RepaintBoundary(
+      child: MarkdownBody(
+        data: content,
+        styleSheet: MarkdownStyleSheet(
+          p: TextStyle(
+            fontSize: 13,
+            color: textColor,
+            height: 1.5,
+          ),
+          a: TextStyle(
+            fontSize: 13,
+            color: colors.primary,
+            decoration: TextDecoration.underline,
+          ),
+          code: TextStyle(
+            fontSize: 11.5,
+            color: colors.terminalPrompt,
+            backgroundColor: codeBg,
+          ),
+          codeblockDecoration: BoxDecoration(
+            color: codeBg,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: colors.border),
           ),
         ),
       ),
@@ -2275,20 +1957,7 @@ $messagesJson
     bool sendAfterTranscription = false,
     bool mirrorToOverlay = false,
   }) async {
-    _amplitudeSub?.cancel();
-    _amplitudeSub = null;
-    // Stop stream recording and collect buffered PCM bytes.
-    await _micRecorder.stop();
-    await _micStreamSub?.cancel();
-    _micStreamSub = null;
-    final pcmBytes = _micStreamBytes?.takeBytes();
-    _micStreamBytes = null;
-
-    // Build WAV from raw PCM (16-bit mono 16 kHz).
-    final wavBytes =
-        pcmBytes != null && pcmBytes.isNotEmpty
-            ? _buildWavFromPcm(pcmBytes)
-            : null;
+    final wavBytes = await _stopMicCaptureAndBuildWav();
 
     if (!mounted) return;
     setState(() {
@@ -2299,244 +1968,26 @@ $messagesJson
 
     final voiceSettings =
         await CloudLlmSettingsService.instance.loadVoiceSettings();
-    final asrMode =
-        !voiceSettings.useCloudAsr
-            ? 'local'
-            : voiceSettings.useChatModelForCloudAsr
-            ? 'direct_audio'
-            : 'cloud';
-    // Resolve the effective ASR model for debug display (mirrors CloudAsrService logic).
-    String? asrResolvedModel;
-    String? asrProviderName;
-    if (voiceSettings.useCloudAsr) {
-      if (!voiceSettings.useChatModelForCloudAsr &&
-          voiceSettings.cloudAsrModel?.trim().isNotEmpty == true) {
-        asrResolvedModel = voiceSettings.cloudAsrModel!.trim();
-      }
-      // Load config to get provider name + fallback model.
-      final explicitId =
-          voiceSettings.useChatModelForCloudAsr
-              ? null
-              : voiceSettings.cloudAsrConfigId?.trim();
-      final asrCfg =
-          (explicitId != null && explicitId.isNotEmpty
-              ? await CloudLlmSettingsService.instance.loadConfigById(
-                explicitId,
-              )
-              : null) ??
-          await CloudLlmSettingsService.instance.loadActiveConfig();
-      asrResolvedModel ??= asrCfg?.model.trim();
-      asrProviderName = asrCfg?.name;
-    }
-    final asrStartedAt = DateTime.now().toIso8601String();
-    final asrStopwatch = Stopwatch()..start();
-    var asrStatus = 'ok';
-    var asrTranscriptChars = 0;
-    String? asrError;
+    final run = await _beginAsrRun(voiceSettings);
 
     // For local ASR we still need a temp file path (local ASR reads from disk).
     // Cloud ASR uses bytes directly.
-    String? tempPath;
     if (wavBytes != null && !voiceSettings.useCloudAsr) {
-      tempPath =
+      run.tempPath =
           '${Directory.systemTemp.path}/yoloit_asr_${DateTime.now().millisecondsSinceEpoch}.wav';
     }
 
-    var shouldSend = false;
     try {
-      if (wavBytes == null || wavBytes.isEmpty) {
-        asrStatus = 'no_audio';
-        return;
-      }
-
-      if (voiceSettings.useCloudAsr && voiceSettings.useChatModelForCloudAsr) {
-        // ── Direct audio → chat model: attach audio as message content ──────
-        // Optionally convert WAV → MP3 to reduce payload size.
-        var audioBytes = wavBytes;
-        var audioFormat = 'wav';
-        int? conversionMs;
-        if (voiceSettings.convertWavToMp3) {
-          try {
-            final convSw = Stopwatch()..start();
-            final tmpWav =
-                '${Directory.systemTemp.path}/yoloit_direct_${DateTime.now().millisecondsSinceEpoch}.wav';
-            final tmpMp3 = tmpWav.replaceAll('.wav', '.mp3');
-            await File(tmpWav).writeAsBytes(wavBytes, flush: true);
-            final result = await Process.run('ffmpeg', [
-              '-i',
-              tmpWav,
-              '-codec:a',
-              'libmp3lame',
-              '-qscale:a',
-              '4',
-              '-y',
-              tmpMp3,
-            ]);
-            convSw.stop();
-            conversionMs = convSw.elapsedMilliseconds;
-            if (result.exitCode == 0 && File(tmpMp3).existsSync()) {
-              audioBytes = await File(tmpMp3).readAsBytes();
-              audioFormat = 'mp3';
-            }
-            // Clean up temp files
-            try {
-              File(tmpWav).deleteSync();
-            } catch (_) {}
-            try {
-              File(tmpMp3).deleteSync();
-            } catch (_) {}
-          } on ProcessException {
-            // ffmpeg not available — fall back to WAV
-          }
-        }
-        _pendingAudioContent = [
-          {
-            'type': 'input_audio',
-            'input_audio': {
-              'data': base64Encode(audioBytes),
-              'format': audioFormat,
-            },
-          },
-        ];
-        if (conversionMs != null) {
-          _pendingAsrConversionMs = conversionMs;
-        }
-        if (!mounted) return;
-        _syncOverlayState(hiddenOverride: _voiceOverlayHidden);
-        shouldSend = sendAfterTranscription;
-        asrStatus = 'ok';
-        asrTranscriptChars = -1; // sentinel: audio sent directly
-      } else if (voiceSettings.useCloudAsr) {
-        // ── Cloud ASR: transcribe with ASR model, then put text in field ────
-        final transcript = await _cloudAsrService.transcribeFromBytes(
-          audioBytes: wavBytes,
-          voiceSettings: voiceSettings,
-        );
-        if (!mounted) return;
-        final text = transcript.trim();
-        asrTranscriptChars = text.length;
-        if (text.isNotEmpty) {
-          final current = _inputController.text.trim();
-          _inputController.text =
-              current.isEmpty ? text : '$current ${text.trim()}';
-          _inputController.selection = TextSelection.collapsed(
-            offset: _inputController.text.length,
-          );
-          _syncOverlayState(hiddenOverride: _voiceOverlayHidden);
-          shouldSend = sendAfterTranscription;
-        }
-      } else {
-        // ── Local ASR: needs a file on disk — write WAV once ─────────────────
-        if (tempPath != null) {
-          await File(tempPath).writeAsBytes(wavBytes, flush: true);
-        }
-        final transcript = await LocalAiModelsService.instance
-            .transcribeWithSelectedAsr(tempPath ?? '');
-
-        if (!mounted) return;
-        final text = transcript.trim();
-        asrTranscriptChars = text.length;
-        if (text.isNotEmpty) {
-          final current = _inputController.text.trim();
-          _inputController.text =
-              current.isEmpty ? text : '$current ${text.trim()}';
-          _inputController.selection = TextSelection.collapsed(
-            offset: _inputController.text.length,
-          );
-          _syncOverlayState(hiddenOverride: _voiceOverlayHidden);
-          shouldSend = sendAfterTranscription;
-        }
-      }
-    } catch (e) {
-      asrStatus = 'error';
-      asrError = '$e';
-      if (!mounted) return;
-      await _showCopyableErrorDialog(
-        title: 'ASR error',
-        message: 'ASR failed:\n$e',
+      await _runAsrTranscription(
+        wavBytes,
+        voiceSettings,
+        sendAfterTranscription,
+        run,
       );
     } finally {
-      asrStopwatch.stop();
-      final completedAt = DateTime.now().toIso8601String();
-      _pendingAsrDebug = {
-        'mode': asrMode,
-        'status': asrStatus,
-        'startedAt': asrStartedAt,
-        'completedAt': completedAt,
-        'durationMs': asrStopwatch.elapsedMilliseconds,
-        'transcriptChars': asrTranscriptChars,
-        if (asrResolvedModel != null) 'model': asrResolvedModel,
-        if (asrProviderName != null) 'provider': asrProviderName,
-        if (asrError != null) 'error': asrError,
-      };
-      // Save a persistent copy for ASR benchmarking.
-      if (wavBytes != null && wavBytes.isNotEmpty) {
-        try {
-          final samplesDir = Directory(
-            '${PlatformDirs.instance.dataDir}/asr_samples',
-          );
-          if (!samplesDir.existsSync()) {
-            samplesDir.createSync(recursive: true);
-          }
-          final ts = DateTime.now().millisecondsSinceEpoch;
-          final sampleWav = '${samplesDir.path}/$ts.wav';
-          // Reuse already-written temp file if available, otherwise write from bytes.
-          if (tempPath != null && File(tempPath).existsSync()) {
-            await File(tempPath).copy(sampleWav);
-          } else {
-            await File(sampleWav).writeAsBytes(wavBytes, flush: true);
-          }
-          // Companion metadata JSON — useful for replay benchmarks.
-          final transcript =
-              asrTranscriptChars > 0 ? (_inputController.text.trim()) : '';
-          final meta = {
-            'recordedAt': asrStartedAt,
-            'completedAt': completedAt,
-            'durationMs': asrStopwatch.elapsedMilliseconds,
-            'asrMode': asrMode,
-            'asrStatus': asrStatus,
-            if (asrResolvedModel != null) 'asrModel': asrResolvedModel,
-            if (asrProviderName != null) 'asrProvider': asrProviderName,
-            'transcript': transcript,
-            'transcriptChars': asrTranscriptChars,
-            if (asrError != null) 'error': asrError,
-          };
-          await File(
-            '${samplesDir.path}/$ts.json',
-          ).writeAsString(const JsonEncoder.withIndent('  ').convert(meta));
-        } on Exception {
-          // Best-effort — never block the main flow.
-        }
-      }
-      // Delete the temp file used for local ASR (if written).
-      if (tempPath != null) {
-        try {
-          final f = File(tempPath);
-          if (f.existsSync()) await f.delete();
-        } on FileSystemException {
-          // ignore
-        }
-      }
-      if (mounted) {
-        setState(() => _isTranscribingMic = false);
-        // If we are about to send the message, keep the overlay in 'processing'
-        // to avoid a visual bounce: processing → idle → processing.
-        _syncOverlayState(
-          forcedStatus: shouldSend ? 'processing' : null,
-          hiddenOverride: _voiceOverlayHidden,
-        );
-      }
+      await _finalizeAsrRun(run, wavBytes);
     }
-    if (shouldSend && mounted) {
-      if (_pendingAudioContent != null ||
-          _inputController.text.trim().isNotEmpty) {
-        if (mirrorToOverlay) {
-          await Future<void>.delayed(const Duration(milliseconds: 850));
-          if (!mounted) return;
-        }
-        await _sendMessage(mirrorToOverlay: mirrorToOverlay);
-      }
-    }
+    await _maybeSendAfterTranscription(run, mirrorToOverlay: mirrorToOverlay);
   }
 
   Future<void> _cancelRecordingFromMic() async {

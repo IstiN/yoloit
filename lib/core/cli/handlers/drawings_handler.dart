@@ -28,10 +28,9 @@ Future<shelf.Response> handleDrawings(
     final boardId =
         request.url.queryParameters['board'] ??
         (isSvgExport ? sub.elementAtOrNull(1) : sub.firstOrNull);
-    final board =
-        (boardId != null && boardId.isNotEmpty)
-            ? findBoard(cubit, boardId)
-            : cubit.state.activeBoard;
+    final board = (boardId != null && boardId.isNotEmpty)
+        ? findBoard(cubit, boardId)
+        : cubit.state.activeBoard;
     if (board == null) return error('Board not found');
 
     if (isSvgExport) {
@@ -93,34 +92,32 @@ Future<shelf.Response> handleDrawings(
   return notFound('Unknown drawings route');
 }
 
-Future<shelf.Response> handleDrawingsPost(
-  shelf.Request request,
-  BoardCubit cubit,
-  List<String> sub, {
-  required Future<Map<String, dynamic>> Function(shelf.Request) body,
-  required shelf.Response Function(Object) json,
-  required shelf.Response Function(String) error,
-  required void Function() scheduleRebuild,
-  required Color? Function(String?) parseColor,
-}) async {
-  final requestBody = await body(request);
-  final boardId =
-      (requestBody['board'] as String?) ?? request.url.queryParameters['board'];
-  final board =
-      (boardId != null && boardId.isNotEmpty)
-          ? findBoard(cubit, boardId)
-          : cubit.state.activeBoard;
-  if (board == null) return error('Board not found');
+/// Outcome of a stroke builder in [handleDrawingsPost]: either an immediate
+/// error response or the computed strokes + size.
+class _StrokesBuild {
+  const _StrokesBuild.error(this.errorResponse) : strokes = null, size = null;
+  const _StrokesBuild.done(this.strokes, this.size) : errorResponse = null;
 
-  final type = (requestBody['type'] as String? ?? 'freehand').toLowerCase();
-  final colorStr = requestBody['color'] as String? ?? '#FFFFFF';
-  final color = parseColor(colorStr) ?? const Color(0xFFFFFFFF);
-  final strokeWidth = (requestBody['width'] as num?)?.toDouble() ?? 3.0;
-  final posX = (requestBody['x'] as num?)?.toDouble() ?? 100.0;
-  final posY = (requestBody['y'] as num?)?.toDouble() ?? 100.0;
+  final shelf.Response? errorResponse;
+  final List<List<Offset>>? strokes;
+  final Size? size;
+}
 
-  List<List<Offset>> strokes;
-  Size size;
+/// Parsed inputs shared by the per-type stroke builders of
+/// [handleDrawingsPost], so each builder takes a single parameter.
+class _DrawingsPostContext {
+  _DrawingsPostContext(this.requestBody, {required this.json})
+    : type = (requestBody['type'] as String? ?? 'freehand').toLowerCase(),
+      strokeWidth = (requestBody['width'] as num?)?.toDouble() ?? 3.0,
+      posX = (requestBody['x'] as num?)?.toDouble() ?? 100.0,
+      posY = (requestBody['y'] as num?)?.toDouble() ?? 100.0;
+
+  final Map<String, dynamic> requestBody;
+  final shelf.Response Function(Object) json;
+  final String type;
+  final double strokeWidth;
+  final double posX;
+  final double posY;
 
   ({double x1, double y1, double x2, double y2}) parseEndpoints() => (
     x1: (requestBody['x1'] as num?)?.toDouble() ?? posX,
@@ -128,138 +125,166 @@ Future<shelf.Response> handleDrawingsPost(
     x2: (requestBody['x2'] as num?)?.toDouble() ?? posX + 200,
     y2: (requestBody['y2'] as num?)?.toDouble() ?? posY,
   );
+}
 
-  switch (type) {
-    case 'line':
-      final ep = parseEndpoints();
-      final result = lineToElement(ep.x1, ep.y1, ep.x2, ep.y2, strokeWidth);
-      strokes = result.$1;
-      size = result.$2;
+typedef _StrokeBuilder =
+    Future<_StrokesBuild> Function(_DrawingsPostContext ctx);
 
-    case 'arrow':
-      final ep = parseEndpoints();
-      final result = arrowToElement(ep.x1, ep.y1, ep.x2, ep.y2, strokeWidth);
-      strokes = result.$1;
-      size = result.$2;
+Future<_StrokesBuild> _buildLineStrokes(_DrawingsPostContext ctx) async {
+  final ep = ctx.parseEndpoints();
+  final result = lineToElement(ep.x1, ep.y1, ep.x2, ep.y2, ctx.strokeWidth);
+  return _StrokesBuild.done(result.$1, result.$2);
+}
 
-    case 'circle':
-      final cx = (requestBody['cx'] as num?)?.toDouble() ?? posX;
-      final cy = (requestBody['cy'] as num?)?.toDouble() ?? posY;
-      final r =
-          (requestBody['r'] as num?)?.toDouble() ??
-          (requestBody['radius'] as num?)?.toDouble() ??
-          50.0;
-      final result = circleToElement(cx, cy, r, strokeWidth);
-      strokes = result.$1;
-      size = result.$2;
+Future<_StrokesBuild> _buildArrowStrokes(_DrawingsPostContext ctx) async {
+  final ep = ctx.parseEndpoints();
+  final result = arrowToElement(ep.x1, ep.y1, ep.x2, ep.y2, ctx.strokeWidth);
+  return _StrokesBuild.done(result.$1, result.$2);
+}
 
-    case 'rect':
-    case 'rectangle':
-      final rx = (requestBody['x'] as num?)?.toDouble() ?? posX;
-      final ry = (requestBody['y'] as num?)?.toDouble() ?? posY;
-      // Use 'rw' or 'rectWidth' for shape width; fall back to 'width' only if
-      // no stroke-width was explicitly provided (to avoid conflict).
-      final w =
-          (requestBody['rw'] as num?)?.toDouble() ??
-          (requestBody['rectWidth'] as num?)?.toDouble() ??
-          (requestBody['w'] as num?)?.toDouble() ??
-          200.0;
-      final h = (requestBody['height'] as num?)?.toDouble() ?? 100.0;
-      final result = rectToElement(rx, ry, w, h, strokeWidth);
-      strokes = result.$1;
-      size = result.$2;
+Future<_StrokesBuild> _buildCircleStrokes(_DrawingsPostContext ctx) async {
+  final requestBody = ctx.requestBody;
+  final cx = (requestBody['cx'] as num?)?.toDouble() ?? ctx.posX;
+  final cy = (requestBody['cy'] as num?)?.toDouble() ?? ctx.posY;
+  final r =
+      (requestBody['r'] as num?)?.toDouble() ??
+      (requestBody['radius'] as num?)?.toDouble() ??
+      50.0;
+  final result = circleToElement(cx, cy, r, ctx.strokeWidth);
+  return _StrokesBuild.done(result.$1, result.$2);
+}
 
-    case 'svg':
-      final pathD = requestBody['d'] as String? ?? requestBody['path'] as String? ?? '';
-      final svgStr = requestBody['svg'] as String?;
-      final dStr =
-          pathD.isNotEmpty
-              ? pathD
-              : (svgStr != null ? extractSvgPathD(svgStr) : '');
-      if (dStr.isEmpty) {
-        return json({
-          'ok': false,
-          'error': 'Missing "d" (SVG path data) or "svg" field',
-        });
-      }
-      final result = svgPathToElement(dStr, posX, posY, strokeWidth);
-      if (result == null) {
-        return json({
-          'ok': false,
-          'error':
-              'Failed to parse SVG path — check "d" syntax (M/L/C/Q/Z commands)',
-        });
-      }
-      strokes = result.$1;
-      size = result.$2;
+Future<_StrokesBuild> _buildRectStrokes(_DrawingsPostContext ctx) async {
+  final requestBody = ctx.requestBody;
+  final rx = (requestBody['x'] as num?)?.toDouble() ?? ctx.posX;
+  final ry = (requestBody['y'] as num?)?.toDouble() ?? ctx.posY;
+  // Use 'rw' or 'rectWidth' for shape width; fall back to 'width' only if
+  // no stroke-width was explicitly provided (to avoid conflict).
+  final w =
+      (requestBody['rw'] as num?)?.toDouble() ??
+      (requestBody['rectWidth'] as num?)?.toDouble() ??
+      (requestBody['w'] as num?)?.toDouble() ??
+      200.0;
+  final h = (requestBody['height'] as num?)?.toDouble() ?? 100.0;
+  final result = rectToElement(rx, ry, w, h, ctx.strokeWidth);
+  return _StrokesBuild.done(result.$1, result.$2);
+}
 
-    case 'file':
-      // Render all paths from an SVG file as a single drawing element
-      final filePath =
-          requestBody['file'] as String? ?? requestBody['path'] as String? ?? '';
-      if (filePath.isEmpty) {
-        return json({
-          'ok': false,
-          'error': 'Missing "file" — provide path to SVG file',
-        });
-      }
-      final svgFile = File(filePath);
-      if (!svgFile.existsSync()) {
-        return json({'ok': false, 'error': 'SVG file not found: $filePath'});
-      }
-      final svgContent = await svgFile.readAsString();
-      // Extract all d="" attributes and combine into one element per path
-      final dMatches = RegExp(r'd="([^"]*)"').allMatches(svgContent);
-      final allStrokes = <List<Offset>>[];
-      var maxW = 0.0, maxH = 0.0;
-      for (final m in dMatches) {
-        final d = m.group(1) ?? '';
-        if (d.isEmpty) continue;
-        final r = svgPathToElement(d, 0, 0, strokeWidth);
-        if (r != null) {
-          allStrokes.addAll(r.$1);
-          if (r.$2.width > maxW) maxW = r.$2.width;
-          if (r.$2.height > maxH) maxH = r.$2.height;
-        }
-      }
-      if (allStrokes.isEmpty) {
-        return json({
-          'ok': false,
-          'error': 'No drawable paths found in SVG file',
-        });
-      }
-      strokes = allStrokes;
-      size = Size(maxW, maxH);
-
-    case 'freehand':
-    default:
-      final rawPointsVal = requestBody['points'];
-      final rawPoints =
-          rawPointsVal is List
-              ? rawPointsVal
-              : rawPointsVal is String
-              ? (jsonDecode(rawPointsVal) as List?)
-              : null;
-      if (rawPoints == null || rawPoints.isEmpty) {
-        return json({
-          'ok': false,
-          'error': 'Missing "points" for freehand — provide [[x,y],...]',
-        });
-      }
-      final points =
-          rawPoints.map((p) {
-            final pt = p as List;
-            return Offset(
-              pt[0] is num ? (pt[0] as num).toDouble() : 0,
-              pt[1] is num ? (pt[1] as num).toDouble() : 0,
-            );
-          }).toList();
-      final result = freehandToElement(points, strokeWidth);
-      strokes = result.$1;
-      size = result.$2;
+Future<_StrokesBuild> _buildSvgStrokes(_DrawingsPostContext ctx) async {
+  final requestBody = ctx.requestBody;
+  final pathD =
+      requestBody['d'] as String? ?? requestBody['path'] as String? ?? '';
+  final svgStr = requestBody['svg'] as String?;
+  final dStr = pathD.isNotEmpty
+      ? pathD
+      : (svgStr != null ? extractSvgPathD(svgStr) : '');
+  if (dStr.isEmpty) {
+    return _StrokesBuild.error(
+      ctx.json({
+        'ok': false,
+        'error': 'Missing "d" (SVG path data) or "svg" field',
+      }),
+    );
   }
+  final result = svgPathToElement(dStr, ctx.posX, ctx.posY, ctx.strokeWidth);
+  if (result == null) {
+    return _StrokesBuild.error(
+      ctx.json({
+        'ok': false,
+        'error':
+            'Failed to parse SVG path — check "d" syntax (M/L/C/Q/Z commands)',
+      }),
+    );
+  }
+  return _StrokesBuild.done(result.$1, result.$2);
+}
 
-  final absPos = switch (type) {
+Future<_StrokesBuild> _buildFileStrokes(_DrawingsPostContext ctx) async {
+  final requestBody = ctx.requestBody;
+  // Render all paths from an SVG file as a single drawing element
+  final filePath =
+      requestBody['file'] as String? ?? requestBody['path'] as String? ?? '';
+  if (filePath.isEmpty) {
+    return _StrokesBuild.error(
+      ctx.json({
+        'ok': false,
+        'error': 'Missing "file" — provide path to SVG file',
+      }),
+    );
+  }
+  final svgFile = File(filePath);
+  if (!svgFile.existsSync()) {
+    return _StrokesBuild.error(
+      ctx.json({'ok': false, 'error': 'SVG file not found: $filePath'}),
+    );
+  }
+  final svgContent = await svgFile.readAsString();
+  // Extract all d="" attributes and combine into one element per path
+  final dMatches = RegExp(r'd="([^"]*)"').allMatches(svgContent);
+  final allStrokes = <List<Offset>>[];
+  var maxW = 0.0, maxH = 0.0;
+  for (final m in dMatches) {
+    final d = m.group(1) ?? '';
+    if (d.isEmpty) continue;
+    final r = svgPathToElement(d, 0, 0, ctx.strokeWidth);
+    if (r != null) {
+      allStrokes.addAll(r.$1);
+      if (r.$2.width > maxW) maxW = r.$2.width;
+      if (r.$2.height > maxH) maxH = r.$2.height;
+    }
+  }
+  if (allStrokes.isEmpty) {
+    return _StrokesBuild.error(
+      ctx.json({'ok': false, 'error': 'No drawable paths found in SVG file'}),
+    );
+  }
+  return _StrokesBuild.done(allStrokes, Size(maxW, maxH));
+}
+
+Future<_StrokesBuild> _buildFreehandStrokes(_DrawingsPostContext ctx) async {
+  final rawPointsVal = ctx.requestBody['points'];
+  final rawPoints = rawPointsVal is List
+      ? rawPointsVal
+      : rawPointsVal is String
+      ? (jsonDecode(rawPointsVal) as List?)
+      : null;
+  if (rawPoints == null || rawPoints.isEmpty) {
+    return _StrokesBuild.error(
+      ctx.json({
+        'ok': false,
+        'error': 'Missing "points" for freehand — provide [[x,y],...]',
+      }),
+    );
+  }
+  final points = rawPoints.map((p) {
+    final pt = p as List;
+    return Offset(
+      pt[0] is num ? (pt[0] as num).toDouble() : 0,
+      pt[1] is num ? (pt[1] as num).toDouble() : 0,
+    );
+  }).toList();
+  final result = freehandToElement(points, ctx.strokeWidth);
+  return _StrokesBuild.done(result.$1, result.$2);
+}
+
+/// Stroke builders keyed by drawing `type`; any other type (including the
+/// default `freehand`) falls back to [_buildFreehandStrokes].
+final _strokeBuilders = <String, _StrokeBuilder>{
+  'line': _buildLineStrokes,
+  'arrow': _buildArrowStrokes,
+  'circle': _buildCircleStrokes,
+  'rect': _buildRectStrokes,
+  'rectangle': _buildRectStrokes,
+  'svg': _buildSvgStrokes,
+  'file': _buildFileStrokes,
+};
+
+Offset _drawingAbsPos(_DrawingsPostContext ctx) {
+  final requestBody = ctx.requestBody;
+  final posX = ctx.posX;
+  final posY = ctx.posY;
+  final strokeWidth = ctx.strokeWidth;
+  return switch (ctx.type) {
     'line' || 'arrow' => Offset(
       math.min(
             (requestBody['x1'] as num?)?.toDouble() ?? posX,
@@ -286,6 +311,39 @@ Future<shelf.Response> handleDrawingsPost(
     ),
     _ => Offset(posX, posY),
   };
+}
+
+Future<shelf.Response> handleDrawingsPost(
+  shelf.Request request,
+  BoardCubit cubit,
+  List<String> sub, {
+  required Future<Map<String, dynamic>> Function(shelf.Request) body,
+  required shelf.Response Function(Object) json,
+  required shelf.Response Function(String) error,
+  required void Function() scheduleRebuild,
+  required Color? Function(String?) parseColor,
+}) async {
+  final requestBody = await body(request);
+  final boardId =
+      (requestBody['board'] as String?) ?? request.url.queryParameters['board'];
+  final board = (boardId != null && boardId.isNotEmpty)
+      ? findBoard(cubit, boardId)
+      : cubit.state.activeBoard;
+  if (board == null) return error('Board not found');
+
+  final ctx = _DrawingsPostContext(requestBody, json: json);
+  final colorStr = requestBody['color'] as String? ?? '#FFFFFF';
+  final color = parseColor(colorStr) ?? const Color(0xFFFFFFFF);
+  final strokeWidth = ctx.strokeWidth;
+
+  final builder = _strokeBuilders[ctx.type] ?? _buildFreehandStrokes;
+  final built = await builder(ctx);
+  final errorResponse = built.errorResponse;
+  if (errorResponse != null) return errorResponse;
+  final strokes = built.strokes!;
+  final size = built.size!;
+
+  final absPos = _drawingAbsPos(ctx);
 
   final maxZ = board.drawings.fold<int>(
     0,
@@ -306,7 +364,7 @@ Future<shelf.Response> handleDrawingsPost(
     'ok': true,
     'id': drawing.id,
     'boardId': board.id,
-    'type': type,
+    'type': ctx.type,
     'strokeCount': strokes.length,
     'pointCount': strokes.fold<int>(0, (s, st) => s + st.length),
   });
@@ -377,8 +435,7 @@ Map<String, dynamic> drawingToJson(BoardDrawingElement d) => {
   final origin = Offset(minX, minY);
   final pts = List.generate(steps + 1, (i) {
     final angle = 2 * math.pi * i / steps;
-    return Offset(cx + r * math.cos(angle), cy + r * math.sin(angle)) -
-        origin;
+    return Offset(cx + r * math.cos(angle), cy + r * math.sin(angle)) - origin;
   });
   final size = Size((r + sw) * 2, (r + sw) * 2);
   return ([pts], size);
@@ -415,10 +472,7 @@ Map<String, dynamic> drawingToJson(BoardDrawingElement d) => {
   return (origin, Size(maxX - minX + sw * 2, maxY - minY + sw * 2));
 }
 
-(List<List<Offset>>, Size) freehandToElement(
-  List<Offset> points,
-  double sw,
-) {
+(List<List<Offset>>, Size) freehandToElement(List<Offset> points, double sw) {
   if (points.isEmpty) return ([<Offset>[]], Size(sw * 2, sw * 2));
   final (origin, size) = _computeBBox(points, sw);
   final rel = points.map((p) => p - origin).toList();
@@ -431,6 +485,154 @@ String extractSvgPathD(String svg) {
   return match?.group(1) ?? '';
 }
 
+/// Mutable state for [svgPathToElement]: the token stream cursor plus the
+/// in-progress stroke geometry, so each path command is a tiny self-contained
+/// method instead of one giant switch.
+class _SvgPathParser {
+  _SvgPathParser(this.tokens);
+
+  final List<String> tokens;
+  final strokes = <List<Offset>>[];
+  List<Offset> current = [];
+  double cx = 0, cy = 0;
+  int i = 0;
+  String cmd = 'M';
+
+  static final _commandHandlers = <String, void Function(_SvgPathParser)>{
+    'M': (p) => p._moveToAbs(),
+    'm': (p) => p._moveToRel(),
+    'L': (p) => p._lineToAbs(),
+    'l': (p) => p._lineToRel(),
+    'H': (p) => p._horizontalToAbs(),
+    'h': (p) => p._horizontalToRel(),
+    'V': (p) => p._verticalToAbs(),
+    'v': (p) => p._verticalToRel(),
+    'C': (p) => p._cubicTo(),
+    'c': (p) => p._cubicTo(),
+    'Q': (p) => p._quadTo(),
+    'q': (p) => p._quadTo(),
+  };
+
+  void run() {
+    while (i < tokens.length) {
+      final t = tokens[i];
+      if (RegExp(r'[MLHVCSQTAZmlhvcsqtaz]').hasMatch(t)) {
+        _handleCommandLetter(t);
+        continue;
+      }
+      final handler = _commandHandlers[cmd];
+      if (handler == null) {
+        i++; // skip unknown
+      } else {
+        handler(this);
+      }
+    }
+    if (current.isNotEmpty) strokes.add(current);
+  }
+
+  void _handleCommandLetter(String t) {
+    i++;
+    // Z/z need no arguments — handle immediately
+    if (t == 'Z' || t == 'z') {
+      if (current.length > 1) current.add(current.first);
+      if (current.isNotEmpty) strokes.add(current);
+      current = [];
+    } else {
+      cmd = t;
+    }
+  }
+
+  double num() {
+    final v = double.tryParse(tokens[i]) ?? 0;
+    i++;
+    return v;
+  }
+
+  void _moveToAbs() {
+    if (current.isNotEmpty) strokes.add(current);
+    cx = num();
+    cy = num();
+    current = [Offset(cx, cy)];
+    cmd = 'L';
+  }
+
+  void _moveToRel() {
+    if (current.isNotEmpty) strokes.add(current);
+    cx += num();
+    cy += num();
+    current = [Offset(cx, cy)];
+    cmd = 'l';
+  }
+
+  void _lineToAbs() {
+    cx = num();
+    cy = num();
+    current.add(Offset(cx, cy));
+  }
+
+  void _lineToRel() {
+    cx += num();
+    cy += num();
+    current.add(Offset(cx, cy));
+  }
+
+  void _horizontalToAbs() {
+    cx = num();
+    current.add(Offset(cx, cy));
+  }
+
+  void _horizontalToRel() {
+    cx += num();
+    current.add(Offset(cx, cy));
+  }
+
+  void _verticalToAbs() {
+    cy = num();
+    current.add(Offset(cx, cy));
+  }
+
+  void _verticalToRel() {
+    cy += num();
+    current.add(Offset(cx, cy));
+  }
+
+  // cubic bezier — approximate with 10 points
+  void _cubicTo() {
+    final rel = cmd == 'c';
+    double coord(double c) => rel ? c + num() : num();
+    final x1 = coord(cx), y1 = coord(cy);
+    final x2 = coord(cx), y2 = coord(cy);
+    final ex = coord(cx), ey = coord(cy);
+    for (int s = 1; s <= 10; s++) {
+      final tt = s / 10;
+      current.add(
+        Offset(
+          cubicBezier(cx, x1, x2, ex, tt),
+          cubicBezier(cy, y1, y2, ey, tt),
+        ),
+      );
+    }
+    cx = ex;
+    cy = ey;
+  }
+
+  // quadratic bezier
+  void _quadTo() {
+    final rel = cmd == 'q';
+    double coord(double c) => rel ? c + num() : num();
+    final x1 = coord(cx), y1 = coord(cy);
+    final ex = coord(cx), ey = coord(cy);
+    for (int s = 1; s <= 10; s++) {
+      final tt = s / 10;
+      current.add(
+        Offset(quadBezier(cx, x1, ex, tt), quadBezier(cy, y1, ey, tt)),
+      );
+    }
+    cx = ex;
+    cy = ey;
+  }
+}
+
 /// Parse a subset of SVG path commands into strokes.
 /// Supports: M, L, H, V, C (cubic bezier), Q (quadratic), Z, and lowercase variants.
 (List<List<Offset>>, Size)? svgPathToElement(
@@ -439,115 +641,21 @@ String extractSvgPathD(String svg) {
   double baseY,
   double sw,
 ) {
-  final strokes = <List<Offset>>[];
-  List<Offset> current = [];
-  double cx = 0, cy = 0;
-
   // Tokenize: split on command letters, keeping the letter
-  final tokens =
-      RegExp(
-        r'[MLHVCSQTAZmlhvcsqtaz]|[-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?',
-      ).allMatches(d).map((m) => m.group(0)!).toList();
+  final tokens = RegExp(
+    r'[MLHVCSQTAZmlhvcsqtaz]|[-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?',
+  ).allMatches(d).map((m) => m.group(0)!).toList();
 
-  int i = 0;
-  String cmd = 'M';
-  while (i < tokens.length) {
-    final t = tokens[i];
-    if (RegExp(r'[MLHVCSQTAZmlhvcsqtaz]').hasMatch(t)) {
-      i++;
-      // Z/z need no arguments — handle immediately
-      if (t == 'Z' || t == 'z') {
-        if (current.length > 1) current.add(current.first);
-        if (current.isNotEmpty) strokes.add(current);
-        current = [];
-      } else {
-        cmd = t;
-      }
-      continue;
-    }
-    double num() {
-      final v = double.tryParse(tokens[i]) ?? 0;
-      i++;
-      return v;
-    }
-
-    switch (cmd) {
-      case 'M':
-        if (current.isNotEmpty) strokes.add(current);
-        cx = num();
-        cy = num();
-        current = [Offset(cx, cy)];
-        cmd = 'L';
-      case 'm':
-        if (current.isNotEmpty) strokes.add(current);
-        cx += num();
-        cy += num();
-        current = [Offset(cx, cy)];
-        cmd = 'l';
-      case 'L':
-        cx = num();
-        cy = num();
-        current.add(Offset(cx, cy));
-      case 'l':
-        cx += num();
-        cy += num();
-        current.add(Offset(cx, cy));
-      case 'H':
-        cx = num();
-        current.add(Offset(cx, cy));
-      case 'h':
-        cx += num();
-        current.add(Offset(cx, cy));
-      case 'V':
-        cy = num();
-        current.add(Offset(cx, cy));
-      case 'v':
-        cy += num();
-        current.add(Offset(cx, cy));
-      case 'C': // cubic bezier — approximate with 10 points
-      case 'c':
-        final rel = cmd == 'c';
-        double coord(double c) => rel ? c + num() : num();
-        final x1 = coord(cx), y1 = coord(cy);
-        final x2 = coord(cx), y2 = coord(cy);
-        final ex = coord(cx), ey = coord(cy);
-        for (int s = 1; s <= 10; s++) {
-          final tt = s / 10;
-          current.add(
-            Offset(
-              cubicBezier(cx, x1, x2, ex, tt),
-              cubicBezier(cy, y1, y2, ey, tt),
-            ),
-          );
-        }
-        cx = ex;
-        cy = ey;
-      case 'Q': // quadratic bezier
-      case 'q':
-        final rel = cmd == 'q';
-        double coord(double c) => rel ? c + num() : num();
-        final x1 = coord(cx), y1 = coord(cy);
-        final ex = coord(cx), ey = coord(cy);
-        for (int s = 1; s <= 10; s++) {
-          final tt = s / 10;
-          current.add(
-            Offset(quadBezier(cx, x1, ex, tt), quadBezier(cy, y1, ey, tt)),
-          );
-        }
-        cx = ex;
-        cy = ey;
-      default:
-        i++; // skip unknown
-    }
-  }
-  if (current.isNotEmpty) strokes.add(current);
+  final parser = _SvgPathParser(tokens)..run();
+  final strokes = parser.strokes;
   if (strokes.isEmpty) return null;
 
   // Compute bounding box of all points
   final allPts = strokes.expand((s) => s).toList();
   final (origin, size) = _computeBBox(allPts, sw);
-  final relStrokes =
-      strokes.map((s) => s.map((p) => p - origin).toList()).toList();
+  final relStrokes = strokes
+      .map((s) => s.map((p) => p - origin).toList())
+      .toList();
   return (relStrokes, size);
 }
 

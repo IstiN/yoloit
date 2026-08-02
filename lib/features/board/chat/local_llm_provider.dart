@@ -83,7 +83,8 @@ class LocalLlmProvider extends ChatProvider {
     required bool isFirstMessage,
     List<String> attachments = const [],
     ChatRuntimeContext? runtimeContext,
-    List<Map<String, Object?>>? audioContentOverride, // ignored by local provider
+    List<Map<String, Object?>>?
+    audioContentOverride, // ignored by local provider
   }) {
     // ignore: close_sinks
     final controller = StreamController<ChatEvent>();
@@ -157,24 +158,20 @@ class LocalLlmProvider extends ChatProvider {
         ),
       );
 
-      var emitted = '';
+      final state = _LocalRunState();
       final completionStopwatch = Stopwatch()..start();
-      var firstTokenMs = -1;
-      var streamedChunkCount = 0;
       final loopContext = <Map<String, String>>[];
 
       final disabledTools = YoloitCliToolCatalog.normalizeFunctionNames(
         config.disabledLocalToolNames,
       );
-      final tools =
-          isRouter
-              ? const <flm.LocalTool>[]
-              : YoloitCliToolCatalogLocal.localToolsFor(
-                disabledFunctionNames:
-                    config.disabledLocalToolNames
-                        .map((name) => name.trim())
-                        .toSet(),
-              );
+      final tools = isRouter
+          ? const <flm.LocalTool>[]
+          : YoloitCliToolCatalogLocal.localToolsFor(
+              disabledFunctionNames: config.disabledLocalToolNames
+                  .map((name) => name.trim())
+                  .toSet(),
+            );
 
       Future<String> toolHandler(String name, Map<String, Object?> arguments) {
         final resolvedName =
@@ -193,188 +190,24 @@ class LocalLlmProvider extends ChatProvider {
         );
       }
 
-      String completedContent = '';
-      // Track last failed tool signature to stop loop on repeated failure.
-      String? lastFailedToolSig;
-
-      for (var iteration = 0; iteration < maxIterations; iteration++) {
-        if (_cancelRequested[session] == true) break;
-
-        final iterToolCountBefore = sessionToolHistory.length;
-        final messages = await _buildMessages(
-          installed.manifest,
-          sessionHistory,
-          sessionToolHistory,
-          message,
-          runtimeContext,
-          loopContext: loopContext,
-        );
-
-        var rawEmitted = '';
-        var iterEmitted = '';
-        // Buffer ALL streamed content during orchestrator loop iterations
-        // to prevent raw JSON / tool echoes from reaching the user.
-        // Only flush clean post-processed content.
-        var jsonBuffering = true;
-
-        final full = await _engine.completeStreaming(
-          flm.LmCompletionRequest(
-            modelPath: installed.directory.path,
-            manifest: installed.manifest,
-            messages: messages,
-            maxTokens: requestProfile.maxTokens,
-            temperature: requestProfile.temperature,
-            enableThinking: requestProfile.enableThinking,
-            tools: tools,
-            onToolCall: toolHandler,
-          ),
-          (chunk) {
-            if (_cancelRequested[session] == true) return;
-            if (firstTokenMs < 0 && chunk.trim().isNotEmpty) {
-              firstTokenMs = completionStopwatch.elapsedMilliseconds;
-            }
-            final rawDelta = _extractDelta(
-              previous: rawEmitted,
-              incoming: chunk,
-            );
-            if (rawDelta.isEmpty) return;
-            streamedChunkCount++;
-            rawEmitted += rawDelta;
-            final visible = stripEmbeddedGemmaToolCallBlocks(rawEmitted);
-            final delta = _extractDelta(
-              previous: iterEmitted,
-              incoming: visible,
-            );
-            if (delta.isEmpty) return;
-
-            // While buffering, check if the accumulated output still looks
-            // like it could be a JSON tool call or tool echo. If it clearly
-            // isn't, flush the buffer and stream normally.
-            if (jsonBuffering) {
-              final soFar = (iterEmitted + delta).trimLeft();
-              if (_looksLikeToolOutput(soFar)) {
-                // Still looks like potential JSON / tool output — keep buffering.
-                iterEmitted += delta;
-                emitted += delta;
-                return;
-              }
-              // Definitely not tool output — stop buffering and flush.
-              jsonBuffering = false;
-            }
-
-            iterEmitted += delta;
-            emitted += delta;
-            controller.add(
-              ChatEvent(
-                type: ChatEventType.assistantDelta,
-                rawType: 'assistant.message_delta',
-                timestamp: DateTime.now(),
-                data: {'deltaContent': delta},
-              ),
-            );
-          },
-        );
-
-        final rawFull = full.trim().isNotEmpty ? full : rawEmitted;
-        var iterContent = await applyEmbeddedGemmaToolCallsIfAny(
-          rawModelOutput: rawFull,
-          cleanedOutput: stripEmbeddedGemmaToolCallBlocks(rawFull),
-          onTool: toolHandler,
-        );
-        iterContent = await _applyRouterJsonToolCallIfAny(
-          rawModelOutput: rawFull,
-          currentContent: iterContent,
-          toolHistory: sessionToolHistory,
-          toolHistoryCountBefore: iterToolCountBefore,
-          onTool: toolHandler,
-        );
-
-        // Strip any remaining tool-result-like patterns from content
-        // that may have leaked through (e.g. model echoing tool output).
-        iterContent = _stripToolEchoPatterns(iterContent);
-
-        // Emit any post-processed content that wasn't streamed yet.
-        // When JSON was buffered (jsonBuffering stayed true), iterEmitted
-        // contains text the user never saw. In that case, emit the entire
-        // post-processed content.
-        if (jsonBuffering && iterContent.trim().isNotEmpty) {
-          // The user hasn't seen anything yet — emit the full
-          // post-processed content (tool summary or clean text).
-          controller.add(
-            ChatEvent(
-              type: ChatEventType.assistantDelta,
-              rawType: 'assistant.message_delta',
-              timestamp: DateTime.now(),
-              data: {'deltaContent': iterContent},
-            ),
-          );
-          // Re-align emitted to match what the user actually saw.
-          emitted = iterContent;
-        } else if (!jsonBuffering && iterContent.startsWith(iterEmitted)) {
-          final delta = iterContent.substring(iterEmitted.length);
-          if (delta.isNotEmpty) {
-            emitted += delta;
-            controller.add(
-              ChatEvent(
-                type: ChatEventType.assistantDelta,
-                rawType: 'assistant.message_delta',
-                timestamp: DateTime.now(),
-                data: {'deltaContent': delta},
-              ),
-            );
-          }
-        }
-
-        completedContent = iterContent;
-
-        // Check if new tool calls were made this iteration.
-        final newToolCalls = sessionToolHistory.length - iterToolCountBefore;
-        if (newToolCalls > 0 && iteration < maxIterations - 1) {
-          // Check for repeated failure — same tool+args failing again.
-          final lastCall = sessionToolHistory.last;
-          final sig = '${lastCall.toolName}:${lastCall.arguments}';
-          if (!lastCall.success) {
-            if (sig == lastFailedToolSig) {
-              // ignore: avoid_print
-              print(
-                '[LocalLlmProvider] orchestrator loop: repeated failure '
-                'on "$sig" — stopping loop',
-              );
-              break;
-            }
-            lastFailedToolSig = sig;
-          } else {
-            lastFailedToolSig = null;
-          }
-
-          // Add assistant response + tool results to loop context for next
-          // iteration so the model sees what it already did.
-          loopContext.add({'role': 'assistant', 'content': iterContent.trim()});
-          for (
-            var i = iterToolCountBefore;
-            i < sessionToolHistory.length;
-            i++
-          ) {
-            final tc = sessionToolHistory[i];
-            loopContext.add({
-              'role': 'tool',
-              'content':
-                  '${tc.toolName} ${tc.success ? "→ ok" : "→ error"}: '
-                  '${compactToolResultForPrompt(tc.result)}',
-            });
-          }
-
-          // ignore: avoid_print
-          print(
-            '[LocalLlmProvider] orchestrator loop: iteration=$iteration '
-            'newToolCalls=$newToolCalls → continuing',
-          );
-          continue;
-        }
-
-        // No tool calls or last iteration — done.
-        break;
-      }
+      await _runOrchestratorLoop(
+        session: session,
+        installed: installed,
+        maxTokens: requestProfile.maxTokens,
+        temperature: requestProfile.temperature,
+        enableThinking: requestProfile.enableThinking,
+        maxIterations: maxIterations,
+        message: message,
+        sessionHistory: sessionHistory,
+        sessionToolHistory: sessionToolHistory,
+        loopContext: loopContext,
+        tools: tools,
+        toolHandler: toolHandler,
+        runtimeContext: runtimeContext,
+        controller: controller,
+        state: state,
+        completionStopwatch: completionStopwatch,
+      );
 
       completionStopwatch.stop();
 
@@ -382,57 +215,17 @@ class LocalLlmProvider extends ChatProvider {
         return;
       }
 
-      final content =
-          completedContent.trim().isNotEmpty
-              ? completedContent.trim()
-              : emitted.trim();
-      Map<String, Object?>? nativeTimings;
-      final engine = _engine;
-      if (engine is flm.NativeLmEngine) {
-        nativeTimings = engine.lastNativeTimings;
-      }
-      final totalApiDurationMs =
-          (nativeTimings?['swiftTotalMs'] as num?)?.toInt() ??
-          completionStopwatch.elapsedMilliseconds;
-      final effectiveFirstTokenMs =
-          (nativeTimings?['swiftFirstTokenMs'] as num?)?.toInt() ??
-          firstTokenMs;
-      final generationDurationMs =
-          (nativeTimings?['swiftGenerateMs'] as num?)?.toInt() ??
-          (effectiveFirstTokenMs >= 0
-              ? totalApiDurationMs - effectiveFirstTokenMs
-              : totalApiDurationMs);
+      final content = state.completedContent.trim().isNotEmpty
+          ? state.completedContent.trim()
+          : state.emitted.trim();
       sessionHistory.add((user: message, assistant: content));
-      controller.add(
-        ChatEvent(
-          type: ChatEventType.assistantMessage,
-          rawType: 'assistant.message',
-          timestamp: DateTime.now(),
-          data: {'messageId': messageId, 'content': content},
-        ),
-      );
-      controller.add(
-        ChatEvent(
-          type: ChatEventType.result,
-          rawType: 'result',
-          timestamp: DateTime.now(),
-          data: {
-            'usage': {
-              'outputTokens': streamedChunkCount,
-              'premiumRequests': 0,
-              'totalApiDurationMs': totalApiDurationMs,
-              'sessionDurationMs': totalApiDurationMs,
-              'codeChanges': const {'linesAdded': 0, 'linesRemoved': 0},
-              if (effectiveFirstTokenMs >= 0)
-                'firstTokenMs': effectiveFirstTokenMs,
-              'generationDurationMs':
-                  generationDurationMs < 0 ? 0 : generationDurationMs,
-              if (nativeTimings != null) 'nativeTimings': nativeTimings,
-              'orchestratorIterations':
-                  loopContext.where((m) => m['role'] == 'assistant').length + 1,
-            },
-          },
-        ),
+      _emitCompletionEvents(
+        controller: controller,
+        messageId: messageId,
+        content: content,
+        state: state,
+        completionStopwatch: completionStopwatch,
+        loopContext: loopContext,
       );
     } catch (e) {
       final raw = e.toString();
@@ -451,6 +244,358 @@ class LocalLlmProvider extends ChatProvider {
       _cancelRequested.remove(session);
       await controller.close();
     }
+  }
+
+  /// Agentic loop — orchestrator models may call tools across iterations.
+  Future<void> _runOrchestratorLoop({
+    required String session,
+    required flm.InstalledModel installed,
+    required int maxTokens,
+    required double temperature,
+    required bool? enableThinking,
+    required int maxIterations,
+    required String message,
+    required List<({String user, String assistant})> sessionHistory,
+    required List<
+      ({
+        String toolName,
+        Map<String, Object?> arguments,
+        String result,
+        bool success,
+      })
+    >
+    sessionToolHistory,
+    required List<Map<String, String>> loopContext,
+    required List<flm.LocalTool> tools,
+    required Future<String> Function(
+      String name,
+      Map<String, Object?> arguments,
+    )
+    toolHandler,
+    required ChatRuntimeContext? runtimeContext,
+    required StreamController<ChatEvent> controller,
+    required _LocalRunState state,
+    required Stopwatch completionStopwatch,
+  }) async {
+    for (var iteration = 0; iteration < maxIterations; iteration++) {
+      if (_cancelRequested[session] == true) break;
+
+      final iterToolCountBefore = sessionToolHistory.length;
+      final messages = await _buildMessages(
+        installed.manifest,
+        sessionHistory,
+        sessionToolHistory,
+        message,
+        runtimeContext,
+        loopContext: loopContext,
+      );
+
+      final iterState = _IterationStreamState();
+      final full = await _engine.completeStreaming(
+        flm.LmCompletionRequest(
+          modelPath: installed.directory.path,
+          manifest: installed.manifest,
+          messages: messages,
+          maxTokens: maxTokens,
+          temperature: temperature,
+          enableThinking: enableThinking,
+          tools: tools,
+          onToolCall: toolHandler,
+        ),
+        (chunk) => _onStreamChunk(
+          session: session,
+          chunk: chunk,
+          state: state,
+          iterState: iterState,
+          completionStopwatch: completionStopwatch,
+          controller: controller,
+        ),
+      );
+
+      final iterContent = await _postProcessIterationContent(
+        full: full,
+        iterState: iterState,
+        toolHandler: toolHandler,
+        sessionToolHistory: sessionToolHistory,
+        iterToolCountBefore: iterToolCountBefore,
+      );
+      _flushIterationContent(
+        iterContent: iterContent,
+        iterState: iterState,
+        state: state,
+        controller: controller,
+      );
+      state.completedContent = iterContent;
+
+      if (!_shouldContinueLoop(
+        iteration: iteration,
+        maxIterations: maxIterations,
+        sessionToolHistory: sessionToolHistory,
+        iterToolCountBefore: iterToolCountBefore,
+        iterContent: iterContent,
+        loopContext: loopContext,
+        state: state,
+      )) {
+        break;
+      }
+    }
+  }
+
+  /// Handles a single streamed chunk from the engine.
+  void _onStreamChunk({
+    required String session,
+    required String chunk,
+    required _LocalRunState state,
+    required _IterationStreamState iterState,
+    required Stopwatch completionStopwatch,
+    required StreamController<ChatEvent> controller,
+  }) {
+    if (_cancelRequested[session] == true) return;
+    if (state.firstTokenMs < 0 && chunk.trim().isNotEmpty) {
+      state.firstTokenMs = completionStopwatch.elapsedMilliseconds;
+    }
+    final rawDelta = _extractDelta(
+      previous: iterState.rawEmitted,
+      incoming: chunk,
+    );
+    if (rawDelta.isEmpty) return;
+    state.streamedChunkCount++;
+    iterState.rawEmitted += rawDelta;
+    final visible = stripEmbeddedGemmaToolCallBlocks(iterState.rawEmitted);
+    final delta = _extractDelta(
+      previous: iterState.iterEmitted,
+      incoming: visible,
+    );
+    if (delta.isEmpty) return;
+
+    // While buffering, check if the accumulated output still looks
+    // like it could be a JSON tool call or tool echo. If it clearly
+    // isn't, flush the buffer and stream normally.
+    if (iterState.jsonBuffering) {
+      final soFar = (iterState.iterEmitted + delta).trimLeft();
+      if (_looksLikeToolOutput(soFar)) {
+        // Still looks like potential JSON / tool output — keep buffering.
+        iterState.iterEmitted += delta;
+        state.emitted += delta;
+        return;
+      }
+      // Definitely not tool output — stop buffering and flush.
+      iterState.jsonBuffering = false;
+    }
+
+    iterState.iterEmitted += delta;
+    state.emitted += delta;
+    controller.add(
+      ChatEvent(
+        type: ChatEventType.assistantDelta,
+        rawType: 'assistant.message_delta',
+        timestamp: DateTime.now(),
+        data: {'deltaContent': delta},
+      ),
+    );
+  }
+
+  /// Applies embedded/router tool calls and strips tool echo patterns.
+  Future<String> _postProcessIterationContent({
+    required String full,
+    required _IterationStreamState iterState,
+    required Future<String> Function(
+      String name,
+      Map<String, Object?> arguments,
+    )
+    toolHandler,
+    required List<
+      ({
+        String toolName,
+        Map<String, Object?> arguments,
+        String result,
+        bool success,
+      })
+    >
+    sessionToolHistory,
+    required int iterToolCountBefore,
+  }) async {
+    final rawFull = full.trim().isNotEmpty ? full : iterState.rawEmitted;
+    var iterContent = await applyEmbeddedGemmaToolCallsIfAny(
+      rawModelOutput: rawFull,
+      cleanedOutput: stripEmbeddedGemmaToolCallBlocks(rawFull),
+      onTool: toolHandler,
+    );
+    iterContent = await _applyRouterJsonToolCallIfAny(
+      rawModelOutput: rawFull,
+      currentContent: iterContent,
+      toolHistory: sessionToolHistory,
+      toolHistoryCountBefore: iterToolCountBefore,
+      onTool: toolHandler,
+    );
+
+    // Strip any remaining tool-result-like patterns from content
+    // that may have leaked through (e.g. model echoing tool output).
+    iterContent = _stripToolEchoPatterns(iterContent);
+    return iterContent;
+  }
+
+  /// Emits any post-processed content that wasn't streamed yet.
+  void _flushIterationContent({
+    required String iterContent,
+    required _IterationStreamState iterState,
+    required _LocalRunState state,
+    required StreamController<ChatEvent> controller,
+  }) {
+    // When JSON was buffered (jsonBuffering stayed true), iterEmitted
+    // contains text the user never saw. In that case, emit the entire
+    // post-processed content.
+    if (iterState.jsonBuffering && iterContent.trim().isNotEmpty) {
+      // The user hasn't seen anything yet — emit the full
+      // post-processed content (tool summary or clean text).
+      controller.add(
+        ChatEvent(
+          type: ChatEventType.assistantDelta,
+          rawType: 'assistant.message_delta',
+          timestamp: DateTime.now(),
+          data: {'deltaContent': iterContent},
+        ),
+      );
+      // Re-align emitted to match what the user actually saw.
+      state.emitted = iterContent;
+    } else if (!iterState.jsonBuffering &&
+        iterContent.startsWith(iterState.iterEmitted)) {
+      final delta = iterContent.substring(iterState.iterEmitted.length);
+      if (delta.isNotEmpty) {
+        state.emitted += delta;
+        controller.add(
+          ChatEvent(
+            type: ChatEventType.assistantDelta,
+            rawType: 'assistant.message_delta',
+            timestamp: DateTime.now(),
+            data: {'deltaContent': delta},
+          ),
+        );
+      }
+    }
+  }
+
+  /// Decides whether the orchestrator loop should continue after an
+  /// iteration; appends assistant/tool results to [loopContext] when it does.
+  bool _shouldContinueLoop({
+    required int iteration,
+    required int maxIterations,
+    required List<
+      ({
+        String toolName,
+        Map<String, Object?> arguments,
+        String result,
+        bool success,
+      })
+    >
+    sessionToolHistory,
+    required int iterToolCountBefore,
+    required String iterContent,
+    required List<Map<String, String>> loopContext,
+    required _LocalRunState state,
+  }) {
+    // Check if new tool calls were made this iteration.
+    final newToolCalls = sessionToolHistory.length - iterToolCountBefore;
+    if (newToolCalls <= 0 || iteration >= maxIterations - 1) {
+      // No tool calls or last iteration — done.
+      return false;
+    }
+
+    // Check for repeated failure — same tool+args failing again.
+    final lastCall = sessionToolHistory.last;
+    final sig = '${lastCall.toolName}:${lastCall.arguments}';
+    if (!lastCall.success) {
+      if (sig == state.lastFailedToolSig) {
+        // ignore: avoid_print
+        print(
+          '[LocalLlmProvider] orchestrator loop: repeated failure '
+          'on "$sig" — stopping loop',
+        );
+        return false;
+      }
+      state.lastFailedToolSig = sig;
+    } else {
+      state.lastFailedToolSig = null;
+    }
+
+    // Add assistant response + tool results to loop context for next
+    // iteration so the model sees what it already did.
+    loopContext.add({'role': 'assistant', 'content': iterContent.trim()});
+    for (var i = iterToolCountBefore; i < sessionToolHistory.length; i++) {
+      final tc = sessionToolHistory[i];
+      loopContext.add({
+        'role': 'tool',
+        'content':
+            '${tc.toolName} ${tc.success ? "→ ok" : "→ error"}: '
+            '${compactToolResultForPrompt(tc.result)}',
+      });
+    }
+
+    // ignore: avoid_print
+    print(
+      '[LocalLlmProvider] orchestrator loop: iteration=$iteration '
+      'newToolCalls=$newToolCalls → continuing',
+    );
+    return true;
+  }
+
+  /// Emits the final assistant message and usage result events.
+  void _emitCompletionEvents({
+    required StreamController<ChatEvent> controller,
+    required String messageId,
+    required String content,
+    required _LocalRunState state,
+    required Stopwatch completionStopwatch,
+    required List<Map<String, String>> loopContext,
+  }) {
+    Map<String, Object?>? nativeTimings;
+    final engine = _engine;
+    if (engine is flm.NativeLmEngine) {
+      nativeTimings = engine.lastNativeTimings;
+    }
+    final totalApiDurationMs =
+        (nativeTimings?['swiftTotalMs'] as num?)?.toInt() ??
+        completionStopwatch.elapsedMilliseconds;
+    final effectiveFirstTokenMs =
+        (nativeTimings?['swiftFirstTokenMs'] as num?)?.toInt() ??
+        state.firstTokenMs;
+    final generationDurationMs =
+        (nativeTimings?['swiftGenerateMs'] as num?)?.toInt() ??
+        (effectiveFirstTokenMs >= 0
+            ? totalApiDurationMs - effectiveFirstTokenMs
+            : totalApiDurationMs);
+    controller.add(
+      ChatEvent(
+        type: ChatEventType.assistantMessage,
+        rawType: 'assistant.message',
+        timestamp: DateTime.now(),
+        data: {'messageId': messageId, 'content': content},
+      ),
+    );
+    controller.add(
+      ChatEvent(
+        type: ChatEventType.result,
+        rawType: 'result',
+        timestamp: DateTime.now(),
+        data: {
+          'usage': {
+            'outputTokens': state.streamedChunkCount,
+            'premiumRequests': 0,
+            'totalApiDurationMs': totalApiDurationMs,
+            'sessionDurationMs': totalApiDurationMs,
+            'codeChanges': const {'linesAdded': 0, 'linesRemoved': 0},
+            if (effectiveFirstTokenMs >= 0)
+              'firstTokenMs': effectiveFirstTokenMs,
+            'generationDurationMs': generationDurationMs < 0
+                ? 0
+                : generationDurationMs,
+            if (nativeTimings != null) 'nativeTimings': nativeTimings,
+            'orchestratorIterations':
+                loopContext.where((m) => m['role'] == 'assistant').length + 1,
+          },
+        },
+      ),
+    );
   }
 
   Future<flm.InstalledModel> _loadInstalledModel() async {
@@ -472,16 +617,15 @@ class LocalLlmProvider extends ChatProvider {
     // The orchestrator (Gemma 4) decides when to call tools vs respond with text.
     if (modelId.toLowerCase().contains('router')) {
       final service = LocalAiModelsService.instance;
-      final orchestratorId =
-          service.chatModels
-              .map((m) => m.id)
-              .where(
-                (id) =>
-                    id.toLowerCase().contains('gemma4') ||
-                    id.toLowerCase().contains('gemma-4'),
-              )
-              .where((id) => service.installedModelById(id) != null)
-              .firstOrNull;
+      final orchestratorId = service.chatModels
+          .map((m) => m.id)
+          .where(
+            (id) =>
+                id.toLowerCase().contains('gemma4') ||
+                id.toLowerCase().contains('gemma-4'),
+          )
+          .where((id) => service.installedModelById(id) != null)
+          .firstOrNull;
       if (orchestratorId != null) {
         // ignore: avoid_print
         print(
@@ -770,17 +914,16 @@ class LocalLlmProvider extends ChatProvider {
           final rawA = root['a'];
           if (rawA is List) {
             // Filter out /no_think artifacts leaked from the prompt.
-            final cleaned =
-                rawA
-                    .where(
-                      (e) =>
-                          e != null &&
-                          !RegExp(
-                            r'^/?no_think$',
-                            caseSensitive: false,
-                          ).hasMatch(e.toString().trim()),
-                    )
-                    .toList();
+            final cleaned = rawA
+                .where(
+                  (e) =>
+                      e != null &&
+                      !RegExp(
+                        r'^/?no_think$',
+                        caseSensitive: false,
+                      ).hasMatch(e.toString().trim()),
+                )
+                .toList();
             arguments = _positionalArgsToNamed(compactName, cleaned);
           }
         } else {
@@ -817,10 +960,12 @@ class LocalLlmProvider extends ChatProvider {
     // so map positional args to content params first, then overflow to
     // context params as fallback.
     const contextKeys = {'board', 'panel'};
-    final contentParams =
-        params.where((p) => !contextKeys.contains(p.key)).toList();
-    final contextParams =
-        params.where((p) => contextKeys.contains(p.key)).toList();
+    final contentParams = params
+        .where((p) => !contextKeys.contains(p.key))
+        .toList();
+    final contextParams = params
+        .where((p) => contextKeys.contains(p.key))
+        .toList();
     final orderedParams = [...contentParams, ...contextParams];
 
     for (var i = 0; i < positional.length && i < orderedParams.length; i++) {
@@ -836,20 +981,18 @@ class LocalLlmProvider extends ChatProvider {
     var trimmed = text.trim();
     if (trimmed.isEmpty) return null;
     // Strip <think>...</think> blocks from Qwen3 models.
-    trimmed =
-        trimmed
-            .replaceAll(
-              RegExp(r'<think>[\s\S]*?</think>\s*', caseSensitive: false),
-              '',
-            )
-            .trim();
+    trimmed = trimmed
+        .replaceAll(
+          RegExp(r'<think>[\s\S]*?</think>\s*', caseSensitive: false),
+          '',
+        )
+        .trim();
     if (trimmed.isEmpty) return null;
     if (trimmed.startsWith('```')) {
-      trimmed =
-          trimmed
-              .replaceFirst(RegExp(r'^```(?:json)?\s*'), '')
-              .replaceFirst(RegExp(r'\s*```$'), '')
-              .trim();
+      trimmed = trimmed
+          .replaceFirst(RegExp(r'^```(?:json)?\s*'), '')
+          .replaceFirst(RegExp(r'\s*```$'), '')
+          .trim();
     }
     if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
       return trimmed;
@@ -954,20 +1097,36 @@ class LocalLlmProvider extends ChatProvider {
     ChatRuntimeContext? runtimeContext, {
     List<Map<String, String>> loopContext = const [],
   }) async {
-    final boardId = runtimeContext?.boardId?.trim();
-    final boardName = runtimeContext?.boardName?.trim();
-    final panelId = runtimeContext?.panelId?.trim();
-    final panelTitle = runtimeContext?.panelTitle?.trim();
-    final panelType = runtimeContext?.panelType?.trim();
-    final boardsSummary = runtimeContext?.availableBoardsSummary?.trim();
-    final panelsSummary = runtimeContext?.currentBoardPanelsSummary?.trim();
-    final hasContext =
-        (boardId != null && boardId.isNotEmpty) ||
-        (boardName != null && boardName.isNotEmpty) ||
-        (panelId != null && panelId.isNotEmpty) ||
-        (panelTitle != null && panelTitle.isNotEmpty) ||
-        (panelType != null && panelType.isNotEmpty);
+    final isRouter = _isRouterModel(manifest);
+    final result = <Map<String, String>>[];
+    final systemContent = await _buildSystemPrompt(manifest, runtimeContext);
+    if (systemContent.isNotEmpty) {
+      result.add({'role': 'system', 'content': systemContent});
+    }
 
+    if (!isRouter) {
+      _appendHistoryMessages(result, turns, toolHistory);
+    }
+
+    result.add({
+      'role': 'user',
+      'content': _cleanUserMessage(userMessage, isRouter),
+    });
+
+    // Append agentic loop context (intermediate assistant + tool messages from
+    // previous iterations of the current request).
+    if (loopContext.isNotEmpty) {
+      result.addAll(loopContext);
+    }
+
+    return result;
+  }
+
+  /// Builds the system prompt for the model, including UI context.
+  Future<String> _buildSystemPrompt(
+    flm.LocalModelManifest manifest,
+    ChatRuntimeContext? runtimeContext,
+  ) async {
     final isRouter = _isRouterModel(manifest);
     final systemBuf = StringBuffer();
     if (isRouter) {
@@ -984,80 +1143,116 @@ class LocalLlmProvider extends ChatProvider {
             ? _compactLocalRoutingPrompt.trim()
             : await loadYoloChatSystemPrompt(),
       );
-      if (hasContext) {
-        systemBuf.writeln('\nCurrent UI context:');
-        systemBuf.writeln('- Board id: ${boardId ?? 'unknown'}');
-        systemBuf.writeln('- Board name: ${boardName ?? 'unknown'}');
-        systemBuf.writeln('- Chat panel id: ${panelId ?? 'unknown'}');
-        systemBuf.writeln('- Chat panel title: ${panelTitle ?? 'unknown'}');
-        systemBuf.writeln('- Chat panel type: ${panelType ?? 'unknown'}');
-        systemBuf.write(
-          'Default to this board/panel when a tool argument is omitted.',
-        );
-      }
-      if (boardsSummary != null && boardsSummary.isNotEmpty) {
-        systemBuf.writeln('\nAvailable boards:');
-        systemBuf.writeln(boardsSummary);
-        systemBuf.writeln(
-          'When asked to switch/open a board, use board:focus if the board is listed here.',
-        );
-      }
-      if (panelsSummary != null && panelsSummary.isNotEmpty) {
-        systemBuf.writeln('\nCurrent board panels:');
-        systemBuf.writeln(panelsSummary);
-        systemBuf.writeln(
-          'When asked to show/focus/play an existing panel, use the listed panel instead of asking for a new URL/file.',
-        );
-      }
-      final targetPanelSummary = runtimeContext?.targetPanelSummary?.trim();
-      if (targetPanelSummary != null && targetPanelSummary.isNotEmpty) {
-        systemBuf.writeln('\nFocus panel (the panel the assistant is attached to):');
-        systemBuf.writeln(targetPanelSummary);
-      }
+      _appendUiContextSection(systemBuf, runtimeContext);
+      _appendSummarySections(systemBuf, runtimeContext);
+    }
+    return systemBuf.toString().trim();
+  }
+
+  void _appendUiContextSection(
+    StringBuffer systemBuf,
+    ChatRuntimeContext? runtimeContext,
+  ) {
+    final boardId = runtimeContext?.boardId?.trim();
+    final boardName = runtimeContext?.boardName?.trim();
+    final panelId = runtimeContext?.panelId?.trim();
+    final panelTitle = runtimeContext?.panelTitle?.trim();
+    final panelType = runtimeContext?.panelType?.trim();
+    final hasContext = _anyNonEmpty([
+      boardId,
+      boardName,
+      panelId,
+      panelTitle,
+      panelType,
+    ]);
+    if (!hasContext) return;
+    systemBuf.writeln('\nCurrent UI context:');
+    systemBuf.writeln('- Board id: ${boardId ?? 'unknown'}');
+    systemBuf.writeln('- Board name: ${boardName ?? 'unknown'}');
+    systemBuf.writeln('- Chat panel id: ${panelId ?? 'unknown'}');
+    systemBuf.writeln('- Chat panel title: ${panelTitle ?? 'unknown'}');
+    systemBuf.writeln('- Chat panel type: ${panelType ?? 'unknown'}');
+    systemBuf.write(
+      'Default to this board/panel when a tool argument is omitted.',
+    );
+  }
+
+  bool _anyNonEmpty(List<String?> values) {
+    for (final value in values) {
+      if (value != null && value.isNotEmpty) return true;
+    }
+    return false;
+  }
+
+  void _appendSummarySections(
+    StringBuffer systemBuf,
+    ChatRuntimeContext? runtimeContext,
+  ) {
+    final boardsSummary = runtimeContext?.availableBoardsSummary?.trim();
+    if (boardsSummary != null && boardsSummary.isNotEmpty) {
+      systemBuf.writeln('\nAvailable boards:');
+      systemBuf.writeln(boardsSummary);
+      systemBuf.writeln(
+        'When asked to switch/open a board, use board:focus if the board is listed here.',
+      );
+    }
+    final panelsSummary = runtimeContext?.currentBoardPanelsSummary?.trim();
+    if (panelsSummary != null && panelsSummary.isNotEmpty) {
+      systemBuf.writeln('\nCurrent board panels:');
+      systemBuf.writeln(panelsSummary);
+      systemBuf.writeln(
+        'When asked to show/focus/play an existing panel, use the listed panel instead of asking for a new URL/file.',
+      );
+    }
+    final targetPanelSummary = runtimeContext?.targetPanelSummary?.trim();
+    if (targetPanelSummary != null && targetPanelSummary.isNotEmpty) {
+      systemBuf.writeln(
+        '\nFocus panel (the panel the assistant is attached to):',
+      );
+      systemBuf.writeln(targetPanelSummary);
+    }
+  }
+
+  void _appendHistoryMessages(
+    List<Map<String, String>> result,
+    List<({String user, String assistant})> turns,
+    List<
+      ({
+        String toolName,
+        Map<String, Object?> arguments,
+        String result,
+        bool success,
+      })
+    >
+    toolHistory,
+  ) {
+    for (final turn in turns) {
+      result.add({'role': 'user', 'content': turn.user});
+      result.add({'role': 'assistant', 'content': turn.assistant});
     }
 
-    final result = <Map<String, String>>[];
-    final systemContent = systemBuf.toString().trim();
-    if (systemContent.isNotEmpty) {
-      result.add({'role': 'system', 'content': systemContent});
-    }
-
-    if (!isRouter) {
-      for (final turn in turns) {
-        result.add({'role': 'user', 'content': turn.user});
-        result.add({'role': 'assistant', 'content': turn.assistant});
+    if (toolHistory.isNotEmpty) {
+      final toolBuf = StringBuffer('Tool call history:\n');
+      for (final call in toolHistory) {
+        toolBuf.writeln(
+          '- ${call.toolName} ${call.success ? 'succeeded' : 'failed'} '
+          'args=${compactPromptJson(call.arguments, 600)} '
+          'result=${compactToolResultForPrompt(call.result)}',
+        );
       }
-
-      if (toolHistory.isNotEmpty) {
-        final toolBuf = StringBuffer('Tool call history:\n');
-        for (final call in toolHistory) {
-          toolBuf.writeln(
-            '- ${call.toolName} ${call.success ? 'succeeded' : 'failed'} '
-            'args=${compactPromptJson(call.arguments, 600)} '
-            'result=${compactToolResultForPrompt(call.result)}',
-          );
-        }
-        result.add({'role': 'tool', 'content': toolBuf.toString().trim()});
-      }
+      result.add({'role': 'tool', 'content': toolBuf.toString().trim()});
     }
+  }
 
+  String _cleanUserMessage(String userMessage, bool isRouter) {
     var cleanedMessage = userMessage;
     if (isRouter) {
       // Strip /no_think suffix — thinking is already disabled for router models.
-      cleanedMessage =
-          cleanedMessage
-              .replaceAll(RegExp(r'\s*/no_think\b', caseSensitive: false), '')
-              .trim();
+      cleanedMessage = cleanedMessage
+          .replaceAll(RegExp(r'\s*/no_think\b', caseSensitive: false), '')
+          .trim();
     }
-    result.add({'role': 'user', 'content': cleanedMessage});
-
-    // Append agentic loop context (intermediate assistant + tool messages from
-    // previous iterations of the current request).
-    if (loopContext.isNotEmpty) {
-      result.addAll(loopContext);
-    }
-
-    return result;
+    return cleanedMessage;
   }
 
   String _extractDelta({required String previous, required String incoming}) {
@@ -1091,13 +1286,12 @@ class LocalLlmProvider extends ChatProvider {
     // Remove tool echo lines (e.g. "[nadd] {"ok":false,...}")
     var cleaned = content.replaceAll(_toolEchoPattern, '').trim();
     // Remove standalone raw JSON tool results
-    cleaned =
-        cleaned
-            .replaceAll(
-              RegExp(r'\{"ok"\s*:\s*(true|false)\s*,\s*"command"\s*:[^}]+\}'),
-              '',
-            )
-            .trim();
+    cleaned = cleaned
+        .replaceAll(
+          RegExp(r'\{"ok"\s*:\s*(true|false)\s*,\s*"command"\s*:[^}]+\}'),
+          '',
+        )
+        .trim();
     return cleaned;
   }
 
@@ -1111,4 +1305,24 @@ class LocalLlmProvider extends ChatProvider {
     _running.clear();
     _cancelRequested.clear();
   }
+}
+
+/// Mutable state threaded through the orchestrator loop of a single request.
+class _LocalRunState {
+  String emitted = '';
+  int firstTokenMs = -1;
+  int streamedChunkCount = 0;
+  String completedContent = '';
+  // Track last failed tool signature to stop loop on repeated failure.
+  String? lastFailedToolSig;
+}
+
+/// Per-iteration streaming buffer state.
+class _IterationStreamState {
+  String rawEmitted = '';
+  String iterEmitted = '';
+  // Buffer ALL streamed content during orchestrator loop iterations
+  // to prevent raw JSON / tool echoes from reaching the user.
+  // Only flush clean post-processed content.
+  bool jsonBuffering = true;
 }
