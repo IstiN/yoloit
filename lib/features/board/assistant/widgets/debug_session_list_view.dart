@@ -277,16 +277,31 @@ class DebugSessionListViewState extends State<DebugSessionListView> {
         (s['toolCalls'] as List?)?.whereType<Map<String, dynamic>>().toList() ??
         [];
 
-    // ── helpers ──────────────────────────────────────────────────────────────
-    String ms(int? v) => v != null ? '${v}ms' : '?';
-    // Right-align a label/value row in a fixed 40-char line
-    String row(String tag, String label, String? value) {
-      final pad = (30 - label.length).clamp(1, 30);
-      final dots = '.' * pad;
-      return '$tag  $label$dots  ${value ?? '?'}';
-    }
+    _writeTimingsHeader(buf, s);
+    _writeAsrTiming(buf, asr);
+    _writeTtftTiming(buf, promptSentAt, firstTokenAt, toolCalls);
+    final lastToolEnd = _writeToolTimings(buf, toolCalls);
+    _writeFinalLlmTiming(buf, toolCalls, lastToolEnd, firstTokenAt, completedAt);
+    _writeTimingTotals(buf, asr, requestAt, promptSentAt, completedAt);
+    _writeTimingError(buf, s);
+    _writeSwiftTimings(buf, s);
+    _writeModelSettings(buf, s);
 
-    // ── header ───────────────────────────────────────────────────────────────
+    return buf.toString();
+  }
+
+  // ── timings helpers ────────────────────────────────────────────────────────
+  String _fmtMs(int? v) => v != null ? '${v}ms' : '?';
+
+  // Right-align a label/value row in a fixed 40-char line
+  String _timingRow(String tag, String label, String? value) {
+    final pad = (30 - label.length).clamp(1, 30);
+    final dots = '.' * pad;
+    return '$tag  $label$dots  ${value ?? '?'}';
+  }
+
+  // ── header ─────────────────────────────────────────────────────────────────
+  void _writeTimingsHeader(StringBuffer buf, Map<String, dynamic> s) {
     buf.writeln('User: ${s['userMessage'] ?? ''}');
     buf.writeln();
     // Model info line
@@ -298,8 +313,10 @@ class DebugSessionListViewState extends State<DebugSessionListView> {
       buf.writeln();
     }
     buf.writeln('══ Timeline ══════════════════════════════════');
+  }
 
-    // ── [ASR] phase ──────────────────────────────────────────────────────────
+  // ── [ASR] phase ────────────────────────────────────────────────────────────
+  void _writeAsrTiming(StringBuffer buf, Map<dynamic, dynamic>? asr) {
     if (asr != null) {
       final asrMs = (asr['durationMs'] as num?)?.toInt();
       final asrStatus = asr['status'] as String? ?? '';
@@ -313,28 +330,44 @@ class DebugSessionListViewState extends State<DebugSessionListView> {
         if (mode.isNotEmpty) '[$mode]',
         if (chars != null) '$chars chars',
       ].join('  ');
-      buf.writeln(row('[ASR]', 'audio → text', '${ms(asrMs)}  $suffix'.trim()));
+      buf.writeln(
+        _timingRow('[ASR]', 'audio → text', '${_fmtMs(asrMs)}  $suffix'.trim()),
+      );
       if (convMs != null) {
-        buf.writeln(row('     ', '↳ wav→mp3 convert', ms(convMs)));
+        buf.writeln(_timingRow('     ', '↳ wav→mp3 convert', _fmtMs(convMs)));
       }
       if (asrModel != null) {
         final provLabel = asrProvider != null ? '  [$asrProvider]' : '';
-        buf.writeln(row('     ', '↳ model', '$asrModel$provLabel'));
+        buf.writeln(_timingRow('     ', '↳ model', '$asrModel$provLabel'));
       }
     }
+  }
 
-    // ── [LLM] text → first token (TTFT) ──────────────────────────────────────
+  // ── [LLM] text → first token (TTFT) ────────────────────────────────────────
+  void _writeTtftTiming(
+    StringBuffer buf,
+    DateTime? promptSentAt,
+    DateTime? firstTokenAt,
+    List<Map<String, dynamic>> toolCalls,
+  ) {
     final ttftMs =
         (promptSentAt != null && firstTokenAt != null)
             ? firstTokenAt.difference(promptSentAt).inMilliseconds
             : null;
     if (toolCalls.isNotEmpty) {
-      buf.writeln(row('[LLM]', 'text → tools (TTFT)', ms(ttftMs)));
+      buf.writeln(_timingRow('[LLM]', 'text → tools (TTFT)', _fmtMs(ttftMs)));
     } else {
-      buf.writeln(row('[LLM]', 'text → first token (TTFT)', ms(ttftMs)));
+      buf.writeln(
+        _timingRow('[LLM]', 'text → first token (TTFT)', _fmtMs(ttftMs)),
+      );
     }
+  }
 
-    // ── per-tool lines ────────────────────────────────────────────────────────
+  // ── per-tool lines ──────────────────────────────────────────────────────────
+  DateTime? _writeToolTimings(
+    StringBuffer buf,
+    List<Map<String, dynamic>> toolCalls,
+  ) {
     DateTime? lastToolEnd;
     for (final tc in toolCalls) {
       final toolStart = _parseTs(tc['startAt'] as String?);
@@ -345,7 +378,9 @@ class DebugSessionListViewState extends State<DebugSessionListView> {
               : null;
       final ok = tc['success'] as bool? ?? true;
       final name = tc['name'] as String? ?? '?';
-      buf.writeln(row('[TOOL]', '↳ $name', '${ms(durMs)}  ${ok ? '✅' : '❌'}'));
+      buf.writeln(
+        _timingRow('[TOOL]', '↳ $name', '${_fmtMs(durMs)}  ${ok ? '✅' : '❌'}'),
+      );
       // Show up to 3 argument key=value pairs inline
       final args = tc['arguments'];
       if (args is Map && args.isNotEmpty) {
@@ -354,50 +389,71 @@ class DebugSessionListViewState extends State<DebugSessionListView> {
           if (shown >= 3) break;
           final val = '${entry.value}';
           final truncVal = val.length > 40 ? '${val.substring(0, 37)}…' : val;
-          buf.writeln(row('     ', '  ${entry.key}', truncVal));
+          buf.writeln(_timingRow('     ', '  ${entry.key}', truncVal));
           shown++;
         }
       }
       if (toolEnd != null) lastToolEnd = toolEnd;
     }
+    return lastToolEnd;
+  }
 
-    // ── [LLM] tools → final response ─────────────────────────────────────────
+  // ── [LLM] tools → final response ───────────────────────────────────────────
+  void _writeFinalLlmTiming(
+    StringBuffer buf,
+    List<Map<String, dynamic>> toolCalls,
+    DateTime? lastToolEnd,
+    DateTime? firstTokenAt,
+    DateTime? completedAt,
+  ) {
     if (toolCalls.isNotEmpty && lastToolEnd != null && completedAt != null) {
       final finalMs = completedAt.difference(lastToolEnd).inMilliseconds;
-      buf.writeln(row('[LLM]', 'tools → final message', ms(finalMs)));
+      buf.writeln(_timingRow('[LLM]', 'tools → final message', _fmtMs(finalMs)));
     } else if (toolCalls.isEmpty &&
         firstTokenAt != null &&
         completedAt != null) {
       final genMs = completedAt.difference(firstTokenAt).inMilliseconds;
-      buf.writeln(row('[LLM]', 'streaming response', ms(genMs)));
+      buf.writeln(_timingRow('[LLM]', 'streaming response', _fmtMs(genMs)));
     }
+  }
 
-    // ── totals ────────────────────────────────────────────────────────────────
+  // ── totals ──────────────────────────────────────────────────────────────────
+  void _writeTimingTotals(
+    StringBuffer buf,
+    Map<dynamic, dynamic>? asr,
+    DateTime? requestAt,
+    DateTime? promptSentAt,
+    DateTime? completedAt,
+  ) {
     buf.writeln('──────────────────────────────────────────────');
     final asrMs = (asr?['durationMs'] as num?)?.toInt();
     if (asrMs != null && completedAt != null && promptSentAt != null) {
       final llmMs = completedAt.difference(promptSentAt).inMilliseconds;
-      buf.writeln(row('     ', 'ASR + LLM total', ms(asrMs + llmMs)));
+      buf.writeln(_timingRow('     ', 'ASR + LLM total', _fmtMs(asrMs + llmMs)));
     }
     if (requestAt != null && completedAt != null) {
       final totalMs = completedAt.difference(requestAt).inMilliseconds;
-      buf.writeln(row('     ', 'Wall time (total)', ms(totalMs)));
+      buf.writeln(_timingRow('     ', 'Wall time (total)', _fmtMs(totalMs)));
     }
+  }
 
-    // ── error ─────────────────────────────────────────────────────────────────
+  // ── error ───────────────────────────────────────────────────────────────────
+  void _writeTimingError(StringBuffer buf, Map<String, dynamic> s) {
     if (s['error'] != null) {
       buf.writeln();
       buf.writeln('❌ ERROR: ${s['error']}');
     }
+  }
 
-    // ── Swift (MLX) section ───────────────────────────────────────────────────
+  // ── Swift (MLX) section ─────────────────────────────────────────────────────
+  void _writeSwiftTimings(StringBuffer buf, Map<String, dynamic> s) {
     final swift = s['swiftTimings'] as Map?;
     if (swift != null) {
       buf.writeln();
       buf.writeln('══ MLX (Swift) ═══════════════════════════════');
       final cacheHit = swift['swiftCacheHit'];
       buf.writeln(
-        row(
+        _timingRow(
           '     ',
           'model cache',
           cacheHit == true
@@ -409,29 +465,31 @@ class DebugSessionListViewState extends State<DebugSessionListView> {
       );
       final loadMs = swift['swiftLoadMs'] as num?;
       if (loadMs != null) {
-        buf.writeln(row('     ', 'load time', ms(loadMs.toInt())));
+        buf.writeln(_timingRow('     ', 'load time', _fmtMs(loadMs.toInt())));
       }
       final ttft = swift['swiftFirstTokenMs'] as num?;
       if (ttft != null) {
-        buf.writeln(row('     ', 'first token (TTFT)', ms(ttft.toInt())));
+        buf.writeln(
+          _timingRow('     ', 'first token (TTFT)', _fmtMs(ttft.toInt())),
+        );
       }
       final genMs = swift['swiftGenerateMs'] as num?;
       if (genMs != null) {
-        buf.writeln(row('     ', 'generation', ms(genMs.toInt())));
+        buf.writeln(_timingRow('     ', 'generation', _fmtMs(genMs.toInt())));
       }
       final totalMs = swift['swiftTotalMs'] as num?;
       if (totalMs != null) {
-        buf.writeln(row('     ', 'swift total', ms(totalMs.toInt())));
+        buf.writeln(_timingRow('     ', 'swift total', _fmtMs(totalMs.toInt())));
       }
     }
+  }
 
-    // ── model settings ────────────────────────────────────────────────────────
+  // ── model settings ──────────────────────────────────────────────────────────
+  void _writeModelSettings(StringBuffer buf, Map<String, dynamic> s) {
     buf.writeln();
     buf.writeln('══ Settings ══════════════════════════════════');
-    buf.writeln(row('     ', 'maxTokens', '${s['maxTokens'] ?? '-'}'));
-    buf.writeln(row('     ', 'temperature', '${s['temperature'] ?? '-'}'));
-
-    return buf.toString();
+    buf.writeln(_timingRow('     ', 'maxTokens', '${s['maxTokens'] ?? '-'}'));
+    buf.writeln(_timingRow('     ', 'temperature', '${s['temperature'] ?? '-'}'));
   }
 
   String _buildToolsText(Map<String, dynamic> s) {

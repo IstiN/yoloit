@@ -662,6 +662,22 @@ class _WsClient {
   /// Tries to decode one complete WebSocket frame from [_rxBuf].
   /// Returns the decoded text ('' for control frames), or null if incomplete.
   String? _tryExtractFrame() {
+    final header = _parseFrameHeader();
+    if (header == null) return null;
+
+    final maskLen = header.masked ? 4 : 0;
+    final totalLen = header.offset + maskLen + header.payloadLen;
+    if (_rxBuf.length < totalLen) return null;
+
+    final payload = _extractPayload(header, maskLen, totalLen);
+
+    _rxBuf.removeRange(0, totalLen);
+
+    return _dispatchFrame(header.opcode, payload);
+  }
+
+  /// Parses the frame header from [_rxBuf], or returns null if incomplete.
+  ({int opcode, bool masked, int payloadLen, int offset})? _parseFrameHeader() {
     if (_rxBuf.length < 2) return null;
 
     final b0 = _rxBuf[0];
@@ -684,20 +700,29 @@ class _WsClient {
       offset = 10;
     }
 
-    final maskLen = masked ? 4 : 0;
-    final totalLen = offset + maskLen + payloadLen;
-    if (_rxBuf.length < totalLen) return null;
+    return (opcode: opcode, masked: masked, payloadLen: payloadLen, offset: offset);
+  }
 
-    final payload = List<int>.from(_rxBuf.sublist(offset + maskLen, totalLen));
-    if (masked) {
-      final mask = _rxBuf.sublist(offset, offset + 4);
+  /// Copies the payload bytes out of [_rxBuf] and unmasks them if needed.
+  List<int> _extractPayload(
+    ({int opcode, bool masked, int payloadLen, int offset}) header,
+    int maskLen,
+    int totalLen,
+  ) {
+    final payload = List<int>.from(
+      _rxBuf.sublist(header.offset + maskLen, totalLen),
+    );
+    if (header.masked) {
+      final mask = _rxBuf.sublist(header.offset, header.offset + 4);
       for (int i = 0; i < payload.length; i++) {
         payload[i] ^= mask[i % 4];
       }
     }
+    return payload;
+  }
 
-    _rxBuf.removeRange(0, totalLen);
-
+  /// Handles a fully received frame by opcode and returns its text payload.
+  String _dispatchFrame(int opcode, List<int> payload) {
     switch (opcode) {
       case 0x8: // Close
         _closed = true;

@@ -90,15 +90,8 @@ class _PanelYoloAssistantBadgeState extends State<PanelYoloAssistantBadge> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final height =
-            constraints.maxHeight.isFinite && constraints.maxHeight > 0
-                ? constraints.maxHeight
-                : PanelYoloAssistantBadge.minTriggerHeight;
+        final height = _heightFor(constraints);
         final docked = widget.assistantOpen;
-        final visualWidth =
-            showBadge
-                ? PanelYoloAssistantBadge.badgeWidth
-                : PanelYoloAssistantBadge.stripWidth;
         return Semantics(
           button: true,
           label:
@@ -123,66 +116,12 @@ class _PanelYoloAssistantBadgeState extends State<PanelYoloAssistantBadge> {
                   clipBehavior: Clip.none,
                   alignment: Alignment.centerLeft,
                   children: [
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 220),
-                      curve: Curves.easeOutCubic,
-                      width: visualWidth,
+                    _buildTrigger(
+                      colors,
                       height: height,
-                      decoration: BoxDecoration(
-                        borderRadius:
-                            docked
-                                ? const BorderRadius.horizontal(
-                                  left: Radius.circular(2),
-                                  right: Radius.zero,
-                                )
-                                : BorderRadius.horizontal(
-                                  left: const Radius.circular(2),
-                                  right: Radius.circular(showBadge ? 10 : 3),
-                                ),
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            colors.accentBlue.withValues(
-                              alpha: showBadge ? 0.95 : idleOpacity,
-                            ),
-                            colors.primary.withValues(
-                              alpha: showBadge ? 0.95 : idleOpacity,
-                            ),
-                          ],
-                        ),
-                        boxShadow:
-                            showBadge && !docked
-                                ? [
-                                  BoxShadow(
-                                    color: colors.textMuted.withValues(
-                                      alpha: 0.22,
-                                    ),
-                                    blurRadius: 12,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ]
-                                : null,
-                      ),
-                      child: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 180),
-                        switchInCurve: Curves.easeOutCubic,
-                        switchOutCurve: Curves.easeInCubic,
-                        child:
-                            showBadge
-                                ? YoloEdgeBadgeMorphContent(
-                                  key: const ValueKey('yolo-edge-badge'),
-                                  height: height,
-                                  colors: colors,
-                                  showMic: !docked,
-                                  showDockedArrow: docked,
-                                  onMicTap: docked ? null : _onMicTap,
-                                )
-                                : const SizedBox(
-                                  key: ValueKey('yolo-edge-strip'),
-                                  width: double.infinity,
-                                ),
-                      ),
+                      docked: docked,
+                      showBadge: showBadge,
+                      idleOpacity: idleOpacity,
                     ),
                   ],
                 ),
@@ -193,6 +132,103 @@ class _PanelYoloAssistantBadgeState extends State<PanelYoloAssistantBadge> {
       },
     );
   }
+
+  double _heightFor(BoxConstraints constraints) =>
+      constraints.maxHeight.isFinite && constraints.maxHeight > 0
+          ? constraints.maxHeight
+          : PanelYoloAssistantBadge.minTriggerHeight;
+
+  Widget _buildTrigger(
+    AppColorScheme colors, {
+    required double height,
+    required bool docked,
+    required bool showBadge,
+    required double idleOpacity,
+  }) {
+    final visualWidth =
+        showBadge
+            ? PanelYoloAssistantBadge.badgeWidth
+            : PanelYoloAssistantBadge.stripWidth;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+      width: visualWidth,
+      height: height,
+      decoration: BoxDecoration(
+        borderRadius: _borderRadius(docked: docked, showBadge: showBadge),
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            colors.accentBlue.withValues(
+              alpha: showBadge ? 0.95 : idleOpacity,
+            ),
+            colors.primary.withValues(
+              alpha: showBadge ? 0.95 : idleOpacity,
+            ),
+          ],
+        ),
+        boxShadow: _boxShadow(colors, docked: docked, showBadge: showBadge),
+      ),
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 180),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        child: _switcherChild(
+          colors,
+          height: height,
+          docked: docked,
+          showBadge: showBadge,
+        ),
+      ),
+    );
+  }
+
+  BorderRadius _borderRadius({required bool docked, required bool showBadge}) =>
+      docked
+          ? const BorderRadius.horizontal(
+            left: Radius.circular(2),
+            right: Radius.zero,
+          )
+          : BorderRadius.horizontal(
+            left: const Radius.circular(2),
+            right: Radius.circular(showBadge ? 10 : 3),
+          );
+
+  List<BoxShadow>? _boxShadow(
+    AppColorScheme colors, {
+    required bool docked,
+    required bool showBadge,
+  }) =>
+      showBadge && !docked
+          ? [
+            BoxShadow(
+              color: colors.textMuted.withValues(alpha: 0.22),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ]
+          : null;
+
+  Widget _switcherChild(
+    AppColorScheme colors, {
+    required double height,
+    required bool docked,
+    required bool showBadge,
+  }) =>
+      showBadge
+          ? YoloEdgeBadgeMorphContent(
+            key: const ValueKey('yolo-edge-badge'),
+            height: height,
+            colors: colors,
+            showMic: !docked,
+            showDockedArrow: docked,
+            onMicTap: docked ? null : _onMicTap,
+          )
+          : const SizedBox(
+            key: ValueKey('yolo-edge-strip'),
+            width: double.infinity,
+          );
 }
 
 class YoloEdgeBadgeMorphContent extends StatelessWidget {

@@ -182,33 +182,74 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
     final results = <_QuickResult>[];
 
     // 0. If the query looks like an existing file path, surface it first.
-    if (PlatformCapabilities.current.platform != RuntimePlatform.web) {
-      final pathInfo = await file_search.tryResolveExistingPath(rawQuery);
-      if (pathInfo != null &&
-          !results.any((r) => r.filePath == pathInfo.filePath)) {
-        final ext =
-            pathInfo.name.contains('.')
-                ? pathInfo.name.split('.').last.toLowerCase()
-                : '';
-        final (icon, color) = _iconForExtension(ext, appColors);
-        results.insert(
-          0,
-          _QuickResult(
-            kind: _QuickResultKind.file,
-            title: pathInfo.name,
-            subtitle: pathInfo.filePath,
-            icon: icon,
-            iconColor: color,
-            filePath: pathInfo.filePath,
-          ),
-        );
-      }
-    }
+    await _collectPathResult(results, rawQuery, appColors);
 
     final boardState = context.read<BoardCubit>().state;
 
     // 1. Search boards by name (quick board switch).
-    for (final board in matchBoardsForQuickOpen(boardState.boards, rawQuery)) {
+    _collectBoardResults(results, boardState.boards, rawQuery, appColors);
+
+    // 2. Search panels across all boards by title and shallow state content.
+    _collectPanelResults(results, queries, appColors);
+
+    // 3. Search files inside file-tree directories (no-op on web).
+    if (!await _collectFileTreeResults(results, queries, appColors, generation)) {
+      return;
+    }
+
+    // 4. Also search workspace files via existing service (no-op on web).
+    if (!await _collectWorkspaceResults(results, wsState, generation, appColors)) {
+      return;
+    }
+
+    if (!mounted || generation != _searchGeneration) return;
+    results.sort(
+      (a, b) => _kindRank(a.kind).compareTo(_kindRank(b.kind)),
+    );
+    setState(() {
+      _results = results;
+      _loading = false;
+      _selectedIndex = 0;
+    });
+  }
+
+  // 0. If the query looks like an existing file path, surface it first.
+  Future<void> _collectPathResult(
+    List<_QuickResult> results,
+    String rawQuery,
+    AppColorScheme appColors,
+  ) async {
+    if (PlatformCapabilities.current.platform == RuntimePlatform.web) return;
+    final pathInfo = await file_search.tryResolveExistingPath(rawQuery);
+    if (pathInfo != null &&
+        !results.any((r) => r.filePath == pathInfo.filePath)) {
+      final ext =
+          pathInfo.name.contains('.')
+              ? pathInfo.name.split('.').last.toLowerCase()
+              : '';
+      final (icon, color) = _iconForExtension(ext, appColors);
+      results.insert(
+        0,
+        _QuickResult(
+          kind: _QuickResultKind.file,
+          title: pathInfo.name,
+          subtitle: pathInfo.filePath,
+          icon: icon,
+          iconColor: color,
+          filePath: pathInfo.filePath,
+        ),
+      );
+    }
+  }
+
+  // 1. Search boards by name (quick board switch).
+  void _collectBoardResults(
+    List<_QuickResult> results,
+    List<BoardDocument> boards,
+    String rawQuery,
+    AppColorScheme appColors,
+  ) {
+    for (final board in matchBoardsForQuickOpen(boards, rawQuery)) {
       final panelCount = board.panels.where((panel) => !panel.hidden).length;
       results.add(
         _QuickResult(
@@ -225,8 +266,14 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
         ),
       );
     }
+  }
 
-    // 2. Search panels across all boards by title and shallow state content.
+  // 2. Search panels across all boards by title and shallow state content.
+  void _collectPanelResults(
+    List<_QuickResult> results,
+    List<String> queries,
+    AppColorScheme appColors,
+  ) {
     for (final entry in _panels) {
       final board = entry.board;
       final panel = entry.panel;
@@ -260,81 +307,91 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
         );
       }
     }
+  }
 
-    // 3. Search files inside file-tree directories (no-op on web).
-    if (PlatformCapabilities.current.platform != RuntimePlatform.web) {
-      final fileInfos = await file_search.collectMatchingFiles(
-        _fileTreeRoots,
-        queries,
-        maxResults: 100,
+  // 3. Search files inside file-tree directories (no-op on web).
+  // Returns false when a newer search superseded this one.
+  Future<bool> _collectFileTreeResults(
+    List<_QuickResult> results,
+    List<String> queries,
+    AppColorScheme appColors,
+    int generation,
+  ) async {
+    if (PlatformCapabilities.current.platform == RuntimePlatform.web) {
+      return true;
+    }
+    final fileInfos = await file_search.collectMatchingFiles(
+      _fileTreeRoots,
+      queries,
+      maxResults: 100,
+    );
+    for (final info in fileInfos) {
+      if (generation != _searchGeneration) return false;
+      if (results.length >= 150) break;
+      final ext =
+          info.name.contains('.') ? info.name.split('.').last.toLowerCase() : '';
+      final (icon, color) = _iconForExtension(ext, appColors);
+      if (!results.any((r) => r.filePath == info.filePath)) {
+        results.add(
+          _QuickResult(
+            kind: _QuickResultKind.file,
+            title: info.name,
+            subtitle: info.relativePath,
+            icon: icon,
+            iconColor: color,
+            filePath: info.filePath,
+          ),
+        );
+      }
+    }
+    return true;
+  }
+
+  // 4. Also search workspace files via existing service (no-op on web).
+  // Returns false when a newer search superseded this one.
+  Future<bool> _collectWorkspaceResults(
+    List<_QuickResult> results,
+    WorkspaceState wsState,
+    int generation,
+    AppColorScheme appColors,
+  ) async {
+    if (wsState is! WorkspaceLoaded ||
+        PlatformCapabilities.current.platform == RuntimePlatform.web) {
+      return true;
+    }
+    if (generation != _searchGeneration) return false;
+    final active =
+        wsState.workspaces
+            .where((w) => w.id == wsState.activeWorkspaceId)
+            .firstOrNull ??
+        wsState.workspaces.firstOrNull;
+    if (active != null) {
+      // Only add workspace files that aren't already covered by file tree roots
+      final wsResults = await file_search.searchWorkspaceFiles(
+        _controller.text.trim(),
+        (name: active.name, path: active.path),
+        maxResults: 50,
       );
-      for (final info in fileInfos) {
-        if (generation != _searchGeneration) return;
+      for (final r in wsResults) {
+        // Skip if already in results from file tree
+        if (results.any((q) => q.filePath == r.filePath)) continue;
         if (results.length >= 150) break;
         final ext =
-            info.name.contains('.') ? info.name.split('.').last.toLowerCase() : '';
+            r.name.contains('.') ? r.name.split('.').last.toLowerCase() : '';
         final (icon, color) = _iconForExtension(ext, appColors);
-        if (!results.any((r) => r.filePath == info.filePath)) {
-          results.add(
-            _QuickResult(
-              kind: _QuickResultKind.file,
-              title: info.name,
-              subtitle: info.relativePath,
-              icon: icon,
-              iconColor: color,
-              filePath: info.filePath,
-            ),
-          );
-        }
-      }
-    }
-
-    // 4. Also search workspace files via existing service (no-op on web).
-    if (wsState is WorkspaceLoaded &&
-        PlatformCapabilities.current.platform != RuntimePlatform.web) {
-      if (generation != _searchGeneration) return;
-      final active =
-          wsState.workspaces
-              .where((w) => w.id == wsState.activeWorkspaceId)
-              .firstOrNull ??
-          wsState.workspaces.firstOrNull;
-      if (active != null) {
-        // Only add workspace files that aren't already covered by file tree roots
-        final wsResults = await file_search.searchWorkspaceFiles(
-          _controller.text.trim(),
-          (name: active.name, path: active.path),
-          maxResults: 50,
+        results.add(
+          _QuickResult(
+            kind: _QuickResultKind.file,
+            title: r.name,
+            subtitle: r.relativePath,
+            icon: icon,
+            iconColor: color,
+            filePath: r.filePath,
+          ),
         );
-        for (final r in wsResults) {
-          // Skip if already in results from file tree
-          if (results.any((q) => q.filePath == r.filePath)) continue;
-          if (results.length >= 150) break;
-          final ext =
-              r.name.contains('.') ? r.name.split('.').last.toLowerCase() : '';
-          final (icon, color) = _iconForExtension(ext, appColors);
-          results.add(
-            _QuickResult(
-              kind: _QuickResultKind.file,
-              title: r.name,
-              subtitle: r.relativePath,
-              icon: icon,
-              iconColor: color,
-              filePath: r.filePath,
-            ),
-          );
-        }
       }
     }
-
-    if (!mounted || generation != _searchGeneration) return;
-    results.sort(
-      (a, b) => _kindRank(a.kind).compareTo(_kindRank(b.kind)),
-    );
-    setState(() {
-      _results = results;
-      _loading = false;
-      _selectedIndex = 0;
-    });
+    return true;
   }
 
   List<String> _collectSearchStrings(dynamic value, {int depth = 0}) {

@@ -335,251 +335,368 @@ class _ConsoleHeader extends StatelessWidget {
       child: Row(
         children: [
           // Session tabs (hidden in detached panel mode)
-          Expanded(
-            child:
-                showSessionTabs
-                    ? ListView(
-                      scrollDirection: Axis.horizontal,
-                      children: [
-                        ...state.sessions.map(
-                          (s) => _SessionTab(
-                            session: s,
-                            isActive: s.id == state.activeSessionId,
-                            onTap: () => onAttachSession(s.id),
-                            onClose: () => cubit.removeSession(s.id),
-                          ),
-                        ),
-                      ],
-                    )
-                    : (activeSession == null
-                        ? const SizedBox.shrink()
-                        : Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 10),
-                          child: Align(
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              activeSession.config.name,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: Theme.of(context).colorScheme.onSurface,
-                              ),
-                            ),
-                          ),
-                        )),
-          ),
+          Expanded(child: _buildTabsArea(context, cubit, activeSession)),
           // Action buttons
           if (activeSession != null) ...[
-            if (isRunning)
-              ...quickActions.map(
-                (action) => _HeaderButton(
-                  tooltip:
-                      action.appendNewline
-                          ? '${action.label} (sends Enter)'
-                          : action.label,
-                  icon: _quickActionIcon(action.icon),
-                  label: action.label.isNotEmpty ? action.label[0] : 'A',
-                  iconColor: colors.accentGreen,
-                  onTap:
-                      () => cubit.triggerQuickAction(activeSession.id, action),
-                ),
-              ),
-            if (isRunning)
-              _HeaderButton(
-                tooltip: 'Stop',
-                icon: Icons.stop_rounded,
-                iconColor: colors.accentRed,
-                onTap: () => cubit.stopRun(activeSession.id),
-              )
-            else
-              _HeaderButton(
-                tooltip: 'Re-run',
-                icon: Icons.refresh_rounded,
-                iconColor: colors.accentGreen,
-                onTap: () => cubit.restartSession(activeSession.id),
-              ),
-            _HeaderButton(
-              tooltip: 'Clear output',
-              icon: Icons.clear_all_rounded,
-              iconColor: Theme.of(context).colorScheme.onSurface.withAlpha(120),
-              onTap: () => cubit.clearOutput(activeSession.id),
+            ..._quickActionButtons(
+              colors,
+              cubit,
+              activeSession,
+              isRunning,
+              quickActions,
             ),
-            _HeaderButton(
-              tooltip: 'Scroll to top',
-              icon: Icons.keyboard_double_arrow_up_rounded,
-              iconColor: Theme.of(context).colorScheme.onSurface.withAlpha(120),
-              onTap: () {
-                if (scrollController.hasClients) {
-                  scrollController.animateTo(
-                    0,
-                    duration: const Duration(milliseconds: 200),
-                    curve: Curves.easeOut,
-                  );
-                }
-              },
-            ),
-            _HeaderButton(
-              tooltip: 'Scroll to bottom',
-              icon: Icons.keyboard_double_arrow_down_rounded,
-              iconColor: Theme.of(context).colorScheme.onSurface.withAlpha(120),
-              onTap: () {
-                if (scrollController.hasClients) {
-                  scrollController.animateTo(
-                    scrollController.position.maxScrollExtent,
-                    duration: const Duration(milliseconds: 200),
-                    curve: Curves.easeOut,
-                  );
-                }
-              },
-            ),
-            _HeaderButton(
-              tooltip: 'Detach session',
-              icon: Icons.link_off_rounded,
-              iconColor: Theme.of(context).colorScheme.onSurface.withAlpha(120),
-              onTap: () {
-                onSessionVisibilityChanged?.call(activeSession.id, true);
-                onAttachSession(null);
-              },
-            ),
+            _buildStopOrRerunButton(colors, cubit, activeSession, isRunning),
+            _buildClearButton(context, cubit, activeSession),
+            _buildScrollToTopButton(context),
+            _buildScrollToBottomButton(context),
+            _buildDetachButton(context, activeSession),
             if (onDetachToPanel != null)
-              _HeaderButton(
-                tooltip: 'Detach to new panel',
-                icon: Icons.open_in_new_rounded,
-                iconColor: colors.accentGreen,
-                onTap: () async {
-                  onSessionVisibilityChanged?.call(activeSession.id, true);
-                  await onDetachToPanel!(activeSession);
-                  onAttachSession(null);
-                },
-              ),
+              _buildDetachToPanelButton(colors, activeSession),
             if (onSendToGroup != null)
-              _HeaderButton(
-                tooltip: 'Send to group',
-                icon: Icons.group_work_rounded,
-                iconColor: colors.accentGreen,
-                onTap: () async {
-                  final target = await _pickSendTarget(
-                    context,
-                    allSessions: allSessions,
-                    allConfigs: allConfigs,
-                    currentGroup: currentGroup,
-                  );
-                  if (target == null) return;
-                  onSessionVisibilityChanged?.call(activeSession.id, true);
-                  await onSendToGroup!(
-                    activeSession,
-                    target.group,
-                    target.createNewPanel,
-                  );
-                  onAttachSession(null);
-                },
-              ),
-            PopupMenuButton<String>(
-              tooltip: 'Run menu',
-              padding: EdgeInsets.zero,
-              color: colors.surfaceElevated,
-              onSelected: (value) async {
-                if (value == 'detach') {
-                  onSessionVisibilityChanged?.call(activeSession.id, true);
-                  onAttachSession(null);
-                } else if (value == 'popout') {
-                  if (onDetachToPanel != null) {
-                    onSessionVisibilityChanged?.call(activeSession.id, true);
-                    await onDetachToPanel!(activeSession);
-                    onAttachSession(null);
-                  }
-                } else if (value == 'send-group') {
-                  if (onSendToGroup != null) {
-                    final target = await _pickSendTarget(
-                      context,
-                      allSessions: allSessions,
-                      allConfigs: allConfigs,
-                      currentGroup: currentGroup,
-                    );
-                    if (target == null) return;
-                    onSessionVisibilityChanged?.call(activeSession.id, true);
-                    await onSendToGroup!(
-                      activeSession,
-                      target.group,
-                      target.createNewPanel,
-                    );
-                    onAttachSession(null);
-                  }
-                } else if (value == 'attach-latest') {
-                  if (attachCandidate != null) {
-                    onSessionVisibilityChanged?.call(attachCandidate.id, false);
-                    if (attachCandidate.config.group != currentGroup) {
-                      onGroupChanged?.call(attachCandidate.config.group);
-                    }
-                    onAttachSession(attachCandidate.id);
-                  }
-                } else if (value == 'attach') {
-                  final selected = await _pickAttachTarget(
-                    context,
-                    allSessions,
-                  );
-                  if (selected != null) {
-                    onSessionVisibilityChanged?.call(selected.id, false);
-                    if (selected.config.group != currentGroup) {
-                      onGroupChanged?.call(selected.config.group);
-                    }
-                    onAttachSession(selected.id);
-                  }
-                }
-              },
-              itemBuilder:
-                  (context) => [
-                    const PopupMenuItem(
-                      value: 'attach',
-                      child: Text('Attach…'),
-                    ),
-                    const PopupMenuItem(
-                      value: 'detach',
-                      child: Text('Detach from console'),
-                    ),
-                    if (onDetachToPanel != null)
-                      const PopupMenuItem(
-                        value: 'popout',
-                        child: Text('Detach to new panel'),
-                      ),
-                    if (onSendToGroup != null)
-                      const PopupMenuItem(
-                        value: 'send-group',
-                        child: Text('Send to group'),
-                      ),
-                    if (attachCandidate != null)
-                      const PopupMenuItem(
-                        value: 'attach-latest',
-                        child: Text('Attach latest session'),
-                      ),
-                  ],
-              child: Icon(
-                Icons.more_horiz_rounded,
-                size: 16,
-                color: Theme.of(context).colorScheme.onSurface.withAlpha(140),
-              ),
+              _buildSendToGroupButton(context, colors, activeSession),
+            _buildRunMenuButton(
+              context,
+              colors,
+              activeSession,
+              attachCandidate,
             ),
           ],
           if (activeSession == null && attachCandidate != null)
-            _HeaderButton(
-              tooltip: 'Attach session',
-              icon: Icons.link_rounded,
-              iconColor: colors.accentGreen,
-              onTap: () async {
-                final selected = await _pickAttachTarget(context, allSessions);
-                if (selected == null) return;
-                onSessionVisibilityChanged?.call(selected.id, false);
-                if (selected.config.group != currentGroup) {
-                  onGroupChanged?.call(selected.config.group);
-                }
-                onAttachSession(selected.id);
-              },
-            ),
+            _buildAttachSessionButton(context, colors, attachCandidate),
           Container(width: 1, height: 20, color: colors.border),
           const SizedBox(width: 4),
         ],
       ),
+    );
+  }
+
+  Widget _buildTabsArea(
+    BuildContext context,
+    RunCubit cubit,
+    RunSession? activeSession,
+  ) {
+    return showSessionTabs
+        ? ListView(
+          scrollDirection: Axis.horizontal,
+          children: [
+            ...state.sessions.map(
+              (s) => _SessionTab(
+                session: s,
+                isActive: s.id == state.activeSessionId,
+                onTap: () => onAttachSession(s.id),
+                onClose: () => cubit.removeSession(s.id),
+              ),
+            ),
+          ],
+        )
+        : (activeSession == null
+            ? const SizedBox.shrink()
+            : Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  activeSession.config.name,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+              ),
+            ));
+  }
+
+  List<Widget> _quickActionButtons(
+    AppColorScheme colors,
+    RunCubit cubit,
+    RunSession activeSession,
+    bool isRunning,
+    List<RunQuickAction> quickActions,
+  ) {
+    if (!isRunning) return const [];
+    return quickActions
+        .map(
+          (action) => _HeaderButton(
+            tooltip:
+                action.appendNewline
+                    ? '${action.label} (sends Enter)'
+                    : action.label,
+            icon: _quickActionIcon(action.icon),
+            label: action.label.isNotEmpty ? action.label[0] : 'A',
+            iconColor: colors.accentGreen,
+            onTap: () => cubit.triggerQuickAction(activeSession.id, action),
+          ),
+        )
+        .toList();
+  }
+
+  Widget _buildStopOrRerunButton(
+    AppColorScheme colors,
+    RunCubit cubit,
+    RunSession activeSession,
+    bool isRunning,
+  ) {
+    if (isRunning) {
+      return _HeaderButton(
+        tooltip: 'Stop',
+        icon: Icons.stop_rounded,
+        iconColor: colors.accentRed,
+        onTap: () => cubit.stopRun(activeSession.id),
+      );
+    }
+    return _HeaderButton(
+      tooltip: 'Re-run',
+      icon: Icons.refresh_rounded,
+      iconColor: colors.accentGreen,
+      onTap: () => cubit.restartSession(activeSession.id),
+    );
+  }
+
+  Widget _buildClearButton(
+    BuildContext context,
+    RunCubit cubit,
+    RunSession activeSession,
+  ) {
+    return _HeaderButton(
+      tooltip: 'Clear output',
+      icon: Icons.clear_all_rounded,
+      iconColor: Theme.of(context).colorScheme.onSurface.withAlpha(120),
+      onTap: () => cubit.clearOutput(activeSession.id),
+    );
+  }
+
+  Widget _buildScrollToTopButton(BuildContext context) {
+    return _HeaderButton(
+      tooltip: 'Scroll to top',
+      icon: Icons.keyboard_double_arrow_up_rounded,
+      iconColor: Theme.of(context).colorScheme.onSurface.withAlpha(120),
+      onTap: () {
+        if (scrollController.hasClients) {
+          scrollController.animateTo(
+            0,
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOut,
+          );
+        }
+      },
+    );
+  }
+
+  Widget _buildScrollToBottomButton(BuildContext context) {
+    return _HeaderButton(
+      tooltip: 'Scroll to bottom',
+      icon: Icons.keyboard_double_arrow_down_rounded,
+      iconColor: Theme.of(context).colorScheme.onSurface.withAlpha(120),
+      onTap: () {
+        if (scrollController.hasClients) {
+          scrollController.animateTo(
+            scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOut,
+          );
+        }
+      },
+    );
+  }
+
+  Widget _buildDetachButton(BuildContext context, RunSession activeSession) {
+    return _HeaderButton(
+      tooltip: 'Detach session',
+      icon: Icons.link_off_rounded,
+      iconColor: Theme.of(context).colorScheme.onSurface.withAlpha(120),
+      onTap: () {
+        onSessionVisibilityChanged?.call(activeSession.id, true);
+        onAttachSession(null);
+      },
+    );
+  }
+
+  Widget _buildDetachToPanelButton(
+    AppColorScheme colors,
+    RunSession activeSession,
+  ) {
+    return _HeaderButton(
+      tooltip: 'Detach to new panel',
+      icon: Icons.open_in_new_rounded,
+      iconColor: colors.accentGreen,
+      onTap: () async {
+        onSessionVisibilityChanged?.call(activeSession.id, true);
+        await onDetachToPanel!(activeSession);
+        onAttachSession(null);
+      },
+    );
+  }
+
+  Widget _buildSendToGroupButton(
+    BuildContext context,
+    AppColorScheme colors,
+    RunSession activeSession,
+  ) {
+    return _HeaderButton(
+      tooltip: 'Send to group',
+      icon: Icons.group_work_rounded,
+      iconColor: colors.accentGreen,
+      onTap: () async {
+        final target = await _pickSendTarget(
+          context,
+          allSessions: allSessions,
+          allConfigs: allConfigs,
+          currentGroup: currentGroup,
+        );
+        if (target == null) return;
+        onSessionVisibilityChanged?.call(activeSession.id, true);
+        await onSendToGroup!(
+          activeSession,
+          target.group,
+          target.createNewPanel,
+        );
+        onAttachSession(null);
+      },
+    );
+  }
+
+  Widget _buildRunMenuButton(
+    BuildContext context,
+    AppColorScheme colors,
+    RunSession activeSession,
+    RunSession? attachCandidate,
+  ) {
+    return PopupMenuButton<String>(
+      tooltip: 'Run menu',
+      padding: EdgeInsets.zero,
+      color: colors.surfaceElevated,
+      onSelected:
+          (value) => _onRunMenuSelected(
+            context,
+            value,
+            activeSession: activeSession,
+            attachCandidate: attachCandidate,
+          ),
+      itemBuilder: (context) => _runMenuItems(attachCandidate),
+      child: Icon(
+        Icons.more_horiz_rounded,
+        size: 16,
+        color: Theme.of(context).colorScheme.onSurface.withAlpha(140),
+      ),
+    );
+  }
+
+  Future<void> _onRunMenuSelected(
+    BuildContext context,
+    String value, {
+    required RunSession activeSession,
+    required RunSession? attachCandidate,
+  }) async {
+    if (value == 'detach') {
+      onSessionVisibilityChanged?.call(activeSession.id, true);
+      onAttachSession(null);
+    } else if (value == 'popout') {
+      await _popOutSession(activeSession);
+    } else if (value == 'send-group') {
+      await _sendSessionToGroup(context, activeSession);
+    } else if (value == 'attach-latest') {
+      _attachSessionCandidate(attachCandidate);
+    } else if (value == 'attach') {
+      await _attachPickedSession(context);
+    }
+  }
+
+  Future<void> _popOutSession(RunSession activeSession) async {
+    if (onDetachToPanel != null) {
+      onSessionVisibilityChanged?.call(activeSession.id, true);
+      await onDetachToPanel!(activeSession);
+      onAttachSession(null);
+    }
+  }
+
+  Future<void> _sendSessionToGroup(
+    BuildContext context,
+    RunSession activeSession,
+  ) async {
+    if (onSendToGroup != null) {
+      final target = await _pickSendTarget(
+        context,
+        allSessions: allSessions,
+        allConfigs: allConfigs,
+        currentGroup: currentGroup,
+      );
+      if (target == null) return;
+      onSessionVisibilityChanged?.call(activeSession.id, true);
+      await onSendToGroup!(
+        activeSession,
+        target.group,
+        target.createNewPanel,
+      );
+      onAttachSession(null);
+    }
+  }
+
+  void _attachSessionCandidate(RunSession? attachCandidate) {
+    if (attachCandidate != null) {
+      onSessionVisibilityChanged?.call(attachCandidate.id, false);
+      if (attachCandidate.config.group != currentGroup) {
+        onGroupChanged?.call(attachCandidate.config.group);
+      }
+      onAttachSession(attachCandidate.id);
+    }
+  }
+
+  Future<void> _attachPickedSession(BuildContext context) async {
+    final selected = await _pickAttachTarget(context, allSessions);
+    if (selected != null) {
+      onSessionVisibilityChanged?.call(selected.id, false);
+      if (selected.config.group != currentGroup) {
+        onGroupChanged?.call(selected.config.group);
+      }
+      onAttachSession(selected.id);
+    }
+  }
+
+  List<PopupMenuEntry<String>> _runMenuItems(RunSession? attachCandidate) {
+    return [
+      const PopupMenuItem(value: 'attach', child: Text('Attach…')),
+      const PopupMenuItem(
+        value: 'detach',
+        child: Text('Detach from console'),
+      ),
+      if (onDetachToPanel != null)
+        const PopupMenuItem(
+          value: 'popout',
+          child: Text('Detach to new panel'),
+        ),
+      if (onSendToGroup != null)
+        const PopupMenuItem(
+          value: 'send-group',
+          child: Text('Send to group'),
+        ),
+      if (attachCandidate != null)
+        const PopupMenuItem(
+          value: 'attach-latest',
+          child: Text('Attach latest session'),
+        ),
+    ];
+  }
+
+  Widget _buildAttachSessionButton(
+    BuildContext context,
+    AppColorScheme colors,
+    RunSession attachCandidate,
+  ) {
+    return _HeaderButton(
+      tooltip: 'Attach session',
+      icon: Icons.link_rounded,
+      iconColor: colors.accentGreen,
+      onTap: () async {
+        final selected = await _pickAttachTarget(context, allSessions);
+        if (selected == null) return;
+        onSessionVisibilityChanged?.call(selected.id, false);
+        if (selected.config.group != currentGroup) {
+          onGroupChanged?.call(selected.config.group);
+        }
+        onAttachSession(selected.id);
+      },
     );
   }
 

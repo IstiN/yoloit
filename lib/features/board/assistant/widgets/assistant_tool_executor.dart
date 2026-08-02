@@ -3,6 +3,14 @@ import 'dart:convert';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
 import 'package:yoloit/features/board/chat/yoloit_cli_tools.dart';
 
+/// A scored (board, panel) candidate produced by the target resolvers.
+typedef _PanelCandidate = ({
+  String boardId,
+  String panelId,
+  int score,
+  num zIndex,
+});
+
 /// Wraps the base CLI tool executor with assistant-specific pre/post processing
 /// (note retargeting, panel creation guard, focus after create).
 class AssistantToolExecutor implements YoloitToolExecutor {
@@ -140,54 +148,23 @@ class AssistantToolExecutor implements YoloitToolExecutor {
     final tokens = _searchTokens(userMessage);
     final hintedBoardId = (runtimeContext?.boardId ?? '').trim();
     try {
-      final boardsRaw = await delegate.invoke(
-        'yoloit_boards',
-        const <String, Object?>{},
-        runtimeContext: runtimeContext,
-      );
-      final boardsDecoded = jsonDecode(boardsRaw);
-      if (boardsDecoded is! Map) return null;
-      final boards = boardsDecoded['boards'];
-      if (boards is! List) return null;
+      final boardIds = await _listBoardIds(runtimeContext);
+      if (boardIds == null) return null;
 
-      ({String boardId, String panelId, int score, num zIndex})? best;
-      for (final b in boards) {
-        if (b is! Map) continue;
-        final boardMap = Map<String, Object?>.from(b.cast<String, Object?>());
-        final boardId = '${boardMap['id'] ?? ''}'.trim();
-        if (boardId.isEmpty) continue;
-        final panelsRaw = await delegate.invoke('yoloit_panels', {
-          'id_or_name': boardId,
-        }, runtimeContext: runtimeContext);
-        final panelsDecoded = jsonDecode(panelsRaw);
-        if (panelsDecoded is! Map) continue;
-        final panels = panelsDecoded['panels'];
-        if (panels is! List) continue;
-        for (final p in panels) {
-          if (p is! Map) continue;
-          final panel = Map<String, Object?>.from(p.cast<String, Object?>());
-          if (panel['type'] != 'board.terminal' || panel['hidden'] == true) {
-            continue;
-          }
-          final panelId = '${panel['id'] ?? ''}'.trim();
-          if (panelId.isEmpty) continue;
-          final title = '${panel['title'] ?? ''}'.toLowerCase();
-          final zIndex = (panel['zIndex'] as num?) ?? 0;
-          var score = 1;
-          if (boardId == hintedBoardId) score += 2;
-          for (final token in tokens) {
-            if (token.length < 3) continue;
-            if (title.contains(token)) score += 3;
-          }
-          if (best == null ||
-              score > best.score ||
-              (score == best.score && zIndex > best.zIndex)) {
-            best = (
-              boardId: boardId,
-              panelId: panelId,
-              score: score,
-              zIndex: zIndex,
-            );
+      _PanelCandidate? best;
+      for (final boardId in boardIds) {
+        final panels = await _listBoardPanels(runtimeContext, boardId);
+        if (panels == null) continue;
+        for (final panel in panels) {
+          final candidate = _scoreTerminalPanel(
+            panel: panel,
+            boardId: boardId,
+            hintedBoardId: hintedBoardId,
+            tokens: tokens,
+          );
+          if (candidate == null) continue;
+          if (_isBetterCandidate(best, candidate)) {
+            best = candidate;
           }
         }
       }
@@ -196,6 +173,76 @@ class AssistantToolExecutor implements YoloitToolExecutor {
     } catch (_) {
       return null;
     }
+  }
+
+  // Lists all non-empty board ids, or null when the boards payload is malformed.
+  Future<List<String>?> _listBoardIds(
+    ChatRuntimeContext? runtimeContext,
+  ) async {
+    final boardsRaw = await delegate.invoke(
+      'yoloit_boards',
+      const <String, Object?>{},
+      runtimeContext: runtimeContext,
+    );
+    final boardsDecoded = jsonDecode(boardsRaw);
+    if (boardsDecoded is! Map) return null;
+    final boards = boardsDecoded['boards'];
+    if (boards is! List) return null;
+    final boardIds = <String>[];
+    for (final b in boards) {
+      if (b is! Map) continue;
+      final boardMap = Map<String, Object?>.from(b.cast<String, Object?>());
+      final boardId = '${boardMap['id'] ?? ''}'.trim();
+      if (boardId.isEmpty) continue;
+      boardIds.add(boardId);
+    }
+    return boardIds;
+  }
+
+  // Lists the panels of one board, or null when the panels payload is malformed.
+  Future<List<Map<String, Object?>>?> _listBoardPanels(
+    ChatRuntimeContext? runtimeContext,
+    String boardId,
+  ) async {
+    final panelsRaw = await delegate.invoke('yoloit_panels', {
+      'id_or_name': boardId,
+    }, runtimeContext: runtimeContext);
+    final panelsDecoded = jsonDecode(panelsRaw);
+    if (panelsDecoded is! Map) return null;
+    final panels = panelsDecoded['panels'];
+    if (panels is! List) return null;
+    return [
+      for (final p in panels)
+        if (p is Map) Map<String, Object?>.from(p.cast<String, Object?>()),
+    ];
+  }
+
+  bool _isBetterCandidate(_PanelCandidate? best, _PanelCandidate candidate) {
+    return best == null ||
+        candidate.score > best.score ||
+        (candidate.score == best.score && candidate.zIndex > best.zIndex);
+  }
+
+  _PanelCandidate? _scoreTerminalPanel({
+    required Map<String, Object?> panel,
+    required String boardId,
+    required String hintedBoardId,
+    required Set<String> tokens,
+  }) {
+    if (panel['type'] != 'board.terminal' || panel['hidden'] == true) {
+      return null;
+    }
+    final panelId = '${panel['id'] ?? ''}'.trim();
+    if (panelId.isEmpty) return null;
+    final title = '${panel['title'] ?? ''}'.toLowerCase();
+    final zIndex = (panel['zIndex'] as num?) ?? 0;
+    var score = 1;
+    if (boardId == hintedBoardId) score += 2;
+    for (final token in tokens) {
+      if (token.length < 3) continue;
+      if (title.contains(token)) score += 3;
+    }
+    return (boardId: boardId, panelId: panelId, score: score, zIndex: zIndex);
   }
 
   Future<bool> _isTerminalPanelRef(
@@ -319,80 +366,24 @@ class AssistantToolExecutor implements YoloitToolExecutor {
     final tokens = _searchTokens(userMessage);
     final hintedBoardId = (runtimeContext?.boardId ?? '').trim();
     try {
-      final boardsRaw = await delegate.invoke(
-        'yoloit_boards',
-        const <String, Object?>{},
-        runtimeContext: runtimeContext,
-      );
-      final boardsDecoded = jsonDecode(boardsRaw);
-      if (boardsDecoded is! Map) return null;
-      final boards = boardsDecoded['boards'];
-      if (boards is! List) return null;
+      final boardIds = await _listBoardIds(runtimeContext);
+      if (boardIds == null) return null;
 
-      ({String boardId, String panelId, int score, num zIndex})? best;
-      for (final b in boards) {
-        if (b is! Map) continue;
-        final boardMap = Map<String, Object?>.from(b.cast<String, Object?>());
-        final boardId = '${boardMap['id'] ?? ''}'.trim();
-        if (boardId.isEmpty) continue;
-        final panelsRaw = await delegate.invoke('yoloit_panels', {
-          'id_or_name': boardId,
-        }, runtimeContext: runtimeContext);
-        final panelsDecoded = jsonDecode(panelsRaw);
-        if (panelsDecoded is! Map) continue;
-        final panels = panelsDecoded['panels'];
-        if (panels is! List) continue;
-        for (final p in panels) {
-          if (p is! Map) continue;
-          final panel = Map<String, Object?>.from(p.cast<String, Object?>());
-          if (panel['type'] != 'board.note.markdown' ||
-              panel['hidden'] == true) {
-            continue;
-          }
-          final panelId = '${panel['id'] ?? ''}'.trim();
-          if (panelId.isEmpty) continue;
-          final title = '${panel['title'] ?? ''}'.toLowerCase();
-          final zIndex = (panel['zIndex'] as num?) ?? 0;
-          var score = 0;
-          if (boardId == hintedBoardId) score += 2;
-          if (title.contains('mermaid') ||
-              title.contains('diagram') ||
-              title.contains('диаграм')) {
-            score += 3;
-          }
-          for (final token in tokens) {
-            if (token.length < 3) continue;
-            if (title.contains(token)) score += 2;
-          }
-
-          if (score < 4 && tokens.isNotEmpty) {
-            try {
-              final detailsRaw = await delegate.invoke('yoloit_panel', {
-                'board': boardId,
-                'panel': panelId,
-              }, runtimeContext: runtimeContext);
-              final details = jsonDecode(detailsRaw);
-              if (details is Map) {
-                final markdown =
-                    '${(details['state'] as Map?)?['markdown'] ?? (details['content'] as Map?)?['markdown'] ?? ''}'
-                        .toLowerCase();
-                for (final token in tokens) {
-                  if (token.length < 3) continue;
-                  if (markdown.contains(token)) score += 2;
-                }
-              }
-            } catch (_) {}
-          }
-
-          if (best == null ||
-              score > best.score ||
-              (score == best.score && zIndex > best.zIndex)) {
-            best = (
-              boardId: boardId,
-              panelId: panelId,
-              score: score,
-              zIndex: zIndex,
-            );
+      _PanelCandidate? best;
+      for (final boardId in boardIds) {
+        final panels = await _listBoardPanels(runtimeContext, boardId);
+        if (panels == null) continue;
+        for (final panel in panels) {
+          final candidate = await _scoreNotePanel(
+            panel: panel,
+            boardId: boardId,
+            hintedBoardId: hintedBoardId,
+            tokens: tokens,
+            runtimeContext: runtimeContext,
+          );
+          if (candidate == null) continue;
+          if (_isBetterCandidate(best, candidate)) {
+            best = candidate;
           }
         }
       }
@@ -401,6 +392,71 @@ class AssistantToolExecutor implements YoloitToolExecutor {
     } catch (_) {
       return null;
     }
+  }
+
+  Future<_PanelCandidate?> _scoreNotePanel({
+    required Map<String, Object?> panel,
+    required String boardId,
+    required String hintedBoardId,
+    required Set<String> tokens,
+    required ChatRuntimeContext? runtimeContext,
+  }) async {
+    if (panel['type'] != 'board.note.markdown' || panel['hidden'] == true) {
+      return null;
+    }
+    final panelId = '${panel['id'] ?? ''}'.trim();
+    if (panelId.isEmpty) return null;
+    final title = '${panel['title'] ?? ''}'.toLowerCase();
+    final zIndex = (panel['zIndex'] as num?) ?? 0;
+    var score = 0;
+    if (boardId == hintedBoardId) score += 2;
+    if (title.contains('mermaid') ||
+        title.contains('diagram') ||
+        title.contains('диаграм')) {
+      score += 3;
+    }
+    for (final token in tokens) {
+      if (token.length < 3) continue;
+      if (title.contains(token)) score += 2;
+    }
+
+    if (score < 4 && tokens.isNotEmpty) {
+      score += await _markdownTokenScore(
+        runtimeContext,
+        boardId,
+        panelId,
+        tokens,
+      );
+    }
+
+    return (boardId: boardId, panelId: panelId, score: score, zIndex: zIndex);
+  }
+
+  // Scores a note panel's markdown content against the search tokens.
+  Future<int> _markdownTokenScore(
+    ChatRuntimeContext? runtimeContext,
+    String boardId,
+    String panelId,
+    Set<String> tokens,
+  ) async {
+    var score = 0;
+    try {
+      final detailsRaw = await delegate.invoke('yoloit_panel', {
+        'board': boardId,
+        'panel': panelId,
+      }, runtimeContext: runtimeContext);
+      final details = jsonDecode(detailsRaw);
+      if (details is Map) {
+        final markdown =
+            '${(details['state'] as Map?)?['markdown'] ?? (details['content'] as Map?)?['markdown'] ?? ''}'
+                .toLowerCase();
+        for (final token in tokens) {
+          if (token.length < 3) continue;
+          if (markdown.contains(token)) score += 2;
+        }
+      }
+    } catch (_) {}
+    return score;
   }
 
   Set<String> _searchTokens(String text) {

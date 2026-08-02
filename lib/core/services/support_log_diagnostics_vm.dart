@@ -5,44 +5,73 @@ import 'package:yoloit/core/services/build_info.dart';
 
 Future<String> buildSupportDiagnostics() async {
   final buf = StringBuffer();
+  _appendPlatformInfo(buf);
+  await _appendArchitectureInfo(buf);
+  await _appendToolchainVersions(buf);
+  _appendBuildInfo(buf);
+  await _appendResvgAvailability(buf);
+  await _appendGitInfo(buf);
+  await _appendSubmoduleStatus(buf);
+  return buf.toString();
+}
+
+void _appendPlatformInfo(StringBuffer buf) {
   buf.writeln(
     'OS: ${Platform.operatingSystem} ${Platform.operatingSystemVersion}',
   );
   buf.writeln('Dart: ${Platform.version}');
   buf.writeln('Resolved executable: ${Platform.resolvedExecutable}');
   buf.writeln('PATH: ${Platform.environment['PATH'] ?? '(empty)'}');
+}
 
-  // Architecture (system + binary)
+/// Runs [executable] and writes `<label>: <trimmed stdout>` when the command
+/// succeeds. Writes the [onFailure] line when the command cannot be run.
+Future<void> _appendCommandOutput(
+  StringBuffer buf,
+  String label,
+  String executable,
+  List<String> args, {
+  String? onFailure,
+}) async {
   try {
-    final result = await Process.run('uname', const ['-m']);
+    final result = await Process.run(executable, args);
     if (result.exitCode == 0) {
-      buf.writeln('System architecture: ${(result.stdout as String).trim()}');
+      buf.writeln('$label: ${(result.stdout as String).trim()}');
     }
   } catch (_) {
-    buf.writeln('System architecture: unknown');
-  }
-
-  try {
-    final resolved = Platform.resolvedExecutable;
-    final result = await Process.run('file', [resolved]);
-    if (result.exitCode == 0) {
-      buf.writeln('Binary file info: ${(result.stdout as String).trim()}');
+    if (onFailure != null) {
+      buf.writeln(onFailure);
     }
-  } catch (_) {
-    buf.writeln('Binary file info: unavailable');
   }
+}
 
-  try {
-    final resolved = Platform.resolvedExecutable;
-    final result = await Process.run('lipo', ['-info', resolved]);
-    if (result.exitCode == 0) {
-      buf.writeln('Binary architectures: ${(result.stdout as String).trim()}');
-    }
-  } catch (_) {
-    buf.writeln('Binary architectures: unavailable');
-  }
+// Architecture (system + binary)
+Future<void> _appendArchitectureInfo(StringBuffer buf) async {
+  await _appendCommandOutput(
+    buf,
+    'System architecture',
+    'uname',
+    const ['-m'],
+    onFailure: 'System architecture: unknown',
+  );
+  await _appendCommandOutput(
+    buf,
+    'Binary file info',
+    'file',
+    [Platform.resolvedExecutable],
+    onFailure: 'Binary file info: unavailable',
+  );
+  await _appendCommandOutput(
+    buf,
+    'Binary architectures',
+    'lipo',
+    ['-info', Platform.resolvedExecutable],
+    onFailure: 'Binary architectures: unavailable',
+  );
+}
 
-  // Flutter / Dart toolchain versions
+// Flutter / Dart toolchain versions
+Future<void> _appendToolchainVersions(StringBuffer buf) async {
   try {
     final result = await Process.run('flutter', const ['--version']);
     if (result.exitCode == 0) {
@@ -55,16 +84,17 @@ Future<String> buildSupportDiagnostics() async {
     buf.writeln('Flutter: not found on PATH');
   }
 
-  try {
-    final result = await Process.run('dart', const ['--version']);
-    if (result.exitCode == 0) {
-      buf.writeln('Dart CLI: ${(result.stdout as String).trim()}');
-    }
-  } catch (_) {
-    buf.writeln('Dart CLI: not found on PATH');
-  }
+  await _appendCommandOutput(
+    buf,
+    'Dart CLI',
+    'dart',
+    const ['--version'],
+    onFailure: 'Dart CLI: not found on PATH',
+  );
+}
 
-  // Embedded build info (CI-generated)
+// Embedded build info (CI-generated)
+void _appendBuildInfo(StringBuffer buf) {
   buf.writeln('Build git commit: $kBuildGitCommit');
   buf.writeln('Build git branch: $kBuildGitBranch');
   buf.writeln('Build submodules: $kBuildSubmodules');
@@ -76,8 +106,10 @@ Future<String> buildSupportDiagnostics() async {
   buf.writeln('xterm version: $kXtermVersion');
   buf.writeln('flutter_svg version: $kFlutterSvgVersion');
   buf.writeln('resvg version: $kResvgVersion');
+}
 
-  // resvg availability
+// resvg availability
+Future<void> _appendResvgAvailability(StringBuffer buf) async {
   try {
     final result = await Process.run('which', const ['resvg']);
     if (result.exitCode == 0) {
@@ -95,24 +127,22 @@ Future<String> buildSupportDiagnostics() async {
   } catch (_) {
     buf.writeln('resvg PATH: not found (which failed)');
   }
+}
 
-  // Git info
-  try {
-    final rev = await Process.run('git', const ['rev-parse', '--short', 'HEAD']);
-    if (rev.exitCode == 0) {
-      buf.writeln('Git HEAD: ${(rev.stdout as String).trim()}');
-    }
-  } catch (_) {}
-
-  try {
-    final branch = await Process.run(
-      'git',
-      const ['rev-parse', '--abbrev-ref', 'HEAD'],
-    );
-    if (branch.exitCode == 0) {
-      buf.writeln('Git branch: ${(branch.stdout as String).trim()}');
-    }
-  } catch (_) {}
+// Git info
+Future<void> _appendGitInfo(StringBuffer buf) async {
+  await _appendCommandOutput(
+    buf,
+    'Git HEAD',
+    'git',
+    const ['rev-parse', '--short', 'HEAD'],
+  );
+  await _appendCommandOutput(
+    buf,
+    'Git branch',
+    'git',
+    const ['rev-parse', '--abbrev-ref', 'HEAD'],
+  );
 
   try {
     final status = await Process.run('git', const ['status', '--short']);
@@ -128,8 +158,10 @@ Future<String> buildSupportDiagnostics() async {
       }
     }
   } catch (_) {}
+}
 
-  // Submodule hashes
+// Submodule hashes
+Future<void> _appendSubmoduleStatus(StringBuffer buf) async {
   try {
     final sm = await Process.run(
       'git',
@@ -149,8 +181,6 @@ Future<String> buildSupportDiagnostics() async {
   } catch (_) {
     buf.writeln('Submodules: unable to read');
   }
-
-  return buf.toString();
 }
 
 Future<String> buildSupportCopyPayload(String memoryLog) async {

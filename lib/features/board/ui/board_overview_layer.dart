@@ -236,174 +236,230 @@ class BoardOverviewLayerState extends State<BoardOverviewLayer>
                     ? _zoomBoardId
                     : widget.activeBoardId;
             final widgets = <Widget>[
-              Positioned.fill(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: _close,
-                  child: ColoredBox(
-                    color: colors.background,
-                    child: CustomPaint(
-                      isComplex: true,
-                      painter: BoardOverviewBackdropPainter(
-                        minorColor: colors.divider.withAlpha(45),
-                        majorColor: colors.divider.withAlpha(85),
-                      ),
-                    ),
-                  ),
-                ),
+              _buildBackdrop(colors),
+              ..._buildSectionLabels(sections, layout, fade),
+              ..._buildBoardCards(
+                boards,
+                sections,
+                layout,
+                fullRect,
+                t,
+                fade,
+                highlightedBoardId,
+                colors,
               ),
+              _buildCreateCard(layout, sections, t, fade),
+              _buildCloseButton(fade),
             ];
-
-            for (
-              var sectionIndex = 0;
-              sectionIndex < sections.length;
-              sectionIndex++
-            ) {
-              final section = sections[sectionIndex];
-              if (layout.itemCountForSection(sectionIndex) == 0) continue;
-              widgets.add(
-                BoardOverviewSectionLabel(
-                  rect: layout.rectFor(sectionIndex, 0),
-                  label: section.label,
-                  subtitle: section.subtitle,
-                  opacity: fade,
-                  disconnectKey:
-                      section.remoteUrl == null
-                          ? null
-                          : Key(
-                            'board-overview-disconnect-remote-${section.remoteUrl}',
-                          ),
-                  onDisconnect:
-                      section.remoteUrl == null
-                          ? null
-                          : () =>
-                              widget.onDisconnectRemoteUrl(section.remoteUrl!),
-                ),
-              );
-            }
-
-            for (var i = 0; i < boards.length; i++) {
-              final board = boards[i];
-              final location = layout.locationForBoard(sections, board.id);
-              if (location == null) continue;
-              final endRect = layout.rectFor(
-                location.sectionIndex,
-                location.itemIndex,
-              );
-              final isZoomBoard = board.id == _zoomBoardId;
-              final startRect =
-                  isZoomBoard
-                      ? fullRect
-                      : Rect.fromCenter(
-                        center: endRect.center,
-                        width: endRect.width * 0.82,
-                        height: endRect.height * 0.82,
-                      );
-              final rect = Rect.lerp(startRect, endRect, t)!;
-              final opacity = isZoomBoard ? 1.0 : fade;
-              // When the zoom card is near full-screen (t < 0.5),
-              // hide the card chrome so the purple-tinted surface/border
-              // colors don't create an overlay effect.
-              final showChrome = !isZoomBoard || t >= 0.5;
-              widgets.add(
-                Positioned.fromRect(
-                  rect: rect,
-                  child: Opacity(
-                    opacity: opacity,
-                    child:
-                        showChrome
-                            ? BoardOverviewCard(
-                              board: board,
-                              active:
-                                  board.id == highlightedBoardId && t >= 0.92,
-                              previewPng: widget.previewPngs[board.id],
-                              onTap: () => _selectBoard(board.id),
-                              onDisconnect:
-                                  remoteInfoForBoard(board) == null
-                                      ? null
-                                      : () =>
-                                          widget.onDisconnectRemoteBoard(board),
-                              onDeleteRemote:
-                                  remoteInfoForBoard(board) == null
-                                      ? null
-                                      : () => widget.onDeleteRemoteBoard(board),
-                            )
-                            : GestureDetector(
-                              onTap: () => _selectBoard(board.id),
-                              child: RepaintBoundary(
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(
-                                    16 * t.clamp(0.0, 1.0),
-                                  ),
-                                  child:
-                                      widget.previewPngs[board.id] != null
-                                          ? Image.memory(
-                                            widget.previewPngs[board.id]!,
-                                            fit: BoxFit.contain,
-                                            alignment: Alignment.center,
-                                            gaplessPlayback: true,
-                                          )
-                                          : ColoredBox(
-                                            color: colors.background,
-                                            child: const SizedBox.expand(),
-                                          ),
-                                ),
-                              ),
-                            ),
-                  ),
-                ),
-              );
-            }
-
-            final createLocation = layout.createLocation(sections);
-            final createRect =
-                createLocation == null
-                    ? Rect.zero
-                    : layout.rectFor(
-                      createLocation.sectionIndex,
-                      createLocation.itemIndex,
-                    );
-            widgets.add(
-              Positioned.fromRect(
-                rect:
-                    Rect.lerp(
-                      Rect.fromCenter(
-                        center: createRect.center,
-                        width: createRect.width * 0.82,
-                        height: createRect.height * 0.82,
-                      ),
-                      createRect,
-                      t,
-                    )!,
-                child: Opacity(
-                  opacity: fade,
-                  child: CreateBoardOverviewCard(
-                    onTap: _createBoard,
-                    onTemplateTap: _createBoardFromTemplate,
-                  ),
-                ),
-              ),
-            );
-
-            widgets.add(
-              Positioned(
-                top: 14,
-                right: 14,
-                child: Opacity(
-                  opacity: fade,
-                  child: OverlayIconButton(
-                    icon: Icons.close,
-                    tooltip: 'Close boards overview',
-                    onTap: _close,
-                  ),
-                ),
-              ),
-            );
 
             return Stack(clipBehavior: Clip.none, children: widgets);
           },
         );
       },
+    );
+  }
+
+  Widget _buildBackdrop(AppColorScheme colors) {
+    return Positioned.fill(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: _close,
+        child: ColoredBox(
+          color: colors.background,
+          child: CustomPaint(
+            isComplex: true,
+            painter: BoardOverviewBackdropPainter(
+              minorColor: colors.divider.withAlpha(45),
+              majorColor: colors.divider.withAlpha(85),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildSectionLabels(
+    List<BoardOverviewSection> sections,
+    BoardOverviewSectionedLayout layout,
+    double fade,
+  ) {
+    final widgets = <Widget>[];
+    for (var sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
+      final section = sections[sectionIndex];
+      if (layout.itemCountForSection(sectionIndex) == 0) continue;
+      widgets.add(
+        BoardOverviewSectionLabel(
+          rect: layout.rectFor(sectionIndex, 0),
+          label: section.label,
+          subtitle: section.subtitle,
+          opacity: fade,
+          disconnectKey:
+              section.remoteUrl == null
+                  ? null
+                  : Key(
+                    'board-overview-disconnect-remote-${section.remoteUrl}',
+                  ),
+          onDisconnect:
+              section.remoteUrl == null
+                  ? null
+                  : () => widget.onDisconnectRemoteUrl(section.remoteUrl!),
+        ),
+      );
+    }
+    return widgets;
+  }
+
+  List<Widget> _buildBoardCards(
+    List<BoardDocument> boards,
+    List<BoardOverviewSection> sections,
+    BoardOverviewSectionedLayout layout,
+    Rect fullRect,
+    double t,
+    double fade,
+    String? highlightedBoardId,
+    AppColorScheme colors,
+  ) {
+    final widgets = <Widget>[];
+    for (var i = 0; i < boards.length; i++) {
+      final board = boards[i];
+      final location = layout.locationForBoard(sections, board.id);
+      if (location == null) continue;
+      final endRect = layout.rectFor(
+        location.sectionIndex,
+        location.itemIndex,
+      );
+      final isZoomBoard = board.id == _zoomBoardId;
+      final startRect =
+          isZoomBoard
+              ? fullRect
+              : Rect.fromCenter(
+                center: endRect.center,
+                width: endRect.width * 0.82,
+                height: endRect.height * 0.82,
+              );
+      final rect = Rect.lerp(startRect, endRect, t)!;
+      final opacity = isZoomBoard ? 1.0 : fade;
+      // When the zoom card is near full-screen (t < 0.5),
+      // hide the card chrome so the purple-tinted surface/border
+      // colors don't create an overlay effect.
+      final showChrome = !isZoomBoard || t >= 0.5;
+      widgets.add(
+        _buildBoardCard(
+          board,
+          rect: rect,
+          opacity: opacity,
+          showChrome: showChrome,
+          t: t,
+          highlightedBoardId: highlightedBoardId,
+          colors: colors,
+        ),
+      );
+    }
+    return widgets;
+  }
+
+  Widget _buildBoardCard(
+    BoardDocument board, {
+    required Rect rect,
+    required double opacity,
+    required bool showChrome,
+    required double t,
+    required String? highlightedBoardId,
+    required AppColorScheme colors,
+  }) {
+    return Positioned.fromRect(
+      rect: rect,
+      child: Opacity(
+        opacity: opacity,
+        child:
+            showChrome
+                ? BoardOverviewCard(
+                  board: board,
+                  active: board.id == highlightedBoardId && t >= 0.92,
+                  previewPng: widget.previewPngs[board.id],
+                  onTap: () => _selectBoard(board.id),
+                  onDisconnect:
+                      remoteInfoForBoard(board) == null
+                          ? null
+                          : () => widget.onDisconnectRemoteBoard(board),
+                  onDeleteRemote:
+                      remoteInfoForBoard(board) == null
+                          ? null
+                          : () => widget.onDeleteRemoteBoard(board),
+                )
+                : GestureDetector(
+                  onTap: () => _selectBoard(board.id),
+                  child: RepaintBoundary(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(
+                        16 * t.clamp(0.0, 1.0),
+                      ),
+                      child:
+                          widget.previewPngs[board.id] != null
+                              ? Image.memory(
+                                widget.previewPngs[board.id]!,
+                                fit: BoxFit.contain,
+                                alignment: Alignment.center,
+                                gaplessPlayback: true,
+                              )
+                              : ColoredBox(
+                                color: colors.background,
+                                child: const SizedBox.expand(),
+                              ),
+                    ),
+                  ),
+                ),
+      ),
+    );
+  }
+
+  Widget _buildCreateCard(
+    BoardOverviewSectionedLayout layout,
+    List<BoardOverviewSection> sections,
+    double t,
+    double fade,
+  ) {
+    final createLocation = layout.createLocation(sections);
+    final createRect =
+        createLocation == null
+            ? Rect.zero
+            : layout.rectFor(
+              createLocation.sectionIndex,
+              createLocation.itemIndex,
+            );
+    return Positioned.fromRect(
+      rect:
+          Rect.lerp(
+            Rect.fromCenter(
+              center: createRect.center,
+              width: createRect.width * 0.82,
+              height: createRect.height * 0.82,
+            ),
+            createRect,
+            t,
+          )!,
+      child: Opacity(
+        opacity: fade,
+        child: CreateBoardOverviewCard(
+          onTap: _createBoard,
+          onTemplateTap: _createBoardFromTemplate,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCloseButton(double fade) {
+    return Positioned(
+      top: 14,
+      right: 14,
+      child: Opacity(
+        opacity: fade,
+        child: OverlayIconButton(
+          icon: Icons.close,
+          tooltip: 'Close boards overview',
+          onTap: _close,
+        ),
+      ),
     );
   }
 }

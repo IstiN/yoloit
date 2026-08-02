@@ -721,7 +721,38 @@ class TerminalCubit extends Cubit<TerminalState> {
     if (i < 0) return;
     final current = _allSessions[i];
 
-    // Maintain a rolling tail buffer so patterns split across chunks are caught.
+    // Use the tail for approval detection; raw data still used for spinner/done.
+    final checkData = _appendPtyTail(sessionId, data);
+
+    // Approval dialog detected → AwaitingApprovalPhase + urgent sound.
+    if (_handleApprovalActivity(sessionId, i, current, checkData, config)) {
+      return;
+    }
+
+    // Done-prompt detected while thinking → transition to done.
+    if (current.hookPhase is ThinkingPhase && config.containsDonePrompt(data)) {
+      _onCopilotPromptDetected(sessionId);
+      return;
+    }
+
+    if (!config.containsSpinner(data)) return;
+
+    // Reset idle timer — clear phase when PTY goes quiet.
+    _restartPtyIdleTimer(sessionId, config);
+
+    // Only set ThinkingPhase if no hook phase is already active.
+    if (current.hookPhase != null) return;
+
+    _allSessions[i] = current.copyWith(hookPhase: const ThinkingPhase());
+    final cur = _loaded;
+    if (cur != null && !isClosed) {
+      _emitVisible();
+    }
+  }
+
+  /// Maintains a rolling tail buffer so patterns split across chunks are
+  /// caught. Returns the current tail contents.
+  String _appendPtyTail(String sessionId, String data) {
     final buf = _ptyTailBuffers.putIfAbsent(sessionId, StringBuffer.new)
       ..write(data);
     final tail = buf.toString();
@@ -730,9 +761,19 @@ class TerminalCubit extends Cubit<TerminalState> {
       buf.clear();
       buf.write(trimmed);
     }
-    // Use the tail for approval detection; raw data still used for spinner/done.
-    final checkData = buf.toString();
+    return buf.toString();
+  }
 
+  /// Handles approval-dialog detection for one PTY activity chunk.
+  /// Returns true when the chunk has been fully handled and the caller
+  /// must stop processing it.
+  bool _handleApprovalActivity(
+    String sessionId,
+    int i,
+    AgentSession current,
+    String checkData,
+    AgentPtyConfig config,
+  ) {
     // Approval dialog detected → AwaitingApprovalPhase + urgent sound.
     if (config.containsApproval(checkData) &&
         current.hookPhase is! AwaitingApprovalPhase) {
@@ -770,18 +811,13 @@ class TerminalCubit extends Cubit<TerminalState> {
           }
         }
       });
-      if (config.containsApproval(checkData)) return;
+      if (config.containsApproval(checkData)) return true;
     }
+    return false;
+  }
 
-    // Done-prompt detected while thinking → transition to done.
-    if (current.hookPhase is ThinkingPhase && config.containsDonePrompt(data)) {
-      _onCopilotPromptDetected(sessionId);
-      return;
-    }
-
-    if (!config.containsSpinner(data)) return;
-
-    // Reset idle timer — clear phase when PTY goes quiet.
+  /// Resets the idle timer — clears the phase when the PTY goes quiet.
+  void _restartPtyIdleTimer(String sessionId, AgentPtyConfig config) {
     _ptyIdleTimers[sessionId]?.cancel();
     _ptyIdleTimers[sessionId] = Timer(config.idleTimeout, () {
       _ptyIdleTimers.remove(sessionId);
@@ -794,15 +830,6 @@ class TerminalCubit extends Cubit<TerminalState> {
         }
       }
     });
-
-    // Only set ThinkingPhase if no hook phase is already active.
-    if (current.hookPhase != null) return;
-
-    _allSessions[i] = current.copyWith(hookPhase: const ThinkingPhase());
-    final cur = _loaded;
-    if (cur != null && !isClosed) {
-      _emitVisible();
-    }
   }
 
   void _onSessionDone(String sessionId) {

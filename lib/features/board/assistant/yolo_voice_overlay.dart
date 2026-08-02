@@ -828,7 +828,14 @@ class _ResponseCardState extends State<_ResponseCard>
   @override
   void didUpdateWidget(_ResponseCard old) {
     super.didUpdateWidget(old);
-    // Border animation
+    _syncBorderAnimation(old);
+    _handleStreamingStop(old);
+    _syncTypingAnimation(old);
+    _autoScrollIfGrew(old);
+  }
+
+  // Border animation
+  void _syncBorderAnimation(_ResponseCard old) {
     if (widget.borderSpeed != old.borderSpeed) {
       _borderAnim.duration = Duration(milliseconds: widget.borderSpeed);
     }
@@ -839,15 +846,19 @@ class _ResponseCardState extends State<_ResponseCard>
     } else if (!shouldAnimate && wasAnimating) {
       _borderAnim.stop();
     }
+  }
 
-    // Streaming just stopped → simple fade-in of final answer (no frozen tools content).
+  // Streaming just stopped → simple fade-in of final answer (no frozen tools content).
+  void _handleStreamingStop(_ResponseCard old) {
     if (old.streaming && !widget.streaming && widget.animate) {
       _isCrossfading = true;
       _crossfadeAnim.value = 0.0;
       _crossfadeAnim.forward();
     }
+  }
 
-    // Typing animation — when response text changes (new chars)
+  // Typing animation — when response text changes (new chars)
+  void _syncTypingAnimation(_ResponseCard old) {
     if (widget.response != old.response) {
       _lastResponse = widget.response;
       if (widget.streaming && widget.animate) {
@@ -875,7 +886,10 @@ class _ResponseCardState extends State<_ResponseCard>
     if (!widget.streaming) {
       _visibleChars.value = widget.response.length;
     }
-    // Auto-scroll to bottom when new tool log lines are added
+  }
+
+  // Auto-scroll to bottom when new tool log lines are added
+  void _autoScrollIfGrew(_ResponseCard old) {
     if (widget.response.length > old.response.length) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_scrollCtrl.hasClients &&

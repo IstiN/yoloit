@@ -195,24 +195,18 @@ class BoardPanelCardState extends State<BoardPanelCard>
     final showHeader = plugin?.showHeader ?? true;
     final accent = panel.color;
     final isCapturing = widget.capturingScreenshot;
-    final panelFill =
-        !usePanelChrome
-            ? Colors.transparent
-            : isCapturing
-            ? colors.background
-            : accent == null
-            ? colors.surface
-            : Color.lerp(colors.surface, accent, 0.12) ?? colors.surface;
-    final borderColor =
-        !usePanelChrome
-            ? Colors.transparent
-            : isCapturing
-            ? colors.background
-            : selected
-            ? colors.statusActive
-            : accent == null
-            ? colors.divider
-            : Color.lerp(colors.divider, accent, 0.65) ?? colors.divider;
+    final panelFill = _panelFill(
+      colors,
+      usePanelChrome: usePanelChrome,
+      isCapturing: isCapturing,
+      accent: accent,
+    );
+    final borderColor = _panelBorderColor(
+      colors,
+      usePanelChrome: usePanelChrome,
+      isCapturing: isCapturing,
+      accent: accent,
+    );
     const selectionSideGutter = BoardPanelSelectionMetrics.sideGutter;
     const selectionTopGutter = BoardPanelSelectionMetrics.topGutter;
     const selectionBottomGutter = BoardPanelSelectionMetrics.bottomGutter;
@@ -246,245 +240,61 @@ class BoardPanelCardState extends State<BoardPanelCard>
                   borderRadius: BorderRadius.circular(16),
                   child: Listener(
                     behavior: HitTestBehavior.opaque,
-                    onPointerDown: (_) {
-                      if (kDebugMode) {
-                        debugPrint('[BoardPanelCard] onPointerDown panelId=${panel.id} isWebpage=$isWebpage isFocused=$isFocused');
-                      }
-                        if (isWebpage) {
-                          if (!isFocused) {
-                            if (kDebugMode) {
-                              assert(() {
-                                debugPrint(
-                                  '[BoardWebFocus] panelPointerDown -> focus webpage panel=${panel.id}',
-                                );
-                                return true;
-                              }());
-                            }
-                            onTap();
-                          } else {
-                            if (kDebugMode) {
-                              assert(() {
-                                debugPrint(
-                                  '[BoardWebFocus] panelPointerDown -> already focused, releasing Flutter focus panel=${panel.id}',
-                                );
-                                return true;
-                              }());
-                            }
-                          }
-                          // On the web the panel renders inline, so Flutter
-                          // widgets (URL text field, etc.) must keep focus.
-                          // Only release first responder for the native desktop
-                          // overlay webview.
-                          if (!kIsWeb) {
-                            FocusManager.instance.primaryFocus?.unfocus();
-                          }
-                          return;
-                        }
-                        if (!isFocused) {
-                          onTap();
-                        }
-                      },
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: panelFill,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color:
-                                isCapturing
-                                    ? colors.background
-                                    : selected
-                                    ? colors.statusActive
-                                    : isFocused
-                                    ? colors.primary
-                                    : borderColor,
-                            width:
-                                (selected || isFocused) && !isCapturing ? 2 : 1,
-                          ),
-                          boxShadow:
-                              isCapturing || !usePanelChrome
-                                  ? null
-                                  : [
-                                    BoxShadow(
-                                      color: colors.background.withAlpha(35),
-                                      blurRadius: 22,
-                                      offset: const Offset(0, 8),
-                                    ),
-                                  ],
+                    onPointerDown:
+                        (_) => _handlePanelPointerDown(
+                          isWebpage: isWebpage,
+                          isFocused: isFocused,
                         ),
-                        child: Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            if (isFocused && !isCapturing)
-                              Positioned.fill(
-                                child: IgnorePointer(
-                                  child: DecoratedBox(
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(
-                                        color: colors.primary,
-                                        width: usePanelChrome ? 1.6 : 2.0,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                if (showHeader)
-                                  GestureDetector(
-                                    behavior: HitTestBehavior.opaque,
-                                    onPanStart: _startPanelTransform,
-                                    onPanUpdate:
-                                        panel.locked
-                                            ? null
-                                            : (details) => onMove(details),
-                                    onPanEnd: (_) => _endPanelTransform(),
-                                    onPanCancel: _endPanelTransform,
-                                    child: UnifiedPanelHeader(
-                                      panel: panel,
-                                      isSelected: selected,
-                                      isFocused: isFocused,
-                                      leadingIcon:
-                                          panel.type == ChatPanelPlugin.kTypeId
-                                              ? ChatProviderIcon(
-                                                provider:
-                                                    (panel.state['config']
-                                                            as Map?)?['provider']
-                                                        as String? ??
-                                                    'copilot',
-                                                size: 18,
-                                              )
-                                              : null,
-                                      pluginActions: _buildPluginHeaderActions(
-                                        context,
-                                        panel,
-                                      ),
-                                      onDuplicate: () => _duplicatePanel(panel),
-                                      onToggleLocked:
-                                          () => _toggleLocked(panel),
-                                      onEditColor: onEditColor,
-                                      onBringToFront: onBringToFront,
-                                      onSendToBack: onSendToBack,
-                                      onEdit: onEditNote,
-                                      onFullscreen: onFullscreen,
-                                      remoteLockActor: remoteLockActor,
-                                      onSettings:
-                                          () => _showPanelSettingsDialog(
-                                            context,
-                                            panel: panel,
-                                            plugin: plugin,
-                                            onEditPanel: onEditNote,
-                                            onEditColor: onEditColor,
-                                            onBringToFront: onBringToFront,
-                                            onSendToBack: onSendToBack,
-                                          ),
-                                      onDelete: onDelete,
-                                    ),
-                                  ),
-                                if (contentToolbar != null)
-                                  Padding(
-                                    padding: const EdgeInsets.only(
-                                      left: 12,
-                                      right: 12,
-                                      top: 8,
-                                    ),
-                                    child: PanelContentToolbar(
-                                      children: contentToolbar,
-                                    ),
-                                  ),
-                                Expanded(
-                                  child: Padding(
-                                    padding:
-                                        !showHeader || contentToolbar != null
-                                            ? EdgeInsets.zero
-                                            : plugin?.contentPadding ??
-                                                const EdgeInsets.all(12),
-                                    child: _buildPanelContent(context, panel),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            // ── Connect mode overlay ──────────────────────────────────────
-                            if (connectMode)
-                              Positioned.fill(
-                                child: GestureDetector(
-                                  onTap: onConnectTap,
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(
-                                        color:
-                                            connectSourceId == panel.id
-                                                ? colors.statusActive
-                                                : colors.statusActive.withAlpha(
-                                                  100,
-                                                ),
-                                        width:
-                                            connectSourceId == panel.id
-                                                ? 2.5
-                                                : 1.5,
-                                      ),
-                                      color:
-                                          connectSourceId == panel.id
-                                              ? colors.statusActive.withAlpha(
-                                                21,
-                                              )
-                                              : Colors.transparent,
-                                    ),
-                                    child:
-                                        connectSourceId == null
-                                            ? Center(
-                                              child: Container(
-                                                width: 36,
-                                                height: 36,
-                                                decoration: BoxDecoration(
-                                                  color: colors.statusActive
-                                                      .withAlpha(102),
-                                                  shape: BoxShape.circle,
-                                                ),
-                                                child: Icon(
-                                                  Icons.add_link,
-                                                  size: 18,
-                                                  color: colors.statusActive,
-                                                ),
-                                              ),
-                                            )
-                                            : connectSourceId == panel.id
-                                            ? Center(
-                                              child: Text(
-                                                'Source\n(tap to cancel)',
-                                                textAlign: TextAlign.center,
-                                                style: TextStyle(
-                                                  color: colors.statusActive,
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.w600,
-                                                ),
-                                              ),
-                                            )
-                                            : Center(
-                                              child: Container(
-                                                width: 36,
-                                                height: 36,
-                                                decoration: BoxDecoration(
-                                                  color: colors.statusActive
-                                                      .withAlpha(102),
-                                                  shape: BoxShape.circle,
-                                                ),
-                                                child: Icon(
-                                                  Icons.call_made,
-                                                  size: 18,
-                                                  color: colors.statusActive,
-                                                ),
-                                              ),
-                                            ),
-                                  ),
-                                ),
-                              ),
-                          ],
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: panelFill,
+                        borderRadius: BorderRadius.circular(16),
+                        border: _panelBorder(
+                          colors,
+                          isCapturing: isCapturing,
+                          isFocused: isFocused,
+                          borderColor: borderColor,
+                        ),
+                        boxShadow: _panelBoxShadow(
+                          colors,
+                          isCapturing: isCapturing,
+                          usePanelChrome: usePanelChrome,
                         ),
                       ),
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          ..._focusRingSection(
+                            colors,
+                            isFocused: isFocused,
+                            isCapturing: isCapturing,
+                            usePanelChrome: usePanelChrome,
+                          ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              ..._headerSection(
+                                context,
+                                plugin: plugin,
+                                showHeader: showHeader,
+                                isFocused: isFocused,
+                                remoteLockActor: remoteLockActor,
+                              ),
+                              ..._contentToolbarSection(contentToolbar),
+                              _contentArea(
+                                context,
+                                plugin: plugin,
+                                showHeader: showHeader,
+                                contentToolbar: contentToolbar,
+                              ),
+                            ],
+                          ),
+                          // ── Connect mode overlay ──────────────────────────────────────
+                          ..._connectOverlaySection(colors),
+                        ],
+                      ),
                     ),
+                  ),
                 ),
               ),
             ],
@@ -492,6 +302,293 @@ class BoardPanelCardState extends State<BoardPanelCard>
         ), // ScaleTransition
       ), // FadeTransition
     );
+  }
+
+  void _handlePanelPointerDown({
+    required bool isWebpage,
+    required bool isFocused,
+  }) {
+    if (kDebugMode) {
+      debugPrint(
+        '[BoardPanelCard] onPointerDown panelId=${panel.id} isWebpage=$isWebpage isFocused=$isFocused',
+      );
+    }
+    if (isWebpage) {
+      if (!isFocused) {
+        if (kDebugMode) {
+          assert(() {
+            debugPrint(
+              '[BoardWebFocus] panelPointerDown -> focus webpage panel=${panel.id}',
+            );
+            return true;
+          }());
+        }
+        onTap();
+      } else {
+        if (kDebugMode) {
+          assert(() {
+            debugPrint(
+              '[BoardWebFocus] panelPointerDown -> already focused, releasing Flutter focus panel=${panel.id}',
+            );
+            return true;
+          }());
+        }
+      }
+      // On the web the panel renders inline, so Flutter
+      // widgets (URL text field, etc.) must keep focus.
+      // Only release first responder for the native desktop
+      // overlay webview.
+      if (!kIsWeb) {
+        FocusManager.instance.primaryFocus?.unfocus();
+      }
+      return;
+    }
+    if (!isFocused) {
+      onTap();
+    }
+  }
+
+  Color _panelFill(
+    AppColorScheme colors, {
+    required bool usePanelChrome,
+    required bool isCapturing,
+    required Color? accent,
+  }) {
+    return !usePanelChrome
+        ? Colors.transparent
+        : isCapturing
+        ? colors.background
+        : accent == null
+        ? colors.surface
+        : Color.lerp(colors.surface, accent, 0.12) ?? colors.surface;
+  }
+
+  Color _panelBorderColor(
+    AppColorScheme colors, {
+    required bool usePanelChrome,
+    required bool isCapturing,
+    required Color? accent,
+  }) {
+    return !usePanelChrome
+        ? Colors.transparent
+        : isCapturing
+        ? colors.background
+        : selected
+        ? colors.statusActive
+        : accent == null
+        ? colors.divider
+        : Color.lerp(colors.divider, accent, 0.65) ?? colors.divider;
+  }
+
+  Border _panelBorder(
+    AppColorScheme colors, {
+    required bool isCapturing,
+    required bool isFocused,
+    required Color borderColor,
+  }) {
+    return Border.all(
+      color:
+          isCapturing
+              ? colors.background
+              : selected
+              ? colors.statusActive
+              : isFocused
+              ? colors.primary
+              : borderColor,
+      width: (selected || isFocused) && !isCapturing ? 2 : 1,
+    );
+  }
+
+  List<BoxShadow>? _panelBoxShadow(
+    AppColorScheme colors, {
+    required bool isCapturing,
+    required bool usePanelChrome,
+  }) {
+    return isCapturing || !usePanelChrome
+        ? null
+        : [
+          BoxShadow(
+            color: colors.background.withAlpha(35),
+            blurRadius: 22,
+            offset: const Offset(0, 8),
+          ),
+        ];
+  }
+
+  List<Widget> _focusRingSection(
+    AppColorScheme colors, {
+    required bool isFocused,
+    required bool isCapturing,
+    required bool usePanelChrome,
+  }) {
+    return [
+      if (isFocused && !isCapturing)
+        Positioned.fill(
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: colors.primary,
+                  width: usePanelChrome ? 1.6 : 2.0,
+                ),
+              ),
+            ),
+          ),
+        ),
+    ];
+  }
+
+  List<Widget> _headerSection(
+    BuildContext context, {
+    required BoardPanelPlugin? plugin,
+    required bool showHeader,
+    required bool isFocused,
+    required String? remoteLockActor,
+  }) {
+    return [
+      if (showHeader)
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onPanStart: _startPanelTransform,
+          onPanUpdate: panel.locked ? null : (details) => onMove(details),
+          onPanEnd: (_) => _endPanelTransform(),
+          onPanCancel: _endPanelTransform,
+          child: UnifiedPanelHeader(
+            panel: panel,
+            isSelected: selected,
+            isFocused: isFocused,
+            leadingIcon:
+                panel.type == ChatPanelPlugin.kTypeId
+                    ? ChatProviderIcon(
+                      provider:
+                          (panel.state['config'] as Map?)?['provider']
+                              as String? ??
+                          'copilot',
+                      size: 18,
+                    )
+                    : null,
+            pluginActions: _buildPluginHeaderActions(context, panel),
+            onDuplicate: () => _duplicatePanel(panel),
+            onToggleLocked: () => _toggleLocked(panel),
+            onEditColor: onEditColor,
+            onBringToFront: onBringToFront,
+            onSendToBack: onSendToBack,
+            onEdit: onEditNote,
+            onFullscreen: onFullscreen,
+            remoteLockActor: remoteLockActor,
+            onSettings:
+                () => _showPanelSettingsDialog(
+                  context,
+                  panel: panel,
+                  plugin: plugin,
+                  onEditPanel: onEditNote,
+                  onEditColor: onEditColor,
+                  onBringToFront: onBringToFront,
+                  onSendToBack: onSendToBack,
+                ),
+            onDelete: onDelete,
+          ),
+        ),
+    ];
+  }
+
+  List<Widget> _contentToolbarSection(List<Widget>? contentToolbar) {
+    return [
+      if (contentToolbar != null)
+        Padding(
+          padding: const EdgeInsets.only(left: 12, right: 12, top: 8),
+          child: PanelContentToolbar(children: contentToolbar),
+        ),
+    ];
+  }
+
+  Widget _contentArea(
+    BuildContext context, {
+    required BoardPanelPlugin? plugin,
+    required bool showHeader,
+    required List<Widget>? contentToolbar,
+  }) {
+    return Expanded(
+      child: Padding(
+        padding:
+            !showHeader || contentToolbar != null
+                ? EdgeInsets.zero
+                : plugin?.contentPadding ?? const EdgeInsets.all(12),
+        child: _buildPanelContent(context, panel),
+      ),
+    );
+  }
+
+  List<Widget> _connectOverlaySection(AppColorScheme colors) {
+    return [
+      if (connectMode)
+        Positioned.fill(
+          child: GestureDetector(
+            onTap: onConnectTap,
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color:
+                      connectSourceId == panel.id
+                          ? colors.statusActive
+                          : colors.statusActive.withAlpha(100),
+                  width: connectSourceId == panel.id ? 2.5 : 1.5,
+                ),
+                color:
+                    connectSourceId == panel.id
+                        ? colors.statusActive.withAlpha(21)
+                        : Colors.transparent,
+              ),
+              child:
+                  connectSourceId == null
+                      ? Center(
+                        child: Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: colors.statusActive.withAlpha(102),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.add_link,
+                            size: 18,
+                            color: colors.statusActive,
+                          ),
+                        ),
+                      )
+                      : connectSourceId == panel.id
+                      ? Center(
+                        child: Text(
+                          'Source\n(tap to cancel)',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: colors.statusActive,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      )
+                      : Center(
+                        child: Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: colors.statusActive.withAlpha(102),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.call_made,
+                            size: 18,
+                            color: colors.statusActive,
+                          ),
+                        ),
+                      ),
+            ),
+          ),
+        ),
+    ];
   }
 
   void _duplicatePanel(BoardPanelInstance panel) =>

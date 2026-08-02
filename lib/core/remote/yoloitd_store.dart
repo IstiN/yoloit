@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 import 'package:yoloit/core/remote/history_store_helpers.dart';
+import 'package:yoloit/core/remote/panel_history_undo.dart';
 import 'package:yoloit/core/remote/yoloitd_models.dart';
 
 class YoloitdStore {
@@ -155,46 +156,47 @@ class YoloitdStore {
       if (board == null) return false;
       final events = await historyForBoard(board.id);
 
-      for (var index = events.length - 1; index >= 0; index--) {
-        final event = events[index];
-        if (event.entityType != 'panel') continue;
-        if (event.restoresOpId != null || event.type == 'panel.restored') {
-          continue;
-        }
-        final current =
-            board.panels.where((panel) => panel.id == event.entityId).firstOrNull;
-        final before =
-            event.before == null ? null : RemotePanel.fromJson(event.before!);
-        final after =
-            event.after == null ? null : RemotePanel.fromJson(event.after!);
+      final plan = planPanelHistoryUndo<RemotePanel>(
+        events: events,
+        currentPanelOf:
+            (entityId) =>
+                board.panels
+                    .where((panel) => panel.id == entityId)
+                    .firstOrNull,
+        panelFromJson: RemotePanel.fromJson,
+        panelToJson: (panel) => panel.toJson(),
+        previousInRun:
+            (previous, latest) => previous.type == latest.type,
+      );
 
-        if (after != null &&
-            before == null &&
-            current != null &&
-            _matchesCreateUndo(current, after)) {
+      switch (plan.kind) {
+        case PanelUndoKind.none:
+          return false;
+        case PanelUndoKind.removeCreated:
+          final after = plan.snapshot!;
           _pushRedo(board.id, _RemoteRedoEntry.recreate(after));
           await removePanel(board.id, after.id, recordHistory: false);
           return true;
-        }
-        if (before != null && current != null && !_samePanel(current, before)) {
-          final start = _coalescedPanelUpdateStart(events, index);
-          final snapshot =
-              start.before == null ? before : RemotePanel.fromJson(start.before!);
-          final latestAfter =
-              event.after == null ? null : RemotePanel.fromJson(event.after!);
+        case PanelUndoKind.restoreSnapshot:
+          final latestAfter = plan.redoSnapshot;
           if (latestAfter != null) {
             _pushRedo(board.id, _RemoteRedoEntry.restore(latestAfter));
           }
-          await restorePanel(board.id, snapshot, restoresOpId: event.opId);
+          await restorePanel(
+            board.id,
+            plan.snapshot!,
+            restoresOpId: plan.opId!,
+          );
           return true;
-        }
-        if (before != null && current == null && event.type == 'panel.deleted') {
-          _pushRedo(board.id, _RemoteRedoEntry.delete(event.entityId));
-          await restorePanel(board.id, before, restoresOpId: event.opId);
+        case PanelUndoKind.restoreDeleted:
+          _pushRedo(board.id, _RemoteRedoEntry.delete(plan.entityId!));
+          await restorePanel(
+            board.id,
+            plan.snapshot!,
+            restoresOpId: plan.opId!,
+          );
           return true;
-        }
       }
-      return false;
     });
   }
 
@@ -438,45 +440,6 @@ class YoloitdStore {
 
   static bool _samePanel(RemotePanel a, RemotePanel b) {
     return jsonEncode(a.toJson()) == jsonEncode(b.toJson());
-  }
-
-  static bool _matchesCreateUndo(RemotePanel current, RemotePanel after) {
-    final currentJson = Map<String, dynamic>.from(current.toJson());
-    final afterJson = Map<String, dynamic>.from(after.toJson());
-    currentJson.remove('zIndex');
-    afterJson.remove('zIndex');
-    return jsonEncode(currentJson) == jsonEncode(afterJson);
-  }
-
-  static RemoteHistoryEvent _coalescedPanelUpdateStart(
-    List<RemoteHistoryEvent> events,
-    int latestIndex,
-  ) {
-    final latest = events[latestIndex];
-    if (latest.type != 'panel.updated' &&
-        latest.type != 'panel.placedInGrid') {
-      return latest;
-    }
-    var start = latestIndex;
-    final signature = _patchSignature(latest);
-    while (start > 0) {
-      final previous = events[start - 1];
-      if (previous.type != latest.type ||
-          previous.entityType != latest.entityType ||
-          previous.entityId != latest.entityId ||
-          previous.restoresOpId != null ||
-          previous.revision + 1 != events[start].revision ||
-          _patchSignature(previous) != signature) {
-        break;
-      }
-      start--;
-    }
-    return events[start];
-  }
-
-  static String _patchSignature(RemoteHistoryEvent event) {
-    final keys = event.patch.keys.toList()..sort();
-    return keys.join('|');
   }
 
   static Map<String, dynamic> _panelPatch(

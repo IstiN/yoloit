@@ -1397,35 +1397,39 @@ class _EditorBodyState extends State<_EditorBody> {
     if (!_showQuickFind) return false;
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return false;
 
-    if (event.logicalKey == LogicalKeyboardKey.escape) {
-      _closeQuickFind();
+    final action = _quickFindKeyActions[event.logicalKey];
+    if (action != null) {
+      action();
       return true;
     }
-    if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
-      _closeQuickFind(selection: _QuickFindCloseSelection.collapsedStart);
-      return true;
+    return _handleQuickFindCharacter(event);
+  }
+
+  late final Map<LogicalKeyboardKey, void Function()> _quickFindKeyActions = {
+    LogicalKeyboardKey.escape: _closeQuickFind,
+    LogicalKeyboardKey.arrowLeft:
+        () => _closeQuickFind(
+          selection: _QuickFindCloseSelection.collapsedStart,
+        ),
+    LogicalKeyboardKey.arrowRight:
+        () => _closeQuickFind(
+          selection: _QuickFindCloseSelection.collapsedEnd,
+        ),
+    LogicalKeyboardKey.arrowDown: _quickFindNext,
+    LogicalKeyboardKey.enter: _quickFindNext,
+    LogicalKeyboardKey.arrowUp: _quickFindPrev,
+    LogicalKeyboardKey.backspace: _quickFindBackspace,
+  };
+
+  void _quickFindBackspace() {
+    if (_quickFindQuery.isNotEmpty) {
+      _updateQuickFindQuery(
+        _quickFindQuery.substring(0, _quickFindQuery.length - 1),
+      );
     }
-    if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
-      _closeQuickFind(selection: _QuickFindCloseSelection.collapsedEnd);
-      return true;
-    }
-    if (event.logicalKey == LogicalKeyboardKey.arrowDown ||
-        event.logicalKey == LogicalKeyboardKey.enter) {
-      _quickFindNext();
-      return true;
-    }
-    if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
-      _quickFindPrev();
-      return true;
-    }
-    if (event.logicalKey == LogicalKeyboardKey.backspace) {
-      if (_quickFindQuery.isNotEmpty) {
-        _updateQuickFindQuery(
-          _quickFindQuery.substring(0, _quickFindQuery.length - 1),
-        );
-      }
-      return true;
-    }
+  }
+
+  bool _handleQuickFindCharacter(KeyEvent event) {
     if (HardwareKeyboard.instance.isMetaPressed ||
         HardwareKeyboard.instance.isControlPressed ||
         HardwareKeyboard.instance.isAltPressed) {
@@ -1751,132 +1755,17 @@ class _EditorBodyState extends State<_EditorBody> {
               onGoToLine: () => _showGoToLine(context),
             ),
             if (widget.isLargeFile) const _LargeFileBanner(),
-            if (widget.codeController.searchController.shouldShow)
-              SearchReplaceBar(
-                controller: widget.codeController,
-                replaceController: _replaceCtrl,
-                replaceFocus: _replaceFocus,
-                showReplace: _showReplace,
-                onToggleReplace:
-                    () => setState(() => _showReplace = !_showReplace),
-                onReplace: _replaceCurrentMatch,
-                onReplaceAll: _replaceAllMatches,
-              ),
+            ..._searchBarSection(),
             Expanded(
               child: Stack(
                 children: [
                   Row(
                     children: [
-                      Expanded(
-                        child: Column(
-                          children: [
-                            Expanded(
-                              child: ValueListenableBuilder<double>(
-                                valueListenable: widget.fontSizeNotifier,
-                                builder: (context, fontSize, _) {
-                                  final lineHeight = fontSize * 1.5;
-                                  return NotificationListener<
-                                    ScrollNotification
-                                  >(
-                                    onNotification: (n) {
-                                      if (n.metrics.axis == Axis.vertical) {
-                                        _codeScrollOffset.value =
-                                            n.metrics.pixels;
-                                      }
-                                      return false;
-                                    },
-                                    child: RepaintBoundary(
-                                      child: Stack(
-                                        children: [
-                                          CodeTheme(
-                                            data: CodeThemeData(
-                                              styles: _buildDarkTheme(colors),
-                                            ),
-                                            child: CodeField(
-                                              focusNode: _codeFocus,
-                                              controller: widget.codeController,
-                                              expands: true,
-                                              wrap: _wordWrap,
-                                              textStyle: TextStyle(
-                                                fontFamily: 'monospace',
-                                                fontSize: fontSize,
-                                                height: 1.5,
-                                              ),
-                                              background: colors.background,
-                                              gutterStyle: GutterStyle(
-                                                width: 72,
-                                                margin: 8,
-                                                textStyle: TextStyle(
-                                                  color: Theme.of(context)
-                                                      .colorScheme
-                                                      .onSurface
-                                                      .withAlpha(100),
-                                                  fontFamily: 'monospace',
-                                                ),
-                                                background:
-                                                    colors.surfaceElevated,
-                                              ),
-                                            ),
-                                          ),
-                                          // Git gutter overlay — 3px strip at left edge of gutter.
-                                          if (_gitMarkers.isNotEmpty)
-                                            Positioned(
-                                              left: 0,
-                                              top: 0,
-                                              bottom: 0,
-                                              width: 3,
-                                              child: ValueListenableBuilder<
-                                                double
-                                              >(
-                                                valueListenable:
-                                                    _codeScrollOffset,
-                                                builder: (
-                                                  context,
-                                                  scrollOffset,
-                                                  _,
-                                                ) {
-                                                  return _GitGutterPainter(
-                                                    markers: _gitMarkers,
-                                                    lineHeight: lineHeight,
-                                                    scrollOffset: scrollOffset,
-                                                  );
-                                                },
-                                              ),
-                                            ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
-                            _EditorStatusBar(
-                              controller: widget.codeController,
-                              language: language,
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (_showOutline)
-                        _SymbolOutline(
-                          content: widget.codeController.text,
-                          filePath: widget.tab.filePath,
-                          onJumpToLine:
-                              (line) =>
-                                  _jumpToLine(widget.codeController, line),
-                        ),
+                      Expanded(child: _buildEditorColumn(colors, language)),
+                      ..._outlineSection(),
                     ],
                   ),
-                  if (_showQuickFind)
-                    Positioned(
-                      top: 8,
-                      left: 24,
-                      child: _QuickFindHint(
-                        query: _quickFindQuery,
-                        matchCount: _quickFindOffsets.length,
-                        currentMatch: _quickFindCurrent,
-                      ),
-                    ),
+                  ..._quickFindHintSection(),
                 ],
               ),
             ),
@@ -1884,6 +1773,144 @@ class _EditorBodyState extends State<_EditorBody> {
         ),
       ),
     );
+  }
+
+  List<Widget> _searchBarSection() {
+    if (!widget.codeController.searchController.shouldShow) return const [];
+    return [
+      SearchReplaceBar(
+        controller: widget.codeController,
+        replaceController: _replaceCtrl,
+        replaceFocus: _replaceFocus,
+        showReplace: _showReplace,
+        onToggleReplace: () => setState(() => _showReplace = !_showReplace),
+        onReplace: _replaceCurrentMatch,
+        onReplaceAll: _replaceAllMatches,
+      ),
+    ];
+  }
+
+  List<Widget> _outlineSection() {
+    if (!_showOutline) return const [];
+    return [
+      _SymbolOutline(
+        content: widget.codeController.text,
+        filePath: widget.tab.filePath,
+        onJumpToLine: (line) => _jumpToLine(widget.codeController, line),
+      ),
+    ];
+  }
+
+  List<Widget> _quickFindHintSection() {
+    if (!_showQuickFind) return const [];
+    return [
+      Positioned(
+        top: 8,
+        left: 24,
+        child: _QuickFindHint(
+          query: _quickFindQuery,
+          matchCount: _quickFindOffsets.length,
+          currentMatch: _quickFindCurrent,
+        ),
+      ),
+    ];
+  }
+
+  Widget _buildEditorColumn(AppColorScheme colors, String language) {
+    return Column(
+      children: [
+        Expanded(
+          child: ValueListenableBuilder<double>(
+            valueListenable: widget.fontSizeNotifier,
+            builder:
+                (context, fontSize, _) =>
+                    _buildCodeScrollArea(context, colors, fontSize),
+          ),
+        ),
+        _EditorStatusBar(
+          controller: widget.codeController,
+          language: language,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCodeScrollArea(
+    BuildContext context,
+    AppColorScheme colors,
+    double fontSize,
+  ) {
+    final lineHeight = fontSize * 1.5;
+    return NotificationListener<ScrollNotification>(
+      onNotification: (n) {
+        if (n.metrics.axis == Axis.vertical) {
+          _codeScrollOffset.value = n.metrics.pixels;
+        }
+        return false;
+      },
+      child: RepaintBoundary(
+        child: Stack(
+          children: [
+            _buildCodeField(context, colors, fontSize),
+            // Git gutter overlay — 3px strip at left edge of gutter.
+            ..._gitGutterSection(lineHeight),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCodeField(
+    BuildContext context,
+    AppColorScheme colors,
+    double fontSize,
+  ) {
+    return CodeTheme(
+      data: CodeThemeData(styles: _buildDarkTheme(colors)),
+      child: CodeField(
+        focusNode: _codeFocus,
+        controller: widget.codeController,
+        expands: true,
+        wrap: _wordWrap,
+        textStyle: TextStyle(
+          fontFamily: 'monospace',
+          fontSize: fontSize,
+          height: 1.5,
+        ),
+        background: colors.background,
+        gutterStyle: GutterStyle(
+          width: 72,
+          margin: 8,
+          textStyle: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface.withAlpha(100),
+            fontFamily: 'monospace',
+          ),
+          background: colors.surfaceElevated,
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _gitGutterSection(double lineHeight) {
+    if (_gitMarkers.isEmpty) return const [];
+    return [
+      Positioned(
+        left: 0,
+        top: 0,
+        bottom: 0,
+        width: 3,
+        child: ValueListenableBuilder<double>(
+          valueListenable: _codeScrollOffset,
+          builder: (context, scrollOffset, _) {
+            return _GitGutterPainter(
+              markers: _gitMarkers,
+              lineHeight: lineHeight,
+              scrollOffset: scrollOffset,
+            );
+          },
+        ),
+      ),
+    ];
   }
 
   static Map<String, TextStyle> _buildDarkTheme(AppColorScheme colors) => {
@@ -2278,93 +2305,11 @@ List<_OutlineSymbol> _parseSymbols(String content, String filePath) {
     final t = line.trim();
     switch (ext) {
       case 'dart':
-        if (RegExp(
-          r'^(abstract\s+)?(?:class|enum|mixin|extension)\s+\w+',
-        ).hasMatch(t)) {
-          final m = RegExp(
-            r'(?:class|enum|mixin|extension)\s+(\w+)',
-          ).firstMatch(t);
-          if (m != null) {
-            symbols.add(
-              _OutlineSymbol(name: m.group(1)!, line: i + 1, isClass: true),
-            );
-          }
-        } else {
-          final m = RegExp(
-            r'(?:Future(?:<[^>]*>)?|Widget|void|String|int|bool|double|List|Map|dynamic)\s+(\w+)\s*[\(<]',
-          ).firstMatch(line);
-          if (m != null &&
-              ![
-                'if',
-                'for',
-                'while',
-                'switch',
-                'return',
-              ].contains(m.group(1))) {
-            symbols.add(
-              _OutlineSymbol(
-                name: '${m.group(1)!}()',
-                line: i + 1,
-                isClass: false,
-              ),
-            );
-          }
-        }
+        _parseDartSymbolLine(line, t, i, symbols);
       case 'js' || 'ts' || 'jsx' || 'tsx':
-        if (t.startsWith('class ')) {
-          final m = RegExp(r'class\s+(\w+)').firstMatch(t);
-          if (m != null) {
-            symbols.add(
-              _OutlineSymbol(name: m.group(1)!, line: i + 1, isClass: true),
-            );
-          }
-        } else if (RegExp(
-          r'^(?:export\s+)?(?:async\s+)?function\s+\w+',
-        ).hasMatch(t)) {
-          final m = RegExp(r'function\s+(\w+)').firstMatch(t);
-          if (m != null) {
-            symbols.add(
-              _OutlineSymbol(
-                name: '${m.group(1)!}()',
-                line: i + 1,
-                isClass: false,
-              ),
-            );
-          }
-        } else if (RegExp(
-          r'^(?:const|let|var)\s+\w+\s*=\s*(?:async\s+)?\(',
-        ).hasMatch(t)) {
-          final m = RegExp(r'(?:const|let|var)\s+(\w+)').firstMatch(t);
-          if (m != null) {
-            symbols.add(
-              _OutlineSymbol(
-                name: '${m.group(1)!}()',
-                line: i + 1,
-                isClass: false,
-              ),
-            );
-          }
-        }
+        _parseJsSymbolLine(t, i, symbols);
       case 'py':
-        if (t.startsWith('class ')) {
-          final m = RegExp(r'class\s+(\w+)').firstMatch(t);
-          if (m != null) {
-            symbols.add(
-              _OutlineSymbol(name: m.group(1)!, line: i + 1, isClass: true),
-            );
-          }
-        } else if (t.startsWith('def ') || t.startsWith('async def ')) {
-          final m = RegExp(r'def\s+(\w+)').firstMatch(t);
-          if (m != null) {
-            symbols.add(
-              _OutlineSymbol(
-                name: '${m.group(1)!}()',
-                line: i + 1,
-                isClass: false,
-              ),
-            );
-          }
-        }
+        _parsePySymbolLine(t, i, symbols);
     }
   }
 
@@ -2374,6 +2319,105 @@ List<_OutlineSymbol> _parseSymbols(String content, String filePath) {
   }
   _symbolCache[key] = symbols;
   return symbols;
+}
+
+void _parseDartSymbolLine(
+  String line,
+  String t,
+  int i,
+  List<_OutlineSymbol> symbols,
+) {
+  if (RegExp(
+    r'^(abstract\s+)?(?:class|enum|mixin|extension)\s+\w+',
+  ).hasMatch(t)) {
+    final m = RegExp(
+      r'(?:class|enum|mixin|extension)\s+(\w+)',
+    ).firstMatch(t);
+    if (m != null) {
+      symbols.add(
+        _OutlineSymbol(name: m.group(1)!, line: i + 1, isClass: true),
+      );
+    }
+  } else {
+    final m = RegExp(
+      r'(?:Future(?:<[^>]*>)?|Widget|void|String|int|bool|double|List|Map|dynamic)\s+(\w+)\s*[\(<]',
+    ).firstMatch(line);
+    if (m != null &&
+        ![
+          'if',
+          'for',
+          'while',
+          'switch',
+          'return',
+        ].contains(m.group(1))) {
+      symbols.add(
+        _OutlineSymbol(
+          name: '${m.group(1)!}()',
+          line: i + 1,
+          isClass: false,
+        ),
+      );
+    }
+  }
+}
+
+void _parseJsSymbolLine(String t, int i, List<_OutlineSymbol> symbols) {
+  if (t.startsWith('class ')) {
+    final m = RegExp(r'class\s+(\w+)').firstMatch(t);
+    if (m != null) {
+      symbols.add(
+        _OutlineSymbol(name: m.group(1)!, line: i + 1, isClass: true),
+      );
+    }
+  } else if (RegExp(
+    r'^(?:export\s+)?(?:async\s+)?function\s+\w+',
+  ).hasMatch(t)) {
+    final m = RegExp(r'function\s+(\w+)').firstMatch(t);
+    if (m != null) {
+      symbols.add(
+        _OutlineSymbol(
+          name: '${m.group(1)!}()',
+          line: i + 1,
+          isClass: false,
+        ),
+      );
+    }
+  } else if (RegExp(
+    r'^(?:const|let|var)\s+\w+\s*=\s*(?:async\s+)?\(',
+  ).hasMatch(t)) {
+    final m = RegExp(r'(?:const|let|var)\s+(\w+)').firstMatch(t);
+    if (m != null) {
+      symbols.add(
+        _OutlineSymbol(
+          name: '${m.group(1)!}()',
+          line: i + 1,
+          isClass: false,
+        ),
+      );
+    }
+  }
+}
+
+void _parsePySymbolLine(String t, int i, List<_OutlineSymbol> symbols) {
+  if (t.startsWith('class ')) {
+    final m = RegExp(r'class\s+(\w+)').firstMatch(t);
+    if (m != null) {
+      symbols.add(
+        _OutlineSymbol(name: m.group(1)!, line: i + 1, isClass: true),
+      );
+    }
+  } else if (t.startsWith('def ') || t.startsWith('async def ')) {
+    final m = RegExp(r'def\s+(\w+)').firstMatch(t);
+    if (m != null) {
+      symbols.add(
+        _OutlineSymbol(
+          name: '${m.group(1)!}()',
+          line: i + 1,
+          isClass: false,
+        ),
+      );
+    }
+  }
 }
 
 class _OutlineItem extends StatelessWidget {

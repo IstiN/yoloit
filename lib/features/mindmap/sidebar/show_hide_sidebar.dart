@@ -454,80 +454,24 @@ class _MindMapShowHideSidebarState extends State<MindMapShowHideSidebar> {
     required int depth,
   }) {
     final widgets = <Widget>[];
+    // When a filter is active, only show nodes whose label (or any descendant) matches.
+    // Auto-expand workspaces that contain matches.
+    final bool filterActive = _filterQuery.isNotEmpty;
     for (final node in nodes) {
       final isWorkspace = depth == 0 && node.type == 'workspace';
       final hasChildren = node.children.isNotEmpty;
 
-      // When a filter is active, only show nodes whose label (or any descendant) matches.
-      // Auto-expand workspaces that contain matches.
-      final bool filterActive = _filterQuery.isNotEmpty;
-      if (filterActive && !_nodeMatchesFilter(node, _filterQuery)) continue;
-      if (filterActive && isWorkspace) {
-        // Force-expand workspaces so matching children are visible.
-        _expandedIds.add(node.id);
-      }
+      if (!_applyFilter(node, isWorkspace, filterActive)) continue;
 
       final expanded = _expandedIds.contains(node.id);
 
-      // For workspace rows, toggling hides/shows workspace + all descendant IDs together.
-      List<String> allDescendantIds(ShowHideSidebarNode n) {
-        final ids = <String>[n.id];
-        for (final c in n.children) {
-          ids.addAll(allDescendantIds(c));
-        }
-        return ids;
-      }
-
-      final VoidCallback toggleHide =
-          isWorkspace
-              ? () => widget.onToggleGroup(allDescendantIds(node))
-              : () => widget.onToggleHide(node.id);
-
-      // Collect descendant IDs as a Set for hide/show-all-children callbacks.
-      Set<String> descendantIds() {
-        final ids = <String>{};
-        for (final c in node.children) {
-          ids.add(c.id);
-          void collect(ShowHideSidebarNode n) {
-            for (final ch in n.children) {
-              ids.add(ch.id);
-              collect(ch);
-            }
-          }
-
-          collect(c);
-        }
-        return ids;
-      }
-
       widgets.add(
-        _SidebarTreeRow(
-          node: node,
+        _buildNodeRow(
+          node,
           depth: depth,
           isWorkspace: isWorkspace,
+          hasChildren: hasChildren,
           expanded: expanded,
-          onToggleHide: toggleHide,
-          onToggleExpand:
-              hasChildren
-                  ? () => setState(() {
-                    expanded
-                        ? _expandedIds.remove(node.id)
-                        : _expandedIds.add(node.id);
-                  })
-                  : null,
-          onFocus:
-              widget.onFocusNode != null
-                  ? () => widget.onFocusNode!(node.id)
-                  : null,
-          onRemoveFolder: widget.onRemoveFolder,
-          onHideDescendants:
-              hasChildren && widget.onHideDescendants != null
-                  ? () => widget.onHideDescendants!(descendantIds())
-                  : null,
-          onShowDescendants:
-              hasChildren && widget.onShowDescendants != null
-                  ? () => widget.onShowDescendants!(descendantIds())
-                  : null,
         ),
       );
       if (hasChildren && expanded) {
@@ -535,6 +479,87 @@ class _MindMapShowHideSidebarState extends State<MindMapShowHideSidebar> {
       }
     }
     return widgets;
+  }
+
+  /// Returns false when [node] does not match the active quick filter.
+  bool _applyFilter(
+    ShowHideSidebarNode node,
+    bool isWorkspace,
+    bool filterActive,
+  ) {
+    if (filterActive && !_nodeMatchesFilter(node, _filterQuery)) return false;
+    if (filterActive && isWorkspace) {
+      // Force-expand workspaces so matching children are visible.
+      _expandedIds.add(node.id);
+    }
+    return true;
+  }
+
+  Widget _buildNodeRow(
+    ShowHideSidebarNode node, {
+    required int depth,
+    required bool isWorkspace,
+    required bool hasChildren,
+    required bool expanded,
+  }) {
+    // For workspace rows, toggling hides/shows workspace + all descendant IDs together.
+    final VoidCallback toggleHide =
+        isWorkspace
+            ? () => widget.onToggleGroup(_allDescendantIds(node))
+            : () => widget.onToggleHide(node.id);
+
+    return _SidebarTreeRow(
+      node: node,
+      depth: depth,
+      isWorkspace: isWorkspace,
+      expanded: expanded,
+      onToggleHide: toggleHide,
+      onToggleExpand: hasChildren ? () => _toggleExpanded(node, expanded) : null,
+      onFocus:
+          widget.onFocusNode != null
+              ? () => widget.onFocusNode!(node.id)
+              : null,
+      onRemoveFolder: widget.onRemoveFolder,
+      onHideDescendants:
+          hasChildren && widget.onHideDescendants != null
+              ? () => widget.onHideDescendants!(_descendantIds(node))
+              : null,
+      onShowDescendants:
+          hasChildren && widget.onShowDescendants != null
+              ? () => widget.onShowDescendants!(_descendantIds(node))
+              : null,
+    );
+  }
+
+  void _toggleExpanded(ShowHideSidebarNode node, bool expanded) {
+    setState(() {
+      expanded ? _expandedIds.remove(node.id) : _expandedIds.add(node.id);
+    });
+  }
+
+  List<String> _allDescendantIds(ShowHideSidebarNode n) {
+    final ids = <String>[n.id];
+    for (final c in n.children) {
+      ids.addAll(_allDescendantIds(c));
+    }
+    return ids;
+  }
+
+  /// Collects descendant IDs as a Set for hide/show-all-children callbacks.
+  Set<String> _descendantIds(ShowHideSidebarNode node) {
+    final ids = <String>{};
+    for (final c in node.children) {
+      ids.add(c.id);
+      void collect(ShowHideSidebarNode n) {
+        for (final ch in n.children) {
+          ids.add(ch.id);
+          collect(ch);
+        }
+      }
+
+      collect(c);
+    }
+    return ids;
   }
 
   /// Returns true if the node's label or any descendant label matches [query].
@@ -814,6 +839,12 @@ class _SidebarTreeRow extends StatelessWidget {
         _ => (color: colors.textMuted, isMuted: true),
       };
 
+  bool get _isRepoFolder =>
+      node.type == 'repo' &&
+      onRemoveFolder != null &&
+      node.id.startsWith('repo:') &&
+      !node.id.startsWith('repo:orphan:');
+
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
@@ -822,172 +853,194 @@ class _SidebarTreeRow extends StatelessWidget {
     final icon = _typeIcons[node.type] ?? Icons.circle;
     final rawColor = _typeColor(colors);
     final color = rawColor.isMuted ? mutedColor : rawColor.color;
-    final hasChildren = node.children.isNotEmpty;
     final isAgent = node.type == 'agent';
 
-    Widget row;
+    final Widget row =
+        isWorkspace
+            ? _buildWorkspaceRow(context, colors, mutedColor)
+            : _buildChildRow(context, colors, mutedColor, icon, color);
 
-    if (isWorkspace) {
-      row = InkWell(
-        onTap: onToggleExpand,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-          child: Row(
-            children: [
-              GestureDetector(
-                onTap: onToggleHide,
-                child: Padding(
-                  padding: const EdgeInsets.all(2),
-                  child: Icon(
-                    node.hidden ? Icons.visibility_off : Icons.visibility,
-                    size: 13,
-                    color:
-                        node.hidden
-                            ? Theme.of(
-                              context,
-                            ).colorScheme.onSurface.withAlpha(128)
-                            : colors.primary,
-                  ),
+    return _wrapWithContextMenu(context, row, isAgent);
+  }
+
+  Widget _buildWorkspaceRow(
+    BuildContext context,
+    AppColorScheme colors,
+    Color mutedColor,
+  ) {
+    return InkWell(
+      onTap: onToggleExpand,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        child: Row(
+          children: [
+            GestureDetector(
+              onTap: onToggleHide,
+              child: Padding(
+                padding: const EdgeInsets.all(2),
+                child: Icon(
+                  node.hidden ? Icons.visibility_off : Icons.visibility,
+                  size: 13,
+                  color:
+                      node.hidden
+                          ? Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withAlpha(128)
+                          : colors.primary,
                 ),
               ),
-              const SizedBox(width: 6),
-              Icon(
-                Icons.folder_copy_outlined,
-                size: 13,
-                color:
-                    node.hidden
-                        ? Theme.of(
-                          context,
-                        ).colorScheme.onSurface.withAlpha(128)
-                        : colors.primary,
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  node.label,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color:
-                        node.hidden
-                            ? Theme.of(
-                              context,
-                            ).colorScheme.onSurface.withAlpha(128)
-                            : Theme.of(context).colorScheme.onSurface,
-                  ),
+            ),
+            const SizedBox(width: 6),
+            Icon(
+              Icons.folder_copy_outlined,
+              size: 13,
+              color:
+                  node.hidden
+                      ? Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withAlpha(128)
+                      : colors.primary,
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                node.label,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color:
+                      node.hidden
+                          ? Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withAlpha(128)
+                          : Theme.of(context).colorScheme.onSurface,
                 ),
               ),
+            ),
+            Icon(
+              expanded ? Icons.expand_less : Icons.expand_more,
+              size: 13,
+              color: mutedColor,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildChildRow(
+    BuildContext context,
+    AppColorScheme colors,
+    Color mutedColor,
+    IconData icon,
+    Color color,
+  ) {
+    final hasChildren = node.children.isNotEmpty;
+    final indent = 10.0 + depth * 14.0;
+    return InkWell(
+      onTap: hasChildren ? onToggleExpand : onFocus,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(indent, 3, 8, 3),
+        child: Row(
+          children: [
+            Container(
+              width: 1,
+              height: 16,
+              margin: const EdgeInsets.only(right: 5),
+              color: colors.border,
+            ),
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onToggleHide,
+              child: Padding(
+                padding: const EdgeInsets.all(2),
+                child: Icon(
+                  node.hidden ? Icons.visibility_off : Icons.visibility,
+                  size: 11,
+                  color:
+                      node.hidden
+                          ? Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withAlpha(128)
+                          : colors.primary.withValues(alpha: 0.6),
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              icon,
+              size: 11,
+              color:
+                  node.hidden
+                      ? Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withAlpha(76)
+                      : color,
+            ),
+            const SizedBox(width: 5),
+            Expanded(
+              child: Text(
+                node.label,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 10,
+                  color:
+                      node.hidden
+                          ? Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withAlpha(128)
+                          : Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withAlpha(153),
+                ),
+              ),
+            ),
+            if (hasChildren) ...[
+              const SizedBox(width: 2),
               Icon(
                 expanded ? Icons.expand_less : Icons.expand_more,
-                size: 13,
+                size: 11,
                 color: mutedColor,
               ),
             ],
-          ),
+            if (node.type == 'diff') _buildDiffBadge(colors),
+          ],
         ),
-      );
-    } else {
-      final indent = 10.0 + depth * 14.0;
-      row = InkWell(
-        onTap: hasChildren ? onToggleExpand : onFocus,
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(indent, 3, 8, 3),
-          child: Row(
-            children: [
-              Container(
-                width: 1,
-                height: 16,
-                margin: const EdgeInsets.only(right: 5),
-                color: colors.border,
-              ),
-              GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: onToggleHide,
-                child: Padding(
-                  padding: const EdgeInsets.all(2),
-                  child: Icon(
-                    node.hidden ? Icons.visibility_off : Icons.visibility,
-                    size: 11,
-                    color:
-                        node.hidden
-                            ? Theme.of(
-                              context,
-                            ).colorScheme.onSurface.withAlpha(128)
-                            : colors.primary.withValues(alpha: 0.6),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 4),
-              Icon(
-                icon,
-                size: 11,
-                color:
-                    node.hidden
-                        ? Theme.of(
-                          context,
-                        ).colorScheme.onSurface.withAlpha(76)
-                        : color,
-              ),
-              const SizedBox(width: 5),
-              Expanded(
-                child: Text(
-                  node.label,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 10,
-                    color:
-                        node.hidden
-                            ? Theme.of(
-                              context,
-                            ).colorScheme.onSurface.withAlpha(128)
-                            : Theme.of(
-                              context,
-                            ).colorScheme.onSurface.withAlpha(153),
-                  ),
-                ),
-              ),
-              if (hasChildren) ...[
-                const SizedBox(width: 2),
-                Icon(
-                  expanded ? Icons.expand_less : Icons.expand_more,
-                  size: 11,
-                  color: mutedColor,
-                ),
-              ],
-              if (node.type == 'diff')
-                BlocBuilder<ReviewCubit, ReviewState>(
-                  builder: (context, state) {
-                    final count =
-                        state is ReviewLoaded ? state.changedFiles.length : 0;
-                    if (count == 0) return const SizedBox.shrink();
-                    return Container(
-                      margin: const EdgeInsets.only(left: 4),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 4,
-                        vertical: 1,
-                      ),
-                      decoration: BoxDecoration(
-                        color: colors.primary.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        '$count',
-                        style: TextStyle(
-                          fontSize: 8,
-                          color: colors.primaryLight,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-            ],
-          ),
-        ),
-      );
-    }
+      ),
+    );
+  }
 
+  Widget _buildDiffBadge(AppColorScheme colors) {
+    return BlocBuilder<ReviewCubit, ReviewState>(
+      builder: (context, state) {
+        final count = state is ReviewLoaded ? state.changedFiles.length : 0;
+        if (count == 0) return const SizedBox.shrink();
+        return Container(
+          margin: const EdgeInsets.only(left: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+          decoration: BoxDecoration(
+            color: colors.primary.withValues(alpha: 0.2),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Text(
+            '$count',
+            style: TextStyle(
+              fontSize: 8,
+              color: colors.primaryLight,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _wrapWithContextMenu(
+    BuildContext context,
+    Widget row,
+    bool isAgent,
+  ) {
     // For agent nodes, wrap with a right-click context menu to allow deletion.
     if (isAgent) {
       return GestureDetector(
@@ -1009,11 +1062,7 @@ class _SidebarTreeRow extends StatelessWidget {
     // For other nodes: right-click shows hide/show children + remove folder.
     final hasDescendantActions =
         onHideDescendants != null || onShowDescendants != null;
-    final isRepoFolder =
-        node.type == 'repo' &&
-        onRemoveFolder != null &&
-        node.id.startsWith('repo:') &&
-        !node.id.startsWith('repo:orphan:');
+    final isRepoFolder = _isRepoFolder;
     if (hasDescendantActions || isRepoFolder) {
       return GestureDetector(
         behavior: HitTestBehavior.opaque,

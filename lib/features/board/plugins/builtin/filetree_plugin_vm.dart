@@ -817,22 +817,8 @@ class _FileTreeContentState extends State<_FileTreeContent> {
         visited < maxVisited) {
       if (generation != _searchGeneration) return results;
       final dir = queue.removeAt(0);
-      List<FileSystemEntity> contents;
-      try {
-        contents = await dir.list(followLinks: false).toList();
-      } on FileSystemException {
-        continue;
-      }
-      contents.sort((a, b) {
-        final aIsDir = a is Directory;
-        final bIsDir = b is Directory;
-        if (aIsDir && !bIsDir) return -1;
-        if (!aIsDir && bIsDir) return 1;
-        return p
-            .basename(a.path)
-            .toLowerCase()
-            .compareTo(p.basename(b.path).toLowerCase());
-      });
+      final contents = await _listSortedContents(dir);
+      if (contents == null) continue;
 
       for (final entity in contents) {
         if (generation != _searchGeneration ||
@@ -841,21 +827,60 @@ class _FileTreeContentState extends State<_FileTreeContent> {
           return results;
         }
         visited++;
-        final name = p.basename(entity.path);
-        if (!showHidden && name.startsWith('.')) continue;
-        final matches = name.toLowerCase().contains(query);
-        if (entity is Directory) {
-          if (matches) results.add(entity);
-          queue.add(entity);
-        } else if (entity is File && matches) {
-          results.add(entity);
-        }
+        _collectMatchingEntry(
+          entity,
+          query: query,
+          showHidden: showHidden,
+          results: results,
+          queue: queue,
+        );
       }
       if (visited % 400 == 0) {
         await Future<void>.delayed(Duration.zero);
       }
     }
     return results;
+  }
+
+  /// Lists [dir] contents sorted with directories first, then by name.
+  /// Returns null when the directory cannot be listed (skipped by the walk).
+  Future<List<FileSystemEntity>?> _listSortedContents(Directory dir) async {
+    final List<FileSystemEntity> contents;
+    try {
+      contents = await dir.list(followLinks: false).toList();
+    } on FileSystemException {
+      return null;
+    }
+    contents.sort((a, b) {
+      final aIsDir = a is Directory;
+      final bIsDir = b is Directory;
+      if (aIsDir && !bIsDir) return -1;
+      if (!aIsDir && bIsDir) return 1;
+      return p
+          .basename(a.path)
+          .toLowerCase()
+          .compareTo(p.basename(b.path).toLowerCase());
+    });
+    return contents;
+  }
+
+  /// Adds [entity] to [results] when it matches, and enqueues directories.
+  void _collectMatchingEntry(
+    FileSystemEntity entity, {
+    required String query,
+    required bool showHidden,
+    required List<FileSystemEntity> results,
+    required List<Directory> queue,
+  }) {
+    final name = p.basename(entity.path);
+    if (!showHidden && name.startsWith('.')) return;
+    final matches = name.toLowerCase().contains(query);
+    if (entity is Directory) {
+      if (matches) results.add(entity);
+      queue.add(entity);
+    } else if (entity is File && matches) {
+      results.add(entity);
+    }
   }
 
   List<Widget> _buildTreeEntries(Directory dir, int depth) {

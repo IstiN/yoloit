@@ -241,23 +241,40 @@ class _KanbanContentState extends State<_KanbanContent> {
     final cols = List<String>.from(_columns);
     final col = cols.removeAt(from);
     cols.insert(to, col);
-    // Remap card columnIndex values to follow the move.
-    final cards =
-        _cards.map((c) {
-          var ci = c['columnIndex'] as int? ?? 0;
-          if (ci == from) {
-            ci = to;
-          } else if (from < to && ci > from && ci <= to) {
-            ci -= 1;
-          } else if (from > to && ci >= to && ci < from) {
-            ci += 1;
-          }
-          return {...c, 'columnIndex': ci};
-        }).toList();
-    // Remap column colors.
+    final cards = _remapCardsForColumnMove(from, to);
+    final newColors = _remapColumnColorsForMove(from, to, cols.length);
+    widget.renderContext.onUpdateState({
+      ...widget.panel.state,
+      'columns': cols,
+      'cards': cards,
+      'columnColors': newColors,
+    });
+  }
+
+  // Remap card columnIndex values to follow the move.
+  List<_CardData> _remapCardsForColumnMove(int from, int to) {
+    return _cards.map((c) {
+      var ci = c['columnIndex'] as int? ?? 0;
+      if (ci == from) {
+        ci = to;
+      } else if (from < to && ci > from && ci <= to) {
+        ci -= 1;
+      } else if (from > to && ci >= to && ci < from) {
+        ci += 1;
+      }
+      return {...c, 'columnIndex': ci};
+    }).toList();
+  }
+
+  // Remap column colors.
+  Map<String, String> _remapColumnColorsForMove(
+    int from,
+    int to,
+    int columnCount,
+  ) {
     final oldColors = _columnColors;
     final newColors = <String, String>{};
-    for (int i = 0; i < cols.length; i++) {
+    for (int i = 0; i < columnCount; i++) {
       int oldIdx;
       if (i == to) {
         oldIdx = from;
@@ -271,12 +288,7 @@ class _KanbanContentState extends State<_KanbanContent> {
       final c = oldColors['$oldIdx'];
       if (c != null) newColors['$i'] = c;
     }
-    widget.renderContext.onUpdateState({
-      ...widget.panel.state,
-      'columns': cols,
-      'cards': cards,
-      'columnColors': newColors,
-    });
+    return newColors;
   }
 
   void _setColumnColor(int ci, Color color) {

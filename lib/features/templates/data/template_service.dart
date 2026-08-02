@@ -99,38 +99,52 @@ class BoardTemplateService {
   ) {
     final errors = <String, String>{};
     for (final param in template.parameters) {
-      final value = values[param.name];
-      final hasValue = value != null && value.toString().isNotEmpty;
-      if (param.required && !hasValue) {
-        errors[param.name] = 'Required';
-        continue;
-      }
-      if (!hasValue) continue;
-      final validation = param.validation;
-      if (validation != null) {
-        final text = value.toString();
-        if (validation.minLength != null &&
-            text.length < validation.minLength!) {
-          errors[param.name] =
-              'Minimum length is ${validation.minLength}';
-        } else if (validation.maxLength != null &&
-            text.length > validation.maxLength!) {
-          errors[param.name] =
-              'Maximum length is ${validation.maxLength}';
-        } else if (validation.pattern != null &&
-            validation.pattern!.isNotEmpty &&
-            !RegExp(validation.pattern!).hasMatch(text)) {
-          errors[param.name] = 'Invalid format';
-        }
-      }
-      if (param.type == TemplateParameterType.choice && param.options != null) {
-        final allowed = param.options!.map((o) => o.value).toSet();
-        if (!allowed.contains(value.toString())) {
-          errors[param.name] = 'Invalid option';
-        }
+      final error = _validateParameter(param, values[param.name]);
+      if (error != null) {
+        errors[param.name] = error;
       }
     }
     return errors;
+  }
+
+  /// Validates a single parameter value. Returns the error message, or null
+  /// when the value is valid.
+  String? _validateParameter(TemplateParameter param, dynamic value) {
+    final hasValue = value != null && value.toString().isNotEmpty;
+    if (param.required && !hasValue) {
+      return 'Required';
+    }
+    if (!hasValue) return null;
+    return _choiceError(param, value) ?? _validationError(param, value);
+  }
+
+  String? _validationError(TemplateParameter param, dynamic value) {
+    final validation = param.validation;
+    if (validation == null) return null;
+    final text = value.toString();
+    if (validation.minLength != null && text.length < validation.minLength!) {
+      return 'Minimum length is ${validation.minLength}';
+    }
+    if (validation.maxLength != null && text.length > validation.maxLength!) {
+      return 'Maximum length is ${validation.maxLength}';
+    }
+    if (validation.pattern != null &&
+        validation.pattern!.isNotEmpty &&
+        !RegExp(validation.pattern!).hasMatch(text)) {
+      return 'Invalid format';
+    }
+    return null;
+  }
+
+  String? _choiceError(TemplateParameter param, dynamic value) {
+    if (param.type != TemplateParameterType.choice || param.options == null) {
+      return null;
+    }
+    final allowed = param.options!.map((o) => o.value).toSet();
+    if (!allowed.contains(value.toString())) {
+      return 'Invalid option';
+    }
+    return null;
   }
 
   /// Builds the effective parameter map by filling in defaults for missing

@@ -328,158 +328,161 @@ class _TimerContentState extends State<_TimerContent>
             ),
           ),
 
-        Expanded(
-          child: GestureDetector(
-            onTap:
-                _isRunning || _isPaused || _completed ? null : _enterEditMode,
-            child: Center(
-              child: AnimatedBuilder(
-                animation: _pulseCtrl,
-                builder: (context, _) {
-                  final pulse =
-                      _completed ? 1.0 + _pulseCtrl.value * 0.04 : 1.0;
-                  return Transform.scale(
-                    scale: pulse,
-                    child: SizedBox(
-                      width: 160,
-                      height: 160,
-                      child: TweenAnimationBuilder<double>(
-                        tween: Tween(begin: _progress, end: _progress),
-                        duration: const Duration(milliseconds: 900),
-                        curve: Curves.easeInOut,
-                        builder: (context, value, child) {
-                          return CustomPaint(
-                            painter: _TimerCirclePainter(
-                              progress: value,
-                              accent: _currentAccent,
-                              trackColor: colors.border,
-                              completed: _completed,
-                            ),
-                            child: child,
-                          );
-                        },
-                        child: Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (_completed)
-                                Icon(
-                                  Icons.check_circle_rounded,
-                                  size: 20,
-                                  color: colors.accentGreen,
-                                ),
-                              Text(
-                                _timeText,
-                                style: TextStyle(
-                                  fontSize: _completed ? 28 : 36,
-                                  fontWeight: FontWeight.w700,
-                                  color:
-                                      _completed
-                                          ? colors.accentGreen
-                                          : onSurface,
-                                  fontFeatures: const [
-                                    FontFeature.tabularFigures(),
-                                  ],
-                                ),
-                              ),
-                              if (!_completed) ...[
-                                const SizedBox(height: 2),
-                                Text(
-                                  _remaining <= 60
-                                      ? 'less than a minute'
-                                      : '${_remaining ~/ 60} min',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: onSurface.withAlpha(100),
-                                  ),
-                                ),
-                              ],
-                              if (!_completed && _remaining <= 0)
-                                Text(
-                                  'Time\'s up!',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    color: colors.accentOrange,
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-        ),
+        _buildTimeDial(colors, onSurface),
 
         // ── Controls ────────────────────────────────────────────────────────
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 4, 12, 10),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _SmallBtn(
-                icon: Icons.refresh_rounded,
-                onPressed:
-                    _isRunning ||
-                            _isPaused ||
-                            _completed ||
-                            _remaining < _duration
-                        ? _reset
-                        : null,
-                color: onSurface,
-              ),
-              const SizedBox(width: 16),
-              GestureDetector(
-                onTap: () {
-                  if (_completed) {
-                    _reset();
-                  } else if (_isRunning) {
-                    _pause();
-                  } else if (_isPaused) {
-                    _start();
-                  } else {
-                    _start();
-                  }
-                },
-                child: Container(
-                  width: 52,
-                  height: 52,
-                  decoration: BoxDecoration(
-                    color: _currentAccent,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: _currentAccent.withValues(alpha: 0.35),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Icon(
-                    _completed
-                        ? Icons.refresh_rounded
-                        : _isRunning
-                        ? Icons.pause_rounded
-                        : Icons.play_arrow_rounded,
-                    color: colors.textPrimary,
-                    size: 28,
+        _buildControls(colors, onSurface),
+      ],
+    );
+  }
+
+  Widget _buildTimeDial(AppColorScheme colors, Color onSurface) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: _isRunning || _isPaused || _completed ? null : _enterEditMode,
+        child: Center(
+          child: AnimatedBuilder(
+            animation: _pulseCtrl,
+            builder: (context, _) {
+              final pulse = _completed ? 1.0 + _pulseCtrl.value * 0.04 : 1.0;
+              return Transform.scale(
+                scale: pulse,
+                child: SizedBox(
+                  width: 160,
+                  height: 160,
+                  child: TweenAnimationBuilder<double>(
+                    tween: Tween(begin: _progress, end: _progress),
+                    duration: const Duration(milliseconds: 900),
+                    curve: Curves.easeInOut,
+                    builder: (context, value, child) {
+                      return CustomPaint(
+                        painter: _TimerCirclePainter(
+                          progress: value,
+                          accent: _currentAccent,
+                          trackColor: colors.border,
+                          completed: _completed,
+                        ),
+                        child: child,
+                      );
+                    },
+                    child: _buildDialFace(colors, onSurface),
                   ),
                 ),
-              ),
-              const SizedBox(width: 16),
-              _SmallBtn(
-                icon: Icons.edit_outlined,
-                onPressed: !_isRunning ? _enterEditMode : null,
-                color: onSurface,
-              ),
-            ],
+              );
+            },
           ),
         ),
-      ],
+      ),
+    );
+  }
+
+  Widget _buildDialFace(AppColorScheme colors, Color onSurface) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_completed)
+            Icon(
+              Icons.check_circle_rounded,
+              size: 20,
+              color: colors.accentGreen,
+            ),
+          Text(
+            _timeText,
+            style: TextStyle(
+              fontSize: _completed ? 28 : 36,
+              fontWeight: FontWeight.w700,
+              color: _completed ? colors.accentGreen : onSurface,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+          if (!_completed) ...[
+            const SizedBox(height: 2),
+            Text(
+              _remaining <= 60
+                  ? 'less than a minute'
+                  : '${_remaining ~/ 60} min',
+              style: TextStyle(fontSize: 11, color: onSurface.withAlpha(100)),
+            ),
+          ],
+          if (!_completed && _remaining <= 0)
+            Text(
+              'Time\'s up!',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: colors.accentOrange,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildControls(AppColorScheme colors, Color onSurface) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 10),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          _SmallBtn(
+            icon: Icons.refresh_rounded,
+            onPressed:
+                _isRunning || _isPaused || _completed || _remaining < _duration
+                    ? _reset
+                    : null,
+            color: onSurface,
+          ),
+          const SizedBox(width: 16),
+          _buildMainButton(colors),
+          const SizedBox(width: 16),
+          _SmallBtn(
+            icon: Icons.edit_outlined,
+            onPressed: !_isRunning ? _enterEditMode : null,
+            color: onSurface,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMainButton(AppColorScheme colors) {
+    return GestureDetector(
+      onTap: () {
+        if (_completed) {
+          _reset();
+        } else if (_isRunning) {
+          _pause();
+        } else if (_isPaused) {
+          _start();
+        } else {
+          _start();
+        }
+      },
+      child: Container(
+        width: 52,
+        height: 52,
+        decoration: BoxDecoration(
+          color: _currentAccent,
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: _currentAccent.withValues(alpha: 0.35),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Icon(
+          _completed
+              ? Icons.refresh_rounded
+              : _isRunning
+              ? Icons.pause_rounded
+              : Icons.play_arrow_rounded,
+          color: colors.textPrimary,
+          size: 28,
+        ),
+      ),
     );
   }
 

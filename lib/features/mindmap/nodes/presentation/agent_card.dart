@@ -415,82 +415,109 @@ class _TerminalPaneState extends State<_TerminalPane> {
     }
 
     final key = event.logicalKey;
-    final keyboard = HardwareKeyboard.instance;
-    final isMeta = keyboard.isMetaPressed;
-    final isCtrl = keyboard.isControlPressed;
-    final isAlt = keyboard.isAltPressed;
-    final isShift = keyboard.isShiftPressed;
+    final mods = _KeyMods.current();
 
-    if ((isMeta || isCtrl) && !isAlt && key == LogicalKeyboardKey.keyV) {
+    if (mods.pasteChord && key == LogicalKeyboardKey.keyV) {
       unawaited(_pasteClipboard());
       return KeyEventResult.handled;
     }
 
-    if (key == LogicalKeyboardKey.enter) {
-      _send(isShift && !isMeta && !isCtrl && !isAlt ? '\x1b\r' : '\r');
-      return KeyEventResult.handled;
-    }
+    final sequence =
+        _chordSequenceFor(key, mods) ??
+        _specialSequenceFor(key) ??
+        _gatedControlSequenceFor(key, mods) ??
+        _characterSequenceFor(event, mods);
+    if (sequence == null) return KeyEventResult.ignored;
+    _send(sequence);
+    return KeyEventResult.handled;
+  }
 
-    if (isMeta && key == LogicalKeyboardKey.backspace) {
-      _send('\x15');
-      return KeyEventResult.handled;
-    }
+  /// First matching chord rule wins; rule order preserves the original
+  /// if-chain priority (meta backspace beats alt/ctrl backspace, etc.).
+  static const List<_ChordRule> _chordRules = [
+    _enterChord,
+    _metaBackspaceChord,
+    _altCtrlBackspaceChord,
+    _metaArrowLeftChord,
+    _metaArrowRightChord,
+    _altArrowLeftChord,
+    _altArrowRightChord,
+    _metaKeyKChord,
+  ];
 
-    if ((isAlt || isCtrl) && key == LogicalKeyboardKey.backspace) {
-      _send('\x17');
-      return KeyEventResult.handled;
+  static String? _chordSequenceFor(LogicalKeyboardKey key, _KeyMods mods) {
+    for (final rule in _chordRules) {
+      final sequence = rule(key, mods);
+      if (sequence != null) return sequence;
     }
+    return null;
+  }
 
-    if (isMeta && key == LogicalKeyboardKey.arrowLeft) {
-      _send('\x01');
-      return KeyEventResult.handled;
+  static String? _enterChord(LogicalKeyboardKey key, _KeyMods mods) {
+    if (key != LogicalKeyboardKey.enter) return null;
+    return mods.shift && !mods.meta && !mods.ctrl && !mods.alt
+        ? '\x1b\r'
+        : '\r';
+  }
+
+  static String? _metaBackspaceChord(LogicalKeyboardKey key, _KeyMods mods) {
+    if (!mods.meta || key != LogicalKeyboardKey.backspace) return null;
+    return '\x15';
+  }
+
+  static String? _altCtrlBackspaceChord(
+    LogicalKeyboardKey key,
+    _KeyMods mods,
+  ) {
+    if (!(mods.alt || mods.ctrl) || key != LogicalKeyboardKey.backspace) {
+      return null;
     }
+    return '\x17';
+  }
 
-    if (isMeta && key == LogicalKeyboardKey.arrowRight) {
-      _send('\x05');
-      return KeyEventResult.handled;
-    }
+  static String? _metaArrowLeftChord(LogicalKeyboardKey key, _KeyMods mods) {
+    if (!mods.meta || key != LogicalKeyboardKey.arrowLeft) return null;
+    return '\x01';
+  }
 
-    if (isAlt && key == LogicalKeyboardKey.arrowLeft) {
-      _send('\x1bb');
-      return KeyEventResult.handled;
-    }
+  static String? _metaArrowRightChord(LogicalKeyboardKey key, _KeyMods mods) {
+    if (!mods.meta || key != LogicalKeyboardKey.arrowRight) return null;
+    return '\x05';
+  }
 
-    if (isAlt && key == LogicalKeyboardKey.arrowRight) {
-      _send('\x1bf');
-      return KeyEventResult.handled;
-    }
+  static String? _altArrowLeftChord(LogicalKeyboardKey key, _KeyMods mods) {
+    if (!mods.alt || key != LogicalKeyboardKey.arrowLeft) return null;
+    return '\x1bb';
+  }
 
-    if (isMeta && key == LogicalKeyboardKey.keyK) {
-      _send('\x0c');
-      return KeyEventResult.handled;
-    }
+  static String? _altArrowRightChord(LogicalKeyboardKey key, _KeyMods mods) {
+    if (!mods.alt || key != LogicalKeyboardKey.arrowRight) return null;
+    return '\x1bf';
+  }
 
-    final special = _specialSequenceFor(key);
-    if (special != null) {
-      _send(special);
-      return KeyEventResult.handled;
-    }
+  static String? _metaKeyKChord(LogicalKeyboardKey key, _KeyMods mods) {
+    if (!mods.meta || key != LogicalKeyboardKey.keyK) return null;
+    return '\x0c';
+  }
 
-    if (isCtrl && !isMeta) {
-      final control = _controlSequenceFor(key);
-      if (control != null) {
-        _send(control);
-        return KeyEventResult.handled;
-      }
-    }
+  static String? _gatedControlSequenceFor(
+    LogicalKeyboardKey key,
+    _KeyMods mods,
+  ) {
+    if (!mods.ctrl || mods.meta) return null;
+    return _controlSequenceFor(key);
+  }
 
+  static String? _characterSequenceFor(KeyEvent event, _KeyMods mods) {
     final character = event.character;
-    if (character != null &&
-        character.isNotEmpty &&
-        !isMeta &&
-        !isCtrl &&
-        character != '\u0000') {
-      _send(isAlt ? '\x1b$character' : character);
-      return KeyEventResult.handled;
+    if (character == null ||
+        character.isEmpty ||
+        mods.meta ||
+        mods.ctrl ||
+        character == '\u0000') {
+      return null;
     }
-
-    return KeyEventResult.ignored;
+    return mods.alt ? '\x1b$character' : character;
   }
 
   static String? _specialSequenceFor(LogicalKeyboardKey key) {
@@ -761,4 +788,35 @@ class RepoBranchPill extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Ordered key-chord rule: returns the escape sequence to send when the
+/// rule matches, or null to fall through to the next rule.
+typedef _ChordRule = String? Function(LogicalKeyboardKey key, _KeyMods mods);
+
+/// Modifier-key snapshot for terminal key-chord dispatch.
+final class _KeyMods {
+  const _KeyMods({
+    required this.meta,
+    required this.ctrl,
+    required this.alt,
+    required this.shift,
+  });
+
+  factory _KeyMods.current() {
+    final keyboard = HardwareKeyboard.instance;
+    return _KeyMods(
+      meta: keyboard.isMetaPressed,
+      ctrl: keyboard.isControlPressed,
+      alt: keyboard.isAltPressed,
+      shift: keyboard.isShiftPressed,
+    );
+  }
+
+  final bool meta;
+  final bool ctrl;
+  final bool alt;
+  final bool shift;
+
+  bool get pasteChord => (meta || ctrl) && !alt;
 }

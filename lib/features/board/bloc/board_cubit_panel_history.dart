@@ -6,31 +6,23 @@ extension BoardCubitPanelHistory on BoardCubit {
     return _runHistoryReplay(() async {
       if (!state.boards.any((board) => board.id == boardId)) return false;
       final events = await _historyStore.eventsForBoard(boardId);
-  
-      for (var index = events.length - 1; index >= 0; index--) {
-        final event = events[index];
-        if (event.entityType != 'panel') continue;
-        if (event.restoresOpId != null || event.type == 'panel.restored') {
-          continue;
-        }
-  
-        final current = state.boards
-            .firstWhereOrNull((board) => board.id == boardId)
-            ?.panels
-            .firstWhereOrNull((panel) => panel.id == event.entityId);
-        final before =
-            event.before == null
-                ? null
-                : _panelFromHistorySnapshot(event.before!);
-        final after =
-            event.after == null
-                ? null
-                : _panelFromHistorySnapshot(event.after!);
-  
-        if (after != null &&
-            before == null &&
-            current != null &&
-            _panelMatchesCreateUndo(current, after)) {
+
+      final plan = planPanelHistoryUndo<BoardPanelInstance>(
+        events: events,
+        currentPanelOf:
+            (entityId) => state.boards
+                .firstWhereOrNull((board) => board.id == boardId)
+                ?.panels
+                .firstWhereOrNull((panel) => panel.id == entityId),
+        panelFromJson: _panelFromHistorySnapshot,
+        panelToJson: _panelSnapshot,
+      );
+
+      switch (plan.kind) {
+        case PanelUndoKind.none:
+          return false;
+        case PanelUndoKind.removeCreated:
+          final after = plan.snapshot!;
           _pushRedo(boardId, BoardRedoEntry.recreate(after));
           await removePanel(
             after.id,
@@ -38,38 +30,20 @@ extension BoardCubitPanelHistory on BoardCubit {
             recordHistory: false,
           );
           return true;
-        }
-        if (before != null &&
-            current != null &&
-            !_panelSnapshotsMatch(current, before)) {
-          final coalescedEvent = _coalescedPanelUpdateStart(events, index);
-          final coalescedBefore = coalescedEvent.before;
-          final snapshot =
-              coalescedBefore == null
-                  ? before
-                  : _panelFromHistorySnapshot(coalescedBefore);
-          final latestAfter =
-              event.after == null
-                  ? null
-                  : _panelFromHistorySnapshot(event.after!);
+        case PanelUndoKind.restoreSnapshot:
+          final latestAfter = plan.redoSnapshot;
           if (latestAfter != null) {
             _pushRedo(boardId, BoardRedoEntry.restore(latestAfter));
           }
           return _restorePanelSnapshot(
             boardId: boardId,
-            panelFromEvent: snapshot,
-            restoresOpId: event.opId,
+            panelFromEvent: plan.snapshot!,
+            restoresOpId: plan.opId!,
           );
-        }
-        if (before != null &&
-            current == null &&
-            event.type == 'panel.deleted') {
-          _pushRedo(boardId, BoardRedoEntry.delete(event.entityId));
-          return restorePanelFromEvent(boardId, event.opId);
-        }
+        case PanelUndoKind.restoreDeleted:
+          _pushRedo(boardId, BoardRedoEntry.delete(plan.entityId!));
+          return restorePanelFromEvent(boardId, plan.opId!);
       }
-  
-      return false;
     });
   }
   
@@ -138,55 +112,11 @@ extension BoardCubitPanelHistory on BoardCubit {
     return true;
   }
   
-  BoardHistoryEvent _coalescedPanelUpdateStart(
-    List<BoardHistoryEvent> events,
-    int latestIndex,
-  ) {
-    final latest = events[latestIndex];
-    if (!_isCoalescablePanelMutation(latest)) return latest;
-    var start = latestIndex;
-    final signature = _patchSignature(latest);
-    while (start > 0) {
-      final previous = events[start - 1];
-      if (!_isCoalescablePanelMutation(previous) ||
-          previous.entityType != latest.entityType ||
-          previous.entityId != latest.entityId ||
-          previous.restoresOpId != null ||
-          previous.revision + 1 != events[start].revision ||
-          _patchSignature(previous) != signature) {
-        break;
-      }
-      start--;
-    }
-    return events[start];
-  }
-  
-  bool _isCoalescablePanelMutation(BoardHistoryEvent event) {
-    return event.type == 'panel.updated' || event.type == 'panel.placedInGrid';
-  }
-  
-  bool _panelMatchesCreateUndo(
-    BoardPanelInstance current,
-    BoardPanelInstance after,
-  ) {
-    final currentSnap = Map<String, dynamic>.from(_panelSnapshot(current));
-    final afterSnap = Map<String, dynamic>.from(_panelSnapshot(after));
-    currentSnap.remove('zIndex');
-    afterSnap.remove('zIndex');
-    return jsonEncode(currentSnap) == jsonEncode(afterSnap);
-  }
-  
-  String _patchSignature(BoardHistoryEvent event) {
-    final keys = event.patch.keys.toList()..sort();
-    return keys.join('|');
-  }
-  
   bool _panelSnapshotsMatch(
     BoardPanelInstance current,
     BoardPanelInstance snapshot,
   ) {
-    return jsonEncode(_panelSnapshot(current)) ==
-        jsonEncode(_panelSnapshot(snapshot));
+    return panelSnapshotsEqual(current, snapshot, _panelSnapshot);
   }
   /// Captures the panel snapshot at the start of a drag/resize gesture.
   void beginPanelGesture(String panelId, {String? boardId}) {

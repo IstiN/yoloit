@@ -509,11 +509,29 @@ Widget _buildHeadlessMockup(
   BoardPanelInstance panel,
   BoardPanelPlugin plugin,
 ) {
-  final colors = context.appColors;
   final type = panel.type;
+  if (type == 'board.terminal') return _terminalMockup(context, panel);
+  if (type == 'board.webpage') return _webpageMockup(context, panel, plugin);
+  if (type == 'board.playlist') {
+    return _playlistMockup(context, panel, plugin);
+  }
+  if (type == 'board.run' || type == 'board.run_configs') {
+    return _runMockup(context, panel, plugin);
+  }
+  if (type == 'board.widget.custom') {
+    return _customWidgetMockup(context, panel, plugin);
+  }
+  return _defaultMockup(context, panel, plugin);
+}
 
-  // Fallback if we don't have custom mocks
-  final defaultMock = Center(
+// Fallback if we don't have custom mocks
+Widget _defaultMockup(
+  BuildContext context,
+  BoardPanelInstance panel,
+  BoardPanelPlugin plugin,
+) {
+  final colors = context.appColors;
+  return Center(
     child: Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -542,360 +560,379 @@ Widget _buildHeadlessMockup(
       ],
     ),
   );
+}
 
-  if (type == 'board.terminal') {
-    final stateConfig = panel.state['config'];
-    final workingDir = stateConfig is Map
-        ? (stateConfig['workingDir'] as String? ?? '')
-        : (panel.state['workingDir'] as String? ?? '');
-    return Container(
-      color: colors.terminalBackground,
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: colors.statusError,
-                  shape: BoxShape.circle,
-                ),
+Widget _terminalMockup(BuildContext context, BoardPanelInstance panel) {
+  final colors = context.appColors;
+  final stateConfig = panel.state['config'];
+  final workingDir = stateConfig is Map
+      ? (stateConfig['workingDir'] as String? ?? '')
+      : (panel.state['workingDir'] as String? ?? '');
+  return Container(
+    color: colors.terminalBackground,
+    padding: const EdgeInsets.all(12),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: colors.statusError,
+                shape: BoxShape.circle,
               ),
-              const SizedBox(width: 4),
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: colors.statusWarning,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 4),
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: colors.statusActive,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  workingDir.isNotEmpty ? workingDir : 'zsh',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: colors.textPrimary.withAlpha(96),
-                    fontSize: 10,
-                    fontFamily: 'JetBrainsMono',
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'guest@yoloit:~\$ yoloit status',
-            style: TextStyle(
-              color: colors.terminalPrompt,
-              fontSize: 11,
-              fontFamily: 'JetBrainsMono',
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '● YoLoIT Core Services: Active',
-            style: TextStyle(
-              color: colors.terminalText,
-              fontSize: 11,
-              fontFamily: 'JetBrainsMono',
+            const SizedBox(width: 4),
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: colors.statusWarning,
+                shape: BoxShape.circle,
+              ),
             ),
-          ),
-          Text(
-            '● Sessions: 2 active, 0 suspended',
-            style: TextStyle(
-              color: colors.terminalText,
-              fontSize: 11,
-              fontFamily: 'JetBrainsMono',
+            const SizedBox(width: 4),
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: colors.statusActive,
+                shape: BoxShape.circle,
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Text(
-                'guest@yoloit:~\$ ',
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                workingDir.isNotEmpty ? workingDir : 'zsh',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: colors.terminalPrompt,
-                  fontSize: 11,
+                  color: colors.textPrimary.withAlpha(96),
+                  fontSize: 10,
                   fontFamily: 'JetBrainsMono',
                 ),
               ),
-              const _PulsingCursor(),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  if (type == 'board.webpage') {
-    final url = panel.state['url'] as String? ?? '';
-    return Container(
-      color: colors.surface,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Browser address bar mockup
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            color: colors.surfaceElevated,
-            child: Row(
-              children: [
-                Icon(
-                  Icons.arrow_back,
-                  size: 12,
-                  color: colors.textPrimary.withAlpha(128),
-                ),
-                const SizedBox(width: 6),
-                Icon(
-                  Icons.arrow_forward,
-                  size: 12,
-                  color: colors.textPrimary.withAlpha(64),
-                ),
-                const SizedBox(width: 6),
-                Icon(
-                  Icons.refresh,
-                  size: 12,
-                  color: colors.textPrimary.withAlpha(128),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Container(
-                    height: 20,
-                    decoration: BoxDecoration(
-                      color: colors.background,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      url.isNotEmpty ? url : 'https://yoloit.ai',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: colors.textPrimary.withAlpha(204),
-                        fontSize: 10,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
             ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'guest@yoloit:~\$ yoloit status',
+          style: TextStyle(
+            color: colors.terminalPrompt,
+            fontSize: 11,
+            fontFamily: 'JetBrainsMono',
           ),
-          // Browser body mockup
-          Expanded(
-            child: Container(
-              color: colors.background,
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.language_outlined,
-                      size: 36,
-                      color: plugin.accentColor.withAlpha(120),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      panel.title.isNotEmpty ? panel.title : 'Webpage Preview',
-                      style: TextStyle(
-                        color: colors.textPrimary.withAlpha(128),
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          '● YoLoIT Core Services: Active',
+          style: TextStyle(
+            color: colors.terminalText,
+            fontSize: 11,
+            fontFamily: 'JetBrainsMono',
+          ),
+        ),
+        Text(
+          '● Sessions: 2 active, 0 suspended',
+          style: TextStyle(
+            color: colors.terminalText,
+            fontSize: 11,
+            fontFamily: 'JetBrainsMono',
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Text(
+              'guest@yoloit:~\$ ',
+              style: TextStyle(
+                color: colors.terminalPrompt,
+                fontSize: 11,
+                fontFamily: 'JetBrainsMono',
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
+            const _PulsingCursor(),
+          ],
+        ),
+      ],
+    ),
+  );
+}
 
-  if (type == 'board.playlist') {
-    final rawTracks = panel.state['tracks'] as List? ?? [];
-    final tracks = rawTracks.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
-    final currentIndex = panel.state['currentIndex'] as int? ?? 0;
-    return Container(
-      color: colors.terminalBackground,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Playlist Header
-          Container(
-            padding: const EdgeInsets.all(10),
-            color: colors.surface,
-            child: Row(
-              children: [
-                Icon(Icons.library_music_outlined, size: 16, color: plugin.accentColor),
-                const SizedBox(width: 6),
-                const Text(
-                  'Media Playlist',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-          // Tracks mockup
-          Expanded(
-            child: tracks.isEmpty
-                ? Center(
-                    child: Text(
-                      'No tracks in playlist',
-                      style: TextStyle(
-                        color: colors.textPrimary.withAlpha(64),
-                        fontSize: 11,
-                      ),
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    itemCount: tracks.length,
-                    itemBuilder: (context, idx) {
-                      final track = tracks[idx];
-                      final name = track['name'] as String? ?? 'Track ${idx + 1}';
-                      final isActive = idx == currentIndex;
-                      return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        color: isActive ? plugin.accentColor.withAlpha(30) : Colors.transparent,
-                        child: Row(
-                          children: [
-                            Icon(
-                              isActive ? Icons.play_arrow_rounded : Icons.music_note_outlined,
-                              size: 14,
-                              color:
-                                  isActive
-                                      ? plugin.accentColor
-                                      : colors.textPrimary.withAlpha(96),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color:
-                                      isActive
-                                          ? colors.textPrimary
-                                          : colors.textPrimary.withAlpha(204),
-                                  fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-                                ),
-                              ),
-                            ),
-                            if (isActive)
-                              Container(
-                                width: 6,
-                                height: 6,
-                                decoration: BoxDecoration(color: plugin.accentColor, shape: BoxShape.circle),
-                              ),
-                          ],
-                        ),
-                      );
-                    },
+Widget _webpageMockup(
+  BuildContext context,
+  BoardPanelInstance panel,
+  BoardPanelPlugin plugin,
+) {
+  final colors = context.appColors;
+  final url = panel.state['url'] as String? ?? '';
+  return Container(
+    color: colors.surface,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Browser address bar mockup
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          color: colors.surfaceElevated,
+          child: Row(
+            children: [
+              Icon(
+                Icons.arrow_back,
+                size: 12,
+                color: colors.textPrimary.withAlpha(128),
+              ),
+              const SizedBox(width: 6),
+              Icon(
+                Icons.arrow_forward,
+                size: 12,
+                color: colors.textPrimary.withAlpha(64),
+              ),
+              const SizedBox(width: 6),
+              Icon(
+                Icons.refresh,
+                size: 12,
+                color: colors.textPrimary.withAlpha(128),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Container(
+                  height: 20,
+                  decoration: BoxDecoration(
+                    color: colors.background,
+                    borderRadius: BorderRadius.circular(4),
                   ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  if (type == 'board.run' || type == 'board.run_configs') {
-    final groupName = panel.state['group'] as String? ?? 'default';
-    return Container(
-      color: colors.background,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Run panel top header
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            color: colors.surface,
-            child: Row(
-              children: [
-                Icon(Icons.play_circle_outline_rounded, size: 16, color: plugin.accentColor),
-                const SizedBox(width: 6),
-                Text(
-                  'Run Scope: $groupName',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    url.isNotEmpty ? url : 'https://yoloit.ai',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: colors.textPrimary.withAlpha(204),
+                      fontSize: 10,
+                    ),
+                  ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-          // Run tasks list mock
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
+        ),
+        // Browser body mockup
+        Expanded(
+          child: Container(
+            color: colors.background,
+            child: Center(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  _buildMockRunRow(context, plugin, 'Build Project', 'idle', 'npm run build'),
-                  _buildMockRunRow(context, plugin, 'Start Dev Server', 'active', 'npm run dev'),
-                  _buildMockRunRow(context, plugin, 'Lint & Format', 'idle', 'npm run lint'),
+                  Icon(
+                    Icons.language_outlined,
+                    size: 36,
+                    color: plugin.accentColor.withAlpha(120),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    panel.title.isNotEmpty ? panel.title : 'Webpage Preview',
+                    style: TextStyle(
+                      color: colors.textPrimary.withAlpha(128),
+                      fontSize: 12,
+                    ),
+                  ),
                 ],
               ),
             ),
           ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
+}
 
-  if (type == 'board.widget.custom') {
-    final widgetId = panel.state['widgetId'] as String? ?? 'custom-app';
-    return Container(
-      color: colors.background,
-      padding: const EdgeInsets.all(16),
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.dashboard_customize_outlined, size: 36, color: plugin.accentColor.withAlpha(150)),
-            const SizedBox(height: 10),
-            Text(
-              panel.title.isNotEmpty ? panel.title : 'Custom JS Widget',
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'App ID: $widgetId',
-              style: TextStyle(color: colors.textPrimary.withAlpha(96), fontSize: 10),
-            ),
-            const SizedBox(height: 16),
-            // Decorative mock canvas dashboard element
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+Widget _playlistMockup(
+  BuildContext context,
+  BoardPanelInstance panel,
+  BoardPanelPlugin plugin,
+) {
+  final colors = context.appColors;
+  final rawTracks = panel.state['tracks'] as List? ?? [];
+  final tracks = rawTracks.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+  final currentIndex = panel.state['currentIndex'] as int? ?? 0;
+  return Container(
+    color: colors.terminalBackground,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Playlist Header
+        Container(
+          padding: const EdgeInsets.all(10),
+          color: colors.surface,
+          child: Row(
+            children: [
+              Icon(Icons.library_music_outlined, size: 16, color: plugin.accentColor),
+              const SizedBox(width: 6),
+              const Text(
+                'Media Playlist',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+        // Tracks mockup
+        Expanded(
+          child: tracks.isEmpty
+              ? Center(
+                  child: Text(
+                    'No tracks in playlist',
+                    style: TextStyle(
+                      color: colors.textPrimary.withAlpha(64),
+                      fontSize: 11,
+                    ),
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  itemCount: tracks.length,
+                  itemBuilder: (context, idx) {
+                    final track = tracks[idx];
+                    final name = track['name'] as String? ?? 'Track ${idx + 1}';
+                    final isActive = idx == currentIndex;
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      color: isActive ? plugin.accentColor.withAlpha(30) : Colors.transparent,
+                      child: Row(
+                        children: [
+                          Icon(
+                            isActive ? Icons.play_arrow_rounded : Icons.music_note_outlined,
+                            size: 14,
+                            color:
+                                isActive
+                                    ? plugin.accentColor
+                                    : colors.textPrimary.withAlpha(96),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color:
+                                    isActive
+                                        ? colors.textPrimary
+                                        : colors.textPrimary.withAlpha(204),
+                                fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                              ),
+                            ),
+                          ),
+                          if (isActive)
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: BoxDecoration(color: plugin.accentColor, shape: BoxShape.circle),
+                            ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
+    ),
+  );
+}
+
+Widget _runMockup(
+  BuildContext context,
+  BoardPanelInstance panel,
+  BoardPanelPlugin plugin,
+) {
+  final colors = context.appColors;
+  final groupName = panel.state['group'] as String? ?? 'default';
+  return Container(
+    color: colors.background,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Run panel top header
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          color: colors.surface,
+          child: Row(
+            children: [
+              Icon(Icons.play_circle_outline_rounded, size: 16, color: plugin.accentColor),
+              const SizedBox(width: 6),
+              Text(
+                'Run Scope: $groupName',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+        // Run tasks list mock
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildMockWidgetMetric(context, '78%', 'CPU', colors.accentBlue),
-                const SizedBox(width: 8),
-                _buildMockWidgetMetric(context, '4.2 GB', 'MEM', colors.accentGreen),
-                const SizedBox(width: 8),
-                _buildMockWidgetMetric(context, '99.9%', 'UPTIME', colors.accentOrange),
+                _buildMockRunRow(context, plugin, 'Build Project', 'idle', 'npm run build'),
+                _buildMockRunRow(context, plugin, 'Start Dev Server', 'active', 'npm run dev'),
+                _buildMockRunRow(context, plugin, 'Lint & Format', 'idle', 'npm run lint'),
               ],
             ),
-          ],
+          ),
         ),
-      ),
-    );
-  }
+      ],
+    ),
+  );
+}
 
-  return defaultMock;
+Widget _customWidgetMockup(
+  BuildContext context,
+  BoardPanelInstance panel,
+  BoardPanelPlugin plugin,
+) {
+  final colors = context.appColors;
+  final widgetId = panel.state['widgetId'] as String? ?? 'custom-app';
+  return Container(
+    color: colors.background,
+    padding: const EdgeInsets.all(16),
+    child: Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.dashboard_customize_outlined, size: 36, color: plugin.accentColor.withAlpha(150)),
+          const SizedBox(height: 10),
+          Text(
+            panel.title.isNotEmpty ? panel.title : 'Custom JS Widget',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'App ID: $widgetId',
+            style: TextStyle(color: colors.textPrimary.withAlpha(96), fontSize: 10),
+          ),
+          const SizedBox(height: 16),
+          // Decorative mock canvas dashboard element
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _buildMockWidgetMetric(context, '78%', 'CPU', colors.accentBlue),
+              const SizedBox(width: 8),
+              _buildMockWidgetMetric(context, '4.2 GB', 'MEM', colors.accentGreen),
+              const SizedBox(width: 8),
+              _buildMockWidgetMetric(context, '99.9%', 'UPTIME', colors.accentOrange),
+            ],
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 Widget _buildMockWidgetMetric(

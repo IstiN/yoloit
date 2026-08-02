@@ -44,6 +44,19 @@ class ChatSession extends ChangeNotifier {
     return agentConfig?.streamAdapter ?? providerId;
   }
 
+  /// Re-applies persisted provider session IDs to the provider for [adapter].
+  void _applyStoredSessionIds(String adapter, String sessionName) {
+    if (adapter == 'opencode' && _opencodeSessionId != null) {
+      _provider.setSessionId(sessionName, _opencodeSessionId!);
+    }
+    if (adapter == 'copilot' && _copilotSessionId != null) {
+      _provider.setSessionId(sessionName, _copilotSessionId!);
+    }
+    if (adapter == 'cursor' && _cursorSessionId != null) {
+      _provider.setSessionId(sessionName, _cursorSessionId!);
+    }
+  }
+
   // Mutable UI callbacks — nullified on detach, set on sendMessage.
   // This allows the session to keep processing events from the provider
   // even when the UI widget is detached (disposed).
@@ -78,27 +91,15 @@ class ChatSession extends ChangeNotifier {
     if (newConfig.provider != _config.provider) {
       _provider.dispose();
       _provider = _createProviderFor(newConfig.provider);
-      final newAdapter = _getAdapterFor(newConfig.provider);
-      if (newAdapter == 'opencode' && _opencodeSessionId != null) {
-        _provider.setSessionId(newConfig.sessionName, _opencodeSessionId!);
-      }
-      if (newAdapter == 'copilot' && _copilotSessionId != null) {
-        _provider.setSessionId(newConfig.sessionName, _copilotSessionId!);
-      }
-      if (newAdapter == 'cursor' && _cursorSessionId != null) {
-        _provider.setSessionId(newConfig.sessionName, _cursorSessionId!);
-      }
+      _applyStoredSessionIds(
+        _getAdapterFor(newConfig.provider),
+        newConfig.sessionName,
+      );
     } else if (newConfig.sessionName != previousSessionName) {
-      final currentAdapter = _getAdapterFor(_config.provider);
-      if (currentAdapter == 'opencode' && _opencodeSessionId != null) {
-        _provider.setSessionId(newConfig.sessionName, _opencodeSessionId!);
-      }
-      if (currentAdapter == 'copilot' && _copilotSessionId != null) {
-        _provider.setSessionId(newConfig.sessionName, _copilotSessionId!);
-      }
-      if (currentAdapter == 'cursor' && _cursorSessionId != null) {
-        _provider.setSessionId(newConfig.sessionName, _cursorSessionId!);
-      }
+      _applyStoredSessionIds(
+        _getAdapterFor(_config.provider),
+        newConfig.sessionName,
+      );
     }
     _config = newConfig;
     notifyListeners();
@@ -228,6 +229,12 @@ class ChatSession extends ChangeNotifier {
     _uiDoneCallback = onDone;
   }
 
+  static final _filePathRe = RegExp(r'^/.+');
+  static final _imageExtRe = RegExp(
+    r'\.(png|jpg|jpeg|gif|webp|bmp)$',
+    caseSensitive: false,
+  );
+
   Future<bool> sendMessage({
     required String text,
     List<String> attachments = const [],
@@ -252,18 +259,13 @@ class ChatSession extends ChangeNotifier {
     }
 
     // Parse attachments from text
-    final filePathRe = RegExp(r'^/.+');
-    final imageExtRe = RegExp(
-      r'\.(png|jpg|jpeg|gif|webp|bmp)$',
-      caseSensitive: false,
-    );
     final tokens = text.split(RegExp(r'\s+'));
     final allAttachments = <String>[
       ...attachments,
-      ...tokens.where((t) => filePathRe.hasMatch(t)),
+      ...tokens.where((t) => _filePathRe.hasMatch(t)),
     ];
     var promptText =
-        tokens.where((t) => !filePathRe.hasMatch(t)).join(' ').trim();
+        tokens.where((t) => !_filePathRe.hasMatch(t)).join(' ').trim();
 
     // Inline plain-text file contents so the model can see them.
     // (Images are forwarded via the provider's attachment path; other
@@ -306,28 +308,15 @@ class ChatSession extends ChangeNotifier {
     notifyListeners();
 
     // Start streaming
-    final imageAttachments =
-        keptAttachments.where((t) => imageExtRe.hasMatch(t)).toList();
+    final imageAttachments = _collectImageAttachments(
+      keptAttachments,
+      runtimeContext,
+    );
 
-    // Inject board snapshot as attachment for CLI agents (file path mode)
-    final snapshotPath = runtimeContext?.boardSnapshotPath;
-    if (snapshotPath != null && snapshotPath.isNotEmpty) {
-      final isCliAgent = _provider.imageMode == ChatImageMode.filePath;
-      if (isCliAgent) {
-        imageAttachments.add(snapshotPath);
-      }
-    }
-
-    final currentAdapter = _getAdapterFor(_config.provider);
-    if (currentAdapter == 'opencode' && _opencodeSessionId != null) {
-      _provider.setSessionId(_config.sessionName, _opencodeSessionId!);
-    }
-    if (currentAdapter == 'copilot' && _copilotSessionId != null) {
-      _provider.setSessionId(_config.sessionName, _copilotSessionId!);
-    }
-    if (currentAdapter == 'cursor' && _cursorSessionId != null) {
-      _provider.setSessionId(_config.sessionName, _cursorSessionId!);
-    }
+    _applyStoredSessionIds(
+      _getAdapterFor(_config.provider),
+      _config.sessionName,
+    );
 
     final stream = _provider.sendMessage(
       message: promptText.isNotEmpty ? promptText : text,
@@ -347,57 +336,81 @@ class ChatSession extends ChangeNotifier {
         // Forward to UI if attached
         _uiEventCallback?.call(event);
       },
-      onError: (Object error) {
-        _isProcessing = false;
-        // If the first message failed, allow guidance to be re-injected on retry.
-        if (wasFirstMessage && !_hasAssistantReply()) {
-          _isFirstMessage = true;
-        }
-        _messages.add(
-          ChatMessage(
-            id: 'error-${DateTime.now().millisecondsSinceEpoch}',
-            role: ChatRole.system,
-            content: '❌ Error: $error',
-            timestamp: DateTime.now(),
-          ),
-        );
-        notifyListeners();
-        _persistToHistory();
-        _uiErrorCallback?.call(error);
-      },
-      onDone: () {
-        // Persist provider session IDs
-        final doneAdapter = _getAdapterFor(_config.provider);
-        if (doneAdapter == 'opencode') {
-          final sid = _provider.getSessionId(_config.sessionName);
-          if (sid != null && sid != _opencodeSessionId) {
-            _opencodeSessionId = sid;
-          }
-        }
-        if (doneAdapter == 'copilot') {
-          final sid = _provider.getSessionId(_config.sessionName);
-          if (sid != null && sid != _copilotSessionId) {
-            _copilotSessionId = sid;
-          }
-        }
-        if (doneAdapter == 'cursor') {
-          final sid = _provider.getSessionId(_config.sessionName);
-          if (sid != null && sid != _cursorSessionId) {
-            _cursorSessionId = sid;
-          }
-        }
-        _isProcessing = false;
-        if (_streamingMessageId != null && _streamingContent.isNotEmpty) {
-          _finalizeStreamingMessage();
-        }
-        _assistantInsertIndex = null;
-        notifyListeners();
-        _persistToHistory();
-        _uiDoneCallback?.call();
-      },
+      onError: (Object error) => _handleStreamError(error, wasFirstMessage),
+      onDone: _handleStreamDone,
     );
 
     return true;
+  }
+
+  /// Filters [keptAttachments] down to images and injects the board snapshot
+  /// as attachment for CLI agents (file path mode).
+  List<String> _collectImageAttachments(
+    List<String> keptAttachments,
+    ChatRuntimeContext? runtimeContext,
+  ) {
+    final imageAttachments =
+        keptAttachments.where((t) => _imageExtRe.hasMatch(t)).toList();
+
+    // Inject board snapshot as attachment for CLI agents (file path mode)
+    final snapshotPath = runtimeContext?.boardSnapshotPath;
+    if (snapshotPath != null && snapshotPath.isNotEmpty) {
+      final isCliAgent = _provider.imageMode == ChatImageMode.filePath;
+      if (isCliAgent) {
+        imageAttachments.add(snapshotPath);
+      }
+    }
+    return imageAttachments;
+  }
+
+  void _handleStreamError(Object error, bool wasFirstMessage) {
+    _isProcessing = false;
+    // If the first message failed, allow guidance to be re-injected on retry.
+    if (wasFirstMessage && !_hasAssistantReply()) {
+      _isFirstMessage = true;
+    }
+    _messages.add(
+      ChatMessage(
+        id: 'error-${DateTime.now().millisecondsSinceEpoch}',
+        role: ChatRole.system,
+        content: '❌ Error: $error',
+        timestamp: DateTime.now(),
+      ),
+    );
+    notifyListeners();
+    _persistToHistory();
+    _uiErrorCallback?.call(error);
+  }
+
+  void _handleStreamDone() {
+    // Persist provider session IDs
+    final doneAdapter = _getAdapterFor(_config.provider);
+    if (doneAdapter == 'opencode') {
+      final sid = _provider.getSessionId(_config.sessionName);
+      if (sid != null && sid != _opencodeSessionId) {
+        _opencodeSessionId = sid;
+      }
+    }
+    if (doneAdapter == 'copilot') {
+      final sid = _provider.getSessionId(_config.sessionName);
+      if (sid != null && sid != _copilotSessionId) {
+        _copilotSessionId = sid;
+      }
+    }
+    if (doneAdapter == 'cursor') {
+      final sid = _provider.getSessionId(_config.sessionName);
+      if (sid != null && sid != _cursorSessionId) {
+        _cursorSessionId = sid;
+      }
+    }
+    _isProcessing = false;
+    if (_streamingMessageId != null && _streamingContent.isNotEmpty) {
+      _finalizeStreamingMessage();
+    }
+    _assistantInsertIndex = null;
+    notifyListeners();
+    _persistToHistory();
+    _uiDoneCallback?.call();
   }
 
   /// Send a message and wait for all events to complete. Returns the final
@@ -452,136 +465,156 @@ class ChatSession extends ChangeNotifier {
 
   void _handleCoreEvent(ChatEvent event) {
     // Capture provider session IDs early
-    final coreAdapter = _getAdapterFor(_config.provider);
-    if (coreAdapter == 'opencode' && _opencodeSessionId == null) {
+    _captureNewSessionIds(_getAdapterFor(_config.provider));
+
+    final handler = _coreEventHandlers[event.type];
+    // Events without a handler (subagentStart, subagentComplete, etc.) are
+    // forwarded to the UI via onEvent.
+    handler?.call(event);
+  }
+
+  late final Map<ChatEventType, void Function(ChatEvent event)>
+  _coreEventHandlers = {
+    ChatEventType.assistantMessageStart: _onAssistantMessageStart,
+    ChatEventType.assistantDelta: _onAssistantDelta,
+    ChatEventType.assistantMessage: _onAssistantMessage,
+    ChatEventType.toolStart: _onToolStart,
+    ChatEventType.toolComplete: _onToolComplete,
+    ChatEventType.result: _onResultEvent,
+  };
+
+  /// Captures provider session IDs that are not yet known for [adapter].
+  void _captureNewSessionIds(String adapter) {
+    if (adapter == 'opencode' && _opencodeSessionId == null) {
       final sid = _provider.getSessionId(_config.sessionName);
       if (sid != null) {
         _opencodeSessionId = sid;
       }
     }
-    if (coreAdapter == 'copilot' && _copilotSessionId == null) {
+    if (adapter == 'copilot' && _copilotSessionId == null) {
       final sid = _provider.getSessionId(_config.sessionName);
       if (sid != null) {
         _copilotSessionId = sid;
       }
     }
-    if (coreAdapter == 'cursor' && _cursorSessionId == null) {
+    if (adapter == 'cursor' && _cursorSessionId == null) {
       final sid = _provider.getSessionId(_config.sessionName);
       if (sid != null) {
         _cursorSessionId = sid;
       }
     }
+  }
 
-    switch (event.type) {
-      case ChatEventType.assistantMessageStart:
-        _streamingMessageId = event.messageId;
-        _streamingContent = '';
-        _assistantInsertIndex ??= _messages.length;
-        notifyListeners();
+  void _onAssistantMessageStart(ChatEvent event) {
+    _streamingMessageId = event.messageId;
+    _streamingContent = '';
+    _assistantInsertIndex ??= _messages.length;
+    notifyListeners();
+  }
 
-      case ChatEventType.assistantDelta:
-        final delta = event.deltaContent;
-        if (delta != null) {
-          _streamingContent += delta;
-          notifyListeners();
-        }
+  void _onAssistantDelta(ChatEvent event) {
+    final delta = event.deltaContent;
+    if (delta != null) {
+      _streamingContent += delta;
+      notifyListeners();
+    }
+  }
 
-      case ChatEventType.assistantMessage:
-        final content = event.messageContent ?? _streamingContent;
-        final toolReqs = event.toolRequests;
+  void _onAssistantMessage(ChatEvent event) {
+    final content = event.messageContent ?? _streamingContent;
+    final toolReqs = event.toolRequests;
 
-        // Remove streaming placeholder
-        _messages.removeWhere(
-          (m) => m.id == _streamingMessageId && m.isStreaming,
-        );
+    // Remove streaming placeholder
+    _messages.removeWhere(
+      (m) => m.id == _streamingMessageId && m.isStreaming,
+    );
 
-        final toolCalls =
-            toolReqs.map((tr) {
-              final args = tr['arguments'];
-              return ChatToolCall(
-                toolCallId: tr['toolCallId'] as String? ?? '',
-                toolName: tr['name'] as String? ?? '',
-                arguments:
-                    args is Map
-                        ? Map<String, dynamic>.from(args)
-                        : <String, dynamic>{},
-              );
-            }).toList();
-
-        final outputTokens = event.outputTokens;
-        ChatTokenUsage? usage;
-        if (outputTokens != null) {
-          usage = ChatTokenUsage(outputTokens: outputTokens);
-          _totalOutputTokens += outputTokens;
-        }
-
-        final insertAt = _assistantInsertIndex?.clamp(0, _messages.length);
-        final assistantMessage = ChatMessage(
-          id:
-              event.messageId ??
-              'assistant-${DateTime.now().millisecondsSinceEpoch}',
-          role: ChatRole.assistant,
-          content: content,
-          timestamp: event.timestamp ?? DateTime.now(),
-          toolCalls: toolCalls,
-          isStreaming: false,
-          tokenUsage: usage,
-        );
-        if (insertAt != null && insertAt < _messages.length) {
-          _messages.insert(insertAt, assistantMessage);
-        } else {
-          _messages.add(assistantMessage);
-        }
-        _streamingMessageId = null;
-        _streamingContent = '';
-        _assistantInsertIndex = null;
-        notifyListeners();
-
-      case ChatEventType.toolStart:
-        _assistantInsertIndex ??= _messages.length;
-
-      case ChatEventType.toolComplete:
-        _assistantInsertIndex ??= _messages.length;
-        _messages.add(
-          ChatMessage(
-            id:
-                event.toolCallId ??
-                'tool-${DateTime.now().millisecondsSinceEpoch}',
-            role: ChatRole.tool,
-            content: event.toolResultContent ?? '',
-            toolName: event.toolName,
-            toolCallId: event.toolCallId,
-            timestamp: event.timestamp ?? DateTime.now(),
-            metadata: {
-              if (event.toolSuccess != null) 'success': event.toolSuccess,
-            },
-          ),
-        );
-        notifyListeners();
-
-      case ChatEventType.result:
-        final usage = event.usageData;
-        if (usage != null) {
-          final codeChanges = usage['codeChanges'] as Map<String, dynamic>?;
-          final outputTokens = (usage['outputTokens'] as num?)?.toInt() ?? 0;
-          if (outputTokens > 0) {
-            _totalOutputTokens += outputTokens;
-          }
-          _lastUsage = ChatTokenUsage(
-            outputTokens: outputTokens,
-            premiumRequests: (usage['premiumRequests'] as num?)?.toInt() ?? 0,
-            totalApiDurationMs:
-                (usage['totalApiDurationMs'] as num?)?.toInt() ?? 0,
-            sessionDurationMs:
-                (usage['sessionDurationMs'] as num?)?.toInt() ?? 0,
-            linesAdded: (codeChanges?['linesAdded'] as num?)?.toInt() ?? 0,
-            linesRemoved: (codeChanges?['linesRemoved'] as num?)?.toInt() ?? 0,
+    final toolCalls =
+        toolReqs.map((tr) {
+          final args = tr['arguments'];
+          return ChatToolCall(
+            toolCallId: tr['toolCallId'] as String? ?? '',
+            toolName: tr['name'] as String? ?? '',
+            arguments:
+                args is Map
+                    ? Map<String, dynamic>.from(args)
+                    : <String, dynamic>{},
           );
-          notifyListeners();
-        }
+        }).toList();
 
-      default:
-      // subagentStart, subagentComplete, etc. — forwarded to UI via onEvent.
+    final outputTokens = event.outputTokens;
+    ChatTokenUsage? usage;
+    if (outputTokens != null) {
+      usage = ChatTokenUsage(outputTokens: outputTokens);
+      _totalOutputTokens += outputTokens;
+    }
+
+    final insertAt = _assistantInsertIndex?.clamp(0, _messages.length);
+    final assistantMessage = ChatMessage(
+      id:
+          event.messageId ??
+          'assistant-${DateTime.now().millisecondsSinceEpoch}',
+      role: ChatRole.assistant,
+      content: content,
+      timestamp: event.timestamp ?? DateTime.now(),
+      toolCalls: toolCalls,
+      isStreaming: false,
+      tokenUsage: usage,
+    );
+    if (insertAt != null && insertAt < _messages.length) {
+      _messages.insert(insertAt, assistantMessage);
+    } else {
+      _messages.add(assistantMessage);
+    }
+    _streamingMessageId = null;
+    _streamingContent = '';
+    _assistantInsertIndex = null;
+    notifyListeners();
+  }
+
+  void _onToolStart(ChatEvent event) {
+    _assistantInsertIndex ??= _messages.length;
+  }
+
+  void _onToolComplete(ChatEvent event) {
+    _assistantInsertIndex ??= _messages.length;
+    _messages.add(
+      ChatMessage(
+        id:
+            event.toolCallId ??
+            'tool-${DateTime.now().millisecondsSinceEpoch}',
+        role: ChatRole.tool,
+        content: event.toolResultContent ?? '',
+        toolName: event.toolName,
+        toolCallId: event.toolCallId,
+        timestamp: event.timestamp ?? DateTime.now(),
+        metadata: {
+          if (event.toolSuccess != null) 'success': event.toolSuccess,
+        },
+      ),
+    );
+    notifyListeners();
+  }
+
+  void _onResultEvent(ChatEvent event) {
+    final usage = event.usageData;
+    if (usage != null) {
+      final codeChanges = usage['codeChanges'] as Map<String, dynamic>?;
+      final outputTokens = (usage['outputTokens'] as num?)?.toInt() ?? 0;
+      if (outputTokens > 0) {
+        _totalOutputTokens += outputTokens;
+      }
+      _lastUsage = ChatTokenUsage(
+        outputTokens: outputTokens,
+        premiumRequests: (usage['premiumRequests'] as num?)?.toInt() ?? 0,
+        totalApiDurationMs:
+            (usage['totalApiDurationMs'] as num?)?.toInt() ?? 0,
+        sessionDurationMs:
+            (usage['sessionDurationMs'] as num?)?.toInt() ?? 0,
+        linesAdded: (codeChanges?['linesAdded'] as num?)?.toInt() ?? 0,
+        linesRemoved: (codeChanges?['linesRemoved'] as num?)?.toInt() ?? 0,
+      );
+      notifyListeners();
     }
   }
 

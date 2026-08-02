@@ -118,6 +118,52 @@ buildMindMapGraph({
 
   if (wsState is! WorkspaceLoaded) return (nodes: nodes, conns: conns);
 
+  _addWorkspaceSessionNodes(
+    nodes: nodes,
+    conns: conns,
+    wsState: wsState,
+    termState: termState,
+    palette: palette,
+  );
+  _addOrphanAgentNodes(
+    nodes: nodes,
+    conns: conns,
+    wsState: wsState,
+    termState: termState,
+    palette: palette,
+  );
+  _addRepoTreeDiffNodes(nodes: nodes, conns: conns, palette: palette);
+  _addWorkspaceTreeDiffNodes(
+    nodes: nodes,
+    conns: conns,
+    wsState: wsState,
+    palette: palette,
+  );
+  _addActiveEditorNode(
+    nodes: nodes,
+    conns: conns,
+    editorState: editorState,
+    palette: palette,
+  );
+  _addRunNodes(
+    nodes: nodes,
+    conns: conns,
+    wsState: wsState,
+    runState: runState,
+    palette: palette,
+  );
+
+  return (nodes: nodes, conns: conns);
+}
+
+/// Phase 1: workspace nodes plus their agent sessions with repo/branch nodes.
+void _addWorkspaceSessionNodes({
+  required List<MindMapNodeData> nodes,
+  required List<MindMapConnection> conns,
+  required WorkspaceLoaded wsState,
+  required TerminalState termState,
+  required AppColorScheme palette,
+}) {
   for (final ws in wsState.workspaces) {
     final wsNodeId = 'ws:${ws.id}';
     nodes.add(WorkspaceNodeData(id: wsNodeId, workspace: ws));
@@ -212,7 +258,16 @@ buildMindMapGraph({
       }
     }
   }
+}
 
+/// Phase 2: orphan agent sessions that did not match any workspace.
+void _addOrphanAgentNodes({
+  required List<MindMapNodeData> nodes,
+  required List<MindMapConnection> conns,
+  required WorkspaceLoaded wsState,
+  required TerminalState termState,
+  required AppColorScheme palette,
+}) {
   if (termState is TerminalLoaded) {
     final existingAgents =
         nodes
@@ -272,7 +327,14 @@ buildMindMapGraph({
       }
     }
   }
+}
 
+/// Phase 3: file tree + diff nodes for every repo node collected so far.
+void _addRepoTreeDiffNodes({
+  required List<MindMapNodeData> nodes,
+  required List<MindMapConnection> conns,
+  required AppColorScheme palette,
+}) {
   final repoNodes = nodes.whereType<RepoNodeData>().toList();
   for (final repo in repoNodes) {
     // Use repoPath + branch in the ID so worktrees on the same repo path but
@@ -315,7 +377,15 @@ buildMindMapGraph({
       );
     }
   }
+}
 
+/// Phase 4: file tree + diff nodes hanging directly off each workspace path.
+void _addWorkspaceTreeDiffNodes({
+  required List<MindMapNodeData> nodes,
+  required List<MindMapConnection> conns,
+  required WorkspaceLoaded wsState,
+  required AppColorScheme palette,
+}) {
   for (final ws in wsState.workspaces) {
     for (final path in ws.paths) {
       final treeId = 'tree:$path';
@@ -357,7 +427,15 @@ buildMindMapGraph({
       }
     }
   }
+}
 
+/// Phase 5: the active editor tab node, linked to its best-matching tree.
+void _addActiveEditorNode({
+  required List<MindMapNodeData> nodes,
+  required List<MindMapConnection> conns,
+  required FileEditorState editorState,
+  required AppColorScheme palette,
+}) {
   if (editorState.isVisible && editorState.tabs.isNotEmpty) {
     final idx = editorState.activeIndex.clamp(0, editorState.tabs.length - 1);
     final activeTab = editorState.tabs[idx];
@@ -397,7 +475,16 @@ buildMindMapGraph({
       );
     }
   }
+}
 
+/// Phase 6: run session nodes, linked to their matching agent or workspace.
+void _addRunNodes({
+  required List<MindMapNodeData> nodes,
+  required List<MindMapConnection> conns,
+  required WorkspaceLoaded wsState,
+  required RunState runState,
+  required AppColorScheme palette,
+}) {
   if (runState.sessions.isNotEmpty) {
     for (final runSession in runState.sessions) {
       final matchingWs =
@@ -437,8 +524,6 @@ buildMindMapGraph({
       );
     }
   }
-
-  return (nodes: nodes, conns: conns);
 }
 
 String _detectLanguage(String path) {

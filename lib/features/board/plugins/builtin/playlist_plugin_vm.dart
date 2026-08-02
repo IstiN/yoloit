@@ -562,326 +562,332 @@ class _PlaylistContentState extends State<_PlaylistContent> {
     return Column(
       children: [
         // ── Fixed top header (always visible) ─────────────────────────────
-        Container(
-          height: 36,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            color: colors.surface,
-            border: Border(bottom: BorderSide(color: colors.border)),
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.queue_music_rounded, size: 14, color: colors.primary),
-              const SizedBox(width: 6),
-              Text(
-                '${tracks.length} track${tracks.length == 1 ? '' : 's'}',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: colors.primary,
-                ),
-              ),
-              const Spacer(),
-              Builder(
-                builder:
-                    (btnCtx) => FilledButton.icon(
-                      onPressed: () => _showAddMenu(btnCtx),
-                      icon: const Icon(Icons.add, size: 13),
-                      label: const Text('Add', style: TextStyle(fontSize: 11)),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: colors.primary,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
-                        minimumSize: const Size(0, 24),
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                    ),
-              ),
-            ],
-          ),
-        ),
+        _buildHeader(colors, tracks),
 
         // ── Media area: always 140px — video player OR audio art placeholder ─
-        if (currentTrack != null)
-          SizedBox(
-            height: 140,
-            child:
-                hasVideo
-                    ? Video(
-                      controller: _videoCtrl!,
-                      controls: AdaptiveVideoControls,
-                    )
-                    : Container(
-                      color: colors.surfaceElevated,
-                      child: Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              width: 72,
-                              height: 72,
-                              decoration: BoxDecoration(
-                                color: colors.primary.withAlpha(31),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                Icons.music_note_rounded,
-                                size: 36,
-                                color: colors.primary.withAlpha(178),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-          ),
+        if (currentTrack != null) _buildMediaArea(colors, hasVideo),
 
         // ── Now Playing bar ────────────────────────────────────────────────
         if (currentTrack != null)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: colors.surfaceElevated,
-              border: Border(bottom: BorderSide(color: colors.border)),
+          _buildNowPlayingBar(colors, currentTrack, progress),
+
+        // ── Track list ─────────────────────────────────────────────────────
+        Divider(height: 1, thickness: 0.5, color: colors.border),
+        _buildTrackList(colors, tracks),
+      ],
+    );
+  }
+
+  Widget _buildHeader(AppColorScheme colors, List<Map<String, dynamic>> tracks) {
+    return Container(
+      height: 36,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        border: Border(bottom: BorderSide(color: colors.border)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.queue_music_rounded, size: 14, color: colors.primary),
+          const SizedBox(width: 6),
+          Text(
+            '${tracks.length} track${tracks.length == 1 ? '' : 's'}',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: colors.primary,
             ),
-            child: Column(
-              children: [
-                // Track name
-                Text(
-                  currentTrack['name'] as String? ?? '',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 6),
-                // Progress slider
-                SliderTheme(
-                  data: SliderTheme.of(context).copyWith(
-                    activeTrackColor: colors.primary,
-                    inactiveTrackColor: colors.border,
-                    thumbColor: colors.primary,
-                    overlayColor: colors.primary.withAlpha(38),
-                    trackHeight: 3,
-                    thumbShape: const RoundSliderThumbShape(
-                      enabledThumbRadius: 5,
+          ),
+          const Spacer(),
+          Builder(
+            builder:
+                (btnCtx) => FilledButton.icon(
+                  onPressed: () => _showAddMenu(btnCtx),
+                  icon: const Icon(Icons.add, size: 13),
+                  label: const Text('Add', style: TextStyle(fontSize: 11)),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: colors.primary,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
                     ),
-                  ),
-                  child: Slider(
-                    value: progress,
-                    onChanged:
-                        (v) => _player.seek(
-                          Duration(
-                            milliseconds:
-                                (v * _duration.inMilliseconds).round(),
-                          ),
-                        ),
+                    minimumSize: const Size(0, 24),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
                 ),
-                // Time
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMediaArea(AppColorScheme colors, bool hasVideo) {
+    return SizedBox(
+      height: 140,
+      child:
+          hasVideo
+              ? Video(controller: _videoCtrl!, controls: AdaptiveVideoControls)
+              : Container(
+                color: colors.surfaceElevated,
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        _formatDuration(_position),
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.onSurface.withAlpha(120),
+                      Container(
+                        width: 72,
+                        height: 72,
+                        decoration: BoxDecoration(
+                          color: colors.primary.withAlpha(31),
+                          shape: BoxShape.circle,
                         ),
-                      ),
-                      Text(
-                        _formatDuration(_duration),
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.onSurface.withAlpha(120),
+                        child: Icon(
+                          Icons.music_note_rounded,
+                          size: 36,
+                          color: colors.primary.withAlpha(178),
                         ),
                       ),
                     ],
                   ),
                 ),
-                // Controls row
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // Shuffle
-                    IconButton(
-                      icon: Icon(
-                        Icons.shuffle_rounded,
-                        size: 18,
-                        color:
-                            _shuffle
-                                ? colors.primary
-                                : Theme.of(
-                                  context,
-                                ).colorScheme.onSurface.withAlpha(100),
-                      ),
-                      onPressed: () => _saveState(shuffle: !_shuffle),
-                      padding: const EdgeInsets.all(4),
-                      constraints: const BoxConstraints(
-                        minWidth: 32,
-                        minHeight: 32,
-                      ),
+              ),
+    );
+  }
+
+  Widget _buildNowPlayingBar(
+    AppColorScheme colors,
+    Map<String, dynamic> currentTrack,
+    double progress,
+  ) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: colors.surfaceElevated,
+        border: Border(bottom: BorderSide(color: colors.border)),
+      ),
+      child: Column(
+        children: [
+          // Track name
+          Text(
+            currentTrack['name'] as String? ?? '',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 6),
+          // Progress slider
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              activeTrackColor: colors.primary,
+              inactiveTrackColor: colors.border,
+              thumbColor: colors.primary,
+              overlayColor: colors.primary.withAlpha(38),
+              trackHeight: 3,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
+            ),
+            child: Slider(
+              value: progress,
+              onChanged:
+                  (v) => _player.seek(
+                    Duration(
+                      milliseconds: (v * _duration.inMilliseconds).round(),
                     ),
-                    // Prev
-                    IconButton(
-                      icon: Icon(
-                        Icons.skip_previous_rounded,
-                        size: 24,
-                        color: Theme.of(context).colorScheme.onSurface,
-                      ),
-                      onPressed: tracks.length > 1 ? _skipPrev : null,
-                      padding: const EdgeInsets.all(4),
-                      constraints: const BoxConstraints(
-                        minWidth: 36,
-                        minHeight: 36,
-                      ),
-                    ),
-                    // Play/Pause
-                    GestureDetector(
-                      onTap:
-                          () => _isPlaying ? _player.pause() : _player.play(),
-                      child: Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: colors.primary,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          _isPlaying
-                              ? Icons.pause_rounded
-                              : Icons.play_arrow_rounded,
-                          color: colors.textPrimary,
-                          size: 26,
-                        ),
-                      ),
-                    ),
-                    // Next
-                    IconButton(
-                      icon: Icon(
-                        Icons.skip_next_rounded,
-                        size: 24,
-                        color: Theme.of(context).colorScheme.onSurface,
-                      ),
-                      onPressed: tracks.length > 1 ? _skipNext : null,
-                      padding: const EdgeInsets.all(4),
-                      constraints: const BoxConstraints(
-                        minWidth: 36,
-                        minHeight: 36,
-                      ),
-                    ),
-                    // Repeat
-                    IconButton(
-                      icon: Icon(
-                        Icons.repeat_rounded,
-                        size: 18,
-                        color:
-                            _repeat
-                                ? colors.primary
-                                : Theme.of(
-                                  context,
-                                ).colorScheme.onSurface.withAlpha(100),
-                      ),
-                      onPressed: () => _saveState(repeat: !_repeat),
-                      padding: const EdgeInsets.all(4),
-                      constraints: const BoxConstraints(
-                        minWidth: 32,
-                        minHeight: 32,
-                      ),
-                    ),
-                  ],
+                  ),
+            ),
+          ),
+          // Time
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  _formatDuration(_position),
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withAlpha(120),
+                  ),
+                ),
+                Text(
+                  _formatDuration(_duration),
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withAlpha(120),
+                  ),
                 ),
               ],
             ),
           ),
+          // Controls row
+          _buildControlsRow(colors),
+        ],
+      ),
+    );
+  }
 
-        // ── Track list ─────────────────────────────────────────────────────
-        Divider(height: 1, thickness: 0.5, color: colors.border),
-        Expanded(
-          child:
-              tracks.isEmpty
-                  ? Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.queue_music_rounded,
-                          size: 40,
-                          color: colors.primary.withAlpha(89),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'No tracks yet',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurface.withAlpha(120),
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                  : ReorderableListView.builder(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    itemCount: tracks.length,
-                    onReorder: (oldIdx, newIdx) {
-                      final updated = List<Map<String, dynamic>>.from(tracks);
-                      if (newIdx > oldIdx) newIdx--;
-                      final item = updated.removeAt(oldIdx);
-                      updated.insert(newIdx, item);
-                      int newCurrent = _currentIndex;
-                      if (oldIdx == _currentIndex) {
-                        newCurrent = newIdx;
-                      } else if (oldIdx < _currentIndex &&
-                          newIdx >= _currentIndex) {
-                        newCurrent--;
-                      } else if (oldIdx > _currentIndex &&
-                          newIdx <= _currentIndex) {
-                        newCurrent++;
-                      }
-                      _saveState(tracks: updated, currentIndex: newCurrent);
-                    },
-                    itemBuilder: (context, index) {
-                      final track = tracks[index];
-                      final name = track['name'] as String? ?? '';
-                      final isActive = index == _currentIndex;
-                      final isUrl = track['isUrl'] == true;
-                      final ext = _ext(track['path'] as String? ?? '');
-                      final icon =
-                          isUrl
-                              ? Icons.link_rounded
-                              : (_isVideoExt(ext)
-                                  ? Icons.videocam_outlined
-                                  : Icons.audiotrack_outlined);
-
-                      return _TrackTile(
-                        key: ValueKey(track['id']),
-                        index: index,
-                        name: name,
-                        icon: icon,
-                        isActive: isActive,
-                        isPlaying: isActive && _isPlaying,
-                        onTap: () => _selectTrack(index),
-                        onDelete: () => _removeTrack(index),
-                      );
-                    },
-                    buildDefaultDragHandles: false,
-                  ),
+  Widget _buildControlsRow(AppColorScheme colors) {
+    final tracks = _tracks;
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        // Shuffle
+        IconButton(
+          icon: Icon(
+            Icons.shuffle_rounded,
+            size: 18,
+            color:
+                _shuffle
+                    ? colors.primary
+                    : Theme.of(context).colorScheme.onSurface.withAlpha(100),
+          ),
+          onPressed: () => _saveState(shuffle: !_shuffle),
+          padding: const EdgeInsets.all(4),
+          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+        ),
+        // Prev
+        IconButton(
+          icon: Icon(
+            Icons.skip_previous_rounded,
+            size: 24,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
+          onPressed: tracks.length > 1 ? _skipPrev : null,
+          padding: const EdgeInsets.all(4),
+          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+        ),
+        // Play/Pause
+        GestureDetector(
+          onTap: () => _isPlaying ? _player.pause() : _player.play(),
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: colors.primary,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+              color: colors.textPrimary,
+              size: 26,
+            ),
+          ),
+        ),
+        // Next
+        IconButton(
+          icon: Icon(
+            Icons.skip_next_rounded,
+            size: 24,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
+          onPressed: tracks.length > 1 ? _skipNext : null,
+          padding: const EdgeInsets.all(4),
+          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+        ),
+        // Repeat
+        IconButton(
+          icon: Icon(
+            Icons.repeat_rounded,
+            size: 18,
+            color:
+                _repeat
+                    ? colors.primary
+                    : Theme.of(context).colorScheme.onSurface.withAlpha(100),
+          ),
+          onPressed: () => _saveState(repeat: !_repeat),
+          padding: const EdgeInsets.all(4),
+          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
         ),
       ],
+    );
+  }
+
+  Widget _buildTrackList(
+    AppColorScheme colors,
+    List<Map<String, dynamic>> tracks,
+  ) {
+    return Expanded(
+      child:
+          tracks.isEmpty
+              ? Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.queue_music_rounded,
+                      size: 40,
+                      color: colors.primary.withAlpha(89),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'No tracks yet',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withAlpha(120),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+              : ReorderableListView.builder(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                itemCount: tracks.length,
+                onReorder:
+                    (oldIdx, newIdx) => _onReorder(tracks, oldIdx, newIdx),
+                itemBuilder:
+                    (context, index) => _buildTrackItem(tracks, index),
+                buildDefaultDragHandles: false,
+              ),
+    );
+  }
+
+  void _onReorder(List<Map<String, dynamic>> tracks, int oldIdx, int newIdx) {
+    final updated = List<Map<String, dynamic>>.from(tracks);
+    if (newIdx > oldIdx) newIdx--;
+    final item = updated.removeAt(oldIdx);
+    updated.insert(newIdx, item);
+    int newCurrent = _currentIndex;
+    if (oldIdx == _currentIndex) {
+      newCurrent = newIdx;
+    } else if (oldIdx < _currentIndex && newIdx >= _currentIndex) {
+      newCurrent--;
+    } else if (oldIdx > _currentIndex && newIdx <= _currentIndex) {
+      newCurrent++;
+    }
+    _saveState(tracks: updated, currentIndex: newCurrent);
+  }
+
+  Widget _buildTrackItem(List<Map<String, dynamic>> tracks, int index) {
+    final track = tracks[index];
+    final name = track['name'] as String? ?? '';
+    final isActive = index == _currentIndex;
+    final isUrl = track['isUrl'] == true;
+    final ext = _ext(track['path'] as String? ?? '');
+    final icon =
+        isUrl
+            ? Icons.link_rounded
+            : (_isVideoExt(ext)
+                ? Icons.videocam_outlined
+                : Icons.audiotrack_outlined);
+
+    return _TrackTile(
+      key: ValueKey(track['id']),
+      index: index,
+      name: name,
+      icon: icon,
+      isActive: isActive,
+      isPlaying: isActive && _isPlaying,
+      onTap: () => _selectTrack(index),
+      onDelete: () => _removeTrack(index),
     );
   }
 }
