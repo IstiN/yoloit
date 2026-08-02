@@ -171,6 +171,23 @@ A pre-configured `repomix.config.json` lives at the repo root. It excludes `thir
   python3 scripts/check_panel_write_coverage.py
   ```
 
+## 📊 CRAP Metric (crap4dart)
+
+- [crap4dart](https://github.com/IstiN/crap4dart) tracks the CRAP score
+  (complexity × coverage) of the codebase; config lives in `crap4dart.yaml`,
+  the current max score is shown in `badges/crap.svg` (embedded in `README.md`).
+- **Run it via `dart pub global`, never as a project dependency**: yoloit pins
+  `dependency_overrides: analyzer: ^14.0.0`, while crap4dart is built for
+  analyzer 7.x — inside the project graph it fails to compile. Install once with:
+  `dart pub global activate crap4dart`
+- Regenerate the badge (uses the existing `coverage/lcov.info`):
+  `crap4dart analyze --badge badges/crap.svg`
+- Current mode is **observe-only**: the threshold is the default 8.0 (the
+  legacy max is far above it, so `analyze` exits 2 — expected, do not "fix"
+  by raising the threshold), and all quality gates are `enabled: false` in
+  `crap4dart.yaml`. Enable gates / ratchet via `--diff` only when the team
+  starts actually reducing the score.
+
 ## 🚨 Critical Agent Gotchas
 
 - **No Heredocs (`cat << 'EOF'`)**:

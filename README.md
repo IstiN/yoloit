@@ -1,5 +1,7 @@
 # YoLoIT
 
+![CRAP](badges/crap.svg)
+
 YoLoIT is a Flutter desktop application for orchestrating AI coding CLIs inside a workspace-aware developer environment. It combines multi-repository workspaces, embedded agent terminals, code review, a built-in editor, run configurations, search, setup checks, and release updates in one app.
 
 ## What YoLoIT is for

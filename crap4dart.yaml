@@ -1,0 +1,60 @@
+# crap4dart configuration for YoLoIT.
+# See https://github.com/IstiN/crap4dart for details.
+#
+# Current state: CRAP analysis is enabled in "observe" mode — the score is
+# recorded (see badges/crap.svg) but the existing violations are NOT being
+# fixed yet. Quality gates are disabled for now; enable them gradually.
+
+# Directories scanned for Dart sources by "analyze" and "check"
+# (default mode, without --changed/--staged).
+sources: [lib, bin]
+
+# Files excluded from analysis in every mode (glob patterns relative
+# to the project root).
+exclude:
+  - '**.g.dart'
+  - '**.freezed.dart'
+  - '**.mocks.dart'
+
+# CRAP metric analysis settings ("analyze" command).
+crap:
+  enabled: true
+  # Maximum allowed CRAP score; higher scores fail the run.
+  # NOTE: the current codebase max is far above the default 8.0 (see
+  # badges/crap.svg). The threshold stays at the default so the badge and
+  # the report reflect the real state; enforcement comes later (either
+  # ratchet via --diff or by lowering the max first).
+  threshold: 8.0
+  # Run the test suite to generate coverage before analyzing.
+  run_tests: false
+
+# Coverage input settings.
+coverage:
+  # Path to the LCOV coverage file, relative to the project root.
+  lcov_path: coverage/lcov.info
+  # Run "flutter test --coverage" before analyzing.
+  run_tests: false
+  # Fail when no coverage data is available instead of reporting N/A.
+  required: true
+  # Report branch coverage (BRDA records) in addition to line coverage.
+  branch_coverage: true
+
+# Quality gates ("check" command) — all disabled until the existing
+# violations are addressed; enable one by one later.
+gates:
+  loc:
+    enabled: false
+  test_coverage:
+    enabled: false
+  golden:
+    enabled: false
+  hardcoded_strings:
+    enabled: false
+  accessibility:
+    enabled: false
+  complexity:
+    enabled: false
+  method_size:
+    enabled: false
+  public_docs:
+    enabled: false
