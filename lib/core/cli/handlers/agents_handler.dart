@@ -32,14 +32,92 @@ Future<shelf.Response> handleAgents(
   nextAvailableBoundsFor,
   AgentConfigService? agentConfigService,
   ChatSessionManager? chatSessionManager,
-}) async {
-  final service = agentConfigService ?? AgentConfigService.instance;
-  final sessionManager = chatSessionManager ?? ChatSessionManager.instance;
-  final tc = terminalCubit;
-  if (tc == null) return error('Terminal cubit not available');
+}) {
+  final handler = _AgentsRouteHandler(
+    method: method,
+    sub: sub,
+    request: request,
+    cubit: cubit,
+    terminalCubit: terminalCubit,
+    body: body,
+    json: json,
+    error: error,
+    notFound: notFound,
+    scheduleRebuild: scheduleRebuild,
+    nextAvailableBoundsFor: nextAvailableBoundsFor,
+    service: agentConfigService ?? AgentConfigService.instance,
+    sessionManager: chatSessionManager ?? ChatSessionManager.instance,
+  );
+  return handler.dispatch();
+}
 
-  if ((sub.isEmpty || (sub.length == 1 && sub[0] == 'list')) &&
-      method == 'GET') {
+class _AgentsRouteHandler {
+  const _AgentsRouteHandler({
+    required this.method,
+    required this.sub,
+    required this.request,
+    required this.cubit,
+    required this.terminalCubit,
+    required this.body,
+    required this.json,
+    required this.error,
+    required this.notFound,
+    required this.scheduleRebuild,
+    required this.nextAvailableBoundsFor,
+    required this.service,
+    required this.sessionManager,
+  });
+
+  final String method;
+  final List<String> sub;
+  final shelf.Request request;
+  final BoardCubit? cubit;
+  final TerminalCubit? terminalCubit;
+  final Future<Map<String, dynamic>> Function(shelf.Request) body;
+  final shelf.Response Function(Object) json;
+  final shelf.Response Function(String) error;
+  final shelf.Response Function(String) notFound;
+  final void Function() scheduleRebuild;
+  final BoardPanelBounds Function(
+    BoardDocument board, {
+    required double preferredWidth,
+    required double preferredHeight,
+  })
+  nextAvailableBoundsFor;
+  final AgentConfigService service;
+  final ChatSessionManager sessionManager;
+
+  Future<shelf.Response> dispatch() async {
+    final tc = terminalCubit;
+    if (tc == null) return error('Terminal cubit not available');
+
+    final routes = <(bool Function(), Future<shelf.Response> Function())>[
+      (
+        () =>
+            (sub.isEmpty || (sub.length == 1 && sub[0] == 'list')) &&
+            method == 'GET',
+        () => _listAgents(tc),
+      ),
+      (
+        () => sub.length == 1 && sub[0] == 'default' && method == 'POST',
+        _setDefaultAgent,
+      ),
+      (
+        () => sub.length == 1 && sub[0] == 'run' && method == 'POST',
+        _runAgent,
+      ),
+      (
+        () => sub.length == 1 && sub[0] == 'config' && method == 'POST',
+        _updateAgentConfig,
+      ),
+    ];
+    for (final (matches, run) in routes) {
+      if (matches()) return run();
+    }
+    return notFound('Unknown agents route');
+  }
+
+  Future<shelf.Response> _listAgents(TerminalCubit tc) async {
     final configs = await service.load();
     final defaultId =
         service.defaultAgentId ?? AgentType.copilot.name;
@@ -87,7 +165,7 @@ Future<shelf.Response> handleAgents(
     });
   }
 
-  if (sub.length == 1 && sub[0] == 'default' && method == 'POST') {
+  Future<shelf.Response> _setDefaultAgent() async {
     final requestBody = await body(request);
     final id = requestBody['id'] as String?;
     if (id != null &&
@@ -102,7 +180,7 @@ Future<shelf.Response> handleAgents(
     });
   }
 
-  if (sub.length == 1 && sub[0] == 'run' && method == 'POST') {
+  Future<shelf.Response> _runAgent() async {
     final requestBody = await body(request);
     final agentId =
         (requestBody['agent'] as String?) ??
@@ -232,7 +310,7 @@ Future<shelf.Response> handleAgents(
   }
 
   // POST /agents/config — update agent config fields (defaultModel, asrMode, asrCloudConfigId, asrCloudModel)
-  if (sub.length == 1 && sub[0] == 'config' && method == 'POST') {
+  Future<shelf.Response> _updateAgentConfig() async {
     final requestBody = await body(request);
     final agentId = requestBody['id'] as String?;
     if (agentId == null || agentId.isEmpty) {
@@ -290,6 +368,4 @@ Future<shelf.Response> handleAgents(
       },
     });
   }
-
-  return notFound('Unknown agents route');
 }

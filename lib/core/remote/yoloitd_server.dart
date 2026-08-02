@@ -11,6 +11,54 @@ import 'package:yoloit/core/remote/yoloitd_panel_catalog.dart';
 import 'package:yoloit/core/remote/yoloitd_store.dart';
 import 'package:yoloit/core/utils/directory_utils.dart';
 
+/// A single REST route entry: an optional [method] (null matches any), a
+/// [pattern] of path segments (a null element matches any single segment),
+/// and the [handler] to run. When [prefix] is true, the pattern matches the
+/// leading segments and the path may be longer. [when] is an optional extra
+/// condition evaluated last.
+class _RouteEntry {
+  const _RouteEntry(
+    this.method,
+    this.pattern,
+    this.handler, {
+    this.prefix = false,
+    this.when,
+  });
+
+  final String? method;
+  final List<String?> pattern;
+  final Future<shelf.Response> Function() handler;
+  final bool prefix;
+  final bool Function()? when;
+
+  bool matches(String method, List<String> sub) {
+    if (this.method != null && this.method != method) return false;
+    if (prefix) {
+      if (sub.length < pattern.length) return false;
+    } else if (sub.length != pattern.length) {
+      return false;
+    }
+    for (var i = 0; i < pattern.length; i++) {
+      final expected = pattern[i];
+      if (expected != null && expected != sub[i]) return false;
+    }
+    return when?.call() ?? true;
+  }
+}
+
+/// Runs the handler of the first route in [routes] matching [method] and
+/// [sub], or returns null when no route matches.
+Future<shelf.Response?> _dispatch(
+  String method,
+  List<String> sub,
+  List<_RouteEntry> routes,
+) async {
+  for (final route in routes) {
+    if (route.matches(method, sub)) return route.handler();
+  }
+  return null;
+}
+
 class YoloitdServer with ServerProcessMixin {
   YoloitdServer({
     required this.store,
@@ -54,35 +102,48 @@ class YoloitdServer with ServerProcessMixin {
     final method = request.method.toUpperCase();
 
     try {
-      if (path.isEmpty) return htmlResponse(_dashboardHtml());
-      if (path.length == 1 && path[0] == 'api') {
-        return jsonResponse(<String, Object?>{'ok': true, 'service': 'yoloitd'});
-      }
-      if (path.length == 2 && path[0] == 'api' && path[1] == 'health') {
-        return jsonResponse(<String, Object?>{
-          'ok': true,
-          'service': 'yoloitd',
-          'dataDir': store.rootDir.path,
-        });
-      }
-      if (path.length >= 2 && path[0] == 'api' && path[1] == 'boards') {
-        return _handleBoards(request, method, path.skip(2).toList());
-      }
-      if (path.length >= 2 && path[0] == 'api' && path[1] == 'files') {
-        return _handleFiles(request, method, path.skip(2).toList());
-      }
-      if (path.length >= 2 && path[0] == 'api' && path[1] == 'runs') {
-        return _handleRuns(request, method, path.skip(2).toList());
-      }
-      if (path.length >= 2 && path[0] == 'api' && path[1] == 'setup') {
-        return _handleSetup(request, method, path.skip(2).toList());
-      }
-      if (path.length >= 2 && path[0] == 'api' && path[1] == 'terminals') {
-        return _handleTerminals(request, method, path.skip(2).toList());
-      }
-      if (path.length >= 2 && path[0] == 'api' && path[1] == 'templates') {
-        return _handleTemplates(request, method, path.skip(2).toList());
-      }
+      final response = await _dispatch(method, path, <_RouteEntry>[
+        _RouteEntry(null, const <String?>[], _handleDashboard),
+        _RouteEntry(null, const <String?>['api'], _handleApiInfo),
+        _RouteEntry(null, const <String?>['api', 'health'], _handleHealth),
+        _RouteEntry(
+          null,
+          const <String?>['api', 'boards'],
+          () => _handleBoards(request, method, path.skip(2).toList()),
+          prefix: true,
+        ),
+        _RouteEntry(
+          null,
+          const <String?>['api', 'files'],
+          () => _handleFiles(request, method, path.skip(2).toList()),
+          prefix: true,
+        ),
+        _RouteEntry(
+          null,
+          const <String?>['api', 'runs'],
+          () => _handleRuns(request, method, path.skip(2).toList()),
+          prefix: true,
+        ),
+        _RouteEntry(
+          null,
+          const <String?>['api', 'setup'],
+          () => _handleSetup(request, method, path.skip(2).toList()),
+          prefix: true,
+        ),
+        _RouteEntry(
+          null,
+          const <String?>['api', 'terminals'],
+          () => _handleTerminals(request, method, path.skip(2).toList()),
+          prefix: true,
+        ),
+        _RouteEntry(
+          null,
+          const <String?>['api', 'templates'],
+          () => _handleTemplates(request, method, path.skip(2).toList()),
+          prefix: true,
+        ),
+      ]);
+      if (response != null) return response;
       return jsonResponse(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
     } catch (error, stackTrace) {
       stderr.writeln('[yoloitd] $error\n$stackTrace');
@@ -93,40 +154,29 @@ class YoloitdServer with ServerProcessMixin {
     }
   }
 
+  Future<shelf.Response> _handleDashboard() async =>
+      htmlResponse(_dashboardHtml());
+
+  Future<shelf.Response> _handleApiInfo() async =>
+      jsonResponse(<String, Object?>{'ok': true, 'service': 'yoloitd'});
+
+  Future<shelf.Response> _handleHealth() async =>
+      jsonResponse(<String, Object?>{
+        'ok': true,
+        'service': 'yoloitd',
+        'dataDir': store.rootDir.path,
+      });
+
   Future<shelf.Response> _handleBoards(
     shelf.Request request,
     String method,
     List<String> sub,
   ) async {
-    if (sub.isEmpty && method == 'GET') {
-      final boards = await store.loadBoards();
-      final activeId = await store.activeBoardId();
-      final includeArchived =
-          request.url.queryParameters['includeArchived']?.toLowerCase() ==
-          'true';
-      return jsonResponse(<String, Object?>{
-        'boards':
-            boards
-                .where(
-                  (board) =>
-                      includeArchived ||
-                      (board.metadata['archived'] as bool? ?? false) == false,
-                )
-                .map((board) => board.summary(active: board.id == activeId))
-                .toList(),
-      });
-    }
-    if (sub.isEmpty && method == 'POST') {
-      final body = await readJsonBody(request);
-      final name = (body['name'] as String? ?? 'Remote Board').trim();
-      final board = await store.createBoard(
-        name.isEmpty ? 'Remote Board' : name,
-      );
-      return jsonResponse(<String, Object?>{
-        'ok': true,
-        'board': board.summary(active: true),
-      });
-    }
+    final topLevel = await _dispatch(method, sub, <_RouteEntry>[
+      _RouteEntry('GET', const <String?>[], () => _listBoards(request)),
+      _RouteEntry('POST', const <String?>[], () => _createBoard(request)),
+    ]);
+    if (topLevel != null) return topLevel;
     if (sub.isEmpty) {
       return jsonResponse(<String, Object?>{
         'ok': false,
@@ -142,281 +192,411 @@ class YoloitdServer with ServerProcessMixin {
       }, 404);
     }
 
-    if (sub.length == 1 && method == 'GET') return jsonResponse(board.toJson());
-    if (sub.length == 1 && method == 'DELETE') {
-      await store.deleteBoard(board.id);
+    final response = await _dispatch(method, sub, <_RouteEntry>[
+      _RouteEntry('GET', const <String?>[null], () => _getBoard(board)),
+      _RouteEntry('DELETE', const <String?>[null], () => _deleteBoard(board)),
+      _RouteEntry(
+        'POST',
+        const <String?>[null, 'archive'],
+        () => _archiveBoard(board),
+      ),
+      _RouteEntry(
+        'POST',
+        const <String?>[null, 'unarchive'],
+        () => _unarchiveBoard(board),
+      ),
+      _RouteEntry(
+        'PUT',
+        const <String?>[null],
+        () => _updateBoard(request, board),
+      ),
+      _RouteEntry(
+        'GET',
+        const <String?>[null],
+        () => _boardHistory(board),
+        when: () => request.url.path.endsWith('/history'),
+      ),
+      _RouteEntry(
+        'GET',
+        const <String?>[null, 'history'],
+        () => _boardHistory(board),
+      ),
+      _RouteEntry(
+        'POST',
+        const <String?>[null, 'undo'],
+        () => _undoBoard(board),
+      ),
+      _RouteEntry(
+        'POST',
+        const <String?>[null, 'redo'],
+        () => _redoBoard(board),
+      ),
+      _RouteEntry(
+        'GET',
+        const <String?>[null, 'panel-types'],
+        _boardPanelTypes,
+      ),
+      _RouteEntry(
+        'GET',
+        const <String?>[null, 'snapshot'],
+        () => _boardSnapshot(board),
+      ),
+      _RouteEntry(
+        null,
+        const <String?>[null, 'panels'],
+        () => _handlePanels(request, method, board, sub.skip(2).toList()),
+        prefix: true,
+      ),
+      _RouteEntry(
+        'GET',
+        const <String?>[null, 'links'],
+        () => _listLinks(board),
+      ),
+      _RouteEntry(
+        'POST',
+        const <String?>[null, 'links'],
+        () => _createLink(request, board),
+      ),
+      _RouteEntry(
+        'DELETE',
+        const <String?>[null, 'links', null],
+        () => _deleteLink(board, sub),
+      ),
+      _RouteEntry(
+        'PUT',
+        const <String?>[null, 'links', null],
+        () => _updateLink(request, board, sub),
+      ),
+      _RouteEntry(
+        null,
+        const <String?>[null, 'groups'],
+        () => _handleGroups(request, method, board, sub.skip(2).toList()),
+        prefix: true,
+      ),
+      _RouteEntry(
+        null,
+        const <String?>[null, 'panels', null, 'lock'],
+        () => _handlePanelLock(request, method, board, sub),
+      ),
+    ]);
+    if (response != null) return response;
+    return jsonResponse(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
+  }
+
+  Future<shelf.Response> _listBoards(shelf.Request request) async {
+    final boards = await store.loadBoards();
+    final activeId = await store.activeBoardId();
+    final includeArchived =
+        request.url.queryParameters['includeArchived']?.toLowerCase() ==
+        'true';
+    return jsonResponse(<String, Object?>{
+      'boards':
+          boards
+              .where(
+                (board) =>
+                    includeArchived ||
+                    (board.metadata['archived'] as bool? ?? false) == false,
+              )
+              .map((board) => board.summary(active: board.id == activeId))
+              .toList(),
+    });
+  }
+
+  Future<shelf.Response> _createBoard(shelf.Request request) async {
+    final body = await readJsonBody(request);
+    final name = (body['name'] as String? ?? 'Remote Board').trim();
+    final board = await store.createBoard(
+      name.isEmpty ? 'Remote Board' : name,
+    );
+    return jsonResponse(<String, Object?>{
+      'ok': true,
+      'board': board.summary(active: true),
+    });
+  }
+
+  Future<shelf.Response> _getBoard(RemoteBoard board) async =>
+      jsonResponse(board.toJson());
+
+  Future<shelf.Response> _deleteBoard(RemoteBoard board) async {
+    await store.deleteBoard(board.id);
+    return jsonResponse(<String, Object?>{
+      'ok': true,
+      'message': 'Deleted board ${board.name}',
+    });
+  }
+
+  Future<shelf.Response> _archiveBoard(RemoteBoard board) async {
+    final result = await store.updateBoard(
+      board.id,
+      (current) => current.copyWith(
+        metadata: <String, dynamic>{...current.metadata, 'archived': true},
+      ),
+    );
+    return jsonResponse(<String, Object?>{
+      'ok': result != null,
+      'message': 'Archived board ${board.name}',
+    });
+  }
+
+  Future<shelf.Response> _unarchiveBoard(RemoteBoard board) async {
+    final result = await store.updateBoard(
+      board.id,
+      (current) => current.copyWith(
+        metadata: <String, dynamic>{...current.metadata, 'archived': false},
+      ),
+    );
+    return jsonResponse(<String, Object?>{
+      'ok': result != null,
+      'message': 'Unarchived board ${board.name}',
+    });
+  }
+
+  Future<shelf.Response> _updateBoard(
+    shelf.Request request,
+    RemoteBoard board,
+  ) async {
+    final body = await readJsonBody(request);
+    final expectedRevision = _expectedRevision(body);
+    if (_isSnapshotUpdate(body) &&
+        expectedRevision != null &&
+        expectedRevision != board.historyRevision) {
       return jsonResponse(<String, Object?>{
-        'ok': true,
-        'message': 'Deleted board ${board.name}',
-      });
+        'ok': false,
+        'error': 'board revision conflict',
+        'expectedRevision': expectedRevision,
+        'currentRevision': board.historyRevision,
+        'board': board.toJson(),
+      }, 409);
     }
-    if (sub.length == 2 && sub[1] == 'archive' && method == 'POST') {
-      final result = await store.updateBoard(
-        board.id,
-        (current) => current.copyWith(
-          metadata: <String, dynamic>{...current.metadata, 'archived': true},
-        ),
+    final result = await store.updateBoard(
+      board.id,
+      (current) => _updatedBoardFromBody(current, body),
+      historyEvent:
+          (before, after, revision) =>
+              _snapshotPanelHistoryEvent(before, after, revision),
+    );
+    return jsonResponse(<String, Object?>{
+      'ok': true,
+      'board': result?.after.toJson(),
+    });
+  }
+
+  Future<shelf.Response> _boardHistory(RemoteBoard board) async {
+    return jsonResponse(<String, Object?>{
+      'events':
+          (await store.historyForBoard(
+            board.id,
+          )).map((e) => e.toJson()).toList(),
+    });
+  }
+
+  Future<shelf.Response> _undoBoard(RemoteBoard board) async {
+    final undone = await store.undoLatestPanelHistory(board.id);
+    final updated = await store.findBoard(board.id);
+    return jsonResponse(<String, Object?>{
+      'ok': undone,
+      'undone': undone,
+      'redoDepth': store.redoDepthForBoard(board.id),
+      'message':
+          undone
+              ? 'Undid latest panel change'
+              : 'No restorable panel history yet',
+      if (updated != null) 'board': updated.summary(active: true),
+    });
+  }
+
+  Future<shelf.Response> _redoBoard(RemoteBoard board) async {
+    final redone = await store.redoLatestPanelHistory(board.id);
+    final updated = await store.findBoard(board.id);
+    return jsonResponse(<String, Object?>{
+      'ok': redone,
+      'redone': redone,
+      'redoDepth': store.redoDepthForBoard(board.id),
+      'message':
+          redone
+              ? 'Redid latest undone panel change'
+              : 'No redoable panel history yet',
+      if (updated != null) 'board': updated.summary(active: true),
+    });
+  }
+
+  Future<shelf.Response> _boardPanelTypes() async =>
+      jsonResponse(<String, Object?>{'types': yoloitdPanelTypes});
+
+  Future<shelf.Response> _boardSnapshot(RemoteBoard board) async {
+    return shelf.Response.ok(
+      _snapshot(board),
+      headers: <String, String>{'content-type': 'text/plain; charset=utf-8'},
+    );
+  }
+
+  Future<shelf.Response> _listLinks(RemoteBoard board) async =>
+      jsonResponse(<String, Object?>{'links': board.links});
+
+  Future<shelf.Response> _createLink(
+    shelf.Request request,
+    RemoteBoard board,
+  ) async {
+    final body = await readJsonBody(request);
+    final fromId = (body['from'] as String? ?? '').trim();
+    final toId = (body['to'] as String? ?? '').trim();
+    if (fromId.isEmpty || toId.isEmpty) {
+      return jsonResponse(<String, Object?>{
+        'ok': false,
+        'error': 'from and to required',
+      }, 400);
+    }
+    final fromPanel = _findPanel(board, fromId);
+    final toPanel = _findPanel(board, toId);
+    if (fromPanel == null || toPanel == null) {
+      return jsonResponse(<String, Object?>{
+        'ok': false,
+        'error': 'panel not found',
+      }, 404);
+    }
+    final link = <String, Object?>{
+      'id': _nextId('link'),
+      'fromPanelId': fromPanel.id,
+      'toPanelId': toPanel.id,
+      'from': fromPanel.id,
+      'to': toPanel.id,
+      if (body['color'] != null) 'color': body['color'],
+      if (body['style'] != null) 'style': body['style'],
+    };
+    final result = await store.updateBoard(
+      board.id,
+      (current) => current.copyWith(links: <Map<String, dynamic>>[...current.links, link]),
+    );
+    return jsonResponse(<String, Object?>{
+      'ok': result != null,
+      'link': link,
+    });
+  }
+
+  Future<shelf.Response> _deleteLink(RemoteBoard board, List<String> sub) async {
+    final linkId = Uri.decodeComponent(sub[2]);
+    final result = await store.updateBoard(
+      board.id,
+      (current) => current.copyWith(
+        links: current.links.where((link) => link['id'] != linkId).toList(),
+      ),
+    );
+    return jsonResponse(<String, Object?>{
+      'ok': result != null,
+      'message': 'Link deleted',
+    });
+  }
+
+  Future<shelf.Response> _updateLink(
+    shelf.Request request,
+    RemoteBoard board,
+    List<String> sub,
+  ) async {
+    final linkId = Uri.decodeComponent(sub[2]);
+    final body = await readJsonBody(request);
+    final result = await store.updateBoard(
+      board.id,
+      (current) => current.copyWith(
+        links: current.links.map((link) {
+          if (link['id'] != linkId) return link;
+          final next = Map<String, dynamic>.from(link);
+          if (body['color'] != null) next['color'] = body['color'];
+          if (body['style'] != null) next['style'] = body['style'];
+          return next;
+        }).toList(),
+      ),
+    );
+    return jsonResponse(<String, Object?>{'ok': result != null});
+  }
+
+  Future<shelf.Response> _handlePanelLock(
+    shelf.Request request,
+    String method,
+    RemoteBoard board,
+    List<String> sub,
+  ) async {
+    final panelId = Uri.decodeComponent(sub[2]);
+    final panel = _findPanel(board, panelId);
+    if (panel == null) {
+      return jsonResponse(
+        <String, Object?>{'ok': false, 'error': 'panel not found'},
+        404,
       );
-      return jsonResponse(<String, Object?>{
-        'ok': result != null,
-        'message': 'Archived board ${board.name}',
-      });
     }
-    if (sub.length == 2 && sub[1] == 'unarchive' && method == 'POST') {
-      final result = await store.updateBoard(
-        board.id,
-        (current) => current.copyWith(
-          metadata: <String, dynamic>{...current.metadata, 'archived': false},
-        ),
-      );
-      return jsonResponse(<String, Object?>{
-        'ok': result != null,
-        'message': 'Unarchived board ${board.name}',
-      });
-    }
-    if (sub.length == 1 && method == 'PUT') {
+    if (method == 'PUT') {
       final body = await readJsonBody(request);
-      final expectedRevision = _expectedRevision(body);
-      if (_isSnapshotUpdate(body) &&
-          expectedRevision != null &&
-          expectedRevision != board.historyRevision) {
-        return jsonResponse(<String, Object?>{
-          'ok': false,
-          'error': 'board revision conflict',
-          'expectedRevision': expectedRevision,
-          'currentRevision': board.historyRevision,
-          'board': board.toJson(),
-        }, 409);
-      }
-      final result = await store.updateBoard(
-        board.id,
-        (current) => _updatedBoardFromBody(current, body),
-        historyEvent:
-            (before, after, revision) =>
-                _snapshotPanelHistoryEvent(before, after, revision),
-      );
-      return jsonResponse(<String, Object?>{
-        'ok': true,
-        'board': result?.after.toJson(),
-      });
-    }
-    if (sub.length == 1 &&
-        method == 'GET' &&
-        request.url.path.endsWith('/history')) {
-      return jsonResponse(<String, Object?>{
-        'events':
-            (await store.historyForBoard(
-              board.id,
-            )).map((e) => e.toJson()).toList(),
-      });
-    }
-    if (sub.length == 2 && sub[1] == 'history' && method == 'GET') {
-      return jsonResponse(<String, Object?>{
-        'events':
-            (await store.historyForBoard(
-              board.id,
-            )).map((e) => e.toJson()).toList(),
-      });
-    }
-    if (sub.length == 2 && sub[1] == 'undo' && method == 'POST') {
-      final undone = await store.undoLatestPanelHistory(board.id);
-      final updated = await store.findBoard(board.id);
-      return jsonResponse(<String, Object?>{
-        'ok': undone,
-        'undone': undone,
-        'redoDepth': store.redoDepthForBoard(board.id),
-        'message':
-            undone
-                ? 'Undid latest panel change'
-                : 'No restorable panel history yet',
-        if (updated != null) 'board': updated.summary(active: true),
-      });
-    }
-    if (sub.length == 2 && sub[1] == 'redo' && method == 'POST') {
-      final redone = await store.redoLatestPanelHistory(board.id);
-      final updated = await store.findBoard(board.id);
-      return jsonResponse(<String, Object?>{
-        'ok': redone,
-        'redone': redone,
-        'redoDepth': store.redoDepthForBoard(board.id),
-        'message':
-            redone
-                ? 'Redid latest undone panel change'
-                : 'No redoable panel history yet',
-        if (updated != null) 'board': updated.summary(active: true),
-      });
-    }
-    if (sub.length == 2 && sub[1] == 'panel-types' && method == 'GET') {
-      return jsonResponse(<String, Object?>{'types': yoloitdPanelTypes});
-    }
-    if (sub.length == 2 && sub[1] == 'snapshot' && method == 'GET') {
-      return shelf.Response.ok(
-        _snapshot(board),
-        headers: <String, String>{'content-type': 'text/plain; charset=utf-8'},
-      );
-    }
-    if (sub.length >= 2 && sub[1] == 'panels') {
-      return _handlePanels(request, method, board, sub.skip(2).toList());
-    }
-    if (sub.length == 2 && sub[1] == 'links' && method == 'GET') {
-      return jsonResponse(<String, Object?>{'links': board.links});
-    }
-    if (sub.length == 2 && sub[1] == 'links' && method == 'POST') {
-      final body = await readJsonBody(request);
-      final fromId = (body['from'] as String? ?? '').trim();
-      final toId = (body['to'] as String? ?? '').trim();
-      if (fromId.isEmpty || toId.isEmpty) {
-        return jsonResponse(<String, Object?>{
-          'ok': false,
-          'error': 'from and to required',
-        }, 400);
-      }
-      final fromPanel = _findPanel(board, fromId);
-      final toPanel = _findPanel(board, toId);
-      if (fromPanel == null || toPanel == null) {
-        return jsonResponse(<String, Object?>{
-          'ok': false,
-          'error': 'panel not found',
-        }, 404);
-      }
-      final link = <String, Object?>{
-        'id': _nextId('link'),
-        'fromPanelId': fromPanel.id,
-        'toPanelId': toPanel.id,
-        'from': fromPanel.id,
-        'to': toPanel.id,
-        if (body['color'] != null) 'color': body['color'],
-        if (body['style'] != null) 'style': body['style'],
-      };
-      final result = await store.updateBoard(
-        board.id,
-        (current) => current.copyWith(links: <Map<String, dynamic>>[...current.links, link]),
-      );
-      return jsonResponse(<String, Object?>{
-        'ok': result != null,
-        'link': link,
-      });
-    }
-    if (sub.length == 3 && sub[1] == 'links' && method == 'DELETE') {
-      final linkId = Uri.decodeComponent(sub[2]);
-      final result = await store.updateBoard(
-        board.id,
-        (current) => current.copyWith(
-          links: current.links.where((link) => link['id'] != linkId).toList(),
-        ),
-      );
-      return jsonResponse(<String, Object?>{
-        'ok': result != null,
-        'message': 'Link deleted',
-      });
-    }
-    if (sub.length == 3 && sub[1] == 'links' && method == 'PUT') {
-      final linkId = Uri.decodeComponent(sub[2]);
-      final body = await readJsonBody(request);
-      final result = await store.updateBoard(
-        board.id,
-        (current) => current.copyWith(
-          links: current.links.map((link) {
-            if (link['id'] != linkId) return link;
-            final next = Map<String, dynamic>.from(link);
-            if (body['color'] != null) next['color'] = body['color'];
-            if (body['style'] != null) next['style'] = body['style'];
-            return next;
-          }).toList(),
-        ),
-      );
-      return jsonResponse(<String, Object?>{'ok': result != null});
-    }
-    if (sub.length >= 2 && sub[1] == 'groups') {
-      return _handleGroups(request, method, board, sub.skip(2).toList());
-    }
-    if (sub.length == 4 &&
-        sub[1] == 'panels' &&
-        sub[3] == 'lock') {
-      final panelId = Uri.decodeComponent(sub[2]);
-      final panel = _findPanel(board, panelId);
-      if (panel == null) {
+      final actorId = (body['actorId'] as String? ?? '').trim();
+      final ttlSec = (body['ttlSec'] as num?)?.toInt() ?? 60;
+      if (actorId.isEmpty) {
         return jsonResponse(
-          <String, Object?>{'ok': false, 'error': 'panel not found'},
-          404,
+          <String, Object?>{'ok': false, 'error': 'actorId required'},
+          400,
         );
       }
-      if (method == 'PUT') {
-        final body = await readJsonBody(request);
-        final actorId = (body['actorId'] as String? ?? '').trim();
-        final ttlSec = (body['ttlSec'] as num?)?.toInt() ?? 60;
-        if (actorId.isEmpty) {
+      final now = DateTime.now().toUtc().millisecondsSinceEpoch;
+      final existing =
+          (board.metadata['panelLocks'] as Map?)?[panelId];
+      if (existing is Map) {
+        final existingActor = existing['actorId'] as String?;
+        final existingExpires = existing['expiresAt'];
+        if (existingActor != actorId &&
+            existingExpires is int &&
+            existingExpires > now) {
           return jsonResponse(
-            <String, Object?>{'ok': false, 'error': 'actorId required'},
-            400,
+            <String, Object?>{
+              'ok': false,
+              'error': 'panel locked by another actor',
+              'actorId': existingActor,
+            },
+            409,
           );
         }
-        final now = DateTime.now().toUtc().millisecondsSinceEpoch;
-        final existing =
-            (board.metadata['panelLocks'] as Map?)?[panelId];
-        if (existing is Map) {
-          final existingActor = existing['actorId'] as String?;
-          final existingExpires = existing['expiresAt'];
-          if (existingActor != actorId &&
-              existingExpires is int &&
-              existingExpires > now) {
-            return jsonResponse(
-              <String, Object?>{
-                'ok': false,
-                'error': 'panel locked by another actor',
-                'actorId': existingActor,
-              },
-              409,
-            );
-          }
-        }
-        final expires = now + ttlSec * 1000;
-        await store.updateBoard(
-          board.id,
-          (current) {
-            final locks =
-                current.metadata['panelLocks'] is Map
-                    ? Map<String, dynamic>.from(
-                      current.metadata['panelLocks'] as Map,
-                    )
-                    : <String, dynamic>{};
-            locks[panelId] = {'actorId': actorId, 'expiresAt': expires};
-            return current.copyWith(
-              metadata: <String, dynamic>{...current.metadata, 'panelLocks': locks},
-            );
-          },
-        );
-        return jsonResponse(
-          <String, Object?>{'ok': true, 'panelId': panelId, 'actorId': actorId},
-        );
       }
-      if (method == 'DELETE') {
-        await store.updateBoard(
-          board.id,
-          (current) {
-            final locks =
-                current.metadata['panelLocks'] is Map
-                    ? Map<String, dynamic>.from(
-                      current.metadata['panelLocks'] as Map,
-                    )
-                    : <String, dynamic>{};
-            if (!locks.containsKey(panelId)) return current;
-            final next = Map<String, dynamic>.from(locks)..remove(panelId);
-            return current.copyWith(
-              metadata: <String, dynamic>{...current.metadata, 'panelLocks': next},
-            );
-          },
-        );
-        return jsonResponse(
-          <String, Object?>{'ok': true, 'panelId': panelId},
-        );
-      }
+      final expires = now + ttlSec * 1000;
+      await store.updateBoard(
+        board.id,
+        (current) {
+          final locks =
+              current.metadata['panelLocks'] is Map
+                  ? Map<String, dynamic>.from(
+                    current.metadata['panelLocks'] as Map,
+                  )
+                  : <String, dynamic>{};
+          locks[panelId] = {'actorId': actorId, 'expiresAt': expires};
+          return current.copyWith(
+            metadata: <String, dynamic>{...current.metadata, 'panelLocks': locks},
+          );
+        },
+      );
       return jsonResponse(
-        <String, Object?>{'ok': false, 'error': 'method not allowed'},
-        405,
+        <String, Object?>{'ok': true, 'panelId': panelId, 'actorId': actorId},
       );
     }
-    return jsonResponse(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
+    if (method == 'DELETE') {
+      await store.updateBoard(
+        board.id,
+        (current) {
+          final locks =
+              current.metadata['panelLocks'] is Map
+                  ? Map<String, dynamic>.from(
+                    current.metadata['panelLocks'] as Map,
+                  )
+                  : <String, dynamic>{};
+          if (!locks.containsKey(panelId)) return current;
+          final next = Map<String, dynamic>.from(locks)..remove(panelId);
+          return current.copyWith(
+            metadata: <String, dynamic>{...current.metadata, 'panelLocks': next},
+          );
+        },
+      );
+      return jsonResponse(
+        <String, Object?>{'ok': true, 'panelId': panelId},
+      );
+    }
+    return jsonResponse(
+      <String, Object?>{'ok': false, 'error': 'method not allowed'},
+      405,
+    );
   }
 
   Future<shelf.Response> _handleTemplates(
@@ -645,32 +825,15 @@ class YoloitdServer with ServerProcessMixin {
     RemoteBoard board,
     List<String> sub,
   ) async {
-    if (sub.isEmpty && method == 'GET') {
-      return jsonResponse(<String, Object?>{
-        'panels': board.panels.map(_panelSummary).toList(),
-      });
-    }
-    if (sub.isEmpty && method == 'POST') {
-      final body = await readJsonBody(request);
-      final panel = RemotePanel(
-        id: body['id'] as String? ?? _nextId('p'),
-        type: body['type'] as String? ?? 'board.note.markdown',
-        title: body['title'] as String? ?? 'Panel',
-        bounds: RemotePanelBounds(
-          x: (body['x'] as num?)?.toDouble() ?? 120.0,
-          y: (body['y'] as num?)?.toDouble() ?? 120.0,
-          width: (body['width'] as num?)?.toDouble() ?? 360.0,
-          height: (body['height'] as num?)?.toDouble() ?? 240.0,
-        ),
-        state: Map<String, dynamic>.from(body['state'] as Map? ?? const {}),
-      );
-      final created = await store.addPanel(board.id, panel);
-      return jsonResponse(<String, Object?>{
-        'ok': true,
-        'panel': created.toJson(),
-        'id': created.id,
-      });
-    }
+    final topLevel = await _dispatch(method, sub, <_RouteEntry>[
+      _RouteEntry('GET', const <String?>[], () => _listPanels(board)),
+      _RouteEntry(
+        'POST',
+        const <String?>[],
+        () => _createPanel(request, board),
+      ),
+    ]);
+    if (topLevel != null) return topLevel;
     if (sub.isEmpty) {
       return jsonResponse(<String, Object?>{
         'ok': false,
@@ -685,75 +848,140 @@ class YoloitdServer with ServerProcessMixin {
         'error': 'panel not found',
       }, 404);
     }
-    if (sub.length == 1 && method == 'GET') {
-      return jsonResponse(<String, Object?>{
-        ...panel.toJson(),
-        'typeName': panel.type,
-        'content': panel.state,
-        'supportedActions':
-            yoloitdPanelDescriptorFor(panel.type)?.actions ??
-            const <String>['get', 'set'],
-        'actionHelp': remotePanelActionHelp(panel),
-      });
-    }
-    if (sub.length == 1 && method == 'DELETE') {
-      final ok = await store.removePanel(board.id, panel.id);
-      return jsonResponse(<String, Object?>{'ok': ok});
-    }
-    if (sub.length == 1 && method == 'PUT') {
-      final body = await readJsonBody(request);
-      final updated = await store.updatePanel(
-        board.id,
-        panel.id,
-        (current) => current.copyWith(
-          title: body['title'] as String? ?? current.title,
-          bounds: current.bounds.copyWith(
-            x: (body['x'] as num?)?.toDouble(),
-            y: (body['y'] as num?)?.toDouble(),
-            width: (body['width'] as num?)?.toDouble(),
-            height: (body['height'] as num?)?.toDouble(),
-          ),
-          hidden: body['hidden'] as bool?,
-          locked: body['locked'] as bool?,
-          pinned: body['pinned'] as bool?,
-          zIndex: (body['zIndex'] as num?)?.toInt(),
-          color: _parseColorValue(body['color']),
-          state:
-              body['state'] is Map
-                  ? Map<String, dynamic>.from(body['state'] as Map)
-                  : current.state,
-        ),
-      );
-      return jsonResponse(<String, Object?>{
-        'ok': updated != null,
-        'panel': updated?.toJson(),
-      });
-    }
-    if (sub.length == 2 && sub[1] == 'action' && method == 'POST') {
-      final body = await readJsonBody(request);
-      final action = body['action'] as String? ?? 'get';
-      final result = handleRemotePanelAction(panel, action, body);
-      if (!result.ok) {
-        return jsonResponse(result.toJson(), 400);
-      }
-      if (result.stateUpdate.isEmpty) {
-        return jsonResponse(<String, Object?>{
-          ...result.toJson(),
-          'content': result.data.isEmpty ? panel.state : result.data,
-        });
-      }
-      final nextState = <String, dynamic>{
-        ...panel.state,
-        ...result.stateUpdate,
-      };
-      final updated = await store.updatePanel(
-        board.id,
-        panel.id,
-        (current) => current.copyWith(state: nextState),
-      );
-      return jsonResponse(result.toJson(panel: updated));
-    }
+    final response = await _dispatch(method, sub, <_RouteEntry>[
+      _RouteEntry('GET', const <String?>[null], () => _getPanel(panel)),
+      _RouteEntry(
+        'DELETE',
+        const <String?>[null],
+        () => _deletePanel(board, panel),
+      ),
+      _RouteEntry(
+        'PUT',
+        const <String?>[null],
+        () => _updatePanel(request, board, panel),
+      ),
+      _RouteEntry(
+        'POST',
+        const <String?>[null, 'action'],
+        () => _panelAction(request, board, panel),
+      ),
+    ]);
+    if (response != null) return response;
     return jsonResponse(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
+  }
+
+  Future<shelf.Response> _listPanels(RemoteBoard board) async {
+    return jsonResponse(<String, Object?>{
+      'panels': board.panels.map(_panelSummary).toList(),
+    });
+  }
+
+  Future<shelf.Response> _createPanel(
+    shelf.Request request,
+    RemoteBoard board,
+  ) async {
+    final body = await readJsonBody(request);
+    final panel = RemotePanel(
+      id: body['id'] as String? ?? _nextId('p'),
+      type: body['type'] as String? ?? 'board.note.markdown',
+      title: body['title'] as String? ?? 'Panel',
+      bounds: RemotePanelBounds(
+        x: (body['x'] as num?)?.toDouble() ?? 120.0,
+        y: (body['y'] as num?)?.toDouble() ?? 120.0,
+        width: (body['width'] as num?)?.toDouble() ?? 360.0,
+        height: (body['height'] as num?)?.toDouble() ?? 240.0,
+      ),
+      state: Map<String, dynamic>.from(body['state'] as Map? ?? const {}),
+    );
+    final created = await store.addPanel(board.id, panel);
+    return jsonResponse(<String, Object?>{
+      'ok': true,
+      'panel': created.toJson(),
+      'id': created.id,
+    });
+  }
+
+  Future<shelf.Response> _getPanel(RemotePanel panel) async {
+    return jsonResponse(<String, Object?>{
+      ...panel.toJson(),
+      'typeName': panel.type,
+      'content': panel.state,
+      'supportedActions':
+          yoloitdPanelDescriptorFor(panel.type)?.actions ??
+          const <String>['get', 'set'],
+      'actionHelp': remotePanelActionHelp(panel),
+    });
+  }
+
+  Future<shelf.Response> _deletePanel(
+    RemoteBoard board,
+    RemotePanel panel,
+  ) async {
+    final ok = await store.removePanel(board.id, panel.id);
+    return jsonResponse(<String, Object?>{'ok': ok});
+  }
+
+  Future<shelf.Response> _updatePanel(
+    shelf.Request request,
+    RemoteBoard board,
+    RemotePanel panel,
+  ) async {
+    final body = await readJsonBody(request);
+    final updated = await store.updatePanel(
+      board.id,
+      panel.id,
+      (current) => current.copyWith(
+        title: body['title'] as String? ?? current.title,
+        bounds: current.bounds.copyWith(
+          x: (body['x'] as num?)?.toDouble(),
+          y: (body['y'] as num?)?.toDouble(),
+          width: (body['width'] as num?)?.toDouble(),
+          height: (body['height'] as num?)?.toDouble(),
+        ),
+        hidden: body['hidden'] as bool?,
+        locked: body['locked'] as bool?,
+        pinned: body['pinned'] as bool?,
+        zIndex: (body['zIndex'] as num?)?.toInt(),
+        color: _parseColorValue(body['color']),
+        state:
+            body['state'] is Map
+                ? Map<String, dynamic>.from(body['state'] as Map)
+                : current.state,
+      ),
+    );
+    return jsonResponse(<String, Object?>{
+      'ok': updated != null,
+      'panel': updated?.toJson(),
+    });
+  }
+
+  Future<shelf.Response> _panelAction(
+    shelf.Request request,
+    RemoteBoard board,
+    RemotePanel panel,
+  ) async {
+    final body = await readJsonBody(request);
+    final action = body['action'] as String? ?? 'get';
+    final result = handleRemotePanelAction(panel, action, body);
+    if (!result.ok) {
+      return jsonResponse(result.toJson(), 400);
+    }
+    if (result.stateUpdate.isEmpty) {
+      return jsonResponse(<String, Object?>{
+        ...result.toJson(),
+        'content': result.data.isEmpty ? panel.state : result.data,
+      });
+    }
+    final nextState = <String, dynamic>{
+      ...panel.state,
+      ...result.stateUpdate,
+    };
+    final updated = await store.updatePanel(
+      board.id,
+      panel.id,
+      (current) => current.copyWith(state: nextState),
+    );
+    return jsonResponse(result.toJson(panel: updated));
   }
 
   Future<shelf.Response> _handleGroups(
@@ -764,37 +992,15 @@ class YoloitdServer with ServerProcessMixin {
   ) async {
     final groups = _boardGroups(board);
 
-    if (sub.isEmpty && method == 'GET') {
-      return jsonResponse(<String, Object?>{'ok': true, 'groups': groups});
-    }
-    if (sub.isEmpty && method == 'POST') {
-      final body = await readJsonBody(request);
-      final name = (body['name'] as String? ?? '').trim();
-      if (name.isEmpty) {
-        return jsonResponse(<String, Object?>{
-          'ok': false,
-          'error': 'name required',
-        }, 400);
-      }
-      final group = <String, dynamic>{
-        'id': _nextId('g'),
-        'name': name,
-        'panelIds': _parsePanelIds(board, body['panels']),
-        if (body['color'] != null && body['color'] != 'clear')
-          'color': body['color'],
-      };
-      groups.add(group);
-      final result = await store.updateBoard(
-        board.id,
-        (current) => current.copyWith(
-          metadata: <String, dynamic>{...current.metadata, 'groups': groups},
-        ),
-      );
-      return jsonResponse(<String, Object?>{
-        'ok': result != null,
-        'group': group,
-      });
-    }
+    final topLevel = await _dispatch(method, sub, <_RouteEntry>[
+      _RouteEntry('GET', const <String?>[], () => _listGroups(groups)),
+      _RouteEntry(
+        'POST',
+        const <String?>[],
+        () => _createGroup(request, board, groups),
+      ),
+    ]);
+    if (topLevel != null) return topLevel;
 
     if (sub.isEmpty) {
       return jsonResponse(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
@@ -809,102 +1015,191 @@ class YoloitdServer with ServerProcessMixin {
       }, 404);
     }
 
-    if (sub.length == 1 && method == 'DELETE') {
-      groups.removeAt(index);
-      await store.updateBoard(
-        board.id,
-        (current) => current.copyWith(
-          metadata: <String, dynamic>{...current.metadata, 'groups': groups},
-        ),
-      );
-      return jsonResponse(<String, Object?>{'ok': true, 'message': 'Group deleted'});
-    }
-
-    if (sub.length == 1 && method == 'PUT') {
-      final body = await readJsonBody(request);
-      final group = Map<String, dynamic>.from(groups[index]);
-      if (body['name'] is String) group['name'] = body['name'];
-      if (body.containsKey('color')) {
-        if (body['color'] == null || body['color'] == 'clear') {
-          group.remove('color');
-        } else {
-          group['color'] = body['color'];
-        }
-      }
-      if (body['collapsed'] is bool) group['collapsed'] = body['collapsed'];
-      groups[index] = group;
-      await store.updateBoard(
-        board.id,
-        (current) => current.copyWith(
-          metadata: <String, dynamic>{...current.metadata, 'groups': groups},
-        ),
-      );
-      return jsonResponse(<String, Object?>{'ok': true, 'group': group});
-    }
-
-    if (sub.length == 2 && sub[1] == 'panels' && method == 'POST') {
-      final body = await readJsonBody(request);
-      final ids = _parsePanelIds(board, body['panels']);
-      final group = Map<String, dynamic>.from(groups[index]);
-      final panelIds = _stringList(group['panelIds']).toSet()..addAll(ids);
-      group['panelIds'] = panelIds.toList();
-      groups[index] = group;
-      await store.updateBoard(
-        board.id,
-        (current) => current.copyWith(
-          metadata: <String, dynamic>{...current.metadata, 'groups': groups},
-        ),
-      );
-      return jsonResponse(<String, Object?>{
-        'ok': true,
-        'message': 'Panels added to group',
-      });
-    }
-
-    if (sub.length == 2 && sub[1] == 'panels' && method == 'DELETE') {
-      final body = await readJsonBody(request);
-      final ids = _parsePanelIds(board, body['panels']);
-      final group = Map<String, dynamic>.from(groups[index]);
-      group['panelIds'] = _stringList(group['panelIds'])
-          .where((String id) => !ids.contains(id))
-          .toList();
-      groups[index] = group;
-      await store.updateBoard(
-        board.id,
-        (current) => current.copyWith(
-          metadata: <String, dynamic>{...current.metadata, 'groups': groups},
-        ),
-      );
-      return jsonResponse(<String, Object?>{
-        'ok': true,
-        'message': 'Panels removed from group',
-      });
-    }
-
-    if (sub.length == 2 && sub[1] == 'move' && method == 'POST') {
-      final body = await readJsonBody(request);
-      final dx = (body['dx'] as num?)?.toDouble() ?? 0.0;
-      final dy = (body['dy'] as num?)?.toDouble() ?? 0.0;
-      final group = groups[index];
-      final panelIds = _stringList(group['panelIds']).toSet();
-      await store.updateBoard(
-        board.id,
-        (current) => current.copyWith(
-          panels: current.panels.map((panel) {
-            if (!panelIds.contains(panel.id)) return panel;
-            return panel.copyWith(
-              bounds: panel.bounds.copyWith(
-                x: panel.bounds.x + dx,
-                y: panel.bounds.y + dy,
-              ),
-            );
-          }).toList(),
-        ),
-      );
-      return jsonResponse(<String, Object?>{'ok': true, 'message': 'Group moved'});
-    }
-
+    final response = await _dispatch(method, sub, <_RouteEntry>[
+      _RouteEntry(
+        'DELETE',
+        const <String?>[null],
+        () => _deleteGroup(board, groups, index),
+      ),
+      _RouteEntry(
+        'PUT',
+        const <String?>[null],
+        () => _updateGroup(request, board, groups, index),
+      ),
+      _RouteEntry(
+        'POST',
+        const <String?>[null, 'panels'],
+        () => _addGroupPanels(request, board, groups, index),
+      ),
+      _RouteEntry(
+        'DELETE',
+        const <String?>[null, 'panels'],
+        () => _removeGroupPanels(request, board, groups, index),
+      ),
+      _RouteEntry(
+        'POST',
+        const <String?>[null, 'move'],
+        () => _moveGroup(request, board, groups, index),
+      ),
+    ]);
+    if (response != null) return response;
     return jsonResponse(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
+  }
+
+  Future<shelf.Response> _listGroups(List<Map<String, dynamic>> groups) async {
+    return jsonResponse(<String, Object?>{'ok': true, 'groups': groups});
+  }
+
+  Future<shelf.Response> _createGroup(
+    shelf.Request request,
+    RemoteBoard board,
+    List<Map<String, dynamic>> groups,
+  ) async {
+    final body = await readJsonBody(request);
+    final name = (body['name'] as String? ?? '').trim();
+    if (name.isEmpty) {
+      return jsonResponse(<String, Object?>{
+        'ok': false,
+        'error': 'name required',
+      }, 400);
+    }
+    final group = <String, dynamic>{
+      'id': _nextId('g'),
+      'name': name,
+      'panelIds': _parsePanelIds(board, body['panels']),
+      if (body['color'] != null && body['color'] != 'clear')
+        'color': body['color'],
+    };
+    groups.add(group);
+    final result = await store.updateBoard(
+      board.id,
+      (current) => current.copyWith(
+        metadata: <String, dynamic>{...current.metadata, 'groups': groups},
+      ),
+    );
+    return jsonResponse(<String, Object?>{
+      'ok': result != null,
+      'group': group,
+    });
+  }
+
+  Future<shelf.Response> _deleteGroup(
+    RemoteBoard board,
+    List<Map<String, dynamic>> groups,
+    int index,
+  ) async {
+    groups.removeAt(index);
+    await store.updateBoard(
+      board.id,
+      (current) => current.copyWith(
+        metadata: <String, dynamic>{...current.metadata, 'groups': groups},
+      ),
+    );
+    return jsonResponse(<String, Object?>{'ok': true, 'message': 'Group deleted'});
+  }
+
+  Future<shelf.Response> _updateGroup(
+    shelf.Request request,
+    RemoteBoard board,
+    List<Map<String, dynamic>> groups,
+    int index,
+  ) async {
+    final body = await readJsonBody(request);
+    final group = Map<String, dynamic>.from(groups[index]);
+    if (body['name'] is String) group['name'] = body['name'];
+    if (body.containsKey('color')) {
+      if (body['color'] == null || body['color'] == 'clear') {
+        group.remove('color');
+      } else {
+        group['color'] = body['color'];
+      }
+    }
+    if (body['collapsed'] is bool) group['collapsed'] = body['collapsed'];
+    groups[index] = group;
+    await store.updateBoard(
+      board.id,
+      (current) => current.copyWith(
+        metadata: <String, dynamic>{...current.metadata, 'groups': groups},
+      ),
+    );
+    return jsonResponse(<String, Object?>{'ok': true, 'group': group});
+  }
+
+  Future<shelf.Response> _addGroupPanels(
+    shelf.Request request,
+    RemoteBoard board,
+    List<Map<String, dynamic>> groups,
+    int index,
+  ) async {
+    final body = await readJsonBody(request);
+    final ids = _parsePanelIds(board, body['panels']);
+    final group = Map<String, dynamic>.from(groups[index]);
+    final panelIds = _stringList(group['panelIds']).toSet()..addAll(ids);
+    group['panelIds'] = panelIds.toList();
+    groups[index] = group;
+    await store.updateBoard(
+      board.id,
+      (current) => current.copyWith(
+        metadata: <String, dynamic>{...current.metadata, 'groups': groups},
+      ),
+    );
+    return jsonResponse(<String, Object?>{
+      'ok': true,
+      'message': 'Panels added to group',
+    });
+  }
+
+  Future<shelf.Response> _removeGroupPanels(
+    shelf.Request request,
+    RemoteBoard board,
+    List<Map<String, dynamic>> groups,
+    int index,
+  ) async {
+    final body = await readJsonBody(request);
+    final ids = _parsePanelIds(board, body['panels']);
+    final group = Map<String, dynamic>.from(groups[index]);
+    group['panelIds'] = _stringList(group['panelIds'])
+        .where((String id) => !ids.contains(id))
+        .toList();
+    groups[index] = group;
+    await store.updateBoard(
+      board.id,
+      (current) => current.copyWith(
+        metadata: <String, dynamic>{...current.metadata, 'groups': groups},
+      ),
+    );
+    return jsonResponse(<String, Object?>{
+      'ok': true,
+      'message': 'Panels removed from group',
+    });
+  }
+
+  Future<shelf.Response> _moveGroup(
+    shelf.Request request,
+    RemoteBoard board,
+    List<Map<String, dynamic>> groups,
+    int index,
+  ) async {
+    final body = await readJsonBody(request);
+    final dx = (body['dx'] as num?)?.toDouble() ?? 0.0;
+    final dy = (body['dy'] as num?)?.toDouble() ?? 0.0;
+    final group = groups[index];
+    final panelIds = _stringList(group['panelIds']).toSet();
+    await store.updateBoard(
+      board.id,
+      (current) => current.copyWith(
+        panels: current.panels.map((panel) {
+          if (!panelIds.contains(panel.id)) return panel;
+          return panel.copyWith(
+            bounds: panel.bounds.copyWith(
+              x: panel.bounds.x + dx,
+              y: panel.bounds.y + dy,
+            ),
+          );
+        }).toList(),
+      ),
+    );
+    return jsonResponse(<String, Object?>{'ok': true, 'message': 'Group moved'});
   }
 
   List<Map<String, dynamic>> _boardGroups(RemoteBoard board) {

@@ -69,265 +69,330 @@ class RunConfigsCliHandler extends PanelCliHandler {
     BoardPanelInstance panel,
   ) async {
     final actionGroup = _resolveGroup(panel: panel, args: args);
-    switch (action) {
-      case 'list':
-        return CliActionResult(data: _getContentForGroup(actionGroup));
-
-      case 'add':
-        final name = args['name'] as String?;
-        final command = args['command'] as String?;
-        if (name == null || command == null) {
-          return const CliActionResult(
-            ok: false,
-            message: 'Missing "name" and/or "command"',
-          );
-        }
-        final normalizedName = name.trim().toLowerCase();
-        final normalizedCommand = command.trim().toLowerCase();
-        final normalizedWorkingDir =
-            (args['workingDir'] as String? ?? '').trim();
-        final duplicate = RunBridge.instance.state.configs.firstWhere(
-          (existing) =>
-              existing.group == actionGroup &&
-              existing.name.trim().toLowerCase() == normalizedName &&
-              existing.command.trim().toLowerCase() == normalizedCommand &&
-              (existing.workingDir ?? '').trim() == normalizedWorkingDir,
-          orElse: () => const RunConfig(id: '', name: '', command: ''),
-        );
-        if (duplicate.id.isNotEmpty) {
-          return CliActionResult(
-            message: 'Configuration already exists (id: ${duplicate.id})',
-            data: RunBridge.instance.serializeConfig(duplicate),
-          );
-        }
-        final config = await RunBridge.instance.addConfig(
-          name: name,
-          command: command,
-          group: actionGroup,
-          workingDir: args['workingDir'] as String?,
-          env:
-              args['env'] is Map
-                  ? Map<String, String>.from(args['env'] as Map)
-                  : const {},
-          isFlutterRun: args['isFlutterRun'] as bool? ?? false,
-          quickActions: _parseQuickActions(args['quickActions']) ?? const [],
-        );
-        return CliActionResult(
-          message: 'Configuration "$name" added (id: ${config.id})',
-          data: RunBridge.instance.serializeConfig(config),
-        );
-
-      case 'remove':
-        final identifier = args['id'] as String? ?? args['name'] as String?;
-        final config = RunBridge.instance.findConfig(identifier, actionGroup);
-        if (config == null) {
-          return const CliActionResult(ok: false, message: 'Missing "id"');
-        }
-        await RunBridge.instance.removeConfig(config.id);
-        return const CliActionResult(message: 'Configuration removed');
-
-      case 'update':
-        final identifier = args['id'] as String? ?? args['name'] as String?;
-        if (identifier == null || identifier.trim().isEmpty) {
-          return const CliActionResult(ok: false, message: 'Missing "id"');
-        }
-        try {
-          final updated = await RunBridge.instance.updateConfig(
-            identifier: identifier,
-            group: actionGroup,
-            name: args['newName'] as String? ?? args['nameOverride'] as String?,
-            command: args['command'] as String?,
-            workingDir: args['workingDir'] as String?,
-            env:
-                args['env'] is Map
-                    ? Map<String, String>.from(args['env'] as Map)
-                    : null,
-            isFlutterRun: args['isFlutterRun'] as bool?,
-            quickActions: _parseQuickActions(args['quickActions']),
-          );
-          return CliActionResult(
-            message: 'Configuration updated',
-            data: RunBridge.instance.serializeConfig(updated),
-          );
-        } on StateError catch (error) {
-          return CliActionResult(ok: false, message: error.message);
-        }
-
-      case 'run':
-        try {
-          final session = await RunBridge.instance.startConfig(
-            args['id'] as String? ?? args['name'] as String?,
-            actionGroup,
-          );
-          return CliActionResult(
-            message: 'Running "${session.config.name}"',
-            data: RunBridge.instance.serializeSession(session),
-          );
-        } on StateError catch (error) {
-          return CliActionResult(ok: false, message: error.message);
-        }
-
-      case 'stop':
-        try {
-          final session = await RunBridge.instance.stopSession(
-            args['sessionId'] as String? ??
-                args['id'] as String? ??
-                args['name'] as String?,
-            actionGroup,
-          );
-          return CliActionResult(
-            message: 'Stopped "${session.config.name}"',
-            data: RunBridge.instance.serializeSession(session),
-          );
-        } on StateError catch (error) {
-          return CliActionResult(ok: false, message: error.message);
-        }
-
-      case 'input':
-        final rawText = args['text'] as String? ?? args['input'] as String?;
-        if (rawText == null || rawText.isEmpty) {
-          return const CliActionResult(ok: false, message: 'Missing "text"');
-        }
-        try {
-          final session = await RunBridge.instance.sendInput(
-            identifier:
-                args['sessionId'] as String? ??
-                args['id'] as String? ??
-                args['name'] as String?,
-            group: actionGroup,
-            text: rawText,
-            appendNewline: args['appendNewline'] as bool? ?? false,
-          );
-          return CliActionResult(
-            message: 'Input sent to "${session.config.name}"',
-            data: RunBridge.instance.serializeSession(session),
-          );
-        } on StateError catch (error) {
-          return CliActionResult(ok: false, message: error.message);
-        }
-
-      case 'detach':
-        try {
-          final session = await RunBridge.instance.detachSession(
-            args['sessionId'] as String? ??
-                args['id'] as String? ??
-                args['name'] as String?,
-            actionGroup,
-          );
-          return CliActionResult(
-            message: 'Detached "${session.config.name}"',
-            data: RunBridge.instance.serializeSession(session),
-          );
-        } on StateError catch (error) {
-          return CliActionResult(ok: false, message: error.message);
-        }
-
-      case 'attach':
-        try {
-          final session = await RunBridge.instance.attachSession(
-            identifier:
-                args['sessionId'] as String? ??
-                args['id'] as String? ??
-                args['name'] as String?,
-            group: actionGroup,
-            runningOnly: args['runningOnly'] as bool? ?? true,
-          );
-          return CliActionResult(
-            message: 'Attached "${session.config.name}"',
-            data: RunBridge.instance.serializeSession(session),
-          );
-        } on StateError catch (error) {
-          return CliActionResult(ok: false, message: error.message);
-        }
-
-      case 'output':
-        final session = RunBridge.instance.findSession(
-          args['sessionId'] as String? ??
-              args['id'] as String? ??
-              args['name'] as String?,
-          group: actionGroup,
-        );
-        if (session == null) {
-          return const CliActionResult(
-            ok: false,
-            message: 'Run session not found',
-          );
-        }
-        return CliActionResult(
-          data: RunBridge.instance.serializeSession(session),
-        );
-
-      case 'close':
-        try {
-          final session = await RunBridge.instance.removeSession(
-            args['sessionId'] as String? ??
-                args['id'] as String? ??
-                args['name'] as String?,
-            actionGroup,
-          );
-          return CliActionResult(
-            message: 'Closed "${session.config.name}"',
-            data: RunBridge.instance.serializeSession(session),
-          );
-        } on StateError catch (error) {
-          return CliActionResult(ok: false, message: error.message);
-        }
-
-      case 'logs':
-        final session = RunBridge.instance.findSession(
-          args['sessionId'] as String? ??
-              args['id'] as String? ??
-              args['name'] as String?,
-          group: actionGroup,
-        );
-        if (session == null) {
-          return const CliActionResult(
-            ok: false,
-            message: 'Run session not found',
-          );
-        }
-        final limit = args['limit'] as int?;
-        final outputLines = session.output;
-        final effectiveLines =
-            limit != null && limit > 0 && limit < outputLines.length
-                ? outputLines.sublist(outputLines.length - limit)
-                : outputLines;
-        return CliActionResult(
-          data: {
-            ...RunBridge.instance.serializeSession(session),
-            'outputLines':
-                effectiveLines
-                    .map(
-                      (line) => {
-                        'text': line.text,
-                        'isError': line.isError,
-                        'timestamp': line.timestamp.toIso8601String(),
-                      },
-                    )
-                    .toList(),
-            'output': effectiveLines.map((line) => line.text).join('\n'),
-            'limit': limit,
-          },
-        );
-
-      case 'config':
-        final config = RunBridge.instance.findConfig(
-          args['id'] as String? ?? args['name'] as String?,
-          actionGroup,
-        );
-        if (config == null) {
-          return const CliActionResult(
-            ok: false,
-            message: 'Configuration not found',
-          );
-        }
-        return CliActionResult(
-          data: RunBridge.instance.serializeConfig(config),
-        );
-
-      default:
-        return CliActionResult(ok: false, message: 'Unknown action: $action');
+    final handlers = <String, Future<CliActionResult> Function()>{
+      'list': () => _handleList(actionGroup),
+      'add': () => _handleAdd(args, actionGroup),
+      'remove': () => _handleRemove(args, actionGroup),
+      'update': () => _handleUpdate(args, actionGroup),
+      'run': () => _handleRun(args, actionGroup),
+      'stop': () => _handleStop(args, actionGroup),
+      'input': () => _handleInput(args, actionGroup),
+      'detach': () => _handleDetach(args, actionGroup),
+      'attach': () => _handleAttach(args, actionGroup),
+      'output': () => _handleOutput(args, actionGroup),
+      'close': () => _handleClose(args, actionGroup),
+      'logs': () => _handleLogs(args, actionGroup),
+      'config': () => _handleConfig(args, actionGroup),
+    };
+    final handler = handlers[action];
+    if (handler == null) {
+      return CliActionResult(ok: false, message: 'Unknown action: $action');
     }
+    return handler();
+  }
+
+  Future<CliActionResult> _handleList(String actionGroup) async {
+    return CliActionResult(data: _getContentForGroup(actionGroup));
+  }
+
+  Future<CliActionResult> _handleAdd(
+    Map<String, dynamic> args,
+    String actionGroup,
+  ) async {
+    final name = args['name'] as String?;
+    final command = args['command'] as String?;
+    if (name == null || command == null) {
+      return const CliActionResult(
+        ok: false,
+        message: 'Missing "name" and/or "command"',
+      );
+    }
+    final normalizedName = name.trim().toLowerCase();
+    final normalizedCommand = command.trim().toLowerCase();
+    final normalizedWorkingDir =
+        (args['workingDir'] as String? ?? '').trim();
+    final duplicate = RunBridge.instance.state.configs.firstWhere(
+      (existing) =>
+          existing.group == actionGroup &&
+          existing.name.trim().toLowerCase() == normalizedName &&
+          existing.command.trim().toLowerCase() == normalizedCommand &&
+          (existing.workingDir ?? '').trim() == normalizedWorkingDir,
+      orElse: () => const RunConfig(id: '', name: '', command: ''),
+    );
+    if (duplicate.id.isNotEmpty) {
+      return CliActionResult(
+        message: 'Configuration already exists (id: ${duplicate.id})',
+        data: RunBridge.instance.serializeConfig(duplicate),
+      );
+    }
+    final config = await RunBridge.instance.addConfig(
+      name: name,
+      command: command,
+      group: actionGroup,
+      workingDir: args['workingDir'] as String?,
+      env:
+          args['env'] is Map
+              ? Map<String, String>.from(args['env'] as Map)
+              : const {},
+      isFlutterRun: args['isFlutterRun'] as bool? ?? false,
+      quickActions: _parseQuickActions(args['quickActions']) ?? const [],
+    );
+    return CliActionResult(
+      message: 'Configuration "$name" added (id: ${config.id})',
+      data: RunBridge.instance.serializeConfig(config),
+    );
+  }
+
+  Future<CliActionResult> _handleRemove(
+    Map<String, dynamic> args,
+    String actionGroup,
+  ) async {
+    final identifier = args['id'] as String? ?? args['name'] as String?;
+    final config = RunBridge.instance.findConfig(identifier, actionGroup);
+    if (config == null) {
+      return const CliActionResult(ok: false, message: 'Missing "id"');
+    }
+    await RunBridge.instance.removeConfig(config.id);
+    return const CliActionResult(message: 'Configuration removed');
+  }
+
+  Future<CliActionResult> _handleUpdate(
+    Map<String, dynamic> args,
+    String actionGroup,
+  ) async {
+    final identifier = args['id'] as String? ?? args['name'] as String?;
+    if (identifier == null || identifier.trim().isEmpty) {
+      return const CliActionResult(ok: false, message: 'Missing "id"');
+    }
+    try {
+      final updated = await RunBridge.instance.updateConfig(
+        identifier: identifier,
+        group: actionGroup,
+        name: args['newName'] as String? ?? args['nameOverride'] as String?,
+        command: args['command'] as String?,
+        workingDir: args['workingDir'] as String?,
+        env:
+            args['env'] is Map
+                ? Map<String, String>.from(args['env'] as Map)
+                : null,
+        isFlutterRun: args['isFlutterRun'] as bool?,
+        quickActions: _parseQuickActions(args['quickActions']),
+      );
+      return CliActionResult(
+        message: 'Configuration updated',
+        data: RunBridge.instance.serializeConfig(updated),
+      );
+    } on StateError catch (error) {
+      return CliActionResult(ok: false, message: error.message);
+    }
+  }
+
+  Future<CliActionResult> _handleRun(
+    Map<String, dynamic> args,
+    String actionGroup,
+  ) async {
+    try {
+      final session = await RunBridge.instance.startConfig(
+        args['id'] as String? ?? args['name'] as String?,
+        actionGroup,
+      );
+      return CliActionResult(
+        message: 'Running "${session.config.name}"',
+        data: RunBridge.instance.serializeSession(session),
+      );
+    } on StateError catch (error) {
+      return CliActionResult(ok: false, message: error.message);
+    }
+  }
+
+  Future<CliActionResult> _handleStop(
+    Map<String, dynamic> args,
+    String actionGroup,
+  ) async {
+    try {
+      final session = await RunBridge.instance.stopSession(
+        args['sessionId'] as String? ??
+            args['id'] as String? ??
+            args['name'] as String?,
+        actionGroup,
+      );
+      return CliActionResult(
+        message: 'Stopped "${session.config.name}"',
+        data: RunBridge.instance.serializeSession(session),
+      );
+    } on StateError catch (error) {
+      return CliActionResult(ok: false, message: error.message);
+    }
+  }
+
+  Future<CliActionResult> _handleInput(
+    Map<String, dynamic> args,
+    String actionGroup,
+  ) async {
+    final rawText = args['text'] as String? ?? args['input'] as String?;
+    if (rawText == null || rawText.isEmpty) {
+      return const CliActionResult(ok: false, message: 'Missing "text"');
+    }
+    try {
+      final session = await RunBridge.instance.sendInput(
+        identifier:
+            args['sessionId'] as String? ??
+            args['id'] as String? ??
+            args['name'] as String?,
+        group: actionGroup,
+        text: rawText,
+        appendNewline: args['appendNewline'] as bool? ?? false,
+      );
+      return CliActionResult(
+        message: 'Input sent to "${session.config.name}"',
+        data: RunBridge.instance.serializeSession(session),
+      );
+    } on StateError catch (error) {
+      return CliActionResult(ok: false, message: error.message);
+    }
+  }
+
+  Future<CliActionResult> _handleDetach(
+    Map<String, dynamic> args,
+    String actionGroup,
+  ) async {
+    try {
+      final session = await RunBridge.instance.detachSession(
+        args['sessionId'] as String? ??
+            args['id'] as String? ??
+            args['name'] as String?,
+        actionGroup,
+      );
+      return CliActionResult(
+        message: 'Detached "${session.config.name}"',
+        data: RunBridge.instance.serializeSession(session),
+      );
+    } on StateError catch (error) {
+      return CliActionResult(ok: false, message: error.message);
+    }
+  }
+
+  Future<CliActionResult> _handleAttach(
+    Map<String, dynamic> args,
+    String actionGroup,
+  ) async {
+    try {
+      final session = await RunBridge.instance.attachSession(
+        identifier:
+            args['sessionId'] as String? ??
+            args['id'] as String? ??
+            args['name'] as String?,
+        group: actionGroup,
+        runningOnly: args['runningOnly'] as bool? ?? true,
+      );
+      return CliActionResult(
+        message: 'Attached "${session.config.name}"',
+        data: RunBridge.instance.serializeSession(session),
+      );
+    } on StateError catch (error) {
+      return CliActionResult(ok: false, message: error.message);
+    }
+  }
+
+  Future<CliActionResult> _handleOutput(
+    Map<String, dynamic> args,
+    String actionGroup,
+  ) async {
+    final session = RunBridge.instance.findSession(
+      args['sessionId'] as String? ??
+          args['id'] as String? ??
+          args['name'] as String?,
+      group: actionGroup,
+    );
+    if (session == null) {
+      return const CliActionResult(
+        ok: false,
+        message: 'Run session not found',
+      );
+    }
+    return CliActionResult(
+      data: RunBridge.instance.serializeSession(session),
+    );
+  }
+
+  Future<CliActionResult> _handleClose(
+    Map<String, dynamic> args,
+    String actionGroup,
+  ) async {
+    try {
+      final session = await RunBridge.instance.removeSession(
+        args['sessionId'] as String? ??
+            args['id'] as String? ??
+            args['name'] as String?,
+        actionGroup,
+      );
+      return CliActionResult(
+        message: 'Closed "${session.config.name}"',
+        data: RunBridge.instance.serializeSession(session),
+      );
+    } on StateError catch (error) {
+      return CliActionResult(ok: false, message: error.message);
+    }
+  }
+
+  Future<CliActionResult> _handleLogs(
+    Map<String, dynamic> args,
+    String actionGroup,
+  ) async {
+    final session = RunBridge.instance.findSession(
+      args['sessionId'] as String? ??
+          args['id'] as String? ??
+          args['name'] as String?,
+      group: actionGroup,
+    );
+    if (session == null) {
+      return const CliActionResult(
+        ok: false,
+        message: 'Run session not found',
+      );
+    }
+    final limit = args['limit'] as int?;
+    final outputLines = session.output;
+    final effectiveLines =
+        limit != null && limit > 0 && limit < outputLines.length
+            ? outputLines.sublist(outputLines.length - limit)
+            : outputLines;
+    return CliActionResult(
+      data: {
+        ...RunBridge.instance.serializeSession(session),
+        'outputLines':
+            effectiveLines
+                .map(
+                  (line) => {
+                    'text': line.text,
+                    'isError': line.isError,
+                    'timestamp': line.timestamp.toIso8601String(),
+                  },
+                )
+                .toList(),
+        'output': effectiveLines.map((line) => line.text).join('\n'),
+        'limit': limit,
+      },
+    );
+  }
+
+  Future<CliActionResult> _handleConfig(
+    Map<String, dynamic> args,
+    String actionGroup,
+  ) async {
+    final config = RunBridge.instance.findConfig(
+      args['id'] as String? ?? args['name'] as String?,
+      actionGroup,
+    );
+    if (config == null) {
+      return const CliActionResult(
+        ok: false,
+        message: 'Configuration not found',
+      );
+    }
+    return CliActionResult(
+      data: RunBridge.instance.serializeConfig(config),
+    );
   }
 
   @override

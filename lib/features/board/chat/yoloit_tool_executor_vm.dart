@@ -2,12 +2,12 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:path/path.dart' as p;
 import 'package:yoloit/core/cli/cli_server.dart';
 import 'package:yoloit/core/cli/cli_text_argument_resolver.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
 import 'package:yoloit/features/board/chat/cli_tools/tool_helpers.dart';
 import 'package:yoloit/features/board/chat/ui_cli_inprocess.dart';
+import 'package:yoloit/features/board/chat/yoloit_cli_locator.dart';
 import 'package:yoloit/features/board/chat/yoloit_tool_catalog.dart';
 import 'package:yoloit/features/board/chat/yoloit_tool_executor_base.dart';
 import 'package:yoloit/features/board/chat/yoloit_tool_executor_shared.dart';
@@ -56,15 +56,60 @@ class YoloitCliToolExecutor implements YoloitToolExecutor {
       });
     }
     final validation = _validateCliArgs(tool, cliArgs);
+    final rendered = _renderCommand(cliArgs);
+    final guard = _preExecutionResult(tool, arguments, validation, rendered);
+    if (guard != null) return guard;
+
+    final cliPort = CliServer.instance.port;
+    if (cliPort != null && tool.command.startsWith('ui:')) {
+      final inProcess = await _tryInvokeInProcess(tool, normalized, cliPort);
+      if (inProcess != null) return inProcess;
+    }
+
+    final executable = executablePath ?? _resolveYoloitExecutable();
+    File? boardApplyYamlTemp;
+    var runArgs = cliArgs;
+    if (tool.command == 'board:apply') {
+      final prepared = await _prepareBoardApply(
+        tool,
+        normalized,
+        cliArgs,
+        runtimeContext,
+      );
+      if (prepared.error != null) return prepared.error!;
+      boardApplyYamlTemp = prepared.tempFile;
+      if (prepared.runArgs != null) runArgs = prepared.runArgs!;
+    }
+    try {
+      return await _runCliProcess(
+        executable: executable,
+        runArgs: runArgs,
+        cliPort: cliPort,
+        tool: tool,
+        rendered: rendered,
+      );
+    } finally {
+      _deleteTempFile(boardApplyYamlTemp);
+    }
+  }
+
+  /// Returns a JSON response when the invocation must stop before executing
+  /// the CLI (validation failure, unconfirmed destructive command, or a
+  /// dry run with `execute == false`), or null when execution may proceed.
+  String? _preExecutionResult(
+    YoloitCliTool tool,
+    Map<String, Object?> arguments,
+    String? validation,
+    String rendered,
+  ) {
     if (validation != null) {
       return jsonEncode(<String, Object?>{
         'ok': false,
         'executed': false,
-        'command': _renderCommand(cliArgs),
+        'command': rendered,
         'error': validation,
       });
     }
-    final rendered = _renderCommand(cliArgs);
     if (tool.destructive && !_confirmedDestructive(arguments)) {
       return jsonEncode(<String, Object?>{
         'ok': false,
@@ -81,108 +126,139 @@ class YoloitCliToolExecutor implements YoloitToolExecutor {
         'command': rendered,
       });
     }
+    return null;
+  }
 
-    final cliPort = CliServer.instance.port;
-    if (cliPort != null && tool.command.startsWith('ui:')) {
-      final inProcess = await UiCliInProcessClient.tryExecute(
-        command: tool.command,
-        arguments: normalized,
-        port: cliPort,
+  /// Attempts to execute a `ui:` command in-process via the running CLI
+  /// server. Returns the JSON response, or null when the in-process client
+  /// could not handle the command.
+  Future<String?> _tryInvokeInProcess(
+    YoloitCliTool tool,
+    Map<String, Object?> normalized,
+    int cliPort,
+  ) async {
+    final inProcess = await UiCliInProcessClient.tryExecute(
+      command: tool.command,
+      arguments: normalized,
+      port: cliPort,
+    );
+    if (inProcess == null) return null;
+    var ok = true;
+    try {
+      final decoded = jsonDecode(inProcess);
+      if (decoded is Map && decoded['ok'] is bool) {
+        ok = decoded['ok'] as bool;
+      }
+    } catch (_) {}
+    if (ok && !_isReadOnlyCommand(tool.command)) {
+      BoardEventBus.instance.emit(BoardToolMutationEvent(tool.command));
+    }
+    return inProcess;
+  }
+
+  /// Writes the board:apply YAML payload to a temp file and builds the
+  /// positional CLI arguments for it. Returns an error JSON when the board
+  /// cannot be resolved.
+  Future<({String? error, File? tempFile, List<String>? runArgs})>
+  _prepareBoardApply(
+    YoloitCliTool tool,
+    Map<String, Object?> normalized,
+    List<String> cliArgs,
+    ChatRuntimeContext? runtimeContext,
+  ) async {
+    final yaml = normalized['yaml']?.toString().trim();
+    if (yaml == null || yaml.isEmpty) {
+      return (error: null, tempFile: null, runArgs: null);
+    }
+    final tempFile = File(
+      '${Directory.systemTemp.path}/yoloit_apply_'
+      '${DateTime.now().millisecondsSinceEpoch}.yaml',
+    );
+    await tempFile.writeAsString(yaml);
+    final boardArg =
+        cliArgs.length > 1
+            ? cliArgs[1]
+            : _firstNotEmpty(
+              runtimeContext?.boardId,
+              runtimeContext?.boardName,
+            );
+    if (boardArg == null || boardArg.trim().isEmpty) {
+      return (
+        error: jsonEncode(<String, Object?>{
+          'ok': false,
+          'executed': false,
+          'error': 'Missing board for board:apply',
+        }),
+        tempFile: tempFile,
+        runArgs: null,
       );
-      if (inProcess != null) {
-        var ok = true;
-        try {
-          final decoded = jsonDecode(inProcess);
-          if (decoded is Map && decoded['ok'] is bool) {
-            ok = decoded['ok'] as bool;
-          }
-        } catch (_) {}
-        if (ok && !_isReadOnlyCommand(tool.command)) {
+    }
+    return (
+      error: null,
+      tempFile: tempFile,
+      runArgs: <String>[tool.command, boardArg, tempFile.path],
+    );
+  }
+
+  /// Runs the yoloit CLI as a subprocess and wraps its output in the
+  /// standard JSON tool response.
+  Future<String> _runCliProcess({
+    required String executable,
+    required List<String> runArgs,
+    required int? cliPort,
+    required YoloitCliTool tool,
+    required String rendered,
+  }) async {
+    final result = await Process.run(
+      executable,
+      runArgs.map(_argvQuote).toList(),
+      runInShell: false,
+      environment:
+          cliPort == null
+              ? null
+              : <String, String>{'YOLOIT_CLI_PORT': '$cliPort'},
+    ).timeout(timeout);
+
+    final stdoutText = result.stdout.toString().trim();
+    final stderrText = result.stderr.toString().trim();
+    var ok = result.exitCode == 0;
+    if (ok && stdoutText.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(stdoutText);
+        if (decoded is Map && decoded['ok'] is bool) {
+          ok = decoded['ok'] as bool;
+        }
+      } catch (_) {}
+    }
+
+    // Notify the UI so remote boards can be refreshed after mutations.
+    if (ok && !_isReadOnlyCommand(tool.command)) {
+      try {
+        final decoded = jsonDecode(stdoutText) as Map<String, dynamic>?;
+        if (decoded?['ok'] == true) {
           BoardEventBus.instance.emit(BoardToolMutationEvent(tool.command));
         }
-        return inProcess;
+      } catch (_) {
+        // Non-JSON output is fine for some legacy commands; ignore.
       }
     }
 
-    final executable = executablePath ?? _resolveYoloitExecutable();
-    File? boardApplyYamlTemp;
-    var runArgs = cliArgs;
-    if (tool.command == 'board:apply') {
-      final yaml = normalized['yaml']?.toString().trim();
-      if (yaml != null && yaml.isNotEmpty) {
-        boardApplyYamlTemp = File(
-          '${Directory.systemTemp.path}/yoloit_apply_'
-          '${DateTime.now().millisecondsSinceEpoch}.yaml',
-        );
-        await boardApplyYamlTemp.writeAsString(yaml);
-        final boardArg =
-            cliArgs.length > 1
-                ? cliArgs[1]
-                : _firstNotEmpty(
-                  runtimeContext?.boardId,
-                  runtimeContext?.boardName,
-                );
-        if (boardArg == null || boardArg.trim().isEmpty) {
-          return jsonEncode(<String, Object?>{
-            'ok': false,
-            'executed': false,
-            'error': 'Missing board for board:apply',
-          });
-        }
-        runArgs = <String>[tool.command, boardArg, boardApplyYamlTemp.path];
-      }
-    }
+    return jsonEncode(<String, Object?>{
+      'ok': ok,
+      'command': rendered,
+      'exitCode': result.exitCode,
+      if (stdoutText.isNotEmpty) 'stdout': stdoutText,
+      if (stderrText.isNotEmpty) 'stderr': stderrText,
+    });
+  }
+
+  void _deleteTempFile(File? file) {
+    if (file == null) return;
     try {
-      final result = await Process.run(
-        executable,
-        runArgs.map(_argvQuote).toList(),
-        runInShell: false,
-        environment:
-            cliPort == null
-                ? null
-                : <String, String>{'YOLOIT_CLI_PORT': '$cliPort'},
-      ).timeout(timeout);
-
-      final stdoutText = result.stdout.toString().trim();
-      final stderrText = result.stderr.toString().trim();
-      var ok = result.exitCode == 0;
-      if (ok && stdoutText.isNotEmpty) {
-        try {
-          final decoded = jsonDecode(stdoutText);
-          if (decoded is Map && decoded['ok'] is bool) {
-            ok = decoded['ok'] as bool;
-          }
-        } catch (_) {}
+      if (file.existsSync()) {
+        file.deleteSync();
       }
-
-      // Notify the UI so remote boards can be refreshed after mutations.
-      if (ok && !_isReadOnlyCommand(tool.command)) {
-        try {
-          final decoded = jsonDecode(stdoutText) as Map<String, dynamic>?;
-          if (decoded?['ok'] == true) {
-            BoardEventBus.instance.emit(BoardToolMutationEvent(tool.command));
-          }
-        } catch (_) {
-          // Non-JSON output is fine for some legacy commands; ignore.
-        }
-      }
-
-      return jsonEncode(<String, Object?>{
-        'ok': ok,
-        'command': rendered,
-        'exitCode': result.exitCode,
-        if (stdoutText.isNotEmpty) 'stdout': stdoutText,
-        if (stderrText.isNotEmpty) 'stderr': stderrText,
-      });
-    } finally {
-      if (boardApplyYamlTemp != null) {
-        try {
-          if (boardApplyYamlTemp.existsSync()) {
-            boardApplyYamlTemp.deleteSync();
-          }
-        } catch (_) {}
-      }
-    }
+    } catch (_) {}
   }
 
   static const _readOnlySuffixes = <String>{
@@ -210,61 +286,44 @@ class YoloitCliToolExecutor implements YoloitToolExecutor {
     ':config',
   };
 
+  /// Commands that never mutate board state, matched by exact name.
+  static const _readOnlyExactCommands = <String>{
+    'help',
+    'get_tools',
+    'list_tools',
+    'panels',
+    'panel',
+    'panel:types',
+    'search',
+    'board',
+  };
+
+  /// Read-only command groups: a command is read-only when it starts with
+  /// the prefix and ends with one of the listed suffixes.
+  static const _readOnlyPrefixRules = <(String, Set<String>)>[
+    ('board:', _readOnlySuffixes),
+    ('template:', _readOnlySuffixes),
+    ('files:', _readOnlySuffixes),
+    ('filetree:', _readOnlySuffixes),
+    ('code:', {':get'}),
+    ('note:', {':get'}),
+    ('shape:', {':get'}),
+    ('sticky:', {':get'}),
+    ('table:', {':get'}),
+    ('kanban:', {':columns', ':cards'}),
+    ('checklist:', {':items'}),
+    ('calendar:', {':events', ':show-event'}),
+    ('playlist:', {':list'}),
+    ('timer:', {':status'}),
+    ('webpage:', {':get', ':title', ':url', ':content'}),
+  ];
+
   bool _isReadOnlyCommand(String command) {
-    if (command == 'help' ||
-        command == 'get_tools' ||
-        command == 'list_tools' ||
-        command == 'panels' ||
-        command == 'panel' ||
-        command == 'panel:types' ||
-        command == 'search') {
-      return true;
-    }
-    if (command == 'board') return true;
-    if (command.startsWith('board:') &&
-        _readOnlySuffixes.any(command.endsWith)) {
-      return true;
-    }
-    if (command.startsWith('template:') &&
-        _readOnlySuffixes.any(command.endsWith)) {
-      return true;
-    }
-    if (command.startsWith('files:') &&
-        _readOnlySuffixes.any(command.endsWith)) {
-      return true;
-    }
-    if (command.startsWith('filetree:') &&
-        _readOnlySuffixes.any(command.endsWith)) {
-      return true;
-    }
-    if (command.startsWith('code:') && command.endsWith(':get')) return true;
-    if (command.startsWith('note:') && command.endsWith(':get')) return true;
-    if (command.startsWith('shape:') && command.endsWith(':get')) return true;
-    if (command.startsWith('sticky:') && command.endsWith(':get')) return true;
-    if (command.startsWith('table:') && command.endsWith(':get')) return true;
-    if (command.startsWith('kanban:') &&
-        (command.endsWith(':columns') || command.endsWith(':cards'))) {
-      return true;
-    }
-    if (command.startsWith('checklist:') && command.endsWith(':items')) {
-      return true;
-    }
-    if (command.startsWith('calendar:') &&
-        (command.endsWith(':events') || command.endsWith(':show-event'))) {
-      return true;
-    }
-    if (command.startsWith('playlist:') && command.endsWith(':list')) {
-      return true;
-    }
-    if (command.startsWith('timer:') && command.endsWith(':status')) {
-      return true;
-    }
-    if (command.startsWith('webpage:') &&
-        (command.endsWith(':get') ||
-            command.endsWith(':title') ||
-            command.endsWith(':url') ||
-            command.endsWith(':content'))) {
-      return true;
+    if (_readOnlyExactCommands.contains(command)) return true;
+    for (final (prefix, suffixes) in _readOnlyPrefixRules) {
+      if (command.startsWith(prefix) && suffixes.any(command.endsWith)) {
+        return true;
+      }
     }
     return false;
   }
@@ -304,34 +363,54 @@ class YoloitCliToolExecutor implements YoloitToolExecutor {
       }
       final value = _argumentValue(param, arguments, runtimeContext, tool);
       if (_isMissing(value)) {
-        if (param.required &&
-            !(_cliAutoResolvesPanel(tool.group) &&
-                param.runtimeDefault == YoloitCliRuntimeDefault.panel)) {
-          throw ArgumentError(
-            'Missing required "${param.key}" for ${tool.command}',
-          );
-        }
+        _throwIfMissingRequired(tool, param);
         continue;
       }
-      if (param.isFlag) {
-        if (param.kind == YoloitCliToolParamKind.boolean) {
-          if (_asBool(value)) {
-            out.add(param.flag!);
-          }
-        } else {
-          final rendered = _resolveTextArgument(param, '$value');
-          if (rendered.trim().isEmpty) continue;
-          out
-            ..add(param.flag!)
-            ..add(rendered);
-        }
-        continue;
-      }
-      final rendered = _stringifyArgument(param, value);
-      if (rendered.trim().isEmpty) continue;
-      out.add(rendered);
+      _appendParamArgument(out, param, value);
     }
     return out;
+  }
+
+  void _throwIfMissingRequired(YoloitCliTool tool, YoloitCliToolParam param) {
+    if (param.required &&
+        !(_cliAutoResolvesPanel(tool.group) &&
+            param.runtimeDefault == YoloitCliRuntimeDefault.panel)) {
+      throw ArgumentError(
+        'Missing required "${param.key}" for ${tool.command}',
+      );
+    }
+  }
+
+  void _appendParamArgument(
+    List<String> out,
+    YoloitCliToolParam param,
+    Object? value,
+  ) {
+    if (param.isFlag) {
+      _appendFlagArgument(out, param, value);
+      return;
+    }
+    final rendered = _stringifyArgument(param, value);
+    if (rendered.trim().isEmpty) return;
+    out.add(rendered);
+  }
+
+  void _appendFlagArgument(
+    List<String> out,
+    YoloitCliToolParam param,
+    Object? value,
+  ) {
+    if (param.kind == YoloitCliToolParamKind.boolean) {
+      if (_asBool(value)) {
+        out.add(param.flag!);
+      }
+      return;
+    }
+    final rendered = _resolveTextArgument(param, '$value');
+    if (rendered.trim().isEmpty) return;
+    out
+      ..add(param.flag!)
+      ..add(rendered);
   }
 
   String _stringifyArgument(YoloitCliToolParam param, Object? value) {
@@ -558,33 +637,9 @@ class YoloitCliToolExecutor implements YoloitToolExecutor {
     }
 
     final checked = <String>[];
-    final roots = <String?>[
-      Directory.current.path,
-      Platform.environment['PWD'],
-      Platform.environment['YOLOIT_PROJECT_ROOT'],
-      Platform.environment['PROJECT_DIR'],
-      p.dirname(Platform.resolvedExecutable),
-    ];
-    final seen = <String>{};
-    for (final root in roots) {
-      if (root == null || root.trim().isEmpty) continue;
-      var dir = Directory(p.normalize(p.absolute(root.trim())));
-      for (var i = 0; i < 16; i++) {
-        final candidates = <File>[
-          File(p.join(dir.path, 'tools', 'yoloit')),
-          File(p.join(dir.path, 'yoloit', 'tools', 'yoloit')),
-        ];
-        for (final candidate in candidates) {
-          if (!seen.add(candidate.path)) continue;
-          checked.add(candidate.path);
-          if (candidate.existsSync()) {
-            return candidate.path;
-          }
-        }
-        final parent = dir.parent;
-        if (parent.path == dir.path) break;
-        dir = parent;
-      }
+    final found = findYoloitCliScript(checked: checked);
+    if (found != null) {
+      return found;
     }
     throw StateError(
       'Cannot find tools/yoloit. Checked: ${checked.join(', ')}',

@@ -365,6 +365,14 @@ class YoloitCliToolArgumentNormalizer {
     required String userMessage,
   }) {
     final text = userMessage.toLowerCase();
+    return _redirectPanelFunctions(functionName, text) ??
+        _redirectNoteFunctions(functionName, text) ??
+        _redirectBoardFunctions(functionName, text) ??
+        _redirectMiscFunctions(functionName, text) ??
+        functionName;
+  }
+
+  static String? _redirectPanelFunctions(String functionName, String text) {
     if (functionName == 'yoloit_panel_help' &&
         text.isNotEmpty &&
         (text.contains('details') || text.contains('content')) &&
@@ -372,15 +380,49 @@ class YoloitCliToolArgumentNormalizer {
         !text.contains('available')) {
       return 'yoloit_panel';
     }
+    if (functionName == 'yoloit_board_focus' && text.contains('panel')) {
+      return 'yoloit_panel_focus';
+    }
+    if (functionName == 'yoloit_panel' &&
+        (text.contains('focus') || text.contains('фокус'))) {
+      return 'yoloit_panel_focus';
+    }
+    if (functionName == 'yoloit_panel_focus' &&
+        text.contains('show') &&
+        text.contains('panel') &&
+        !text.contains('focus')) {
+      return 'yoloit_panel_show';
+    }
+    return null;
+  }
+
+  static String? _redirectNoteFunctions(String functionName, String text) {
     if (functionName == 'yoloit_note_create' &&
         ((text.contains('create') && text.contains('panel')) ||
             (text.contains('создай') && text.contains('панел')) ||
             (text.contains('сделай') && text.contains('панел')))) {
       return 'yoloit_panel_create';
     }
-    if (functionName == 'yoloit_board_focus' && text.contains('panel')) {
-      return 'yoloit_panel_focus';
+    if (functionName == 'yoloit_note_replace') {
+      return 'yoloit_note';
     }
+    // Model picks "note" (set text) when user wants "note:create" (new panel).
+    if ((functionName == 'nst' ||
+            functionName == 'yoloit_note' ||
+            functionName == 'note') &&
+        (text.contains('сделай заметку') ||
+            text.contains('создай заметку') ||
+            text.contains('новая заметка') ||
+            text.contains('добавь заметку') ||
+            (text.contains('create') && text.contains('note')) ||
+            (text.contains('make') && text.contains('note')) ||
+            (text.contains('new') && text.contains('note')))) {
+      return 'ncrt';
+    }
+    return null;
+  }
+
+  static String? _redirectBoardFunctions(String functionName, String text) {
     final looksLikeBoardNavigation =
         text.contains('перейд') ||
         text.contains('переди') ||
@@ -399,36 +441,14 @@ class YoloitCliToolArgumentNormalizer {
         !looksLikeContextOnly) {
       return 'yoloit_board_focus';
     }
-    if (functionName == 'yoloit_panel' &&
-        (text.contains('focus') || text.contains('фокус'))) {
-      return 'yoloit_panel_focus';
-    }
-    if (functionName == 'yoloit_panel_focus' &&
-        text.contains('show') &&
-        text.contains('panel') &&
-        !text.contains('focus')) {
-      return 'yoloit_panel_show';
-    }
-    if (functionName == 'yoloit_note_replace') {
-      return 'yoloit_note';
-    }
-    // Model picks "note" (set text) when user wants "note:create" (new panel).
-    if ((functionName == 'nst' ||
-            functionName == 'yoloit_note' ||
-            functionName == 'note') &&
-        (text.contains('сделай заметку') ||
-            text.contains('создай заметку') ||
-            text.contains('новая заметка') ||
-            text.contains('добавь заметку') ||
-            (text.contains('create') && text.contains('note')) ||
-            (text.contains('make') && text.contains('note')) ||
-            (text.contains('new') && text.contains('note')))) {
-      return 'ncrt';
-    }
+    return null;
+  }
+
+  static String? _redirectMiscFunctions(String functionName, String text) {
     if (functionName == 'yoloit_reload' && text.contains('restart')) {
       return 'yoloit_restart';
     }
-    return functionName;
+    return null;
   }
 
   static Map<String, Object?> normalize({
@@ -447,21 +467,8 @@ class YoloitCliToolArgumentNormalizer {
     // Strip chat/assistant panel IDs from tools that auto-resolve their own
     // panel type. The CLI finds the correct panel by type.
     _stripChatPanelForTypedTools(tool, normalized);
-    // When note→note:create redirect happened, remap text→title.
-    if (tool?.command == 'note:create' &&
-        _isMissing(normalized['title']) &&
-        _isMissing(normalized['ti'])) {
-      final text = normalized.remove('text') ?? normalized.remove('tx');
-      if (text != null) {
-        normalized['title'] = text;
-      }
-    }
-    if (tool?.command == 'panel:create' && _isMissing(normalized['type'])) {
-      final type = _inferPanelType(userMessage);
-      if (type != null) {
-        normalized['type'] = type;
-      }
-    }
+    _remapNoteCreateTitle(tool, normalized);
+    _inferMissingPanelType(tool, normalized, userMessage);
     _normalizeUiArguments(tool?.command, normalized, userMessage);
     _normalizeHelpArguments(tool?.command, normalized, userMessage);
     _normalizeBoardArguments(tool?.command, normalized, userMessage);
@@ -473,25 +480,77 @@ class YoloitCliToolArgumentNormalizer {
       userMessage,
       runtimeContext,
     );
+    _applyConfirmationFlag(tool, normalized, userMessage);
+    _applyRunInputEnterFlag(tool, normalized, userMessage);
+    _applyRunAttachAnyFlag(tool, normalized, userMessage);
+    CliTextArgumentResolver.resolveInArguments(normalized);
+    _encodeStructuredJsonArguments(normalized);
+    return normalized;
+  }
+
+  /// When note→note:create redirect happened, remap text→title.
+  static void _remapNoteCreateTitle(
+    YoloitCliTool? tool,
+    Map<String, Object?> normalized,
+  ) {
+    if (tool?.command == 'note:create' &&
+        _isMissing(normalized['title']) &&
+        _isMissing(normalized['ti'])) {
+      final text = normalized.remove('text') ?? normalized.remove('tx');
+      if (text != null) {
+        normalized['title'] = text;
+      }
+    }
+  }
+
+  static void _inferMissingPanelType(
+    YoloitCliTool? tool,
+    Map<String, Object?> normalized,
+    String userMessage,
+  ) {
+    if (tool?.command == 'panel:create' && _isMissing(normalized['type'])) {
+      final type = _inferPanelType(userMessage);
+      if (type != null) {
+        normalized['type'] = type;
+      }
+    }
+  }
+
+  static void _applyConfirmationFlag(
+    YoloitCliTool? tool,
+    Map<String, Object?> normalized,
+    String userMessage,
+  ) {
     if (tool?.destructive == true &&
         _isMissing(normalized['confirm']) &&
         _mentionsConfirmation(userMessage)) {
       normalized['confirm'] = true;
     }
+  }
+
+  static void _applyRunInputEnterFlag(
+    YoloitCliTool? tool,
+    Map<String, Object?> normalized,
+    String userMessage,
+  ) {
     if (tool?.command == 'run:input' &&
         _isMissing(normalized['enter']) &&
         userMessage.toLowerCase().contains('enter')) {
       normalized['enter'] = true;
     }
+  }
+
+  static void _applyRunAttachAnyFlag(
+    YoloitCliTool? tool,
+    Map<String, Object?> normalized,
+    String userMessage,
+  ) {
     if (tool?.command == 'run:attach' &&
         _isMissing(normalized['any']) &&
         (userMessage.toLowerCase().contains('allow stopped') ||
             userMessage.toLowerCase().contains('allowing stopped'))) {
       normalized['any'] = true;
     }
-    CliTextArgumentResolver.resolveInArguments(normalized);
-    _encodeStructuredJsonArguments(normalized);
-    return normalized;
   }
 
   static void _canonicalizeCompactArguments(
@@ -649,44 +708,79 @@ class YoloitCliToolArgumentNormalizer {
     Map<String, Object?> normalized,
     String userMessage,
   ) {
+    _normalizeBoardZoomArguments(command, normalized, userMessage);
+    _normalizeBoardArrangeArguments(command, normalized, userMessage);
+    _normalizeBoardTranslateArguments(command, normalized, userMessage);
+    _normalizeBoardTargetArguments(command, normalized, userMessage);
+  }
+
+  /// Fills [key] with the first number found after [label] in the user
+  /// message, unless the argument is already present.
+  static void _fillNumberFromLabel(
+    Map<String, Object?> normalized,
+    String userMessage,
+    String key,
+    RegExp label,
+  ) {
+    if (!_isMissing(normalized[key])) return;
+    final value = _numberAfterLabel(userMessage, label);
+    if (value != null) normalized[key] = value;
+  }
+
+  static void _normalizeBoardZoomArguments(
+    String? command,
+    Map<String, Object?> normalized,
+    String userMessage,
+  ) {
     if (command == 'board:zoom' && _isMissing(normalized['scale'])) {
       final scale = _firstNumberAfter(userMessage, RegExp(r'\bzoom\b|\bto\b'));
       if (scale != null) normalized['scale'] = scale;
     }
-    if (command == 'board:arrange') {
-      final text = userMessage.toLowerCase();
-      if (_isMissing(normalized['direction'])) {
-        if (text.contains('right')) {
-          normalized['direction'] = 'right';
-        } else if (text.contains('down')) {
-          normalized['direction'] = 'down';
-        }
-      }
-      if (_isMissing(normalized['h_spacing'])) {
-        final value = _numberAfterLabel(
-          userMessage,
-          RegExp(r'horizontal spacing|h spacing'),
-        );
-        if (value != null) normalized['h_spacing'] = value;
-      }
-      if (_isMissing(normalized['v_spacing'])) {
-        final value = _numberAfterLabel(
-          userMessage,
-          RegExp(r'vertical spacing|v spacing'),
-        );
-        if (value != null) normalized['v_spacing'] = value;
+  }
+
+  static void _normalizeBoardArrangeArguments(
+    String? command,
+    Map<String, Object?> normalized,
+    String userMessage,
+  ) {
+    if (command != 'board:arrange') return;
+    final text = userMessage.toLowerCase();
+    if (_isMissing(normalized['direction'])) {
+      if (text.contains('right')) {
+        normalized['direction'] = 'right';
+      } else if (text.contains('down')) {
+        normalized['direction'] = 'down';
       }
     }
-    if (command == 'board:translate') {
-      if (_isMissing(normalized['x'])) {
-        final value = _numberAfterLabel(userMessage, RegExp(r'\bx\b'));
-        if (value != null) normalized['x'] = value;
-      }
-      if (_isMissing(normalized['y'])) {
-        final value = _numberAfterLabel(userMessage, RegExp(r'\by\b'));
-        if (value != null) normalized['y'] = value;
-      }
-    }
+    _fillNumberFromLabel(
+      normalized,
+      userMessage,
+      'h_spacing',
+      RegExp(r'horizontal spacing|h spacing'),
+    );
+    _fillNumberFromLabel(
+      normalized,
+      userMessage,
+      'v_spacing',
+      RegExp(r'vertical spacing|v spacing'),
+    );
+  }
+
+  static void _normalizeBoardTranslateArguments(
+    String? command,
+    Map<String, Object?> normalized,
+    String userMessage,
+  ) {
+    if (command != 'board:translate') return;
+    _fillNumberFromLabel(normalized, userMessage, 'x', RegExp(r'\bx\b'));
+    _fillNumberFromLabel(normalized, userMessage, 'y', RegExp(r'\by\b'));
+  }
+
+  static void _normalizeBoardTargetArguments(
+    String? command,
+    Map<String, Object?> normalized,
+    String userMessage,
+  ) {
     if ((command == 'board:delete' ||
             command == 'board:archive' ||
             command == 'board:unarchive') &&
@@ -705,51 +799,65 @@ class YoloitCliToolArgumentNormalizer {
     String userMessage,
   ) {
     if (command == 'panel:move') {
-      if (_isMissing(normalized['x'])) {
-        final value = _numberAfterLabel(userMessage, RegExp(r'\bx\b'));
-        if (value != null) normalized['x'] = value;
-      }
-      if (_isMissing(normalized['y'])) {
-        final value = _numberAfterLabel(userMessage, RegExp(r'\by\b'));
-        if (value != null) normalized['y'] = value;
-      }
+      _fillNumberFromLabel(normalized, userMessage, 'x', RegExp(r'\bx\b'));
+      _fillNumberFromLabel(normalized, userMessage, 'y', RegExp(r'\by\b'));
     }
     if (command == 'panel:resize') {
-      final preset = _extractResizePreset(userMessage);
-      if (preset != null) {
-        if (_isMissing(normalized['width'])) normalized['width'] = preset.$1;
-        if (_isMissing(normalized['height'])) normalized['height'] = preset.$2;
-      }
-      final sizePair = _extractSizePair(userMessage);
-      if (sizePair != null) {
-        if (_isMissing(normalized['width'])) normalized['width'] = sizePair.$1;
-        if (_isMissing(normalized['height'])) {
-          normalized['height'] = sizePair.$2;
-        }
-      }
-      if (_isMissing(normalized['width'])) {
-        final value = _numberAfterLabel(
-          userMessage,
-          RegExp(r'\bwidth\b|ширин|широк', caseSensitive: false),
-        );
-        if (value != null) normalized['width'] = value;
-      }
-      if (_isMissing(normalized['height'])) {
-        final value = _numberAfterLabel(
-          userMessage,
-          RegExp(r'\bheight\b|высот', caseSensitive: false),
-        );
-        if (value != null) normalized['height'] = value;
-      }
-      if ((_isMissing(normalized['width']) ||
-              _isMissing(normalized['height'])) &&
-          _mentionsResizeIntent(userMessage)) {
-        normalized['width'] =
-            _isMissing(normalized['width']) ? 500 : normalized['width'];
-        normalized['height'] =
-            _isMissing(normalized['height']) ? 400 : normalized['height'];
-      }
+      _normalizePanelResizeArguments(normalized, userMessage);
     }
+    _normalizePanelTitleArguments(command, normalized, userMessage);
+    _normalizePanelTargetArguments(command, normalized, userMessage);
+  }
+
+  static void _normalizePanelResizeArguments(
+    Map<String, Object?> normalized,
+    String userMessage,
+  ) {
+    _applyResizeDimensions(normalized, _extractResizePreset(userMessage));
+    _applyResizeDimensions(normalized, _extractSizePair(userMessage));
+    _fillNumberFromLabel(
+      normalized,
+      userMessage,
+      'width',
+      RegExp(r'\bwidth\b|ширин|широк', caseSensitive: false),
+    );
+    _fillNumberFromLabel(
+      normalized,
+      userMessage,
+      'height',
+      RegExp(r'\bheight\b|высот', caseSensitive: false),
+    );
+    _applyResizeIntentDefault(normalized, userMessage);
+  }
+
+  static void _applyResizeDimensions(
+    Map<String, Object?> normalized,
+    (num, num)? dimensions,
+  ) {
+    if (dimensions == null) return;
+    if (_isMissing(normalized['width'])) normalized['width'] = dimensions.$1;
+    if (_isMissing(normalized['height'])) normalized['height'] = dimensions.$2;
+  }
+
+  static void _applyResizeIntentDefault(
+    Map<String, Object?> normalized,
+    String userMessage,
+  ) {
+    if ((_isMissing(normalized['width']) ||
+            _isMissing(normalized['height'])) &&
+        _mentionsResizeIntent(userMessage)) {
+      normalized['width'] =
+          _isMissing(normalized['width']) ? 500 : normalized['width'];
+      normalized['height'] =
+          _isMissing(normalized['height']) ? 400 : normalized['height'];
+    }
+  }
+
+  static void _normalizePanelTitleArguments(
+    String? command,
+    Map<String, Object?> normalized,
+    String userMessage,
+  ) {
     if (command == 'panel:create' && _isMissing(normalized['title'])) {
       final title = _extractTitle(userMessage);
       if (title != null) normalized['title'] = title;
@@ -765,6 +873,13 @@ class YoloitCliToolArgumentNormalizer {
         if (panel != null) normalized['panel'] = panel;
       }
     }
+  }
+
+  static void _normalizePanelTargetArguments(
+    String? command,
+    Map<String, Object?> normalized,
+    String userMessage,
+  ) {
     if (command != null &&
         (command == 'panel' || command.startsWith('panel:')) &&
         _isMissing(normalized['panel']) &&
@@ -772,21 +887,28 @@ class YoloitCliToolArgumentNormalizer {
       normalized['panel'] = normalized['id_or_name'];
       normalized.remove('id_or_name');
     }
-    if ((command == 'panel:focus' || command == 'panel:show') &&
-        _isMissing(normalized['panel'])) {
-      final panelName = _extractNamedTarget(
+    if (command == 'panel:focus' || command == 'panel:show') {
+      _fillNamedPanelTarget(
+        normalized,
         userMessage,
         RegExp(r'panel named|panel called|panel titled'),
       );
-      if (panelName != null) normalized['panel'] = panelName;
     }
-    if (command == 'panel:delete' && _isMissing(normalized['panel'])) {
-      final panelName = _extractNamedTarget(
-        userMessage,
-        RegExp(r'delete panel'),
-      );
-      if (panelName != null) normalized['panel'] = panelName;
+    if (command == 'panel:delete') {
+      _fillNamedPanelTarget(normalized, userMessage, RegExp(r'delete panel'));
     }
+  }
+
+  /// Fills the `panel` argument with the name captured after [phrase] in the
+  /// user message, unless the argument is already present.
+  static void _fillNamedPanelTarget(
+    Map<String, Object?> normalized,
+    String userMessage,
+    RegExp phrase,
+  ) {
+    if (!_isMissing(normalized['panel'])) return;
+    final panelName = _extractNamedTarget(userMessage, phrase);
+    if (panelName != null) normalized['panel'] = panelName;
   }
 
   static void _normalizeLinkArguments(
@@ -807,127 +929,254 @@ class YoloitCliToolArgumentNormalizer {
     ChatRuntimeContext? runtimeContext,
   ) {
     if (command == null || runtimeContext == null) return;
-    if (_usesBoardArgument(command)) {
-      final boardId = runtimeContext.boardId?.trim();
-      if (boardId != null &&
-          boardId.isNotEmpty &&
-          (_mentionsCurrentBoard(userMessage) ||
-              _looselySameIdentifier(
-                normalized['id_or_name'],
-                'current board',
-              ) ||
-              _looselySameIdentifier(normalized['board'], 'current board'))) {
-        normalized['id_or_name'] = boardId;
-      }
-    }
+    _applyContextBoardId(command, normalized, userMessage, runtimeContext);
     if (!_usesPanelArgument(command)) return;
     final panelId = runtimeContext.panelId?.trim();
     if (panelId == null || panelId.isEmpty) return;
+    _applyContextPanelId(normalized, userMessage, runtimeContext, panelId);
+    _applyNoteLookupPanelOverride(
+      command,
+      normalized,
+      userMessage,
+      runtimeContext,
+      panelId,
+    );
+  }
+
+  static void _applyContextBoardId(
+    String command,
+    Map<String, Object?> normalized,
+    String userMessage,
+    ChatRuntimeContext runtimeContext,
+  ) {
+    if (!_usesBoardArgument(command)) return;
+    final boardId = runtimeContext.boardId?.trim();
+    if (boardId != null &&
+        boardId.isNotEmpty &&
+        (_mentionsCurrentBoard(userMessage) ||
+            _looselySameIdentifier(
+              normalized['id_or_name'],
+              'current board',
+            ) ||
+            _looselySameIdentifier(normalized['board'], 'current board'))) {
+      normalized['id_or_name'] = boardId;
+    }
+  }
+
+  static void _applyContextPanelId(
+    Map<String, Object?> normalized,
+    String userMessage,
+    ChatRuntimeContext runtimeContext,
+    String panelId,
+  ) {
     final panelValue = normalized['panel'];
     if (_mentionsCurrentPanel(userMessage) ||
         _looselySameIdentifier(panelValue, panelId) ||
         _looselySameIdentifier(panelValue, runtimeContext.panelTitle)) {
       normalized['panel'] = panelId;
     }
-    if ((command == 'panel' || command == 'panel:focus') &&
-        _mentionsNoteLookupIntent(userMessage)) {
-      final currentPanelValue = '${normalized['panel'] ?? ''}'.trim();
-      final query = _inferNoteLookupPanelQuery(userMessage);
-      if (query != null &&
-          query.isNotEmpty &&
-          _looksLikeOpaquePanelId(currentPanelValue)) {
+  }
+
+  static void _applyNoteLookupPanelOverride(
+    String command,
+    Map<String, Object?> normalized,
+    String userMessage,
+    ChatRuntimeContext runtimeContext,
+    String panelId,
+  ) {
+    if ((command != 'panel' && command != 'panel:focus') ||
+        !_mentionsNoteLookupIntent(userMessage)) {
+      return;
+    }
+    final currentPanelValue = '${normalized['panel'] ?? ''}'.trim();
+    final query = _inferNoteLookupPanelQuery(userMessage);
+    if (query != null &&
+        query.isNotEmpty &&
+        _looksLikeOpaquePanelId(currentPanelValue)) {
+      normalized['panel'] = query;
+      return;
+    }
+    final targetsCurrentChatPanel =
+        currentPanelValue.isEmpty ||
+        _looselySameIdentifier(currentPanelValue, panelId) ||
+        _looselySameIdentifier(
+          currentPanelValue,
+          runtimeContext.panelTitle,
+        ) ||
+        _isChatPanelId(currentPanelValue);
+    if (targetsCurrentChatPanel) {
+      if (query != null && query.isNotEmpty) {
         normalized['panel'] = query;
-        return;
-      }
-      final targetsCurrentChatPanel =
-          currentPanelValue.isEmpty ||
-          _looselySameIdentifier(currentPanelValue, panelId) ||
-          _looselySameIdentifier(
-            currentPanelValue,
-            runtimeContext.panelTitle,
-          ) ||
-          _isChatPanelId(currentPanelValue);
-      if (targetsCurrentChatPanel) {
-        if (query != null && query.isNotEmpty) {
-          normalized['panel'] = query;
-        } else {
-          normalized.remove('panel');
-        }
+      } else {
+        normalized.remove('panel');
       }
     }
   }
 
+  static const Set<String> _panelArgumentCommands = <String>{
+    'panel',
+    'do',
+    'note',
+    'play',
+    'pause',
+    'stop',
+    'next',
+    'prev',
+    'playlist:list',
+    'web:open',
+  };
+
+  static const List<String> _panelArgumentPrefixes = <String>[
+    'panel:',
+    'ui:',
+    'note:',
+    'checklist:',
+    'kanban:',
+    'run:',
+  ];
+
   static bool _usesPanelArgument(String command) {
-    return command == 'panel' ||
-        command.startsWith('panel:') ||
-        command == 'do' ||
-        command.startsWith('ui:') ||
-        command == 'note' ||
-        command.startsWith('note:') ||
-        command.startsWith('checklist:') ||
-        command.startsWith('kanban:') ||
-        command.startsWith('run:') ||
-        command == 'play' ||
-        command == 'pause' ||
-        command == 'stop' ||
-        command == 'next' ||
-        command == 'prev' ||
-        command == 'playlist:list' ||
-        command == 'web:open';
+    if (_panelArgumentCommands.contains(command)) return true;
+    for (final prefix in _panelArgumentPrefixes) {
+      if (command.startsWith(prefix)) return true;
+    }
+    return false;
   }
 
   static bool _usesBoardArgument(String command) {
     return command == 'board' || command.startsWith('board:');
   }
 
+  /// Ordered panel-type inference rules. Each rule is a list of alternatives
+  /// (OR); an alternative is a list of substrings that must all be contained
+  /// in the lowercased user message (AND). The first matching rule wins.
+  static const List<(List<List<String>>, String)> _panelTypeRules =
+      <(List<List<String>>, String)>[
+        (
+          <List<String>>[
+            <String>['kanban'],
+          ],
+          'board.kanban',
+        ),
+        (
+          <List<String>>[
+            <String>['run panel'],
+            <String>['dev server'],
+            <String>['terminal'],
+            <String>['console'],
+          ],
+          'board.run',
+        ),
+        (
+          <List<String>>[
+            <String>['markdown'],
+            <String>['note'],
+            <String>['замет'],
+          ],
+          'board.note.markdown',
+        ),
+        (
+          <List<String>>[
+            <String>['канбан'],
+          ],
+          'board.kanban',
+        ),
+        (
+          <List<String>>[
+            <String>['терминал'],
+            <String>['консол'],
+          ],
+          'board.run',
+        ),
+        (
+          <List<String>>[
+            <String>['чеклист'],
+          ],
+          'board.checklist',
+        ),
+        (
+          <List<String>>[
+            <String>['чат'],
+          ],
+          'board.chat',
+        ),
+        (
+          <List<String>>[
+            <String>['checklist'],
+          ],
+          'board.checklist',
+        ),
+        (
+          <List<String>>[
+            <String>['webpage'],
+            <String>['web panel'],
+          ],
+          'board.webpage',
+        ),
+        (
+          <List<String>>[
+            <String>['playlist'],
+            <String>['media'],
+          ],
+          'board.playlist',
+        ),
+        (
+          <List<String>>[
+            <String>['кастомн', 'ui'],
+          ],
+          'board.ui',
+        ),
+        (
+          <List<String>>[
+            <String>['кастом', 'ui'],
+            <String>['кастом', 'view'],
+          ],
+          'board.ui',
+        ),
+        (
+          <List<String>>[
+            <String>['custom ui'],
+            <String>['ui view'],
+            <String>['json ui'],
+            <String>['декларатив'],
+          ],
+          'board.ui',
+        ),
+        (
+          <List<String>>[
+            <String>['ui', 'список'],
+            <String>['ui', 'карточ'],
+            <String>['ui', 'панел'],
+            <String>['json', 'список'],
+            <String>['json', 'карточ'],
+            <String>['json', 'панел'],
+          ],
+          'board.ui',
+        ),
+        (
+          <List<String>>[
+            <String>['chat panel'],
+          ],
+          'board.chat',
+        ),
+      ];
+
   static String? _inferPanelType(String userMessage) {
     final text = userMessage.toLowerCase();
-    if (text.contains('kanban')) return 'board.kanban';
-    if (text.contains('run panel') ||
-        text.contains('dev server') ||
-        text.contains('terminal') ||
-        text.contains('console')) {
-      return 'board.run';
+    for (final (alternatives, type) in _panelTypeRules) {
+      if (_matchesPanelTypeRule(text, alternatives)) return type;
     }
-    if (text.contains('markdown') ||
-        text.contains('note') ||
-        text.contains('замет')) {
-      return 'board.note.markdown';
-    }
-    if (text.contains('канбан')) return 'board.kanban';
-    if (text.contains('терминал') || text.contains('консол')) {
-      return 'board.run';
-    }
-    if (text.contains('чеклист')) return 'board.checklist';
-    if (text.contains('чат')) return 'board.chat';
-    if (text.contains('checklist')) return 'board.checklist';
-    if (text.contains('webpage') || text.contains('web panel')) {
-      return 'board.webpage';
-    }
-    if (text.contains('playlist') || text.contains('media')) {
-      return 'board.playlist';
-    }
-    if (text.contains('кастомн') && text.contains('ui')) {
-      return 'board.ui';
-    }
-    if (text.contains('кастом') &&
-        (text.contains('ui') || text.contains('view'))) {
-      return 'board.ui';
-    }
-    if (text.contains('custom ui') ||
-        text.contains('ui view') ||
-        text.contains('json ui') ||
-        text.contains('декларатив')) {
-      return 'board.ui';
-    }
-    if ((text.contains('ui') || text.contains('json')) &&
-        (text.contains('список') ||
-            text.contains('карточ') ||
-            text.contains('панел'))) {
-      return 'board.ui';
-    }
-    if (text.contains('chat panel')) return 'board.chat';
     return null;
+  }
+
+  static bool _matchesPanelTypeRule(
+    String text,
+    List<List<String>> alternatives,
+  ) {
+    for (final alternative in alternatives) {
+      if (alternative.every(text.contains)) return true;
+    }
+    return false;
   }
 
   /// Strip known LLM artifacts from string values (e.g. Mistral's "/no_think").

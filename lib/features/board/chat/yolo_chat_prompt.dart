@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/services.dart';
-import 'package:path/path.dart' as p;
+import 'package:yoloit/features/board/chat/yoloit_cli_locator.dart';
 
 const yoloChatSystemPromptAsset = 'assets/prompts/yolo_chat_system_prompt.md';
 
@@ -14,32 +14,7 @@ Future<String> _loadBasePrompt() async {
 String? _resolveYoloitExecutable() {
   final explicit = Platform.environment['YOLOIT_CLI_PATH'];
   if (explicit != null && explicit.trim().isNotEmpty) return explicit.trim();
-
-  final roots = <String?>[
-    Directory.current.path,
-    Platform.environment['PWD'],
-    Platform.environment['YOLOIT_PROJECT_ROOT'],
-    Platform.environment['PROJECT_DIR'],
-    p.dirname(Platform.resolvedExecutable),
-  ];
-  final seen = <String>{};
-  for (final root in roots) {
-    if (root == null || root.trim().isEmpty) continue;
-    var dir = Directory(p.normalize(p.absolute(root.trim())));
-    for (var i = 0; i < 16; i++) {
-      for (final candidate in [
-        File(p.join(dir.path, 'tools', 'yoloit')),
-        File(p.join(dir.path, 'yoloit', 'tools', 'yoloit')),
-      ]) {
-        if (!seen.add(candidate.path)) continue;
-        if (candidate.existsSync()) return candidate.path;
-      }
-      final parent = dir.parent;
-      if (parent.path == dir.path) break;
-      dir = parent;
-    }
-  }
-  return null;
+  return findYoloitCliScript();
 }
 
 /// Fetches the short CLI help via `yoloit help --format short`.

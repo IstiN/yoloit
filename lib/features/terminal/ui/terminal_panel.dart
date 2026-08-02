@@ -26,6 +26,7 @@ import 'package:yoloit/features/terminal/models/agent_phase.dart';
 import 'package:yoloit/features/terminal/models/agent_session.dart';
 import 'package:yoloit/features/terminal/models/agent_type.dart';
 import 'package:yoloit/features/terminal/models/terminal_render_engine.dart';
+import 'package:yoloit/features/terminal/ui/terminal_shortcuts.dart';
 import 'package:yoloit/features/terminal/ui/widgets/workspace_status_bar.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_cubit.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_state.dart';
@@ -1132,12 +1133,22 @@ class TerminalWidgetState extends State<TerminalWidget> {
 
   bool _isInterestingTerminalRow(String text) {
     final normalized = text.replaceAll('\r', '').trimLeft();
+    return _hasInterestingRowPrefix(normalized) ||
+        _hasInterestingRowMarker(normalized);
+  }
+
+  bool _hasInterestingRowPrefix(String normalized) {
     return normalized.startsWith('>') ||
         normalized.startsWith('}') ||
         normalized.startsWith('1.') ||
         normalized.startsWith('2.') ||
         normalized.startsWith('3.') ||
-        normalized.contains('Confirm folder trust') ||
+        normalized.startsWith('◆') ||
+        normalized.startsWith('❯');
+  }
+
+  bool _hasInterestingRowMarker(String normalized) {
+    return normalized.contains('Confirm folder trust') ||
         normalized.contains('Do you trust') ||
         normalized.contains('Yes') ||
         normalized.contains('No (Esc)') ||
@@ -1147,9 +1158,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
         normalized.contains('┌') ||
         normalized.contains('├') ||
         normalized.contains('└') ||
-        normalized.contains('│') ||
-        normalized.startsWith('◆') ||
-        normalized.startsWith('❯');
+        normalized.contains('│');
   }
 
   String _sanitizeTerminalText(String text) {
@@ -1193,16 +1202,8 @@ class TerminalWidgetState extends State<TerminalWidget> {
   /// Intercepts macOS keyboard shortcuts and translates them to PTY control
   /// sequences before [TerminalView] can process the raw key event.
   ///
-  /// Mapping (readline / bash compatible):
-  ///   Cmd+V              → smart paste: safe short text inline, otherwise file ref
-  ///   Cmd+Backspace      → Ctrl+U  (\x15) — erase to start of line
-  ///   Opt+Backspace      → Ctrl+W  (\x17) — erase word backward
-  ///   Ctrl+Backspace     → Ctrl+W  (\x17) — erase word backward (PC style)
-  ///   Cmd+←             → Ctrl+A  (\x01) — beginning of line
-  ///   Cmd+→             → Ctrl+E  (\x05) — end of line
-  /// xterm onKeyEvent — intercepts Shift+Enter to send the Kitty keyboard
-  /// protocol escape sequence (\x1b[13;2u) so modern CLIs (Copilot, Claude
-  /// Code) treat it as a newline in the input buffer instead of submitting.
+  /// The key → sequence/action mapping lives in [terminalKeyEventShortcut];
+  /// this method only computes modifier flags and executes the result.
   KeyEventResult _onTerminalKeyEvent(FocusNode node, KeyEvent event) {
     if (kDebugMode) {
       debugPrint(
@@ -1214,45 +1215,33 @@ class TerminalWidgetState extends State<TerminalWidget> {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
       return KeyEventResult.ignored;
     }
-    if (event.logicalKey == LogicalKeyboardKey.keyC &&
-        HardwareKeyboard.instance.isControlPressed &&
-        !HardwareKeyboard.instance.isMetaPressed &&
-        !HardwareKeyboard.instance.isAltPressed) {
-      _writePty('\x03');
-      return KeyEventResult.handled;
+    final shortcut = terminalKeyEventShortcut(
+      event.logicalKey,
+      isShift: HardwareKeyboard.instance.isShiftPressed,
+      isCmd: HardwareKeyboard.instance.isMetaPressed,
+      isCtrl: HardwareKeyboard.instance.isControlPressed,
+      isAlt: HardwareKeyboard.instance.isAltPressed,
+      awaitingApproval: widget.session.hookPhase is AwaitingApprovalPhase,
+    );
+    switch (shortcut) {
+      case TerminalPtyShortcut(:final sequence):
+        _writePty(sequence);
+        return KeyEventResult.handled;
+      case TerminalActionShortcut(
+        action: TerminalShortcutAction.blockNativePaste,
+      ):
+        return KeyEventResult.handled;
+      case TerminalActionShortcut(
+        action: TerminalShortcutAction.notifyEnterPressed,
+      ):
+        context.read<TerminalCubit>().onTerminalEnterPressed(widget.session.id);
+        return KeyEventResult.ignored;
+      case TerminalActionShortcut():
+      case null:
+        return KeyEventResult.ignored;
     }
-    // Shift+Enter → ESC+CR (newline-in-input for Copilot/Claude Code)
-    if (event.logicalKey == LogicalKeyboardKey.enter &&
-        HardwareKeyboard.instance.isShiftPressed &&
-        !HardwareKeyboard.instance.isMetaPressed &&
-        !HardwareKeyboard.instance.isControlPressed &&
-        !HardwareKeyboard.instance.isAltPressed) {
-      _writePty('\x1b\r');
-      return KeyEventResult.handled;
-    }
-    // Plain Enter while awaiting approval → immediately signal ThinkingPhase.
-    if (event.logicalKey == LogicalKeyboardKey.enter &&
-        !HardwareKeyboard.instance.isShiftPressed &&
-        !HardwareKeyboard.instance.isMetaPressed &&
-        !HardwareKeyboard.instance.isControlPressed &&
-        !HardwareKeyboard.instance.isAltPressed &&
-        widget.session.hookPhase is AwaitingApprovalPhase) {
-      context.read<TerminalCubit>().onTerminalEnterPressed(widget.session.id);
-    }
-    // Cmd+V — already handled by _handleHardwareKey; block xterm's native
-    // paste so text isn't inserted twice.
-    if (event.logicalKey == LogicalKeyboardKey.keyV &&
-        HardwareKeyboard.instance.isMetaPressed &&
-        !HardwareKeyboard.instance.isControlPressed &&
-        !HardwareKeyboard.instance.isAltPressed) {
-      return KeyEventResult.handled;
-    }
-    return KeyEventResult.ignored;
   }
 
-  ///   Opt+←             → ESC+b   (\x1bb) — word backward
-  ///   Opt+→             → ESC+f   (\x1bf) — word forward
-  ///   Cmd+K             → Ctrl+L  (\x0c) — clear screen
   bool _handleHardwareKey(KeyEvent event) {
     if (kDebugMode) {
       debugPrint(
@@ -1264,108 +1253,62 @@ class TerminalWidgetState extends State<TerminalWidget> {
     if (!_focusNode.hasFocus) return false;
     if (event is! KeyDownEvent) return false;
 
-    final key = event.logicalKey;
-    final isCmd = HardwareKeyboard.instance.isMetaPressed;
-    final isCtrl = HardwareKeyboard.instance.isControlPressed;
-    final isAlt = HardwareKeyboard.instance.isAltPressed;
-
-    // Ctrl+C → SIGINT. Handle explicitly so Flutter focus/copy shortcuts cannot
-    // swallow it before the terminal backend sees ETX.
-    if (isCtrl && !isCmd && !isAlt && key == LogicalKeyboardKey.keyC) {
-      _writePty('\x03');
-      return true;
+    final shortcut = terminalShortcutSequence(
+      event.logicalKey,
+      isCmd: HardwareKeyboard.instance.isMetaPressed,
+      isCtrl: HardwareKeyboard.instance.isControlPressed,
+      isAlt: HardwareKeyboard.instance.isAltPressed,
+      hasSelection: _controller.selection != null,
+    );
+    switch (shortcut) {
+      case TerminalPtyShortcut(:final sequence):
+        _writePty(sequence);
+        return true;
+      case TerminalActionShortcut(:final action):
+        return _runShortcutAction(action);
+      case null:
+        return false;
     }
+  }
 
-    // Cmd+V → smart paste (safe short text inline, otherwise file ref).
-    if (isCmd && !isCtrl && !isAlt && key == LogicalKeyboardKey.keyV) {
-      _pasteAsFileRef();
-      return true;
-    }
-
-    // Cmd+Backspace → erase to start of line (Ctrl+U)
-    if (isCmd && key == LogicalKeyboardKey.backspace) {
-      _writePty('\x15');
-      return true;
-    }
-
-    // Option+Backspace or Ctrl+Backspace → erase word backward (Ctrl+W)
-    if ((isAlt || isCtrl) && key == LogicalKeyboardKey.backspace) {
-      _writePty('\x17');
-      return true;
-    }
-
-    // Cmd+Left → beginning of line (Ctrl+A)
-    if (isCmd && key == LogicalKeyboardKey.arrowLeft) {
-      _writePty('\x01');
-      return true;
-    }
-
-    // Cmd+Right → end of line (Ctrl+E)
-    if (isCmd && key == LogicalKeyboardKey.arrowRight) {
-      _writePty('\x05');
-      return true;
-    }
-
-    // Option+Left → word backward (ESC b)
-    if (isAlt && key == LogicalKeyboardKey.arrowLeft) {
-      _writePty('\x1bb');
-      return true;
-    }
-
-    // Option+Right → word forward (ESC f)
-    if (isAlt && key == LogicalKeyboardKey.arrowRight) {
-      _writePty('\x1bf');
-      return true;
-    }
-
-    // Cmd+K → clear screen (Ctrl+L)
-    if (isCmd && key == LogicalKeyboardKey.keyK) {
-      _writePty('\x0c');
-      return true;
-    }
-
-    // Cmd+F → open search
-    if (isCmd && key == LogicalKeyboardKey.keyF) {
-      _openSearch();
-      return true;
-    }
-
-    // Cmd+O → global quick file search (prevent terminal from swallowing it)
-    if (isCmd && !isCtrl && !isAlt && key == LogicalKeyboardKey.keyO) {
-      Actions.invoke(context, const OpenFileSearchIntent());
-      return true;
-    }
-
-    // Cmd+= → increase font size
-    if (isCmd && !isCtrl && !isAlt && key == LogicalKeyboardKey.equal) {
-      setState(() => _fontSize = (_fontSize + 1).clamp(8.0, 32.0));
-      return true;
-    }
-
-    // Cmd+- → decrease font size
-    if (isCmd && !isCtrl && !isAlt && key == LogicalKeyboardKey.minus) {
-      setState(() => _fontSize = (_fontSize - 1).clamp(8.0, 32.0));
-      return true;
-    }
-
-    // Cmd+A → select all terminal buffer content
-    if (isCmd && !isCtrl && !isAlt && key == LogicalKeyboardKey.keyA) {
-      _selectAll();
-      return true;
-    }
-
-    // Cmd+C → copy selection if one exists; otherwise let xterm send ^C
-    if (isCmd && !isCtrl && !isAlt && key == LogicalKeyboardKey.keyC) {
-      final selection = _controller.selection;
-      if (selection != null) {
+  bool _runShortcutAction(TerminalShortcutAction action) {
+    switch (action) {
+      // Cmd+V → smart paste (safe short text inline, otherwise file ref).
+      case TerminalShortcutAction.paste:
+        _pasteAsFileRef();
+        return true;
+      // Cmd+F → open search
+      case TerminalShortcutAction.openSearch:
+        _openSearch();
+        return true;
+      // Cmd+O → global quick file search (prevent terminal from swallowing it)
+      case TerminalShortcutAction.openFileSearch:
+        Actions.invoke(context, const OpenFileSearchIntent());
+        return true;
+      // Cmd+= → increase font size
+      case TerminalShortcutAction.increaseFontSize:
+        setState(() => _fontSize = (_fontSize + 1).clamp(8.0, 32.0));
+        return true;
+      // Cmd+- → decrease font size
+      case TerminalShortcutAction.decreaseFontSize:
+        setState(() => _fontSize = (_fontSize - 1).clamp(8.0, 32.0));
+        return true;
+      // Cmd+A → select all terminal buffer content
+      case TerminalShortcutAction.selectAll:
+        _selectAll();
+        return true;
+      // Cmd+C → copy selection if one exists; otherwise let xterm send ^C
+      case TerminalShortcutAction.copySelection:
+        final selection = _controller.selection;
+        if (selection == null) return false;
         final text = widget.session.terminal.buffer.getText(selection);
         copyToClipboard(text);
         return true;
-      }
-      // No selection — fall through so xterm sends ^C (SIGINT)
+      // Never produced by terminalShortcutSequence.
+      case TerminalShortcutAction.blockNativePaste:
+      case TerminalShortcutAction.notifyEnterPressed:
+        return false;
     }
-
-    return false;
   }
 
   void _selectAll() {
@@ -1967,217 +1910,231 @@ class TerminalWidgetState extends State<TerminalWidget> {
   Widget _buildXtermTerminal(AppColorScheme colors) {
     return Listener(
       behavior: HitTestBehavior.opaque,
-      onPointerSignal: (event) {
-        final isMouseWheel =
-            event is PointerScrollEvent &&
-            event.kind == PointerDeviceKind.mouse;
-        if (CanvasInteractionLock.instance.isCanvasGestureActive &&
-            !isMouseWheel) {
-          _preserveScrollForCanvasGesture();
-          return;
-        }
-        if (event is PointerScrollEvent) {
-          if (isMouseWheel) {
-            CanvasInteractionLock.instance.clearCanvasSignalGesture();
+      onPointerSignal: _onTerminalPointerSignal,
+      onPointerPanZoomStart: _onTerminalPanZoomStart,
+      onPointerPanZoomUpdate: _onTerminalPanZoomUpdate,
+      onPointerDown: _onTerminalPointerDown,
+      onPointerMove: _onTerminalPointerMove,
+      onPointerUp: _onTerminalPointerUp,
+      onPointerCancel: _onTerminalPointerCancel,
+      child: _wrapTerminal(colors, _buildTerminalView(colors)),
+    );
+  }
+
+  void _onTerminalPointerSignal(PointerSignalEvent event) {
+    final isMouseWheel =
+        event is PointerScrollEvent && event.kind == PointerDeviceKind.mouse;
+    if (CanvasInteractionLock.instance.isCanvasGestureActive &&
+        !isMouseWheel) {
+      _preserveScrollForCanvasGesture();
+      return;
+    }
+    if (event is PointerScrollEvent) {
+      if (isMouseWheel) {
+        CanvasInteractionLock.instance.clearCanvasSignalGesture();
+      }
+      if (_isHorizontalTrackpadGesture(event.scrollDelta)) {
+        CanvasInteractionLock.instance.markCanvasSignalGesture();
+        _preserveScrollForCanvasGesture();
+        return;
+      }
+      GestureBinding.instance.pointerSignalResolver.register(
+        event,
+        (resolved) {
+          final scrollEvent = resolved as PointerScrollEvent;
+          if (widget.session.terminal.isUsingAltBuffer) {
+            _scrollAltBufferBy(
+              scrollEvent.scrollDelta.dy,
+              scrollEvent.position,
+              'pointer-signal',
+            );
+          } else {
+            _scrollTerminalBy(
+              scrollEvent.scrollDelta.dy,
+              'pointer-signal',
+            );
           }
-          if (_isHorizontalTrackpadGesture(event.scrollDelta)) {
-            CanvasInteractionLock.instance.markCanvasSignalGesture();
-            _preserveScrollForCanvasGesture();
-            return;
-          }
-          GestureBinding.instance.pointerSignalResolver.register(
-            event,
-            (resolved) {
-              final scrollEvent = resolved as PointerScrollEvent;
-              if (widget.session.terminal.isUsingAltBuffer) {
-                _scrollAltBufferBy(
-                  scrollEvent.scrollDelta.dy,
-                  scrollEvent.position,
-                  'pointer-signal',
-                );
-              } else {
-                _scrollTerminalBy(
-                  scrollEvent.scrollDelta.dy,
-                  'pointer-signal',
-                );
-              }
-            },
-          );
-        }
-      },
-      onPointerPanZoomStart: (_) {
-        if (CanvasInteractionLock.instance.isCanvasGestureActive) {
-          _preserveScrollForCanvasGesture();
-          return;
-        }
-      },
-      onPointerPanZoomUpdate: (event) {
-        if ((event.scale - 1.0).abs() > 0.01) {
-          CanvasInteractionLock.instance.markCanvasSignalGesture();
-          _preserveScrollForCanvasGesture();
-          return;
-        }
-        if (_isHorizontalTrackpadGesture(event.panDelta)) {
-          CanvasInteractionLock.instance.markCanvasSignalGesture();
-          _preserveScrollForCanvasGesture();
-          return;
-        }
-        if (CanvasInteractionLock.instance.isCanvasGestureActive) {
-          _preserveScrollForCanvasGesture();
-          return;
-        }
-        if (widget.session.terminal.isUsingAltBuffer) {
-          _scrollAltBufferBy(
-            -event.panDelta.dy,
-            event.position,
-            'pan-zoom',
-          );
-        } else {
-          _scrollTerminalBy(-event.panDelta.dy, 'pan-zoom');
-        }
-      },
-      onPointerDown: (event) {
-        if (!_focusNode.hasFocus) _focusNode.requestFocus();
-        if (_isTerminalScrollbarHit(event.localPosition)) {
-          _scrollbarPointers.add(event.pointer);
-          _clickDownPosition = null;
-          _dragStartGlobal = null;
-          _isDragSelecting = false;
-          _activePointers.remove(event.pointer);
-          _userScrollAnchorTimer?.cancel();
-          _userScrollAnchorTimer = null;
-          _userScrollPreserveTimer?.cancel();
-          _userScrollPreserveTimer = null;
-          _userScrollAnchor = null;
-          return;
-        }
-        if (event.buttons == kSecondaryMouseButton) {
-          _showTerminalContextMenu(context, event.position);
-          return;
-        }
-        if (event.buttons != kPrimaryButton) return;
-        _clickDownPosition = event.localPosition;
-        _dragStartGlobal = event.position;
-        _isDragSelecting = false;
-        _activePointers[event.pointer] = event.localPosition;
-        if (_activePointers.length == 2 &&
-            event.kind == PointerDeviceKind.touch) {
-          final positions = _activePointers.values.toList();
-          _pinchStartDistance = (positions[0] - positions[1]).distance;
-          _pinchStartFontSize = _fontSize;
-        }
-      },
-      onPointerMove: (event) {
-        if (_scrollbarPointers.contains(event.pointer)) {
-          return;
-        }
-        _activePointers[event.pointer] = event.localPosition;
-        if (_activePointers.length == 2 &&
-            _pinchStartDistance > 0 &&
-            event.kind == PointerDeviceKind.touch) {
-          final positions = _activePointers.values.toList();
-          final dist = (positions[0] - positions[1]).distance;
-          final newSize =
-              (_pinchStartFontSize * dist / _pinchStartDistance)
-                  .clamp(8.0, 48.0);
-          setState(() => _fontSize = newSize);
-          SessionPrefs.saveTerminalFontSize(newSize);
-          return;
-        }
-        final startGlobal = _dragStartGlobal;
-        if (startGlobal == null || _activePointers.length != 1) {
-          return;
-        }
-        final dist = (event.position - startGlobal).distance;
-        if (dist < 4.0) return;
-        final state = _terminalViewKey.currentState;
-        if (state == null) return;
-        final rt = state.renderTerminal;
-        if (!_isDragSelecting) {
-          _isDragSelecting = true;
-          _controller.clearSelection();
-        }
-        final localStart = rt.globalToLocal(startGlobal);
-        final localCurrent = rt.globalToLocal(event.position);
-        rt.selectCharacters(localStart, localCurrent);
-      },
-      onPointerUp: (event) {
-        if (_scrollbarPointers.remove(event.pointer)) {
-          _clickDownPosition = null;
-          _dragStartGlobal = null;
-          _isDragSelecting = false;
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) _markUserScrollActive();
-          });
-          return;
-        }
-        _activePointers.remove(event.pointer);
-        final wasDragging = _isDragSelecting;
-        _isDragSelecting = false;
-        _dragStartGlobal = null;
-        final down = _clickDownPosition;
-        _clickDownPosition = null;
-        if (wasDragging) {
-          return;
-        }
-        if (down == null) return;
-        if ((event.localPosition - down).distance > 6.0) return;
-        if (_openXtermUrlAt(event.position)) return;
-        if (_controller.selection != null) {
-          _controller.clearSelection();
-          return;
-        }
-      },
-      onPointerCancel: (event) {
-        _scrollbarPointers.remove(event.pointer);
-        _activePointers.remove(event.pointer);
-        _isDragSelecting = false;
-        _dragStartGlobal = null;
-      },
-      child: _wrapTerminal(
-        colors,
-        TerminalView(
-          widget.session.terminal,
-          key: _terminalViewKey,
-          controller: _controller,
-          focusNode: _focusNode,
-          autofocus: widget.isActive,
-          hardwareKeyboardOnly: _hardwareKeyboardOnly,
-          scrollController: _scrollController,
-          simulateScroll: false,
-          onKeyEvent: _onTerminalKeyEvent,
-          textStyle: TerminalStyle(
-            fontSize: _fontSize,
-            height: 1.2,
-          ),
-          theme: TerminalTheme(
-            cursor: colors.primary,
-            selection: colors.primary.withAlpha(120),
-            foreground: colors.terminalText,
-            background: colors.terminalBackground,
-            black: colors.surface,
-            red: colors.accentRed,
-            green: colors.accentGreen,
-            yellow: colors.accentOrange,
-            blue: colors.accentBlue,
-            magenta: colors.primary,
-            cyan: colors.terminalPrompt,
-            white: colors.terminalText,
-            brightBlack: colors.textMuted,
-            brightRed: colors.accentRedDim,
-            brightGreen: colors.accentGreenDim,
-            brightYellow: colors.statusWarning,
-            brightBlue: colors.accentBlue,
-            brightMagenta: colors.primaryLight,
-            brightCyan: colors.accentBlue,
-            brightWhite: colors.textPrimary,
-            searchHitBackground: colors.accentOrange,
-            searchHitBackgroundCurrent: colors.statusWarning,
-            searchHitForeground: colors.background,
-          ),
-          padding: const EdgeInsets.all(8),
-        ),
+        },
+      );
+    }
+  }
+
+  void _onTerminalPanZoomStart(PointerPanZoomStartEvent event) {
+    if (CanvasInteractionLock.instance.isCanvasGestureActive) {
+      _preserveScrollForCanvasGesture();
+      return;
+    }
+  }
+
+  void _onTerminalPanZoomUpdate(PointerPanZoomUpdateEvent event) {
+    if ((event.scale - 1.0).abs() > 0.01) {
+      CanvasInteractionLock.instance.markCanvasSignalGesture();
+      _preserveScrollForCanvasGesture();
+      return;
+    }
+    if (_isHorizontalTrackpadGesture(event.panDelta)) {
+      CanvasInteractionLock.instance.markCanvasSignalGesture();
+      _preserveScrollForCanvasGesture();
+      return;
+    }
+    if (CanvasInteractionLock.instance.isCanvasGestureActive) {
+      _preserveScrollForCanvasGesture();
+      return;
+    }
+    if (widget.session.terminal.isUsingAltBuffer) {
+      _scrollAltBufferBy(
+        -event.panDelta.dy,
+        event.position,
+        'pan-zoom',
+      );
+    } else {
+      _scrollTerminalBy(-event.panDelta.dy, 'pan-zoom');
+    }
+  }
+
+  void _onTerminalPointerDown(PointerDownEvent event) {
+    if (!_focusNode.hasFocus) _focusNode.requestFocus();
+    if (_isTerminalScrollbarHit(event.localPosition)) {
+      _scrollbarPointers.add(event.pointer);
+      _clickDownPosition = null;
+      _dragStartGlobal = null;
+      _isDragSelecting = false;
+      _activePointers.remove(event.pointer);
+      _userScrollAnchorTimer?.cancel();
+      _userScrollAnchorTimer = null;
+      _userScrollPreserveTimer?.cancel();
+      _userScrollPreserveTimer = null;
+      _userScrollAnchor = null;
+      return;
+    }
+    if (event.buttons == kSecondaryMouseButton) {
+      _showTerminalContextMenu(context, event.position);
+      return;
+    }
+    if (event.buttons != kPrimaryButton) return;
+    _clickDownPosition = event.localPosition;
+    _dragStartGlobal = event.position;
+    _isDragSelecting = false;
+    _activePointers[event.pointer] = event.localPosition;
+    if (_activePointers.length == 2 &&
+        event.kind == PointerDeviceKind.touch) {
+      final positions = _activePointers.values.toList();
+      _pinchStartDistance = (positions[0] - positions[1]).distance;
+      _pinchStartFontSize = _fontSize;
+    }
+  }
+
+  void _onTerminalPointerMove(PointerMoveEvent event) {
+    if (_scrollbarPointers.contains(event.pointer)) {
+      return;
+    }
+    _activePointers[event.pointer] = event.localPosition;
+    if (_activePointers.length == 2 &&
+        _pinchStartDistance > 0 &&
+        event.kind == PointerDeviceKind.touch) {
+      final positions = _activePointers.values.toList();
+      final dist = (positions[0] - positions[1]).distance;
+      final newSize =
+          (_pinchStartFontSize * dist / _pinchStartDistance)
+              .clamp(8.0, 48.0);
+      setState(() => _fontSize = newSize);
+      SessionPrefs.saveTerminalFontSize(newSize);
+      return;
+    }
+    final startGlobal = _dragStartGlobal;
+    if (startGlobal == null || _activePointers.length != 1) {
+      return;
+    }
+    final dist = (event.position - startGlobal).distance;
+    if (dist < 4.0) return;
+    final state = _terminalViewKey.currentState;
+    if (state == null) return;
+    final rt = state.renderTerminal;
+    if (!_isDragSelecting) {
+      _isDragSelecting = true;
+      _controller.clearSelection();
+    }
+    final localStart = rt.globalToLocal(startGlobal);
+    final localCurrent = rt.globalToLocal(event.position);
+    rt.selectCharacters(localStart, localCurrent);
+  }
+
+  void _onTerminalPointerUp(PointerUpEvent event) {
+    if (_scrollbarPointers.remove(event.pointer)) {
+      _clickDownPosition = null;
+      _dragStartGlobal = null;
+      _isDragSelecting = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _markUserScrollActive();
+      });
+      return;
+    }
+    _activePointers.remove(event.pointer);
+    final wasDragging = _isDragSelecting;
+    _isDragSelecting = false;
+    _dragStartGlobal = null;
+    final down = _clickDownPosition;
+    _clickDownPosition = null;
+    if (wasDragging) {
+      return;
+    }
+    if (down == null) return;
+    if ((event.localPosition - down).distance > 6.0) return;
+    if (_openXtermUrlAt(event.position)) return;
+    if (_controller.selection != null) {
+      _controller.clearSelection();
+      return;
+    }
+  }
+
+  void _onTerminalPointerCancel(PointerCancelEvent event) {
+    _scrollbarPointers.remove(event.pointer);
+    _activePointers.remove(event.pointer);
+    _isDragSelecting = false;
+    _dragStartGlobal = null;
+  }
+
+  Widget _buildTerminalView(AppColorScheme colors) {
+    return TerminalView(
+      widget.session.terminal,
+      key: _terminalViewKey,
+      controller: _controller,
+      focusNode: _focusNode,
+      autofocus: widget.isActive,
+      hardwareKeyboardOnly: _hardwareKeyboardOnly,
+      scrollController: _scrollController,
+      simulateScroll: false,
+      onKeyEvent: _onTerminalKeyEvent,
+      textStyle: TerminalStyle(
+        fontSize: _fontSize,
+        height: 1.2,
       ),
+      theme: TerminalTheme(
+        cursor: colors.primary,
+        selection: colors.primary.withAlpha(120),
+        foreground: colors.terminalText,
+        background: colors.terminalBackground,
+        black: colors.surface,
+        red: colors.accentRed,
+        green: colors.accentGreen,
+        yellow: colors.accentOrange,
+        blue: colors.accentBlue,
+        magenta: colors.primary,
+        cyan: colors.terminalPrompt,
+        white: colors.terminalText,
+        brightBlack: colors.textMuted,
+        brightRed: colors.accentRedDim,
+        brightGreen: colors.accentGreenDim,
+        brightYellow: colors.statusWarning,
+        brightBlue: colors.accentBlue,
+        brightMagenta: colors.primaryLight,
+        brightCyan: colors.accentBlue,
+        brightWhite: colors.textPrimary,
+        searchHitBackground: colors.accentOrange,
+        searchHitBackgroundCurrent: colors.statusWarning,
+        searchHitForeground: colors.background,
+      ),
+      padding: const EdgeInsets.all(8),
     );
   }
 
