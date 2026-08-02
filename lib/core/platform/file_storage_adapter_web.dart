@@ -50,6 +50,22 @@ class WebFileStorageAdapter implements FileStorageAdapter {
   }
 
   @override
+  Future<void> appendString(String path, String contents) async {
+    final prefs = await _prefs;
+    final key = _key(path);
+    final existing = prefs.getString(key) ?? '';
+    await prefs.setString(key, existing + contents);
+  }
+
+  @override
+  Future<int?> length(String path) async {
+    final prefs = await _prefs;
+    final raw = prefs.getString(_key(path));
+    if (raw == null) return null;
+    return raw.length;
+  }
+
+  @override
   Future<void> writeBytes(String path, Uint8List bytes) async {
     final prefs = await _prefs;
     await prefs.setString('${_key(path)}.bytes', base64Encode(bytes));

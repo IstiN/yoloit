@@ -28,6 +28,15 @@ class _FakeStorage implements FileStorageAdapter {
   }
 
   @override
+  Future<void> appendString(String path, String contents) async {
+    _strings[path] = (_strings[path] ?? '') + contents;
+  }
+
+  @override
+  Future<int?> length(String path) async =>
+      _strings[path]?.length ?? _bytes[path]?.length;
+
+  @override
   Future<void> writeBytes(String path, Uint8List bytes) async {
     _bytes[path] = bytes;
   }

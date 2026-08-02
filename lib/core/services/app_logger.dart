@@ -24,11 +24,19 @@ class AppLogger {
   static const _enabledKey = 'app_logging_enabled_v1';
   static const _maxBytes = 5 * 1024 * 1024; // 5 MB
   static const _maxBufferLines = 50;
+  static const _flushInterval = Duration(seconds: 2);
+  // How many bytes may be appended before the next rotation size check.
+  // Checking file length on every flush would defeat the purpose of
+  // append-only writes; 1 MB of appends between checks keeps I/O negligible.
+  static const _rotationCheckIntervalBytes = 1024 * 1024;
 
   bool _enabled = false;
   bool get enabled => _enabled;
 
   final List<String> _buffer = [];
+  Timer? _flushTimer;
+  bool _flushing = false;
+  int _bytesSinceRotationCheck = 0;
 
   // Saved originals so we can restore on disable
   DebugPrintCallback? _originalDebugPrint;
@@ -76,7 +84,9 @@ class AppLogger {
   }
 
   Future<void> clearLog() async {
+    _flushTimer?.cancel();
     _buffer.clear();
+    _bytesSinceRotationCheck = 0;
     final path = await logPath;
     final storage = FileStorageAdapter.instance;
     if (await storage.exists(path)) await storage.delete(path);
@@ -90,28 +100,56 @@ class AppLogger {
     _buffer.add('$ts  $line');
     if (_buffer.length >= _maxBufferLines) {
       unawaited(_flushBuffer());
+    } else {
+      // Debounce: under load (board pan/zoom, terminal output) dozens of
+      // lines arrive per second — batch them into one append per interval
+      // instead of hitting the disk on every line.
+      _flushTimer ??= Timer(_flushInterval, () {
+        _flushTimer = null;
+        unawaited(_flushBuffer());
+      });
     }
   }
 
   Future<void> _flushBuffer() async {
-    if (_buffer.isEmpty) return;
+    // Serialize flushes: a flush already in flight will pick up whatever
+    // lands in the buffer afterwards via the timer / line-count trigger.
+    if (_buffer.isEmpty || _flushing) return;
+    _flushing = true;
     final lines = List<String>.of(_buffer);
     _buffer.clear();
+    _flushTimer?.cancel();
+    _flushTimer = null;
     final path = await logPath;
     final storage = FileStorageAdapter.instance;
     try {
-      final existing = await storage.readString(path) ?? '';
-      var merged = existing.isEmpty ? lines.join('\n') : '$existing\n${lines.join('\n')}';
-      // Approximate rotation: keep the most recent bytes if we exceed the limit.
-      final bytes = merged.length;
-      if (bytes > _maxBytes) {
-        final keep = _maxBytes ~/ 2;
-        merged = merged.substring(merged.length - keep);
+      final chunk = '${lines.join('\n')}\n';
+      _bytesSinceRotationCheck += chunk.length;
+      if (_bytesSinceRotationCheck >= _rotationCheckIntervalBytes) {
+        _bytesSinceRotationCheck = 0;
+        await _rotateIfNeeded(storage, path);
       }
-      await storage.writeString(path, merged);
+      // Append-only: never read the whole log back just to add lines.
+      await storage.appendString(path, chunk);
     } catch (_) {
       // Ignore — file logging unavailable (e.g. permission issue).
+    } finally {
+      _flushing = false;
     }
+  }
+
+  /// Trims the log to the most recent half when it exceeds [_maxBytes].
+  /// Runs at most once per [_rotationCheckIntervalBytes] appended bytes.
+  Future<void> _rotateIfNeeded(
+    FileStorageAdapter storage,
+    String path,
+  ) async {
+    final size = await storage.length(path);
+    if (size == null || size <= _maxBytes) return;
+    final existing = await storage.readString(path) ?? '';
+    if (existing.length <= _maxBytes) return;
+    const keep = _maxBytes ~/ 2;
+    await storage.writeString(path, existing.substring(existing.length - keep));
   }
 
   void _hookDebugPrint() {

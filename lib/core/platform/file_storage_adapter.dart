@@ -29,6 +29,13 @@ abstract class FileStorageAdapter {
   /// Writes UTF-8 text to [path], creating parent directories implicitly.
   Future<void> writeString(String path, String contents);
 
+  /// Appends UTF-8 text to [path], creating the file (and parent
+  /// directories) if it does not exist yet.
+  Future<void> appendString(String path, String contents);
+
+  /// Returns the size in bytes of the entry at [path], or `null` if missing.
+  Future<int?> length(String path);
+
   /// Writes raw bytes to [path].
   Future<void> writeBytes(String path, Uint8List bytes);
 

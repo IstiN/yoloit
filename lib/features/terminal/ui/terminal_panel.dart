@@ -956,10 +956,41 @@ class TerminalWidgetState extends State<TerminalWidget> {
   }
 
   void _onFocusChanged() {
-    SupportLogService.instance.add(
-      'terminal-widget',
-      'session=${widget.session.id} focus=${_focusNode.hasFocus}',
-    );
+    final hasFocus = _focusNode.hasFocus;
+    var message = 'session=${widget.session.id} focus=$hasFocus';
+    if (!hasFocus) {
+      // Typing silently dies when focus leaves the terminal — record who
+      // holds focus now plus the active board/panel so support logs show
+      // the thief.
+      message += ' ${_describePrimaryFocus()} ${_describeBoardContext()}';
+    }
+    SupportLogService.instance.add('terminal-widget', message);
+  }
+
+  String _describePrimaryFocus() {
+    final primary = FocusManager.instance.primaryFocus;
+    if (primary == null) return 'primaryFocus=none';
+    final widgetType = primary.context?.widget.runtimeType.toString() ?? '?';
+    final label = primary.debugLabel ?? '-';
+    return 'primaryFocus=$widgetType(label=$label)';
+  }
+
+  String _describeBoardContext() {
+    try {
+      final board = context.read<BoardCubit>().state.activeBoard;
+      if (board == null) return 'board=none';
+      final focusedId = board.viewport.focusedPanelId;
+      if (focusedId == null) return 'board=${board.name} focusedPanel=none';
+      for (final panel in board.panels) {
+        if (panel.id == focusedId) {
+          return 'board=${board.name} '
+              'focusedPanel=${panel.type}:"${panel.title}"($focusedId)';
+        }
+      }
+      return 'board=${board.name} focusedPanel=missing($focusedId)';
+    } catch (_) {
+      return 'board=unavailable';
+    }
   }
 
   void _onTerminalStateChangedForSupportLog() {

@@ -368,7 +368,10 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                             final scale = matrixScaleOf(
                                               _transformController.value,
                                             );
-                                            _boardSupportLog(
+                                            // Per-tick scroll events fire at
+                                            // trackpad rate (~120 Hz) — debug
+                                            // only, never the support log.
+                                            _boardDebugLog(
                                               'pointerScroll locked=$isLocked canvasGesture=${CanvasInteractionLock.instance.isCanvasGestureActive} overScrollable=$overScrollable tool=${_activeTool.name} kind=${event.kind.name} delta=${fmtOffset(event.scrollDelta)} pos=${fmtOffset(event.position)} scale=${fmtDouble(scale)}',
                                             );
                                             if (overScrollable) {
@@ -409,7 +412,10 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                           );
                                         },
                                         onPointerPanZoomUpdate: (event) {
-                                          _boardSupportLog(
+                                          // Per-frame during a pan/zoom
+                                          // gesture — debug only, never the
+                                          // support log.
+                                          _boardDebugLog(
                                             'panZoom.update locked=$isLocked tool=${_activeTool.name} pan=${fmtOffset(event.pan)} panDelta=${fmtOffset(event.panDelta)} scale=${fmtDouble(event.scale)} rotation=${event.rotation.toStringAsFixed(3)} viewScale=${fmtDouble(matrixScaleOf(_transformController.value))}',
                                           );
                                         },
@@ -511,7 +517,10 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                   _interactionStartMatrix!;
                                               return;
                                             }
-                                            _boardSupportLog(
+                                            // Per-frame during an
+                                            // interaction — debug only,
+                                            // never the support log.
+                                            _boardDebugLog(
                                               'interaction.update locked=$isLocked '
                                               'tool=${_activeTool.name} '
                                               'pointerCount=${details.pointerCount} '

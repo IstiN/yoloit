@@ -48,6 +48,19 @@ class VmFileStorageAdapter implements FileStorageAdapter {
   }
 
   @override
+  Future<void> appendString(String path, String contents) async {
+    await _ensureParent(path);
+    await _file(path).writeAsString(contents, mode: FileMode.append);
+  }
+
+  @override
+  Future<int?> length(String path) async {
+    final file = _file(path);
+    if (!await file.exists()) return null;
+    return await file.length();
+  }
+
+  @override
   Future<void> writeBytes(String path, Uint8List bytes) async {
     await _ensureParent(path);
     await _file(path).writeAsBytes(bytes, flush: true);
