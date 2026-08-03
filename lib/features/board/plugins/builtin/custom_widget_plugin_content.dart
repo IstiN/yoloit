@@ -250,14 +250,7 @@ class _CustomWidgetContentState extends State<CustomWidgetContent> {
     }
 
     if (_widgetId.isEmpty) {
-      _engineManager.remove(widget.panel.id);
-      HeadlessRenderRegistry.activeTasks.remove(taskKey);
-      if (mounted) {
-        setState(() {
-          _loading = false;
-          _error = null;
-        });
-      }
+      _showEmptyWidget(taskKey);
       return;
     }
 
@@ -265,12 +258,7 @@ class _CustomWidgetContentState extends State<CustomWidgetContent> {
       _engineManager.remove(widget.panel.id);
     }
 
-    if (!keepExistingUi && mounted) {
-      setState(() {
-        _loading = true;
-        _error = null;
-      });
-    }
+    _markLoading(keepExistingUi);
 
     try {
       final engine = await _engineManager.getOrCreate(
@@ -281,38 +269,69 @@ class _CustomWidgetContentState extends State<CustomWidgetContent> {
         onRenderUI: _handleRenderedTree,
       );
       if (engine == null) {
-        HeadlessRenderRegistry.activeTasks.remove(taskKey);
-        if (mounted) {
-          setState(() {
-            _loading = false;
-            _error = 'Widget "$_widgetId" not found';
-          });
-        }
+        _showWidgetNotFound(taskKey);
         return;
       }
-
-      _applyEnvVars(engine, widget.panel.state);
-      _engine = engine;
-      _renderer = _buildRenderer(engine);
-      final tree = _engineManager.tree(widget.panel.id);
-      if (tree != null) {
-        HeadlessRenderRegistry.activeTasks.remove(taskKey);
-      }
-      if (mounted) {
-        setState(() {
-          _uiTree = tree ?? _uiTree;
-          _loading = false;
-          _error = null;
-        });
-      }
+      _onEngineLoaded(engine, taskKey);
     } catch (e) {
+      _showLoadError(taskKey, e);
+    }
+  }
+
+  void _showEmptyWidget(String taskKey) {
+    _engineManager.remove(widget.panel.id);
+    HeadlessRenderRegistry.activeTasks.remove(taskKey);
+    if (mounted) {
+      setState(() {
+        _loading = false;
+        _error = null;
+      });
+    }
+  }
+
+  void _markLoading(bool keepExistingUi) {
+    if (!keepExistingUi && mounted) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
+  }
+
+  void _showWidgetNotFound(String taskKey) {
+    HeadlessRenderRegistry.activeTasks.remove(taskKey);
+    if (mounted) {
+      setState(() {
+        _loading = false;
+        _error = 'Widget "$_widgetId" not found';
+      });
+    }
+  }
+
+  void _onEngineLoaded(JsWidgetEngine engine, String taskKey) {
+    _applyEnvVars(engine, widget.panel.state);
+    _engine = engine;
+    _renderer = _buildRenderer(engine);
+    final tree = _engineManager.tree(widget.panel.id);
+    if (tree != null) {
       HeadlessRenderRegistry.activeTasks.remove(taskKey);
-      if (mounted) {
-        setState(() {
-          _loading = false;
-          _error = '$e';
-        });
-      }
+    }
+    if (mounted) {
+      setState(() {
+        _uiTree = tree ?? _uiTree;
+        _loading = false;
+        _error = null;
+      });
+    }
+  }
+
+  void _showLoadError(String taskKey, Object e) {
+    HeadlessRenderRegistry.activeTasks.remove(taskKey);
+    if (mounted) {
+      setState(() {
+        _loading = false;
+        _error = '$e';
+      });
     }
   }
 

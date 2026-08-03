@@ -344,65 +344,75 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       _setProcessing(true);
       _session!.attachUI(
         onEvent: _handleEvent,
-        onError: (Object error) {
-          if (!mounted) return;
-          setState(() {
-            _isSending = false;
-            _setProcessing(false);
-            _messages
-              ..clear()
-              ..addAll(_session!.messages);
-          });
-          _persistMessages();
-          _scrollToBottom();
-        },
-        onDone: () {
-          if (!mounted) return;
-          if (_config.provider == 'opencode') {
-            final sid = _provider.getSessionId(_config.sessionName);
-            if (sid != null && sid != _opencodeSessionId) {
-              _opencodeSessionId = sid;
-              widget.onUpdateState({
-                ...widget.panel.state,
-                'opencodeSessionId': sid,
-              });
-            }
-          }
-          if (_config.provider == 'copilot') {
-            final sid = _provider.getSessionId(_config.sessionName);
-            if (sid != null && sid != _copilotSessionId) {
-              _copilotSessionId = sid;
-              widget.onUpdateState({
-                ...widget.panel.state,
-                'copilotSessionId': sid,
-              });
-            }
-          }
-          if (_config.provider == 'cursor') {
-            final sid = _provider.getSessionId(_config.sessionName);
-            if (sid != null && sid != _cursorSessionId) {
-              _cursorSessionId = sid;
-              widget.onUpdateState({
-                ...widget.panel.state,
-                'cursorSessionId': sid,
-              });
-            }
-          }
-          setState(() {
-            _isSending = false;
-            _setProcessing(false);
-            _messages
-              ..clear()
-              ..addAll(_session!.messages);
-            _streamingContent = '';
-            _streamingMessageId = null;
-          });
-          _persistMessages();
-          _scrollToBottom();
-          _playCompletionSound();
-        },
+        onError: _handleReattachError,
+        onDone: _handleReattachDone,
       );
     }
+  }
+
+  void _handleReattachError(Object error) {
+    if (!mounted) return;
+    setState(() {
+      _isSending = false;
+      _setProcessing(false);
+      _messages
+        ..clear()
+        ..addAll(_session!.messages);
+    });
+    _persistMessages();
+    _scrollToBottom();
+  }
+
+  void _handleReattachDone() {
+    if (!mounted) return;
+    _syncProviderSessionId(
+      'opencode',
+      _opencodeSessionId,
+      (sid) => _opencodeSessionId = sid,
+    );
+    _syncProviderSessionId(
+      'copilot',
+      _copilotSessionId,
+      (sid) => _copilotSessionId = sid,
+    );
+    _syncProviderSessionId(
+      'cursor',
+      _cursorSessionId,
+      (sid) => _cursorSessionId = sid,
+    );
+    setState(() {
+      _isSending = false;
+      _setProcessing(false);
+      _messages
+        ..clear()
+        ..addAll(_session!.messages);
+      _streamingContent = '';
+      _streamingMessageId = null;
+    });
+    _persistMessages();
+    _scrollToBottom();
+    _playCompletionSound();
+  }
+
+  /// Persists the provider's current session id to panel state when it
+  /// changed, so the next mount can resume the session. When
+  /// [onlyWhenMissing] is true, only persists if no session id was captured
+  /// yet (dispose safety net).
+  void _syncProviderSessionId(
+    String provider,
+    String? currentSessionId,
+    void Function(String) onChanged, {
+    bool onlyWhenMissing = false,
+  }) {
+    if (_config.provider != provider) return;
+    if (onlyWhenMissing && currentSessionId != null) return;
+    final sid = _provider.getSessionId(_config.sessionName);
+    if (sid == null || sid == currentSessionId) return;
+    onChanged(sid);
+    widget.onUpdateState({
+      ...widget.panel.state,
+      '${provider}SessionId': sid,
+    });
   }
 
   void _registerSessionListeners() {
@@ -445,27 +455,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         Map<String, dynamic>.from(oldRaw),
       );
       if (nextConfig != previousConfig && nextConfig != _config) {
-        setState(() {
-          if (nextConfig.provider != _config.provider) {
-            // Update session config — it will recreate the provider internally
-            _session?.updateConfig(nextConfig);
-            _provider = _session!.provider;
-            // Restore sessionID for new provider
-            if (nextConfig.provider == 'opencode' &&
-                _opencodeSessionId != null) {
-              _provider.setSessionId(
-                nextConfig.sessionName,
-                _opencodeSessionId!,
-              );
-            }
-            if (nextConfig.provider == 'cursor' && _cursorSessionId != null) {
-              _provider.setSessionId(nextConfig.sessionName, _cursorSessionId!);
-            }
-          } else {
-            _session?.updateConfig(nextConfig);
-          }
-          _config = nextConfig;
-        });
+        setState(() => _onConfigChanged(nextConfig));
       }
     }
 
@@ -473,6 +463,24 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       previousPendingMessage:
           oldWidget.panel.state['_cliPendingMessage'] as String?,
     );
+  }
+
+  void _onConfigChanged(ChatSessionConfig nextConfig) {
+    if (nextConfig.provider != _config.provider) {
+      // Update session config — it will recreate the provider internally
+      _session?.updateConfig(nextConfig);
+      _provider = _session!.provider;
+      // Restore sessionID for new provider
+      if (nextConfig.provider == 'opencode' && _opencodeSessionId != null) {
+        _provider.setSessionId(nextConfig.sessionName, _opencodeSessionId!);
+      }
+      if (nextConfig.provider == 'cursor' && _cursorSessionId != null) {
+        _provider.setSessionId(nextConfig.sessionName, _cursorSessionId!);
+      }
+    } else {
+      _session?.updateConfig(nextConfig);
+    }
+    _config = nextConfig;
   }
 
   void _consumeCliPendingMessage({String? previousPendingMessage}) {
@@ -653,44 +661,27 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     // Safety net: if the board is switched before the first opencode event
     // arrives (so _handleEvent never had a chance to run), persist the session
     // ID now so the next mount can resume the session correctly.
-    if (_config.provider == 'opencode' && _opencodeSessionId == null) {
-      final sid = _provider.getSessionId(_config.sessionName);
-      if (sid != null) {
-        _opencodeSessionId = sid;
-        widget.onUpdateState({...widget.panel.state, 'opencodeSessionId': sid});
-      }
-    }
-    if (_config.provider == 'copilot' && _copilotSessionId == null) {
-      final sid = _provider.getSessionId(_config.sessionName);
-      if (sid != null) {
-        _copilotSessionId = sid;
-        widget.onUpdateState({...widget.panel.state, 'copilotSessionId': sid});
-      }
-    }
-    if (_config.provider == 'cursor' && _cursorSessionId == null) {
-      final sid = _provider.getSessionId(_config.sessionName);
-      if (sid != null) {
-        _cursorSessionId = sid;
-        widget.onUpdateState({...widget.panel.state, 'cursorSessionId': sid});
-      }
-    }
+    _syncProviderSessionId(
+      'opencode',
+      _opencodeSessionId,
+      (sid) => _opencodeSessionId = sid,
+      onlyWhenMissing: true,
+    );
+    _syncProviderSessionId(
+      'copilot',
+      _copilotSessionId,
+      (sid) => _copilotSessionId = sid,
+      onlyWhenMissing: true,
+    );
+    _syncProviderSessionId(
+      'cursor',
+      _cursorSessionId,
+      (sid) => _cursorSessionId = sid,
+      onlyWhenMissing: true,
+    );
     // Persist current messages to board state
     _persistMessages();
-    // Save scroll offset so the user returns to the same position after
-    // switching boards. If still processing, reset to null so we jump to
-    // the bottom on re-mount instead of restoring a stale middle position.
-    final session = _session;
-    if (session != null && _scrollController.hasClients) {
-      if (!session.isProcessing) {
-        final offset = _scrollController.offset;
-        session.savedScrollOffset = offset;
-        widget.onUpdateState(
-          PanelScrollMemory.write(widget.panel.state, offset),
-        );
-      } else {
-        session.savedScrollOffset = null;
-      }
-    }
+    _persistScrollOffset();
     // Detach from session — session keeps its stream subscription alive.
     // The session already has accurate messages via _handleCoreEvent.
     // When the widget re-mounts, it reads from session.messages.
@@ -708,6 +699,24 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     ChatPanelWidget.processingNotifiers.remove(widget.panel.id);
     processingNotifier.dispose();
     super.dispose();
+  }
+
+  // Save scroll offset so the user returns to the same position after
+  // switching boards. If still processing, reset to null so we jump to
+  // the bottom on re-mount instead of restoring a stale middle position.
+  void _persistScrollOffset() {
+    final session = _session;
+    if (session != null && _scrollController.hasClients) {
+      if (!session.isProcessing) {
+        final offset = _scrollController.offset;
+        session.savedScrollOffset = offset;
+        widget.onUpdateState(
+          PanelScrollMemory.write(widget.panel.state, offset),
+        );
+      } else {
+        session.savedScrollOffset = null;
+      }
+    }
   }
 
   void _scrollToBottom({bool onlyIfNearBottom = false, bool animate = true}) {
@@ -2057,6 +2066,17 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       return KeyEventResult.ignored;
     }
 
+    final slashResult = _handleSlashKeyEvent(event);
+    if (slashResult != null) return slashResult;
+
+    final result = _handleEnterOrPasteKey(event);
+    if (result != null) return result;
+    return KeyEventResult.ignored;
+  }
+
+  /// Key handling while any slash menu is open.
+  /// Returns null when the key was not consumed.
+  KeyEventResult? _handleSlashKeyEvent(KeyEvent event) {
     if (_isModelSlash) {
       final result = _handleModelSlashKeyEvent(event);
       if (result != null) return result;
@@ -2071,7 +2091,12 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       _hideYoloSlash();
       return KeyEventResult.handled;
     }
+    return null;
+  }
 
+  /// Enter (without Shift) sends; Cmd/Ctrl+V smart-pastes.
+  /// Returns null when the key was not consumed.
+  KeyEventResult? _handleEnterOrPasteKey(KeyEvent event) {
     // Enter (without Shift) → send
     final isEnter =
         event.logicalKey == LogicalKeyboardKey.enter ||
@@ -2087,7 +2112,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       _handleSmartPaste();
       return KeyEventResult.handled;
     }
-    return KeyEventResult.ignored;
+    return null;
   }
 
   /// Key handling while the /model suggestion list is open.
@@ -2095,41 +2120,20 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   KeyEventResult? _handleModelSlashKeyEvent(KeyEvent event) {
     final isUp = event.logicalKey == LogicalKeyboardKey.arrowUp;
     final isDown = event.logicalKey == LogicalKeyboardKey.arrowDown;
-    final isEnter =
-        event.logicalKey == LogicalKeyboardKey.enter ||
-        event.logicalKey == LogicalKeyboardKey.numpadEnter;
     final isEscape = event.logicalKey == LogicalKeyboardKey.escape;
     final isTab = event.logicalKey == LogicalKeyboardKey.tab;
 
     if (isTab && _filteredModels.isNotEmpty) {
       // Tab: select highlighted model
-      _selectModelFromSlash(_filteredModels[_modelSelectedIndex].id);
-      return KeyEventResult.handled;
+      return _selectHighlightedModel();
     }
 
     if (isUp || isDown) {
-      final delta = isDown ? 1 : -1;
-      final next = (_modelSelectedIndex + delta).clamp(
-        0,
-        _filteredModels.length - 1,
-      );
-      if (next == _modelSelectedIndex) {
-        return KeyEventResult.handled;
-      }
-      setState(() {
-        _modelSelectedIndex = next;
-      });
-      WidgetsBinding.instance.addPostFrameCallback(
-        (_) => _scrollToModelSelection(),
-      );
-      return KeyEventResult.handled;
+      return _navigateModelSlash(isDown: isDown);
     }
 
-    if (isEnter &&
-        !HardwareKeyboard.instance.isShiftPressed &&
-        _filteredModels.isNotEmpty) {
-      _selectModelFromSlash(_filteredModels[_modelSelectedIndex].id);
-      return KeyEventResult.handled;
+    if (_isModelSlashEnter(event) && _filteredModels.isNotEmpty) {
+      return _selectHighlightedModel();
     }
 
     if (isEscape) {
@@ -2137,6 +2141,37 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       return KeyEventResult.handled;
     }
     return null;
+  }
+
+  /// Enter (without Shift) confirms the highlighted model.
+  bool _isModelSlashEnter(KeyEvent event) {
+    final isEnter =
+        event.logicalKey == LogicalKeyboardKey.enter ||
+        event.logicalKey == LogicalKeyboardKey.numpadEnter;
+    return isEnter && !HardwareKeyboard.instance.isShiftPressed;
+  }
+
+  KeyEventResult _selectHighlightedModel() {
+    _selectModelFromSlash(_filteredModels[_modelSelectedIndex].id);
+    return KeyEventResult.handled;
+  }
+
+  KeyEventResult _navigateModelSlash({required bool isDown}) {
+    final delta = isDown ? 1 : -1;
+    final next = (_modelSelectedIndex + delta).clamp(
+      0,
+      _filteredModels.length - 1,
+    );
+    if (next == _modelSelectedIndex) {
+      return KeyEventResult.handled;
+    }
+    setState(() {
+      _modelSelectedIndex = next;
+    });
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _scrollToModelSelection(),
+    );
+    return KeyEventResult.handled;
   }
 
   /// Key handling while the plain slash command chips are open.

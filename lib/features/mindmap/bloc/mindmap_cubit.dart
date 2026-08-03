@@ -151,17 +151,13 @@ class MindMapCubit extends Cubit<MindMapState> {
     // (which only emits 'editor:active') and must survive rebuild cycles.
     // Also preserve FilePanelNodeData nodes (the new standalone panel type).
     final panelEditors = state.nodes
-        .where((n) =>
-            (n is EditorNodeData && n.id != 'editor:active' ||
-             n is FilePanelNodeData ||
-             n is FileDiffPanelNodeData) &&
-            !nodes.any((m) => m.id == n.id))
+        .where((n) => _isPreservedPanelNode(n, nodes))
         .toList();
     if (panelEditors.isNotEmpty) {
       assert(() { debugPrint('[MindMapCubit] updateNodes: preserving ${panelEditors.length} panel nodes: ${panelEditors.map((n) => n.id).toList()}'); return true; }());
     }
     final panelConns = state.connections
-        .where((c) => panelEditors.any((n) => n.id == c.fromId || n.id == c.toId))
+        .where((c) => _touchesPreservedPanel(c, panelEditors))
         .toList();
 
     // Collect all file paths that already have a FilePanelNodeData —
@@ -174,20 +170,14 @@ class MindMapCubit extends Cubit<MindMapState> {
     // Suppress ANY EditorNodeData (including old persisted 'panel:...' nodes)
     // when there's already a FilePanelNodeData for the same file — this
     // prevents the duplicate Code/Preview toolbar from appearing.
-    final filteredNodes = nodes.where((n) {
-      if (n is EditorNodeData) {
-        return !panelFilePaths.contains(n.filePath);
-      }
-      return true;
-    }).toList();
+    final filteredNodes = nodes
+        .where((n) => _keepsNode(n, panelFilePaths))
+        .toList();
 
     // Also remove stale EditorNodeData panels from preserved list.
-    final filteredPanelEditors = panelEditors.where((n) {
-      if (n is EditorNodeData) {
-        return !panelFilePaths.contains(n.filePath);
-      }
-      return true;
-    }).toList();
+    final filteredPanelEditors = panelEditors
+        .where((n) => _keepsNode(n, panelFilePaths))
+        .toList();
 
     final mergedNodes = [...filteredNodes, ...filteredPanelEditors];
     final mergedConns = [...connections, ...panelConns];
@@ -204,7 +194,7 @@ class MindMapCubit extends Cubit<MindMapState> {
     // This avoids un-hiding sessions that were explicitly hidden in a saved view.
     final prevAgentIds = state.nodes.whereType<AgentNodeData>().map((a) => a.id).toSet();
     final newLiveAgentIds = nodes.whereType<AgentNodeData>()
-        .where((a) => a.session.status == AgentStatus.live && !prevAgentIds.contains(a.id))
+        .where((a) => _isNewLiveAgent(a, prevAgentIds))
         .map((a) => a.id)
         .toSet();
     final newHidden = newLiveAgentIds.isEmpty
@@ -220,6 +210,38 @@ class MindMapCubit extends Cubit<MindMapState> {
     _savePositions(newPositions);
     if (newHidden != state.hidden) _saveHidden(newHidden);
   }
+
+  // Manually opened panel nodes (editor/file/diff panels) that the incoming
+  // graph rebuild does not produce — they must survive rebuild cycles.
+  bool _isPreservedPanelNode(
+    MindMapNodeData node,
+    List<MindMapNodeData> incoming,
+  ) =>
+      (node is EditorNodeData && node.id != 'editor:active' ||
+          node is FilePanelNodeData ||
+          node is FileDiffPanelNodeData) &&
+      !incoming.any((m) => m.id == node.id);
+
+  bool _touchesPreservedPanel(
+    MindMapConnection connection,
+    List<MindMapNodeData> panelEditors,
+  ) =>
+      panelEditors.any(
+        (n) => n.id == connection.fromId || n.id == connection.toId,
+      );
+
+  // Suppresses an EditorNodeData when a FilePanelNodeData already exists for
+  // the same file — prevents the duplicate Code/Preview toolbar.
+  bool _keepsNode(MindMapNodeData node, Set<String> panelFilePaths) {
+    if (node is EditorNodeData) {
+      return !panelFilePaths.contains(node.filePath);
+    }
+    return true;
+  }
+
+  bool _isNewLiveAgent(AgentNodeData agent, Set<String> prevAgentIds) =>
+      agent.session.status == AgentStatus.live &&
+      !prevAgentIds.contains(agent.id);
 
   // ── Drag ──────────────────────────────────────────────────────────────────
 

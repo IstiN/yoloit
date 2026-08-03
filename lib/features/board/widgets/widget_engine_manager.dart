@@ -195,105 +195,19 @@ class WidgetEngineManager {
       initialTheme: initialTheme,
       initialStorage: initialStorage,
       js3dHost: createJs3dHost(),
-      onRender: (tree) {
-        debugPrint(
-          '[WidgetEngineManager] onRender widgetId=$widgetId '
-          'hasScene3d=${_treeHasScene3d(tree)}',
-        );
-        onRender(tree);
-      },
+      onRender: (tree) => _onEngineRender(widgetId, tree, onRender),
       onSetTitle: onSetTitle,
       onStorageUpdate: onStorageUpdate,
-      isPermissionAllowed: (capability) {
-        if (capability == 'exec') {
-          return WidgetPermissionsService.instance.isAllowed('exec');
-        }
-        return true;
-      },
-      fetchHandler: (id, url, method, headers) async {
-        if (!WidgetPermissionsService.instance.isAllowed('fetch')) {
-          resolve?.call(id, {
-            '__error': 'fetch is disabled in Settings → Apps & Widgets',
-          });
-          return;
-        }
-        await _handleFetch(resolve, id, url, method, headers);
-      },
-      secretsGetHandler: (id, key) async {
-        final fullKey = '_widget_${widgetId}_$key';
-        try {
-          final val = await _secureStorage.read(key: fullKey);
-          resolve?.call(id, val);
-        } catch (_) {
-          resolve?.call(id, null);
-        }
-      },
-      secretsSetHandler: (id, key, value) async {
-        final fullKey = '_widget_${widgetId}_$key';
-        try {
-          if (value == null) {
-            await _secureStorage.delete(key: fullKey);
-          } else {
-            await _secureStorage.write(key: fullKey, value: value.toString());
-          }
-          resolve?.call(id, true);
-        } catch (_) {
-          resolve?.call(id, false);
-        }
-      },
-      loadAssetHandler: (id, path) async {
-        try {
-          final dir = appDir;
-          if (dir.isEmpty) {
-            resolve?.call(id, null);
-            return;
-          }
-          final file = File(
-            '$dir${Platform.pathSeparator}${path.replaceAll('/', Platform.pathSeparator)}',
-          );
-          if (await file.exists()) {
-            final content = await file.readAsString();
-            resolve?.call(id, content);
-          } else {
-            resolve?.call(id, null);
-          }
-        } catch (e) {
-          debugPrint('[WidgetEngineManager] loadAsset error: $e');
-          resolve?.call(id, null);
-        }
-      },
-      execHandler: (id, cmd) async {
-        if (!WidgetPermissionsService.instance.isAllowed('exec')) {
-          resolve?.call(id, {
-            '__error': 'exec is disabled in Settings → Apps & Widgets',
-          });
-          return;
-        }
-        if (!cmd.startsWith('yoloit ') && cmd != 'yoloit') {
-          resolve?.call(id, {'__error': 'Only yoloit commands are allowed'});
-          return;
-        }
-        try {
-          final yoloitBin = '${Platform.environment['HOME']}/.config/yoloit/yoloit';
-          final cmdArgs = cmd.substring('yoloit'.length).trim().split(
-            RegExp(r'\s+'),
-          );
-          final env = Map<String, String>.from(Platform.environment)
-            ..addAll(_envVars[panelId] ?? const {});
-          final result = await Process.run(
-            yoloitBin,
-            cmdArgs.where((s) => s.isNotEmpty).toList(),
-            environment: env,
-          ).timeout(const Duration(seconds: 30));
-          resolve?.call(id, {
-            'stdout': result.stdout.toString(),
-            'stderr': result.stderr.toString(),
-            'exitCode': result.exitCode,
-          });
-        } catch (e) {
-          resolve?.call(id, {'__error': e.toString()});
-        }
-      },
+      isPermissionAllowed: _isWidgetCapabilityAllowed,
+      fetchHandler:
+          (id, url, method, headers) =>
+              _onEngineFetch(resolve, id, url, method, headers),
+      secretsGetHandler:
+          (id, key) => _onSecretsGet(resolve, widgetId, id, key),
+      secretsSetHandler:
+          (id, key, value) => _onSecretsSet(resolve, widgetId, id, key, value),
+      loadAssetHandler: (id, path) => _onLoadAsset(resolve, appDir, id, path),
+      execHandler: (id, cmd) => _onExec(resolve, panelId, id, cmd),
       onResolveReady: (resolveFn) {
         resolve = resolveFn;
         onResolveReady(resolveFn);
@@ -303,6 +217,141 @@ class WidgetEngineManager {
     final factory = _engineFactory;
     if (factory != null) return factory(config);
     return JsWidgetEngine(config: config);
+  }
+
+  void _onEngineRender(
+    String widgetId,
+    Map<String, dynamic> tree,
+    void Function(Map<String, dynamic> tree) onRender,
+  ) {
+    debugPrint(
+      '[WidgetEngineManager] onRender widgetId=$widgetId '
+      'hasScene3d=${_treeHasScene3d(tree)}',
+    );
+    onRender(tree);
+  }
+
+  bool _isWidgetCapabilityAllowed(String capability) {
+    if (capability == 'exec') {
+      return WidgetPermissionsService.instance.isAllowed('exec');
+    }
+    return true;
+  }
+
+  Future<void> _onEngineFetch(
+    void Function(String id, dynamic value)? resolve,
+    String id,
+    String url,
+    String method,
+    Map<String, String> headers,
+  ) async {
+    if (!WidgetPermissionsService.instance.isAllowed('fetch')) {
+      resolve?.call(id, {
+        '__error': 'fetch is disabled in Settings → Apps & Widgets',
+      });
+      return;
+    }
+    await _handleFetch(resolve, id, url, method, headers);
+  }
+
+  Future<void> _onSecretsGet(
+    void Function(String id, dynamic value)? resolve,
+    String widgetId,
+    String id,
+    String key,
+  ) async {
+    final fullKey = '_widget_${widgetId}_$key';
+    try {
+      final val = await _secureStorage.read(key: fullKey);
+      resolve?.call(id, val);
+    } catch (_) {
+      resolve?.call(id, null);
+    }
+  }
+
+  Future<void> _onSecretsSet(
+    void Function(String id, dynamic value)? resolve,
+    String widgetId,
+    String id,
+    String key,
+    dynamic value,
+  ) async {
+    final fullKey = '_widget_${widgetId}_$key';
+    try {
+      if (value == null) {
+        await _secureStorage.delete(key: fullKey);
+      } else {
+        await _secureStorage.write(key: fullKey, value: value.toString());
+      }
+      resolve?.call(id, true);
+    } catch (_) {
+      resolve?.call(id, false);
+    }
+  }
+
+  Future<void> _onLoadAsset(
+    void Function(String id, dynamic value)? resolve,
+    String appDir,
+    String id,
+    String path,
+  ) async {
+    try {
+      final dir = appDir;
+      if (dir.isEmpty) {
+        resolve?.call(id, null);
+        return;
+      }
+      final file = File(
+        '$dir${Platform.pathSeparator}${path.replaceAll('/', Platform.pathSeparator)}',
+      );
+      if (await file.exists()) {
+        final content = await file.readAsString();
+        resolve?.call(id, content);
+      } else {
+        resolve?.call(id, null);
+      }
+    } catch (e) {
+      debugPrint('[WidgetEngineManager] loadAsset error: $e');
+      resolve?.call(id, null);
+    }
+  }
+
+  Future<void> _onExec(
+    void Function(String id, dynamic value)? resolve,
+    String panelId,
+    String id,
+    String cmd,
+  ) async {
+    if (!WidgetPermissionsService.instance.isAllowed('exec')) {
+      resolve?.call(id, {
+        '__error': 'exec is disabled in Settings → Apps & Widgets',
+      });
+      return;
+    }
+    if (!cmd.startsWith('yoloit ') && cmd != 'yoloit') {
+      resolve?.call(id, {'__error': 'Only yoloit commands are allowed'});
+      return;
+    }
+    try {
+      final yoloitBin = '${Platform.environment['HOME']}/.config/yoloit/yoloit';
+      final cmdArgs = cmd.substring('yoloit'.length).trim().split(
+        RegExp(r'\s+'),
+      );
+      final env = Map<String, String>.from(Platform.environment)
+        ..addAll(_envVars[panelId] ?? const {});
+      final result = await Process.run(
+        yoloitBin,
+        cmdArgs.where((s) => s.isNotEmpty).toList(),
+        environment: env,
+      ).timeout(const Duration(seconds: 30));
+      resolve?.call(id, {
+        'stdout': result.stdout.toString(),
+        'stderr': result.stderr.toString(),
+        'exitCode': result.exitCode,
+      });
+    } catch (e) {
+      resolve?.call(id, {'__error': e.toString()});
+    }
   }
 
   Future<void> _handleFetch(

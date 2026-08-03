@@ -148,89 +148,115 @@ class _TreeRowState extends State<_TreeRow> {
         borderRadius: BorderRadius.circular(8),
         side: BorderSide(color: colors.border),
       ),
-      items: [
-        if (e.isDir)
-          PopupMenuItem(
-            value: 'new_folder',
-            child: Text(
-              '📁 New Folder',
-              style: TextStyle(fontSize: 12, color: colors.terminalText),
-            ),
-          ),
-        if (e.isDir && widget.onCreateFile != null)
-          PopupMenuItem(
-            value: 'create_file',
-            child: Text(
-              '📄 New File',
-              style: TextStyle(fontSize: 12, color: colors.terminalText),
-            ),
-          ),
-        PopupMenuItem(
-          value: 'rename',
-          child: Text(
-            '✏️ Rename',
-            style: TextStyle(fontSize: 12, color: colors.terminalText),
-          ),
-        ),
-        PopupMenuItem(
-          value: 'copy_path',
-          child: Text(
-            '📋 Copy path',
-            style: TextStyle(fontSize: 12, color: colors.terminalText),
-          ),
-        ),
-        PopupMenuItem(
-          value: 'copy_name',
-          child: Text(
-            '📄 Copy filename',
-            style: TextStyle(fontSize: 12, color: colors.terminalText),
-          ),
-        ),
-        PopupMenuItem(
-          value: 'show_finder',
-          child: Text(
-            '📂 Show in Finder',
-            style: TextStyle(fontSize: 12, color: colors.terminalText),
-          ),
-        ),
-        if (!e.isDir && widget.onOpenInPanel != null)
-          PopupMenuItem(
-            value: 'open_panel',
-            child: Text(
-              '⬡ Open in panel',
-              style: TextStyle(fontSize: 12, color: colors.terminalText),
-            ),
-          ),
-        const PopupMenuDivider(),
-        PopupMenuItem(
-          value: 'delete',
-          child: Text(
-            '🗑️ Delete',
-            style: TextStyle(fontSize: 12, color: colors.accentRed),
-          ),
-        ),
-      ],
+      items: _menuItems(colors, e),
     );
     if (result == null) return;
-    switch (result) {
-      case 'new_folder':
-        widget.onNewFolder?.call(e.path);
-      case 'create_file':
-        widget.onCreateFile?.call(e.path);
-      case 'rename':
-        widget.onRename?.call(e.path, e.name);
-      case 'copy_path':
-        await copyToClipboard(e.path);
-      case 'copy_name':
-        await copyToClipboard(e.name);
-      case 'show_finder':
-        await PlatformLauncher.instance.revealInFinder(e.path);
-      case 'open_panel':
-        widget.onOpenInPanel?.call(e.path);
-      case 'delete':
-        widget.onDelete?.call(e.path);
-    }
+    await _handleMenuResult(result, e);
   }
+
+  List<PopupMenuEntry<String>> _menuItems(AppColorScheme colors, TreeEntry e) {
+    return [
+      if (e.isDir)
+        PopupMenuItem(
+          value: 'new_folder',
+          child: Text(
+            '📁 New Folder',
+            style: TextStyle(fontSize: 12, color: colors.terminalText),
+          ),
+        ),
+      if (e.isDir && widget.onCreateFile != null)
+        PopupMenuItem(
+          value: 'create_file',
+          child: Text(
+            '📄 New File',
+            style: TextStyle(fontSize: 12, color: colors.terminalText),
+          ),
+        ),
+      PopupMenuItem(
+        value: 'rename',
+        child: Text(
+          '✏️ Rename',
+          style: TextStyle(fontSize: 12, color: colors.terminalText),
+        ),
+      ),
+      PopupMenuItem(
+        value: 'copy_path',
+        child: Text(
+          '📋 Copy path',
+          style: TextStyle(fontSize: 12, color: colors.terminalText),
+        ),
+      ),
+      PopupMenuItem(
+        value: 'copy_name',
+        child: Text(
+          '📄 Copy filename',
+          style: TextStyle(fontSize: 12, color: colors.terminalText),
+        ),
+      ),
+      PopupMenuItem(
+        value: 'show_finder',
+        child: Text(
+          '📂 Show in Finder',
+          style: TextStyle(fontSize: 12, color: colors.terminalText),
+        ),
+      ),
+      if (!e.isDir && widget.onOpenInPanel != null)
+        PopupMenuItem(
+          value: 'open_panel',
+          child: Text(
+            '⬡ Open in panel',
+            style: TextStyle(fontSize: 12, color: colors.terminalText),
+          ),
+        ),
+      const PopupMenuDivider(),
+      PopupMenuItem(
+        value: 'delete',
+        child: Text(
+          '🗑️ Delete',
+          style: TextStyle(fontSize: 12, color: colors.accentRed),
+        ),
+      ),
+    ];
+  }
+
+  Future<void> _handleMenuResult(String result, TreeEntry e) {
+    final handler = _menuHandlers[result];
+    if (handler == null) return Future.value();
+    return handler(e);
+  }
+
+  Map<String, Future<void> Function(TreeEntry)> get _menuHandlers => {
+    'new_folder': _onMenuNewFolder,
+    'create_file': _onMenuCreateFile,
+    'rename': _onMenuRename,
+    'copy_path': _onMenuCopyPath,
+    'copy_name': _onMenuCopyName,
+    'show_finder': _onMenuShowFinder,
+    'open_panel': _onMenuOpenPanel,
+    'delete': _onMenuDelete,
+  };
+
+  Future<void> _onMenuNewFolder(TreeEntry e) async =>
+      widget.onNewFolder?.call(e.path);
+
+  Future<void> _onMenuCreateFile(TreeEntry e) async =>
+      widget.onCreateFile?.call(e.path);
+
+  Future<void> _onMenuRename(TreeEntry e) async =>
+      widget.onRename?.call(e.path, e.name);
+
+  Future<void> _onMenuCopyPath(TreeEntry e) => copyToClipboard(e.path);
+
+  Future<void> _onMenuCopyName(TreeEntry e) => copyToClipboard(e.name);
+
+  Future<void> _onMenuShowFinder(TreeEntry e) =>
+      PlatformLauncher.instance.revealInFinder(e.path);
+
+  Future<void> _onMenuOpenPanel(TreeEntry e) async =>
+      widget.onOpenInPanel?.call(e.path);
+
+  Future<void> _onMenuDelete(TreeEntry e) async =>
+      widget.onDelete?.call(e.path);
 
   @override
   Widget build(BuildContext context) {

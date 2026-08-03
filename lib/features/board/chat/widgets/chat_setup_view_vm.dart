@@ -359,99 +359,15 @@ class ChatSetupViewState extends State<ChatSetupView> {
           // Provider type selector
           Text('Provider', style: styles.labelStyle),
           const SizedBox(height: 4),
-          ChatSetupDropdown<String>(
-            value: selectedProvider,
-            fillColor: inputFill,
-            dropdownColor: dropdownFill,
-            style: styles.inputTextStyle,
-            items:
-                providers
-                    .map(
-                      (p) => DropdownMenuItem(
-                        value: p.$1,
-                        child: Row(
-                          children: [
-                            ChatProviderIcon(provider: p.$1, size: 16),
-                            const SizedBox(width: 8),
-                            Text(p.$2),
-                          ],
-                        ),
-                      ),
-                    )
-                    .toList(),
-            onChanged: (v) {
-              if (v == null) return;
-              setState(() {
-                _selectedProvider = v;
-                // Reset model to default for the new provider
-                final models = _modelsForProvider;
-                _selectedModel =
-                    models
-                        .firstWhere(
-                          (m) => m.isDefault,
-                          orElse: () => models.first,
-                        )
-                        .id;
-              });
-              _checkProviderInstalled(v);
-              final cfg = AgentConfigService.instance.configForAgent(v);
-              final adapter = cfg?.streamAdapter ?? v;
-              if (adapter == 'opencode') _loadOpencodeModels();
-              if (adapter == 'cursor') _loadCursorModels();
-              if (adapter == 'codex') _loadCodexModels();
-            },
+          _providerSelector(
+            styles,
+            inputFill,
+            dropdownFill,
+            providers,
+            selectedProvider,
           ),
           // ── Not-installed banner ──────────────────────────────────────────
-          if (_providerInstalled == false) ...[
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: Colors.orange.withAlpha(30),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.orange.withAlpha(80)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.warning_amber_rounded,
-                    color: Colors.orange,
-                    size: 16,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      '${_providerLabel(_selectedProvider)} is not installed',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.orange,
-                      ),
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () => SetupGuidePage.show(context),
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      foregroundColor: Colors.orange,
-                    ),
-                    child: const Text(
-                      'Install',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ] else if (_providerInstalled == null) ...[
-            const SizedBox(height: 8),
-            const LinearProgressIndicator(minHeight: 2),
-          ],
+          ..._providerStatusBanner(),
           const SizedBox(height: 14),
           EnvGroupSelectionField(
             selectedGroupIds: _selectedEnvGroupIds,
@@ -460,83 +376,13 @@ class ChatSetupViewState extends State<ChatSetupView> {
               if (_selectedProvider == 'cursor') _loadCursorModels();
             },
           ),
-          // Show hint when cursor is selected but CURSOR_API_KEY is missing.
-          if (_selectedProvider == 'cursor' &&
-              _cursorApiKeyConfigured == false) ...[
-            const SizedBox(height: 4),
-            Text(
-              'Add CURSOR_API_KEY to an env group above to authenticate.',
-              style: TextStyle(fontSize: 11, color: Colors.orange.shade300),
-            ),
-          ],
-          if (_cursorModelsLoading) ...[
-            const SizedBox(height: 4),
-            const LinearProgressIndicator(minHeight: 2),
-          ],
-          if (_codexModelsLoading) ...[
-            const SizedBox(height: 4),
-            const LinearProgressIndicator(minHeight: 2),
-          ],
+          ..._providerLoadingHints(),
           const SizedBox(height: 14),
 
           // Working directory
           Text('Working Directory', style: styles.labelStyle),
           const SizedBox(height: 4),
-          Row(
-            children: [
-              Expanded(
-                child: GestureDetector(
-                  onTap: () async {
-                    final dir = await BoardFilePicker.pickDirectory(
-                      context,
-                      remoteInfo: widget.remoteInfo,
-                      initialPath: _dirCtrl.text,
-                      title: 'Select working directory',
-                    );
-                    if (!mounted) return;
-                    if (dir != null) {
-                      setState(() => _dirCtrl.text = dir);
-                    }
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(10),
-                      color: inputFill,
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.folder_outlined,
-                          size: 16,
-                          color: context.appColors.statusActive,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            _dirCtrl.text.isEmpty
-                                ? 'Select folder…'
-                                : _dirCtrl.text.split('/').last,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color:
-                                  _dirCtrl.text.isEmpty
-                                      ? styles.colorScheme.onSurface.withAlpha(120)
-                                      : styles.colorScheme.onSurface,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
+          _workingDirPicker(styles, inputFill),
           const SizedBox(height: 14),
 
           // Session name
@@ -549,85 +395,291 @@ class ChatSetupViewState extends State<ChatSetupView> {
           const SizedBox(height: 14),
 
           // Model selector
-          if (!disableModel) ...[
-            Text('Model', style: styles.labelStyle),
-            const SizedBox(height: 4),
-            GestureDetector(
-              onTap: () => _showModelSearch(context, inputFill, styles.colorScheme),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 10,
+          ..._modelSelector(styles, inputFill, disableModel),
+
+          const Spacer(),
+
+          _startButton(),
+        ],
+      ),
+    );
+  }
+
+  Widget _providerSelector(
+    ChatSetupStyles styles,
+    Color inputFill,
+    Color dropdownFill,
+    List<(String, String)> providers,
+    String? selectedProvider,
+  ) {
+    return ChatSetupDropdown<String>(
+      value: selectedProvider,
+      fillColor: inputFill,
+      dropdownColor: dropdownFill,
+      style: styles.inputTextStyle,
+      items:
+          providers
+              .map(
+                (p) => DropdownMenuItem(
+                  value: p.$1,
+                  child: Row(
+                    children: [
+                      ChatProviderIcon(provider: p.$1, size: 16),
+                      const SizedBox(width: 8),
+                      Text(p.$2),
+                    ],
+                  ),
                 ),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(10),
-                  color: inputFill,
+              )
+              .toList(),
+      onChanged: (v) {
+        if (v == null) return;
+        setState(() {
+          _selectedProvider = v;
+          // Reset model to default for the new provider
+          final models = _modelsForProvider;
+          _selectedModel =
+              models
+                  .firstWhere(
+                    (m) => m.isDefault,
+                    orElse: () => models.first,
+                  )
+                  .id;
+        });
+        _checkProviderInstalled(v);
+        final cfg = AgentConfigService.instance.configForAgent(v);
+        final adapter = cfg?.streamAdapter ?? v;
+        if (adapter == 'opencode') _loadOpencodeModels();
+        if (adapter == 'cursor') _loadCursorModels();
+        if (adapter == 'codex') _loadCodexModels();
+      },
+    );
+  }
+
+  /// ── Not-installed banner / checking indicator ─────────────────────────
+  List<Widget> _providerStatusBanner() {
+    if (_providerInstalled == false) {
+      return [
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: Colors.orange.withAlpha(30),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Colors.orange.withAlpha(80)),
+          ),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.warning_amber_rounded,
+                color: Colors.orange,
+                size: 16,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '${_providerLabel(_selectedProvider)} is not installed',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Colors.orange,
+                  ),
                 ),
-                child: Row(
-                  children: [
-                    () {
-                      final m = _modelsForProvider
+              ),
+              TextButton(
+                onPressed: () => SetupGuidePage.show(context),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  foregroundColor: Colors.orange,
+                ),
+                child: const Text(
+                  'Install',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ];
+    }
+    if (_providerInstalled == null) {
+      return [
+        const SizedBox(height: 8),
+        const LinearProgressIndicator(minHeight: 2),
+      ];
+    }
+    return const [];
+  }
+
+  List<Widget> _providerLoadingHints() {
+    return [
+      // Show hint when cursor is selected but CURSOR_API_KEY is missing.
+      if (_selectedProvider == 'cursor' &&
+          _cursorApiKeyConfigured == false) ...[
+        const SizedBox(height: 4),
+        Text(
+          'Add CURSOR_API_KEY to an env group above to authenticate.',
+          style: TextStyle(fontSize: 11, color: Colors.orange.shade300),
+        ),
+      ],
+      if (_cursorModelsLoading) ...[
+        const SizedBox(height: 4),
+        const LinearProgressIndicator(minHeight: 2),
+      ],
+      if (_codexModelsLoading) ...[
+        const SizedBox(height: 4),
+        const LinearProgressIndicator(minHeight: 2),
+      ],
+    ];
+  }
+
+  Widget _workingDirPicker(ChatSetupStyles styles, Color inputFill) {
+    return Row(
+      children: [
+        Expanded(
+          child: GestureDetector(
+            onTap: () async {
+              final dir = await BoardFilePicker.pickDirectory(
+                context,
+                remoteInfo: widget.remoteInfo,
+                initialPath: _dirCtrl.text,
+                title: 'Select working directory',
+              );
+              if (!mounted) return;
+              if (dir != null) {
+                setState(() => _dirCtrl.text = dir);
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 10,
+              ),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                color: inputFill,
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.folder_outlined,
+                    size: 16,
+                    color: context.appColors.statusActive,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _dirCtrl.text.isEmpty
+                          ? 'Select folder…'
+                          : _dirCtrl.text.split('/').last,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color:
+                            _dirCtrl.text.isEmpty
+                                ? styles.colorScheme.onSurface.withAlpha(120)
+                                : styles.colorScheme.onSurface,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  List<Widget> _modelSelector(
+    ChatSetupStyles styles,
+    Color inputFill,
+    bool disableModel,
+  ) {
+    if (disableModel) return const [];
+    return [
+      Text('Model', style: styles.labelStyle),
+      const SizedBox(height: 4),
+      GestureDetector(
+        onTap: () => _showModelSearch(context, inputFill, styles.colorScheme),
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 10,
+          ),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            color: inputFill,
+          ),
+          child: Row(
+            children: [
+              _selectedModelBadge(),
+              Expanded(
+                child: Text(
+                  _modelsForProvider
                           .cast<ChatModelInfo?>()
                           .firstWhere(
                             (m) => m!.id == _selectedModel,
                             orElse: () => null,
-                          );
-                      if (m != null && m.providerGroup != null) {
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 4),
-                          child: buildProviderBadge(context, m.providerGroup!),
-                        );
-                      }
-                      return const SizedBox.shrink();
-                    }(),
-                    Expanded(
-                      child: Text(
-                        _modelsForProvider
-                                .cast<ChatModelInfo?>()
-                                .firstWhere(
-                                  (m) => m!.id == _selectedModel,
-                                  orElse: () => null,
-                                )
-                                ?.displayName ??
-                            _selectedModel,
-                        style: styles.inputTextStyle,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    Icon(
-                      Icons.unfold_more,
-                      size: 16,
-                      color: styles.colorScheme.onSurface.withAlpha(128),
-                    ),
-                  ],
+                          )
+                          ?.displayName ??
+                      _selectedModel,
+                  style: styles.inputTextStyle,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-            ),
-          ],
-
-          const Spacer(),
-
-          FilledButton(
-            onPressed:
-                (_dirCtrl.text.trim().isEmpty || _providerInstalled == false)
-                    ? null
-                    : _start,
-            style: FilledButton.styleFrom(
-              backgroundColor: context.appColors.statusActive,
-              foregroundColor: context.appColors.background,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+              Icon(
+                Icons.unfold_more,
+                size: 16,
+                color: styles.colorScheme.onSurface.withAlpha(128),
               ),
-            ),
-            child: Text(
-              _providerInstalled == false
-                  ? 'Install provider first'
-                  : 'Start Chat',
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
+            ],
           ),
-        ],
+        ),
+      ),
+    ];
+  }
+
+  Widget _selectedModelBadge() {
+    final m = _modelsForProvider
+        .cast<ChatModelInfo?>()
+        .firstWhere(
+          (m) => m!.id == _selectedModel,
+          orElse: () => null,
+        );
+    if (m != null && m.providerGroup != null) {
+      return Padding(
+        padding: const EdgeInsets.only(right: 4),
+        child: buildProviderBadge(context, m.providerGroup!),
+      );
+    }
+    return const SizedBox.shrink();
+  }
+
+  Widget _startButton() {
+    return FilledButton(
+      onPressed:
+          (_dirCtrl.text.trim().isEmpty || _providerInstalled == false)
+              ? null
+              : _start,
+      style: FilledButton.styleFrom(
+        backgroundColor: context.appColors.statusActive,
+        foregroundColor: context.appColors.background,
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+      child: Text(
+        _providerInstalled == false
+            ? 'Install provider first'
+            : 'Start Chat',
+        style: const TextStyle(fontWeight: FontWeight.w600),
       ),
     );
   }

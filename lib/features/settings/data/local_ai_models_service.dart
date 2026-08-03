@@ -296,60 +296,7 @@ class LocalAiModelsService implements LocalTranscriber {
   LocalAiModelState stateForModel(String modelId) {
     final task = _taskByModelId[modelId];
     if (task != null) {
-      switch (task.status) {
-        case sdk.DownloadTaskStatus.running:
-        case sdk.DownloadTaskStatus.installing:
-        case sdk.DownloadTaskStatus.queued:
-          return LocalAiModelState(
-            status: LocalAiModelStatus.downloading,
-            canResume: false,
-            downloadedBytes: task.downloadedBytes,
-            totalBytes: task.totalBytes,
-            speedBytesPerSecond: task.downloadSpeedBytesPerSecond,
-          );
-        case sdk.DownloadTaskStatus.failed:
-          final canceled = (task.errorMessage ?? '').contains(
-            'DownloadCanceledException',
-          );
-          if (canceled) {
-            return const LocalAiModelState(
-              status: LocalAiModelStatus.notDownloaded,
-              canResume: false,
-            );
-          }
-          return LocalAiModelState(
-            status: LocalAiModelStatus.failed,
-            canResume: true,
-            error: task.errorMessage,
-            downloadedBytes: task.downloadedBytes,
-            totalBytes: task.totalBytes,
-            speedBytesPerSecond: task.downloadSpeedBytesPerSecond,
-          );
-        case sdk.DownloadTaskStatus.paused:
-          return LocalAiModelState(
-            status: LocalAiModelStatus.paused,
-            canResume: true,
-            downloadedBytes: task.downloadedBytes,
-            totalBytes: task.totalBytes,
-            speedBytesPerSecond: task.downloadSpeedBytesPerSecond,
-          );
-        case sdk.DownloadTaskStatus.completed:
-          if (_installedById.containsKey(modelId)) {
-            return const LocalAiModelState(
-              status: LocalAiModelStatus.ready,
-              canResume: false,
-            );
-          }
-          return const LocalAiModelState(
-            status: LocalAiModelStatus.notDownloaded,
-            canResume: false,
-          );
-        case sdk.DownloadTaskStatus.canceled:
-          return const LocalAiModelState(
-            status: LocalAiModelStatus.notDownloaded,
-            canResume: false,
-          );
-      }
+      return _stateForTask(modelId, task);
     }
     if (_installedById.containsKey(modelId)) {
       return const LocalAiModelState(
@@ -371,6 +318,71 @@ class LocalAiModelsService implements LocalTranscriber {
     );
   }
 
+  LocalAiModelState _stateForTask(String modelId, sdk.DownloadTaskRecord task) {
+    switch (task.status) {
+      case sdk.DownloadTaskStatus.running:
+      case sdk.DownloadTaskStatus.installing:
+      case sdk.DownloadTaskStatus.queued:
+        return LocalAiModelState(
+          status: LocalAiModelStatus.downloading,
+          canResume: false,
+          downloadedBytes: task.downloadedBytes,
+          totalBytes: task.totalBytes,
+          speedBytesPerSecond: task.downloadSpeedBytesPerSecond,
+        );
+      case sdk.DownloadTaskStatus.failed:
+        return _failedStateForTask(task);
+      case sdk.DownloadTaskStatus.paused:
+        return LocalAiModelState(
+          status: LocalAiModelStatus.paused,
+          canResume: true,
+          downloadedBytes: task.downloadedBytes,
+          totalBytes: task.totalBytes,
+          speedBytesPerSecond: task.downloadSpeedBytesPerSecond,
+        );
+      case sdk.DownloadTaskStatus.completed:
+        return _completedStateForModel(modelId);
+      case sdk.DownloadTaskStatus.canceled:
+        return const LocalAiModelState(
+          status: LocalAiModelStatus.notDownloaded,
+          canResume: false,
+        );
+    }
+  }
+
+  LocalAiModelState _failedStateForTask(sdk.DownloadTaskRecord task) {
+    final canceled = (task.errorMessage ?? '').contains(
+      'DownloadCanceledException',
+    );
+    if (canceled) {
+      return const LocalAiModelState(
+        status: LocalAiModelStatus.notDownloaded,
+        canResume: false,
+      );
+    }
+    return LocalAiModelState(
+      status: LocalAiModelStatus.failed,
+      canResume: true,
+      error: task.errorMessage,
+      downloadedBytes: task.downloadedBytes,
+      totalBytes: task.totalBytes,
+      speedBytesPerSecond: task.downloadSpeedBytesPerSecond,
+    );
+  }
+
+  LocalAiModelState _completedStateForModel(String modelId) {
+    if (_installedById.containsKey(modelId)) {
+      return const LocalAiModelState(
+        status: LocalAiModelStatus.ready,
+        canResume: false,
+      );
+    }
+    return const LocalAiModelState(
+      status: LocalAiModelStatus.notDownloaded,
+      canResume: false,
+    );
+  }
+
   Future<void> downloadOrUpdateModel(String modelId) async {
     await initialize();
     await ensureRuntimeReady();
@@ -380,39 +392,14 @@ class LocalAiModelsService implements LocalTranscriber {
       throw StateError(_initError ?? 'Local model service is not initialized');
     }
 
-    final existingTask = _taskByModelId[modelId];
-    if (existingTask != null) {
-      if (existingTask.status == sdk.DownloadTaskStatus.running ||
-          existingTask.status == sdk.DownloadTaskStatus.installing ||
-          existingTask.status == sdk.DownloadTaskStatus.queued) {
-        return;
-      }
-      if (existingTask.status == sdk.DownloadTaskStatus.failed ||
-          existingTask.status == sdk.DownloadTaskStatus.paused) {
-        unawaited(_runTask(existingTask));
-        return;
-      }
-    }
+    if (_resumeOrSkipExistingTask(modelId)) return;
 
     final manifest = _findManifest(modelId);
     if (manifest == null) {
       throw StateError('Manifest not found for model: $modelId');
     }
 
-    final installed = _installedById[modelId];
-    if (installed != null &&
-        installed.manifest.packaging.releaseTag ==
-            manifest.packaging.releaseTag) {
-      await _store!.writeInstallMetadata(
-        installed.directory,
-        manifest,
-        sourceLabel: installed.sourceLabel,
-        installedAt: installed.installedAt,
-        metadataUpdatedAt: DateTime.now(),
-      );
-      await refreshInstalled();
-      return;
-    }
+    if (await _refreshMetadataIfCurrent(modelId, manifest)) return;
 
     final files = await sdk.fetchGitHubReleaseFileDescriptors(
       owner: _githubOwner,
@@ -435,6 +422,47 @@ class LocalAiModelsService implements LocalTranscriber {
     );
     _taskByModelId[modelId] = record;
     _notify();
+  }
+
+  // Returns true when an existing task already covers the request:
+  // active downloads are left alone, failed/paused ones are resumed.
+  bool _resumeOrSkipExistingTask(String modelId) {
+    final existingTask = _taskByModelId[modelId];
+    if (existingTask == null) return false;
+    if (existingTask.status == sdk.DownloadTaskStatus.running ||
+        existingTask.status == sdk.DownloadTaskStatus.installing ||
+        existingTask.status == sdk.DownloadTaskStatus.queued) {
+      return true;
+    }
+    if (existingTask.status == sdk.DownloadTaskStatus.failed ||
+        existingTask.status == sdk.DownloadTaskStatus.paused) {
+      unawaited(_runTask(existingTask));
+      return true;
+    }
+    return false;
+  }
+
+  // Returns true (after refreshing metadata) when the installed model already
+  // matches the manifest release tag, so no re-download is needed.
+  Future<bool> _refreshMetadataIfCurrent(
+    String modelId,
+    sdk.LocalModelManifest manifest,
+  ) async {
+    final installed = _installedById[modelId];
+    if (installed == null ||
+        installed.manifest.packaging.releaseTag !=
+            manifest.packaging.releaseTag) {
+      return false;
+    }
+    await _store!.writeInstallMetadata(
+      installed.directory,
+      manifest,
+      sourceLabel: installed.sourceLabel,
+      installedAt: installed.installedAt,
+      metadataUpdatedAt: DateTime.now(),
+    );
+    await refreshInstalled();
+    return true;
   }
 
   Future<void> resumeModelDownload(String modelId) async {

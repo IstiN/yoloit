@@ -23,18 +23,20 @@ class PanelSettingsDialog extends StatelessWidget {
   final VoidCallback onSendToBack;
   final VoidCallback? onEditPanel;
 
-  @override
-  Widget build(BuildContext context) {
-    final board = context.read<BoardCubit>().state.activeBoard;
-    BoardPanelGroup? currentGroup;
-    if (board != null) {
-      for (final group in board.groups) {
-        if (group.panelIds.contains(panel.id)) {
-          currentGroup = group;
-          break;
-        }
+  BoardPanelGroup? _currentGroup(BoardDocument? board) {
+    if (board == null) return null;
+    for (final group in board.groups) {
+      if (group.panelIds.contains(panel.id)) {
+        return group;
       }
     }
+    return null;
+  }
+
+  List<BoardPanelGroup> _otherGroups(
+    BoardDocument? board,
+    BoardPanelGroup? currentGroup,
+  ) {
     final otherGroups = <BoardPanelGroup>[];
     if (board != null) {
       for (final group in board.groups) {
@@ -43,6 +45,115 @@ class PanelSettingsDialog extends StatelessWidget {
         }
       }
     }
+    return otherGroups;
+  }
+
+  void _removeFromGroup(
+    BuildContext context,
+    BoardDocument? board,
+    BoardPanelGroup group,
+  ) {
+    final cubit = context.read<BoardCubit>();
+    final boardId = board?.id;
+    if (boardId == null) return;
+    cubit.removePanelsFromGroup(boardId, group.id, [panel.id]);
+    Navigator.of(context).maybePop();
+  }
+
+  Future<void> _createNewGroup(BuildContext context, BoardDocument? board) async {
+    final navigator = Navigator.of(context);
+    final cubit = context.read<BoardCubit>();
+    final boardId = board?.id;
+    final name = await _showGroupNameDialog(context);
+    if (name == null || name.isEmpty) return;
+    if (boardId == null) return;
+    await cubit.createGroup(boardId, name: name, panelIds: [panel.id]);
+    navigator.maybePop();
+  }
+
+  void _addToGroup(BuildContext context, BoardDocument? board, String groupId) {
+    final cubit = context.read<BoardCubit>();
+    final boardId = board?.id;
+    if (boardId == null) return;
+    cubit.addPanelsToGroup(boardId, groupId, [panel.id]);
+    Navigator.of(context).maybePop();
+  }
+
+  Widget _buildCurrentGroupRow(
+    BuildContext context,
+    BoardDocument? board,
+    BoardPanelGroup group,
+  ) {
+    return Row(
+      children: [
+        Expanded(
+          child: PanelSettingsInfoRow(label: 'In group', value: group.name),
+        ),
+        OutlinedButton.icon(
+          onPressed: () => _removeFromGroup(context, board, group),
+          icon: const Icon(Icons.link_off_outlined, size: 18),
+          label: const Text('Remove'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildNoGroupContent(
+    BuildContext context,
+    BoardDocument? board,
+    List<BoardPanelGroup> otherGroups,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            FilledButton.tonalIcon(
+              onPressed: () => _createNewGroup(context, board),
+              icon: const Icon(
+                Icons.create_new_folder_outlined,
+                size: 18,
+              ),
+              label: const Text('New group'),
+            ),
+            if (otherGroups.isNotEmpty)
+              _ExistingGroupDropdown(
+                groups: otherGroups,
+                onSelected: (groupId) => _addToGroup(context, board, groupId),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGroupSection(
+    BuildContext context,
+    BoardDocument? board,
+    BoardPanelGroup? currentGroup,
+    List<BoardPanelGroup> otherGroups,
+  ) {
+    return PanelSettingsSection(
+      title: 'Group',
+      children: [
+        if (currentGroup != null)
+          Builder(
+            builder:
+                (context) => _buildCurrentGroupRow(context, board, currentGroup),
+          )
+        else
+          _buildNoGroupContent(context, board, otherGroups),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final board = context.read<BoardCubit>().state.activeBoard;
+    final currentGroup = _currentGroup(board);
+    final otherGroups = _otherGroups(board, currentGroup);
 
     return AdaptiveDialogScaffold(
       title: 'Panel settings',
@@ -117,90 +228,7 @@ class PanelSettingsDialog extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 18),
-            PanelSettingsSection(
-              title: 'Group',
-              children: [
-                if (currentGroup != null)
-                  Builder(
-                    builder: (context) {
-                      final group = currentGroup!;
-                      return Row(
-                        children: [
-                          Expanded(
-                            child: PanelSettingsInfoRow(
-                              label: 'In group',
-                              value: group.name,
-                            ),
-                          ),
-                          OutlinedButton.icon(
-                            onPressed: () {
-                              final cubit = context.read<BoardCubit>();
-                              final boardId = board?.id;
-                              if (boardId == null) return;
-                              cubit.removePanelsFromGroup(
-                                boardId,
-                                group.id,
-                                [panel.id],
-                              );
-                              Navigator.of(context).maybePop();
-                            },
-                            icon: const Icon(Icons.link_off_outlined, size: 18),
-                            label: const Text('Remove'),
-                          ),
-                        ],
-                      );
-                    },
-                  )
-                else
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Wrap(
-                        spacing: 10,
-                        runSpacing: 10,
-                        children: [
-                          FilledButton.tonalIcon(
-                            onPressed: () async {
-                              final navigator = Navigator.of(context);
-                              final cubit = context.read<BoardCubit>();
-                              final boardId = board?.id;
-                              final name = await _showGroupNameDialog(context);
-                              if (name == null || name.isEmpty) return;
-                              if (boardId == null) return;
-                              await cubit.createGroup(
-                                boardId,
-                                name: name,
-                                panelIds: [panel.id],
-                              );
-                              navigator.maybePop();
-                            },
-                            icon: const Icon(
-                              Icons.create_new_folder_outlined,
-                              size: 18,
-                            ),
-                            label: const Text('New group'),
-                          ),
-                          if (otherGroups.isNotEmpty)
-                            _ExistingGroupDropdown(
-                              groups: otherGroups,
-                              onSelected: (groupId) {
-                                final cubit = context.read<BoardCubit>();
-                                final boardId = board?.id;
-                                if (boardId == null) return;
-                                cubit.addPanelsToGroup(
-                                  boardId,
-                                  groupId,
-                                  [panel.id],
-                                );
-                                Navigator.of(context).maybePop();
-                              },
-                            ),
-                        ],
-                      ),
-                    ],
-                  ),
-              ],
-            ),
+            _buildGroupSection(context, board, currentGroup, otherGroups),
           ],
         ),
       ),

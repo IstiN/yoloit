@@ -87,57 +87,11 @@ class _DiffPreviewContentState extends State<_DiffPreviewContent> {
     }
 
     try {
-      final result = await Process.run(
-        'git',
-        ['diff', 'HEAD', '--', filePath],
-        workingDirectory: rootPath.isNotEmpty ? rootPath : null,
-      );
+      final diffOutput = await _resolveDiffOutput(rootPath, filePath);
 
-      String diffOutput = (result.stdout as String);
-
-      // If no diff against HEAD, try unstaged
       if (diffOutput.trim().isEmpty) {
-        final unstagedResult = await Process.run(
-          'git',
-          ['diff', '--', filePath],
-          workingDirectory: rootPath.isNotEmpty ? rootPath : null,
-        );
-        diffOutput = (unstagedResult.stdout as String);
-      }
-
-      // If still empty, try showing untracked file as all-new
-      if (diffOutput.trim().isEmpty) {
-        final statusResult = await Process.run(
-          'git',
-          ['status', '--porcelain', '--', filePath],
-          workingDirectory: rootPath.isNotEmpty ? rootPath : null,
-        );
-        final status = (statusResult.stdout as String).trim();
-        if (status.startsWith('?')) {
-          // Untracked file — show full content as additions
-          final fullPath = rootPath.isNotEmpty
-              ? '$rootPath/$filePath'
-              : filePath;
-          final file = File(fullPath);
-          if (file.existsSync()) {
-            final content = await file.readAsString();
-            final lines = content.split('\n');
-            if (!mounted) return;
-            setState(() {
-              _lines = lines
-                  .asMap()
-                  .entries
-                  .map((e) => _DiffLine(
-                        type: _DiffLineType.added,
-                        content: e.value,
-                        newLineNo: e.key + 1,
-                      ))
-                  .toList();
-              _loading = false;
-            });
-            return;
-          }
-        }
+        // If still empty, try showing untracked file as all-new
+        if (await _showUntrackedFileContent(rootPath, filePath)) return;
         // No changes
         if (!mounted) return;
         setState(() {
@@ -159,6 +113,65 @@ class _DiffPreviewContentState extends State<_DiffPreviewContent> {
         _error = 'Failed to get diff: $e';
       });
     }
+  }
+
+  /// Runs `git diff HEAD`, falling back to the unstaged diff when empty.
+  Future<String> _resolveDiffOutput(String rootPath, String filePath) async {
+    final result = await Process.run(
+      'git',
+      ['diff', 'HEAD', '--', filePath],
+      workingDirectory: rootPath.isNotEmpty ? rootPath : null,
+    );
+
+    String diffOutput = (result.stdout as String);
+
+    // If no diff against HEAD, try unstaged
+    if (diffOutput.trim().isEmpty) {
+      final unstagedResult = await Process.run(
+        'git',
+        ['diff', '--', filePath],
+        workingDirectory: rootPath.isNotEmpty ? rootPath : null,
+      );
+      diffOutput = (unstagedResult.stdout as String);
+    }
+    return diffOutput;
+  }
+
+  /// When the file is untracked, shows its full content as additions.
+  /// Returns true when the diff was handled (caller must return).
+  Future<bool> _showUntrackedFileContent(
+    String rootPath,
+    String filePath,
+  ) async {
+    final statusResult = await Process.run(
+      'git',
+      ['status', '--porcelain', '--', filePath],
+      workingDirectory: rootPath.isNotEmpty ? rootPath : null,
+    );
+    final status = (statusResult.stdout as String).trim();
+    if (!status.startsWith('?')) return false;
+    // Untracked file — show full content as additions
+    final fullPath = rootPath.isNotEmpty
+        ? '$rootPath/$filePath'
+        : filePath;
+    final file = File(fullPath);
+    if (!file.existsSync()) return false;
+    final content = await file.readAsString();
+    final lines = content.split('\n');
+    if (!mounted) return true;
+    setState(() {
+      _lines = lines
+          .asMap()
+          .entries
+          .map((e) => _DiffLine(
+                type: _DiffLineType.added,
+                content: e.value,
+                newLineNo: e.key + 1,
+              ))
+          .toList();
+      _loading = false;
+    });
+    return true;
   }
 
   List<_DiffLine> _parseDiff(String diff) {

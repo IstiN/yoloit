@@ -252,38 +252,24 @@ class AssistantToolExecutor implements YoloitToolExecutor {
     final ref = panelRef.trim().toLowerCase();
     if (ref.isEmpty) return false;
     try {
-      final boardsRaw = await delegate.invoke(
-        'yoloit_boards',
-        const <String, Object?>{},
-        runtimeContext: runtimeContext,
-      );
-      final boardsDecoded = jsonDecode(boardsRaw);
-      if (boardsDecoded is! Map) return false;
-      final boards = boardsDecoded['boards'];
-      if (boards is! List) return false;
-      for (final b in boards) {
-        if (b is! Map) continue;
-        final boardId = '${b['id'] ?? ''}'.trim();
-        if (boardId.isEmpty) continue;
-        final panelsRaw = await delegate.invoke('yoloit_panels', {
-          'id_or_name': boardId,
-        }, runtimeContext: runtimeContext);
-        final panelsDecoded = jsonDecode(panelsRaw);
-        if (panelsDecoded is! Map) continue;
-        final panels = panelsDecoded['panels'];
-        if (panels is! List) continue;
+      final boardIds = await _listBoardIds(runtimeContext);
+      if (boardIds == null) return false;
+      for (final boardId in boardIds) {
+        final panels = await _listBoardPanels(runtimeContext, boardId);
+        if (panels == null) continue;
         for (final p in panels) {
-          if (p is! Map) continue;
-          if (p['type'] != 'board.terminal') continue;
-          final panelId = '${p['id'] ?? ''}'.trim().toLowerCase();
-          final title = '${p['title'] ?? ''}'.trim().toLowerCase();
-          if (panelId == ref || title == ref) {
-            return true;
-          }
+          if (_isMatchingTerminalPanel(p, ref)) return true;
         }
       }
     } catch (_) {}
     return false;
+  }
+
+  bool _isMatchingTerminalPanel(Map<String, Object?> panel, String ref) {
+    if (panel['type'] != 'board.terminal') return false;
+    final panelId = '${panel['id'] ?? ''}'.trim().toLowerCase();
+    final title = '${panel['title'] ?? ''}'.trim().toLowerCase();
+    return panelId == ref || title == ref;
   }
 
   void _retargetNoteToolIfNeeded(
@@ -408,17 +394,12 @@ class AssistantToolExecutor implements YoloitToolExecutor {
     if (panelId.isEmpty) return null;
     final title = '${panel['title'] ?? ''}'.toLowerCase();
     final zIndex = (panel['zIndex'] as num?) ?? 0;
-    var score = 0;
-    if (boardId == hintedBoardId) score += 2;
-    if (title.contains('mermaid') ||
-        title.contains('diagram') ||
-        title.contains('диаграм')) {
-      score += 3;
-    }
-    for (final token in tokens) {
-      if (token.length < 3) continue;
-      if (title.contains(token)) score += 2;
-    }
+    var score = _noteTitleScore(
+      title: title,
+      boardId: boardId,
+      hintedBoardId: hintedBoardId,
+      tokens: tokens,
+    );
 
     if (score < 4 && tokens.isNotEmpty) {
       score += await _markdownTokenScore(
@@ -430,6 +411,27 @@ class AssistantToolExecutor implements YoloitToolExecutor {
     }
 
     return (boardId: boardId, panelId: panelId, score: score, zIndex: zIndex);
+  }
+
+  // Scores a note panel from its title, board hint, and search tokens.
+  int _noteTitleScore({
+    required String title,
+    required String boardId,
+    required String hintedBoardId,
+    required Set<String> tokens,
+  }) {
+    var score = 0;
+    if (boardId == hintedBoardId) score += 2;
+    if (title.contains('mermaid') ||
+        title.contains('diagram') ||
+        title.contains('диаграм')) {
+      score += 3;
+    }
+    for (final token in tokens) {
+      if (token.length < 3) continue;
+      if (title.contains(token)) score += 2;
+    }
+    return score;
   }
 
   // Scores a note panel's markdown content against the search tokens.

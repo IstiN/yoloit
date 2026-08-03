@@ -368,164 +368,215 @@ class _RemoteSectionState extends State<RemoteSection> {
     await BoardRelayClient.instance.stop();
   }
 
+  String _relayPhoneUrl() {
+    final hubUrl = _relayUrlCtrl.text.trim();
+    final deviceId = _relayDeviceIdCtrl.text.trim();
+    if (hubUrl.isEmpty || deviceId.isEmpty) return '';
+    return '${hubUrl.replaceAll(RegExp(r'/+$'), '')}/api/devices/$deviceId/';
+  }
+
+  List<Widget> _buildRelayDeviceFields() {
+    if (_relayHubTokenCtrl.text.trim().isNotEmpty) return const [];
+    return [
+      const SizedBox(height: 10),
+      LabeledTextField(
+        controller: _relayDeviceIdCtrl,
+        label: 'Device ID',
+        hint: 'default',
+      ),
+      const SizedBox(height: 10),
+      LabeledTextField(
+        controller: _relayDeviceKeyCtrl,
+        label: 'Device key',
+        hint: 'Shared device key from the hub',
+        obscureText: true,
+      ),
+    ];
+  }
+
+  List<Widget> _buildRelayShareRows(
+    BoardRelayStatus status,
+    String phoneUrl,
+  ) {
+    if (status != BoardRelayStatus.connected || phoneUrl.isEmpty) {
+      return const [];
+    }
+    return [
+      ShareValueRow(
+        label: 'Phone URL',
+        value: phoneUrl,
+        copied: _copiedPhoneUrl,
+        onCopy: () => _copy(phoneUrl, (value) => _copiedPhoneUrl = value),
+      ),
+      const SizedBox(height: 10),
+      ShareValueRow(
+        label: 'Device key',
+        value: _relayDeviceKeyCtrl.text,
+        copied: _copiedDeviceKey,
+        onCopy: () => _copy(
+          _relayDeviceKeyCtrl.text,
+          (value) => _copiedDeviceKey = value,
+        ),
+      ),
+      const SizedBox(height: 12),
+    ];
+  }
+
+  String _relayButtonLabel(BoardRelayStatus status) {
+    if (status == BoardRelayStatus.connected) return 'Sharing';
+    if (status == BoardRelayStatus.connecting) return 'Connecting...';
+    return _relayHubTokenCtrl.text.trim().isNotEmpty
+        ? 'Create device & start sharing'
+        : 'Start sharing via hub';
+  }
+
+  List<Widget> _buildRelayActions(BoardRelayStatus status, bool running) {
+    return [
+      FilledButton.icon(
+        onPressed: running ? null : _startRelay,
+        icon: Icon(
+          status == BoardRelayStatus.connecting
+              ? Icons.pending_outlined
+              : Icons.cloud_upload_outlined,
+          size: 16,
+        ),
+        label: Text(_relayButtonLabel(status)),
+      ),
+      if (running) ...[
+        const SizedBox(height: 8),
+        TextButton.icon(
+          onPressed: _stopRelay,
+          icon: const Icon(Icons.stop_circle_outlined, size: 16),
+          label: const Text('Stop sharing via hub'),
+        ),
+      ],
+    ];
+  }
+
+  Color _relayStatusColor(BoardRelayStatus status, AppColorScheme colors) {
+    return switch (status) {
+      BoardRelayStatus.connected => colors.accentGreen,
+      BoardRelayStatus.connecting => colors.accentOrange,
+      BoardRelayStatus.disconnected => colors.accentRed,
+    };
+  }
+
+  String _relayStatusText(BoardRelayStatus status) {
+    return switch (status) {
+      BoardRelayStatus.connected => 'Connected to hub',
+      BoardRelayStatus.connecting => 'Connecting to hub',
+      BoardRelayStatus.disconnected => 'Disconnected',
+    };
+  }
+
+  Widget _buildRelayStatusRow(BoardRelayStatus status, AppColorScheme colors) {
+    return Row(
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: _relayStatusColor(status, colors),
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          _relayStatusText(status),
+          style: TextStyle(color: colors.textMuted, fontSize: 11),
+        ),
+      ],
+    );
+  }
+
+  Widget _relayErrorBuilder(
+    BuildContext context,
+    String? error,
+    Widget? child,
+    AppColorScheme colors,
+  ) {
+    if (error == null || error.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Text(
+        error,
+        style: TextStyle(color: colors.accentRed, fontSize: 11),
+      ),
+    );
+  }
+
+  Widget _buildRelayContent(
+    BuildContext context,
+    BoardRelayStatus status,
+    AppColorScheme colors,
+  ) {
+    final running =
+        status == BoardRelayStatus.connected ||
+        status == BoardRelayStatus.connecting;
+    final phoneUrl = _relayPhoneUrl();
+    return SettingsCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Share via yoloit-hub',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Share this device through a yoloit-hub relay. No inbound '
+            'connections required — the app dials out to the hub over a '
+            'WebSocket.',
+            style: TextStyle(color: colors.textMuted, fontSize: 11),
+          ),
+          const SizedBox(height: 12),
+          LabeledTextField(
+            controller: _relayUrlCtrl,
+            label: 'Hub URL',
+            hint: 'https://yoloit-hub-...run.app',
+          ),
+          const SizedBox(height: 10),
+          LabeledTextField(
+            controller: _relayHubTokenCtrl,
+            label: 'Hub admin token (optional)',
+            hint: 'Bearer token from the hub',
+            obscureText: true,
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 10),
+          LabeledTextField(
+            controller: _relayDeviceNameCtrl,
+            label: 'Device name (optional)',
+            hint: 'YoLoIT Mac',
+          ),
+          ..._buildRelayDeviceFields(),
+          const SizedBox(height: 12),
+          ..._buildRelayShareRows(status, phoneUrl),
+          ..._buildRelayActions(status, running),
+          const SizedBox(height: 8),
+          _buildRelayStatusRow(status, colors),
+          ValueListenableBuilder<String?>(
+            valueListenable: BoardRelayClient.instance.lastError,
+            builder:
+                (context, error, child) =>
+                    _relayErrorBuilder(context, error, child, colors),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildRelayCard(AppColorScheme colors) {
     return ValueListenableBuilder<BoardRelayStatus>(
       valueListenable: BoardRelayClient.instance.status,
-      builder: (context, status, _) {
-        final running =
-            status == BoardRelayStatus.connected ||
-            status == BoardRelayStatus.connecting;
-        final hubUrl = _relayUrlCtrl.text.trim();
-        final deviceId = _relayDeviceIdCtrl.text.trim();
-        final phoneUrl =
-            hubUrl.isNotEmpty && deviceId.isNotEmpty
-                ? '${hubUrl.replaceAll(RegExp(r'/+$'), '')}/api/devices/$deviceId/'
-                : '';
-        return SettingsCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Share via yoloit-hub',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurface,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Share this device through a yoloit-hub relay. No inbound '
-                'connections required — the app dials out to the hub over a '
-                'WebSocket.',
-                style: TextStyle(color: colors.textMuted, fontSize: 11),
-              ),
-              const SizedBox(height: 12),
-              LabeledTextField(
-                controller: _relayUrlCtrl,
-                label: 'Hub URL',
-                hint: 'https://yoloit-hub-...run.app',
-              ),
-              const SizedBox(height: 10),
-              LabeledTextField(
-                controller: _relayHubTokenCtrl,
-                label: 'Hub admin token (optional)',
-                hint: 'Bearer token from the hub',
-                obscureText: true,
-                onChanged: (_) => setState(() {}),
-              ),
-              const SizedBox(height: 10),
-              LabeledTextField(
-                controller: _relayDeviceNameCtrl,
-                label: 'Device name (optional)',
-                hint: 'YoLoIT Mac',
-              ),
-              if (_relayHubTokenCtrl.text.trim().isEmpty) ...[
-                const SizedBox(height: 10),
-                LabeledTextField(
-                  controller: _relayDeviceIdCtrl,
-                  label: 'Device ID',
-                  hint: 'default',
-                ),
-                const SizedBox(height: 10),
-                LabeledTextField(
-                  controller: _relayDeviceKeyCtrl,
-                  label: 'Device key',
-                  hint: 'Shared device key from the hub',
-                  obscureText: true,
-                ),
-              ],
-              const SizedBox(height: 12),
-              if (status == BoardRelayStatus.connected && phoneUrl.isNotEmpty) ...[
-                ShareValueRow(
-                  label: 'Phone URL',
-                  value: phoneUrl,
-                  copied: _copiedPhoneUrl,
-                  onCopy: () => _copy(phoneUrl, (value) => _copiedPhoneUrl = value),
-                ),
-                const SizedBox(height: 10),
-                ShareValueRow(
-                  label: 'Device key',
-                  value: _relayDeviceKeyCtrl.text,
-                  copied: _copiedDeviceKey,
-                  onCopy: () => _copy(
-                    _relayDeviceKeyCtrl.text,
-                    (value) => _copiedDeviceKey = value,
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
-              FilledButton.icon(
-                onPressed: running ? null : _startRelay,
-                icon: Icon(
-                  status == BoardRelayStatus.connecting
-                      ? Icons.pending_outlined
-                      : Icons.cloud_upload_outlined,
-                  size: 16,
-                ),
-                label: Text(
-                  status == BoardRelayStatus.connected
-                      ? 'Sharing'
-                      : status == BoardRelayStatus.connecting
-                      ? 'Connecting...'
-                      : _relayHubTokenCtrl.text.trim().isNotEmpty
-                      ? 'Create device & start sharing'
-                      : 'Start sharing via hub',
-                ),
-              ),
-              if (running) ...[
-                const SizedBox(height: 8),
-                TextButton.icon(
-                  onPressed: _stopRelay,
-                  icon: const Icon(Icons.stop_circle_outlined, size: 16),
-                  label: const Text('Stop sharing via hub'),
-                ),
-              ],
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: switch (status) {
-                        BoardRelayStatus.connected => colors.accentGreen,
-                        BoardRelayStatus.connecting => colors.accentOrange,
-                        BoardRelayStatus.disconnected => colors.accentRed,
-                      },
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    switch (status) {
-                      BoardRelayStatus.connected => 'Connected to hub',
-                      BoardRelayStatus.connecting => 'Connecting to hub',
-                      BoardRelayStatus.disconnected => 'Disconnected',
-                    },
-                    style: TextStyle(color: colors.textMuted, fontSize: 11),
-                  ),
-                ],
-              ),
-              ValueListenableBuilder<String?>(
-                valueListenable: BoardRelayClient.instance.lastError,
-                builder: (context, error, _) {
-                  if (error == null || error.isEmpty) {
-                    return const SizedBox.shrink();
-                  }
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text(
-                      error,
-                      style: TextStyle(color: colors.accentRed, fontSize: 11),
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
-        );
-      },
+      builder:
+          (context, status, _) => _buildRelayContent(context, status, colors),
     );
   }
 }

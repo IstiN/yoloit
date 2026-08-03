@@ -152,6 +152,80 @@ class _BoardPanelLayerState extends State<BoardPanelLayer> {
     );
   }
 
+  Future<void> _deletePanel(
+    BoardCubit boardCubit,
+    BoardPanelInstance panel,
+  ) async {
+    if (panel.type == 'board.widget.custom') {
+      WidgetEngineManager.instance.remove(panel.id);
+    }
+    await boardCubit.removePanel(panel.id);
+  }
+
+  void _bringPanelToFront(BoardCubit boardCubit, BoardPanelInstance panel) {
+    final activeBoard = boardCubit.state.activeBoard;
+    if (activeBoard == null) return;
+    final maxZ = activeBoard.panels.fold<int>(
+      0,
+      (value, panel) => panel.zIndex > value ? panel.zIndex : value,
+    );
+    boardCubit.updatePanel(panel.id, (p) => p.copyWith(zIndex: maxZ + 1));
+  }
+
+  void _sendPanelToBack(BoardCubit boardCubit, BoardPanelInstance panel) {
+    final activeBoard = boardCubit.state.activeBoard;
+    if (activeBoard == null) return;
+    final minZ = activeBoard.panels.fold<int>(
+      0,
+      (value, panel) => panel.zIndex < value ? panel.zIndex : value,
+    );
+    boardCubit.updatePanel(panel.id, (p) => p.copyWith(zIndex: minZ - 1));
+  }
+
+  Future<String?> _createLinkedPanel(
+    BoardCubit boardCubit,
+    BoardPanelInstance panel,
+    String typeId,
+    Map<String, dynamic> state,
+    String title,
+  ) async {
+    final plugin = BoardPluginRegistry.instance.pluginFor(typeId);
+    final size = plugin?.defaultSize ?? const Size(460, 380);
+    final activeBoard = boardCubit.state.activeBoard;
+    if (activeBoard == null) return null;
+    final newBounds = boardCubit.nextAvailableBounds(
+      activeBoard,
+      preferredWidth: size.width,
+      preferredHeight: size.height,
+    );
+    final ts = DateTime.now().microsecondsSinceEpoch;
+    final newPanel = BoardPanelInstance(
+      id: 'panel-$ts',
+      type: typeId,
+      title: title,
+      bounds: newBounds,
+      state: state,
+      zIndex:
+          activeBoard.panels.fold<int>(
+            0,
+            (v, p) => p.zIndex > v ? p.zIndex : v,
+          ) +
+          1,
+    );
+    await boardCubit.addPanel(newPanel);
+    await boardCubit.upsertLink(
+      BoardPanelLink(
+        id: 'link-$ts',
+        fromPanelId: panel.id,
+        toPanelId: newPanel.id,
+        style: BoardLinkStyle.arrow,
+        behavior: BoardLinkBehavior.dynamic,
+        geometry: BoardLinkGeometry.bezier,
+      ),
+    );
+    return newPanel.id;
+  }
+
   Widget _buildPanelCard(
     BuildContext context,
     BoardDocument board,
@@ -173,32 +247,11 @@ class _BoardPanelLayerState extends State<BoardPanelLayer> {
       onResize: (update) => widget.onResizePanel(context, panel, update),
       onDragStart: (details) => widget.onDragStart(panel.id, details),
       onDragEnd: widget.onDragEnd,
-      onDelete: () async {
-        if (panel.type == 'board.widget.custom') {
-          WidgetEngineManager.instance.remove(panel.id);
-        }
-        await boardCubit.removePanel(panel.id);
-      },
+      onDelete: () => _deletePanel(boardCubit, panel),
       onEditColor: () => BoardPanelActions.showPanelColorDialog(context, panel),
       onEditNote: BoardPanelActions.createEditCallback(context, panel),
-      onBringToFront: () {
-        final activeBoard = boardCubit.state.activeBoard;
-        if (activeBoard == null) return;
-        final maxZ = activeBoard.panels.fold<int>(
-          0,
-          (value, panel) => panel.zIndex > value ? panel.zIndex : value,
-        );
-        boardCubit.updatePanel(panel.id, (p) => p.copyWith(zIndex: maxZ + 1));
-      },
-      onSendToBack: () {
-        final activeBoard = boardCubit.state.activeBoard;
-        if (activeBoard == null) return;
-        final minZ = activeBoard.panels.fold<int>(
-          0,
-          (value, panel) => panel.zIndex < value ? panel.zIndex : value,
-        );
-        boardCubit.updatePanel(panel.id, (p) => p.copyWith(zIndex: minZ - 1));
-      },
+      onBringToFront: () => _bringPanelToFront(boardCubit, panel),
+      onSendToBack: () => _sendPanelToBack(boardCubit, panel),
       onFullscreen: () => widget.onFullscreenPanel?.call(context, panel.id),
       onUpdateState: (newState) {
         boardCubit.updatePanel(
@@ -207,43 +260,9 @@ class _BoardPanelLayerState extends State<BoardPanelLayer> {
           boardId: board.id,
         );
       },
-      onCreateLinkedPanel: (typeId, state, title) async {
-        final plugin = BoardPluginRegistry.instance.pluginFor(typeId);
-        final size = plugin?.defaultSize ?? const Size(460, 380);
-        final activeBoard = boardCubit.state.activeBoard;
-        if (activeBoard == null) return null;
-        final newBounds = boardCubit.nextAvailableBounds(
-          activeBoard,
-          preferredWidth: size.width,
-          preferredHeight: size.height,
-        );
-        final ts = DateTime.now().microsecondsSinceEpoch;
-        final newPanel = BoardPanelInstance(
-          id: 'panel-$ts',
-          type: typeId,
-          title: title,
-          bounds: newBounds,
-          state: state,
-          zIndex:
-              activeBoard.panels.fold<int>(
-                0,
-                (v, p) => p.zIndex > v ? p.zIndex : v,
-              ) +
-              1,
-        );
-        await boardCubit.addPanel(newPanel);
-        await boardCubit.upsertLink(
-          BoardPanelLink(
-            id: 'link-$ts',
-            fromPanelId: panel.id,
-            toPanelId: newPanel.id,
-            style: BoardLinkStyle.arrow,
-            behavior: BoardLinkBehavior.dynamic,
-            geometry: BoardLinkGeometry.bezier,
-          ),
-        );
-        return newPanel.id;
-      },
+      onCreateLinkedPanel:
+          (typeId, state, title) =>
+              _createLinkedPanel(boardCubit, panel, typeId, state, title),
       connectMode: widget.activeTool == BoardToolId.connect,
       connectSourceId: widget.connectSourceId,
       onConnectTap:

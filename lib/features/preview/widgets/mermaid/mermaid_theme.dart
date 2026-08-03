@@ -25,44 +25,14 @@ MermaidThemeOptions buildMermaidThemeOptions(
   final theme = Theme.of(context);
   final isDark = theme.brightness == Brightness.dark;
   final onSurface = theme.colorScheme.onSurface;
-  final canvasColor =
+  final palette =
       isDark
-          ? Color.lerp(colors.background, colors.surface, 0.55)!
-          : Color.lerp(colors.surface, colors.background, 0.45)!;
-  final clusterFill =
-      isDark
-          ? Color.lerp(colors.surfaceElevated, colors.primary, 0.18)!
-          : Color.lerp(colors.surfaceElevated, colors.primary, 0.10)!;
-  final nodeFill =
-      isDark
-          ? Color.lerp(clusterFill, colors.textPrimary, 0.07)!
-          : Color.lerp(colors.surface, colors.primary, 0.08)!;
-  final secondaryFill =
-      isDark
-          ? Color.lerp(nodeFill, colors.primaryLight, 0.10)!
-          : Color.lerp(nodeFill, colors.primary, 0.06)!;
-  final tertiaryFill =
-      isDark
-          ? Color.lerp(clusterFill, colors.surfaceHighlight, 0.45)!
-          : Color.lerp(colors.surfaceHighlight, colors.surface, 0.18)!;
-  final noteFill =
-      isDark
-          ? Color.lerp(nodeFill, colors.primary, 0.12)!
-          : Color.lerp(colors.surface, colors.primary, 0.14)!;
-  final borderColor =
-      isDark
-          ? Color.lerp(colors.border, colors.primaryLight, 0.42)!
-          : Color.lerp(colors.border, colors.primaryDark, 0.16)!;
-  final lineColor =
-      Color.lerp(onSurface, colors.primary, isDark ? 0.48 : 0.24)!;
-  final edgeLabelBackground =
-      isDark
-          ? Color.lerp(canvasColor, colors.background, 0.16)!
-          : Color.lerp(canvasColor, colors.surface, 0.78)!;
-  final backgroundHex = _hexColor(canvasColor);
+          ? _MermaidPalette.dark(colors, onSurface)
+          : _MermaidPalette.light(colors, onSurface);
+  final backgroundHex = _hexColor(palette.canvasColor);
   final textHex = _hexColor(onSurface);
-  final borderHex = _hexColor(borderColor);
-  final lineHex = _hexColor(lineColor);
+  final borderHex = _hexColor(palette.borderColor);
+  final lineHex = _hexColor(palette.lineColor);
   final renderOptions = MermaidRenderOptions(
     backgroundColor: backgroundHex,
     config: <String, Object?>{
@@ -72,33 +42,33 @@ MermaidThemeOptions buildMermaidThemeOptions(
         'background': backgroundHex,
         'textColor': textHex,
         'lineColor': lineHex,
-        'mainBkg': _hexColor(nodeFill),
-        'secondBkg': _hexColor(clusterFill),
-        'tertiaryBkg': _hexColor(tertiaryFill),
-        'primaryColor': _hexColor(nodeFill),
+        'mainBkg': _hexColor(palette.nodeFill),
+        'secondBkg': _hexColor(palette.clusterFill),
+        'tertiaryBkg': _hexColor(palette.tertiaryFill),
+        'primaryColor': _hexColor(palette.nodeFill),
         'primaryBorderColor': borderHex,
         'primaryTextColor': textHex,
-        'secondaryColor': _hexColor(secondaryFill),
+        'secondaryColor': _hexColor(palette.secondaryFill),
         'secondaryBorderColor': borderHex,
         'secondaryTextColor': textHex,
-        'tertiaryColor': _hexColor(tertiaryFill),
+        'tertiaryColor': _hexColor(palette.tertiaryFill),
         'tertiaryBorderColor': borderHex,
         'tertiaryTextColor': textHex,
-        'clusterBkg': _hexColor(clusterFill),
+        'clusterBkg': _hexColor(palette.clusterFill),
         'clusterBorder': borderHex,
         'nodeBorder': borderHex,
-        'edgeLabelBackground': _hexColor(edgeLabelBackground),
-        'labelBoxBkgColor': _hexColor(edgeLabelBackground),
+        'edgeLabelBackground': _hexColor(palette.edgeLabelBackground),
+        'labelBoxBkgColor': _hexColor(palette.edgeLabelBackground),
         'labelTextColor': textHex,
-        'actorBkg': _hexColor(nodeFill),
+        'actorBkg': _hexColor(palette.nodeFill),
         'actorBorder': borderHex,
         'actorTextColor': textHex,
         'activationBorderColor': _hexColor(colors.primary),
-        'activationBkgColor': _hexColor(secondaryFill),
+        'activationBkgColor': _hexColor(palette.secondaryFill),
         'sequenceNumberColor': textHex,
         'signalColor': lineHex,
         'signalTextColor': textHex,
-        'noteBkgColor': _hexColor(noteFill),
+        'noteBkgColor': _hexColor(palette.noteFill),
         'noteBorderColor': borderHex,
         'noteTextColor': textHex,
       },
@@ -108,9 +78,85 @@ MermaidThemeOptions buildMermaidThemeOptions(
     renderOptions: renderOptions,
     cacheToken:
         '${isDark ? 'dark' : 'light'}:${_hexColor(colors.primary)}:$backgroundHex:$textHex',
-    canvasColor: canvasColor,
-    scrimColor: canvasColor.withValues(alpha: isDark ? 0.62 : 0.52),
+    canvasColor: palette.canvasColor,
+    scrimColor: palette.canvasColor.withValues(alpha: isDark ? 0.62 : 0.52),
   );
+}
+
+/// Per-brightness palette of derived mermaid colours.
+class _MermaidPalette {
+  const _MermaidPalette._({
+    required this.canvasColor,
+    required this.clusterFill,
+    required this.nodeFill,
+    required this.secondaryFill,
+    required this.tertiaryFill,
+    required this.noteFill,
+    required this.borderColor,
+    required this.lineColor,
+    required this.edgeLabelBackground,
+  });
+
+  factory _MermaidPalette.dark(AppColorScheme colors, Color onSurface) {
+    final canvasColor = Color.lerp(colors.background, colors.surface, 0.55)!;
+    final clusterFill =
+        Color.lerp(colors.surfaceElevated, colors.primary, 0.18)!;
+    final nodeFill = Color.lerp(clusterFill, colors.textPrimary, 0.07)!;
+    final secondaryFill = Color.lerp(nodeFill, colors.primaryLight, 0.10)!;
+    final tertiaryFill =
+        Color.lerp(clusterFill, colors.surfaceHighlight, 0.45)!;
+    final noteFill = Color.lerp(nodeFill, colors.primary, 0.12)!;
+    final borderColor = Color.lerp(colors.border, colors.primaryLight, 0.42)!;
+    final lineColor = Color.lerp(onSurface, colors.primary, 0.48)!;
+    final edgeLabelBackground =
+        Color.lerp(canvasColor, colors.background, 0.16)!;
+    return _MermaidPalette._(
+      canvasColor: canvasColor,
+      clusterFill: clusterFill,
+      nodeFill: nodeFill,
+      secondaryFill: secondaryFill,
+      tertiaryFill: tertiaryFill,
+      noteFill: noteFill,
+      borderColor: borderColor,
+      lineColor: lineColor,
+      edgeLabelBackground: edgeLabelBackground,
+    );
+  }
+
+  factory _MermaidPalette.light(AppColorScheme colors, Color onSurface) {
+    final canvasColor = Color.lerp(colors.surface, colors.background, 0.45)!;
+    final clusterFill =
+        Color.lerp(colors.surfaceElevated, colors.primary, 0.10)!;
+    final nodeFill = Color.lerp(colors.surface, colors.primary, 0.08)!;
+    final secondaryFill = Color.lerp(nodeFill, colors.primary, 0.06)!;
+    final tertiaryFill =
+        Color.lerp(colors.surfaceHighlight, colors.surface, 0.18)!;
+    final noteFill = Color.lerp(colors.surface, colors.primary, 0.14)!;
+    final borderColor = Color.lerp(colors.border, colors.primaryDark, 0.16)!;
+    final lineColor = Color.lerp(onSurface, colors.primary, 0.24)!;
+    final edgeLabelBackground = Color.lerp(canvasColor, colors.surface, 0.78)!;
+    return _MermaidPalette._(
+      canvasColor: canvasColor,
+      clusterFill: clusterFill,
+      nodeFill: nodeFill,
+      secondaryFill: secondaryFill,
+      tertiaryFill: tertiaryFill,
+      noteFill: noteFill,
+      borderColor: borderColor,
+      lineColor: lineColor,
+      edgeLabelBackground: edgeLabelBackground,
+    );
+  }
+
+  final Color canvasColor;
+  final Color clusterFill;
+  final Color nodeFill;
+  final Color secondaryFill;
+  final Color tertiaryFill;
+  final Color noteFill;
+  final Color borderColor;
+  final Color lineColor;
+  final Color edgeLabelBackground;
 }
 
 String _hexColor(Color color) {

@@ -715,16 +715,119 @@ class _KanbanContentState extends State<_KanbanContent> {
     );
   }
 
+  Color _columnHeaderColor(Color baseColor, AppColorScheme colors, bool isLight) {
+    if (isLight && baseColor.computeLuminance() > 0.50) {
+      return Color.lerp(baseColor, colors.textPrimary, 0.45)!;
+    }
+    if (isLight && baseColor.computeLuminance() > 0.40) {
+      return Color.lerp(baseColor, colors.textPrimary, 0.25)!;
+    }
+    return baseColor;
+  }
+
+  bool _canMoveLeft(int ci) => _editMode && ci > 0;
+
+  bool _canMoveRight(int ci, int columnCount) =>
+      _editMode && ci < columnCount - 1;
+
+  bool _showEditToggle(int ci) => !_editMode && ci == 0;
+
+  bool _canDeleteColumn() => _editMode && _columns.length > 1;
+
+  Widget _headerIconButton({
+    required IconData icon,
+    required double iconSize,
+    required Color color,
+    required String tooltip,
+    required VoidCallback onPressed,
+  }) {
+    return SizedBox(
+      width: 20,
+      height: 20,
+      child: IconButton(
+        padding: EdgeInsets.zero,
+        icon: Icon(icon, size: iconSize, color: color),
+        tooltip: tooltip,
+        onPressed: onPressed,
+      ),
+    );
+  }
+
+  Widget _buildColumnTitle(int ci, List<String> columns, Color color) {
+    if (_renamingCol == ci) {
+      return TextField(
+        controller: _renameCtrl,
+        autofocus: true,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
+        decoration: const InputDecoration(
+          isDense: true,
+          contentPadding: EdgeInsets.symmetric(
+            vertical: 2,
+            horizontal: 4,
+          ),
+          border: InputBorder.none,
+        ),
+        onSubmitted: (v) => _renameColumn(ci, v),
+        onEditingComplete: () => _renameColumn(ci, _renameCtrl.text),
+      );
+    }
+    return GestureDetector(
+      onDoubleTap: () {
+        _renameCtrl.text = columns[ci];
+        setState(() => _renamingCol = ci);
+      },
+      child: Text(
+        columns[ci],
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
+  }
+
+  Widget _buildColorPickerRow(int ci, AppColorScheme colors, Color color) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Row(
+        children:
+            _columnColorPalette(colors).map((c) {
+              final isSelected = c.toARGB32() == color.toARGB32();
+              return GestureDetector(
+                onTap: () => _setColumnColor(ci, c),
+                child: Container(
+                  width: 14,
+                  height: 14,
+                  margin: const EdgeInsets.only(right: 3),
+                  decoration: BoxDecoration(
+                    color: c,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color:
+                          isSelected
+                              ? colors.textPrimary
+                              : Colors.transparent,
+                      width: isSelected ? 1.5 : 0,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+      ),
+    );
+  }
+
   Widget _buildColumnHeader(int ci, List<String> columns, int cardCount) {
     final colors = context.appColors;
     final baseColor = _colColor(ci);
     final isLight = Theme.of(context).brightness == Brightness.light;
-    final color =
-        isLight && baseColor.computeLuminance() > 0.50
-            ? Color.lerp(baseColor, colors.textPrimary, 0.45)!
-            : (isLight && baseColor.computeLuminance() > 0.40)
-            ? Color.lerp(baseColor, colors.textPrimary, 0.25)!
-            : baseColor;
+    final color = _columnHeaderColor(baseColor, colors, isLight);
     final muted =
         context.appColors.textMuted;
     return Padding(
@@ -735,68 +838,26 @@ class _KanbanContentState extends State<_KanbanContent> {
           Row(
             children: [
               // Move left (edit mode only)
-              if (_editMode && ci > 0)
-                SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: IconButton(
-                    padding: EdgeInsets.zero,
-                    icon: Icon(Icons.chevron_left, size: 14, color: color),
-                    tooltip: 'Move left',
-                    onPressed: () => _moveColumn(ci, ci - 1),
-                  ),
+              if (_canMoveLeft(ci))
+                _headerIconButton(
+                  icon: Icons.chevron_left,
+                  iconSize: 14,
+                  color: color,
+                  tooltip: 'Move left',
+                  onPressed: () => _moveColumn(ci, ci - 1),
                 ),
               // Name (editable on double-tap)
               Expanded(
-                child:
-                    _renamingCol == ci
-                        ? TextField(
-                          controller: _renameCtrl,
-                          autofocus: true,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: color,
-                          ),
-                          decoration: const InputDecoration(
-                            isDense: true,
-                            contentPadding: EdgeInsets.symmetric(
-                              vertical: 2,
-                              horizontal: 4,
-                            ),
-                            border: InputBorder.none,
-                          ),
-                          onSubmitted: (v) => _renameColumn(ci, v),
-                          onEditingComplete:
-                              () => _renameColumn(ci, _renameCtrl.text),
-                        )
-                        : GestureDetector(
-                          onDoubleTap: () {
-                            _renameCtrl.text = columns[ci];
-                            setState(() => _renamingCol = ci);
-                          },
-                          child: Text(
-                            columns[ci],
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: color,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
+                child: _buildColumnTitle(ci, columns, color),
               ),
               // Move right (edit mode only)
-              if (_editMode && ci < columns.length - 1)
-                SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: IconButton(
-                    padding: EdgeInsets.zero,
-                    icon: Icon(Icons.chevron_right, size: 14, color: color),
-                    tooltip: 'Move right',
-                    onPressed: () => _moveColumn(ci, ci + 1),
-                  ),
+              if (_canMoveRight(ci, columns.length))
+                _headerIconButton(
+                  icon: Icons.chevron_right,
+                  iconSize: 14,
+                  color: color,
+                  tooltip: 'Move right',
+                  onPressed: () => _moveColumn(ci, ci + 1),
                 ),
               // Count badge
               Container(
@@ -830,61 +891,27 @@ class _KanbanContentState extends State<_KanbanContent> {
                 ),
               ),
               // Edit mode toggle (on first column header only, when not in edit mode)
-              if (!_editMode && ci == 0)
-                SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: IconButton(
-                    padding: EdgeInsets.zero,
-                    icon: Icon(Icons.tune, size: 13, color: muted),
-                    tooltip: 'Edit columns',
-                    onPressed: () => setState(() => _editMode = true),
-                  ),
+              if (_showEditToggle(ci))
+                _headerIconButton(
+                  icon: Icons.tune,
+                  iconSize: 13,
+                  color: muted,
+                  tooltip: 'Edit columns',
+                  onPressed: () => setState(() => _editMode = true),
                 ),
               // Delete column (edit mode only, not the last one)
-              if (_editMode && _columns.length > 1)
-                SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: IconButton(
-                    padding: EdgeInsets.zero,
-                    icon: Icon(Icons.remove, size: 13, color: muted),
-                    tooltip: 'Delete column',
-                    onPressed: () => _deleteColumn(ci),
-                  ),
+              if (_canDeleteColumn())
+                _headerIconButton(
+                  icon: Icons.remove,
+                  iconSize: 13,
+                  color: muted,
+                  tooltip: 'Delete column',
+                  onPressed: () => _deleteColumn(ci),
                 ),
             ],
           ),
           // ── Color picker row (edit mode only) ──
-          if (_editMode)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Row(
-                children:
-                    _columnColorPalette(colors).map((c) {
-                      final isSelected = c.toARGB32() == color.toARGB32();
-                      return GestureDetector(
-                        onTap: () => _setColumnColor(ci, c),
-                        child: Container(
-                          width: 14,
-                          height: 14,
-                          margin: const EdgeInsets.only(right: 3),
-                          decoration: BoxDecoration(
-                            color: c,
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color:
-                                  isSelected
-                                      ? colors.textPrimary
-                                      : Colors.transparent,
-                              width: isSelected ? 1.5 : 0,
-                            ),
-                          ),
-                        ),
-                      );
-                    }).toList(),
-              ),
-            ),
+          if (_editMode) _buildColorPickerRow(ci, colors, color),
         ],
       ),
     );

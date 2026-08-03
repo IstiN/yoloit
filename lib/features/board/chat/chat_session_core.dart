@@ -248,15 +248,11 @@ class ChatSession extends ChangeNotifier {
 
     _isProcessing = true;
 
-    // Store UI callbacks if provided
-    if (onEvent != null) _uiEventCallback = onEvent;
-    if (onError != null) _uiErrorCallback = onError;
-    if (onDone != null) _uiDoneCallback = onDone;
-
-    // If currently streaming, finalize
-    if (_streamingMessageId != null && _streamingContent.isNotEmpty) {
-      _finalizeStreamingMessage();
-    }
+    _prepareForSend(
+      onEvent: onEvent,
+      onError: onError,
+      onDone: onDone,
+    );
 
     // Parse attachments from text
     final tokens = text.split(RegExp(r'\s+'));
@@ -270,6 +266,10 @@ class ChatSession extends ChangeNotifier {
     // Inline plain-text file contents so the model can see them.
     // (Images are forwarded via the provider's attachment path; other
     // non-image files are shown as chips in the UI.)
+    // NOTE: keep this loop inline in sendMessage — it contains the first
+    // real await of this method, and moving it into a helper would insert
+    // an extra microtask suspension point before the user message is
+    // appended, changing observable timing for synchronous senders.
     final keptAttachments = <String>[];
     final textFileExtras = <String>[];
     for (final path in allAttachments) {
@@ -286,18 +286,57 @@ class ChatSession extends ChangeNotifier {
       }
       keptAttachments.add(path);
     }
-    if (textFileExtras.isNotEmpty) {
-      promptText = promptText.isEmpty
-          ? textFileExtras.join('\n\n')
-          : '$promptText\n\n${textFileExtras.join('\n\n')}';
-    }
+    promptText = _appendTextFileExtras(promptText, textFileExtras);
 
     // Add user message
+    _appendUserMessage(text, promptText, keptAttachments);
+
+    // Start streaming
+    _startStreaming(promptText, text, keptAttachments, runtimeContext);
+
+    return true;
+  }
+
+  /// Stores UI callbacks (when provided) and finalizes any in-flight
+  /// streaming message before a new send.
+  void _prepareForSend({
+    void Function(ChatEvent event)? onEvent,
+    void Function(Object error)? onError,
+    void Function()? onDone,
+  }) {
+    // Store UI callbacks if provided
+    if (onEvent != null) _uiEventCallback = onEvent;
+    if (onError != null) _uiErrorCallback = onError;
+    if (onDone != null) _uiDoneCallback = onDone;
+
+    // If currently streaming, finalize
+    if (_streamingMessageId != null && _streamingContent.isNotEmpty) {
+      _finalizeStreamingMessage();
+    }
+  }
+
+  /// Appends inlined text-file contents to the prompt.
+  String _appendTextFileExtras(
+    String promptText,
+    List<String> textFileExtras,
+  ) {
+    if (textFileExtras.isEmpty) return promptText;
+    return promptText.isEmpty
+        ? textFileExtras.join('\n\n')
+        : '$promptText\n\n${textFileExtras.join('\n\n')}';
+  }
+
+  /// Appends the user message and resets streaming bookkeeping.
+  void _appendUserMessage(
+    String originalText,
+    String promptText,
+    List<String> keptAttachments,
+  ) {
     _messages.add(
       ChatMessage(
         id: 'user-${DateTime.now().millisecondsSinceEpoch}',
         role: ChatRole.user,
-        content: promptText.isNotEmpty ? promptText : text,
+        content: promptText.isNotEmpty ? promptText : originalText,
         attachments: keptAttachments,
         timestamp: DateTime.now(),
       ),
@@ -306,8 +345,15 @@ class ChatSession extends ChangeNotifier {
     _streamingMessageId = null;
     _assistantInsertIndex = _messages.length;
     notifyListeners();
+  }
 
-    // Start streaming
+  /// Starts the provider stream and wires up event/error/done handlers.
+  void _startStreaming(
+    String promptText,
+    String originalText,
+    List<String> keptAttachments,
+    ChatRuntimeContext? runtimeContext,
+  ) {
     final imageAttachments = _collectImageAttachments(
       keptAttachments,
       runtimeContext,
@@ -319,7 +365,7 @@ class ChatSession extends ChangeNotifier {
     );
 
     final stream = _provider.sendMessage(
-      message: promptText.isNotEmpty ? promptText : text,
+      message: promptText.isNotEmpty ? promptText : originalText,
       config: _config,
       isFirstMessage: _isFirstMessage,
       attachments: imageAttachments,
@@ -339,8 +385,6 @@ class ChatSession extends ChangeNotifier {
       onError: (Object error) => _handleStreamError(error, wasFirstMessage),
       onDone: _handleStreamDone,
     );
-
-    return true;
   }
 
   /// Filters [keptAttachments] down to images and injects the board snapshot

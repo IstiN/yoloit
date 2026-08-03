@@ -31,6 +31,7 @@ import 'package:yoloit/features/settings/ui/setup_guide_page.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_cubit.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_state.dart';
 import 'package:yoloit/features/terminal/data/terminal_backend_service.dart';
+import 'package:yoloit/features/terminal/models/agent_session.dart';
 import 'package:yoloit/features/terminal/ui/terminal_panel.dart';
 import 'package:yoloit/features/updates/data/update_service.dart';
 import 'package:yoloit/features/updates/ui/update_banner.dart';
@@ -123,18 +124,24 @@ class _MainShellState extends State<MainShell> with WindowListener {
     final autoEnabled = await SessionPrefs.isAutoUpdateCheckEnabled();
     if (!autoEnabled) return;
 
-    // Throttle: at most once per 24 hours
-    final lastMs = await SessionPrefs.getLastUpdateCheckMs();
-    if (lastMs != null) {
-      final elapsed = DateTime.now().millisecondsSinceEpoch - lastMs;
-      if (elapsed < const Duration(hours: 24).inMilliseconds) return;
-    }
+    if (!await _isUpdateCheckDue()) return;
 
     final result = await UpdateService.checkForUpdate();
     if (!mounted || result.status != UpdateCheckStatus.available) return;
-    final info = result.info!;
 
-    // ── Found an update — start silent download immediately ──────────────────
+    await _downloadUpdate(result.info!);
+  }
+
+  /// Throttle: at most once per 24 hours
+  Future<bool> _isUpdateCheckDue() async {
+    final lastMs = await SessionPrefs.getLastUpdateCheckMs();
+    if (lastMs == null) return true;
+    final elapsed = DateTime.now().millisecondsSinceEpoch - lastMs;
+    return elapsed >= const Duration(hours: 24).inMilliseconds;
+  }
+
+  /// Found an update — start silent download immediately
+  Future<void> _downloadUpdate(UpdateInfo info) async {
     setState(() {
       _updateInfo = info;
       _updatePhase = AutoUpdatePhase.downloading;
@@ -145,17 +152,7 @@ class _MainShellState extends State<MainShell> with WindowListener {
     try {
       final token = await UpdateService.downloadAndPrepare(
         info,
-        onProgress: (progress, status) {
-          if (!mounted) return;
-          setState(() {
-            _updateProgress = progress;
-            _updateStatus = status;
-            _updatePhase =
-                progress == null
-                    ? AutoUpdatePhase.installing
-                    : AutoUpdatePhase.downloading;
-          });
-        },
+        onProgress: _onUpdateDownloadProgress,
       );
 
       if (!mounted) return;
@@ -171,6 +168,18 @@ class _MainShellState extends State<MainShell> with WindowListener {
         });
       }
     }
+  }
+
+  void _onUpdateDownloadProgress(double? progress, String status) {
+    if (!mounted) return;
+    setState(() {
+      _updateProgress = progress;
+      _updateStatus = status;
+      _updatePhase =
+          progress == null
+              ? AutoUpdatePhase.installing
+              : AutoUpdatePhase.downloading;
+    });
   }
 
   void _openFileSearch() {
@@ -902,74 +911,81 @@ class _FourPaneLayoutState extends State<_FourPaneLayout> {
 class _AgentsContent extends StatelessWidget {
   const _AgentsContent();
 
+  // Workspace switch: reinitialize terminal, run, review, editor
+  bool _workspaceListenWhen(WorkspaceState prev, WorkspaceState curr) {
+    if (curr is! WorkspaceLoaded) return false;
+    if (prev is! WorkspaceLoaded) return true;
+    return prev.activeWorkspaceId != curr.activeWorkspaceId &&
+        curr.activeWorkspaceId != null;
+  }
+
+  void _onWorkspaceChanged(BuildContext context, WorkspaceState state) {
+    if (state is! WorkspaceLoaded) return;
+    final wsId = state.activeWorkspaceId;
+    if (wsId == null) return;
+    final ws = state.workspaces.firstWhere(
+      (w) => w.id == wsId,
+      orElse: () => state.workspaces.first,
+    );
+    context.read<TerminalCubit>().setActiveWorkspace(
+      workspaceId: wsId,
+      workspacePath: ws.workspaceDir,
+      workspacePaths: ws.paths,
+    );
+    context.read<RunCubit>().loadForWorkspace(ws.path);
+    context.read<ReviewCubit>().loadWorkspace(ws.paths, workspaceId: wsId);
+    context.read<FileEditorCubit>().setWorkspace(wsId);
+  }
+
+  // Session switch: sync file tree and editor tabs to the active session
+  bool _sessionListenWhen(TerminalState prev, TerminalState curr) {
+    if (curr is! TerminalLoaded) return false;
+    if (prev is! TerminalLoaded) return true;
+    return prev.activeSession?.id != curr.activeSession?.id;
+  }
+
+  void _onSessionChanged(BuildContext context, TerminalState state) {
+    if (state is! TerminalLoaded) return;
+    final session = state.activeSession;
+    if (session == null) return;
+    final paths = _resolveSessionPaths(context, session);
+    context.read<ReviewCubit>().loadSession(paths, session.id);
+    context.read<FileEditorCubit>().setSession(session.id);
+    // Reload run configs for the session's active worktree path so
+    // each session/worktree shows its own configurations and run history.
+    if (paths.isNotEmpty) {
+      context.read<RunCubit>().loadForWorkspace(paths.first);
+    }
+  }
+
+  // Resolve file tree paths: worktreeContexts values if set, else workspace paths
+  List<String> _resolveSessionPaths(BuildContext context, AgentSession session) {
+    final worktreeContexts = session.worktreeContexts;
+    if (worktreeContexts != null && worktreeContexts.isNotEmpty) {
+      return worktreeContexts.values.toList();
+    }
+    final wsState = context.read<WorkspaceCubit>().state;
+    if (wsState is WorkspaceLoaded && wsState.activeWorkspaceId != null) {
+      final ws = wsState.workspaces.firstWhere(
+        (w) => w.id == wsState.activeWorkspaceId,
+        orElse: () => wsState.workspaces.first,
+      );
+      return ws.paths;
+    }
+    return [];
+  }
+
   @override
   Widget build(BuildContext context) {
     return MultiBlocListener(
       listeners: [
-        // Workspace switch: reinitialize terminal, run, review, editor
         BlocListener<WorkspaceCubit, WorkspaceState>(
-          listenWhen: (prev, curr) {
-            if (curr is! WorkspaceLoaded) return false;
-            if (prev is! WorkspaceLoaded) return true;
-            return prev.activeWorkspaceId != curr.activeWorkspaceId &&
-                curr.activeWorkspaceId != null;
-          },
-          listener: (context, state) {
-            if (state is! WorkspaceLoaded) return;
-            final wsId = state.activeWorkspaceId;
-            if (wsId == null) return;
-            final ws = state.workspaces.firstWhere(
-              (w) => w.id == wsId,
-              orElse: () => state.workspaces.first,
-            );
-            context.read<TerminalCubit>().setActiveWorkspace(
-              workspaceId: wsId,
-              workspacePath: ws.workspaceDir,
-              workspacePaths: ws.paths,
-            );
-            context.read<RunCubit>().loadForWorkspace(ws.path);
-            context.read<ReviewCubit>().loadWorkspace(
-              ws.paths,
-              workspaceId: wsId,
-            );
-            context.read<FileEditorCubit>().setWorkspace(wsId);
-          },
+          listenWhen: _workspaceListenWhen,
+          listener: _onWorkspaceChanged,
         ),
-        // Session switch: sync file tree and editor tabs to the active session
         BlocListener<TerminalCubit, TerminalState>(
-          listenWhen: (prev, curr) {
-            if (curr is! TerminalLoaded) return false;
-            if (prev is! TerminalLoaded) return true;
-            return prev.activeSession?.id != curr.activeSession?.id;
-          },
-          listener: (context, state) {
-            if (state is! TerminalLoaded) return;
-            final session = state.activeSession;
-            if (session == null) return;
-            final wsState = context.read<WorkspaceCubit>().state;
-            // Resolve file tree paths: worktreeContexts values if set, else workspace paths
-            final List<String> paths;
-            if (session.worktreeContexts != null &&
-                session.worktreeContexts!.isNotEmpty) {
-              paths = session.worktreeContexts!.values.toList();
-            } else if (wsState is WorkspaceLoaded &&
-                wsState.activeWorkspaceId != null) {
-              final ws = wsState.workspaces.firstWhere(
-                (w) => w.id == wsState.activeWorkspaceId,
-                orElse: () => wsState.workspaces.first,
-              );
-              paths = ws.paths;
-            } else {
-              paths = [];
-            }
-            context.read<ReviewCubit>().loadSession(paths, session.id);
-            context.read<FileEditorCubit>().setSession(session.id);
-            // Reload run configs for the session's active worktree path so
-            // each session/worktree shows its own configurations and run history.
-            if (paths.isNotEmpty) {
-              context.read<RunCubit>().loadForWorkspace(paths.first);
-            }
-          },
+          listenWhen: _sessionListenWhen,
+          listener: _onSessionChanged,
         ),
       ],
       child: const TerminalPanel(),
@@ -1882,50 +1898,70 @@ SessionStat enrichResourceSessionFromBoards(
   SessionStat session,
   List<BoardDocument> boards,
 ) {
-  if (session.metadata?.panelId?.isNotEmpty ?? false) {
+  if (_hasPanelId(session.metadata)) {
     return session;
   }
   final sessionKey = session.sessionKey ?? _sessionKeyFromLabel(session.label);
-  if (sessionKey != null && sessionKey.isNotEmpty) {
-    final persisted = ResourceMonitorService.instance.metadataForRuntimeSession(
-      sessionKey,
-    );
-    if (persisted?.panelId?.isNotEmpty ?? false) {
-      return session.copyWith(metadata: persisted);
-    }
-  }
   if (sessionKey == null || sessionKey.isEmpty) {
     return session;
   }
+  final persisted = ResourceMonitorService.instance.metadataForRuntimeSession(
+    sessionKey,
+  );
+  if (_hasPanelId(persisted)) {
+    return session.copyWith(metadata: persisted);
+  }
+  final metadata = _terminalMetadataForBoards(boards, sessionKey);
+  if (metadata == null) {
+    return session;
+  }
+  return session.copyWith(metadata: metadata);
+}
+
+bool _hasPanelId(ResourceSessionMetadata? metadata) {
+  return metadata?.panelId?.isNotEmpty ?? false;
+}
+
+ResourceSessionMetadata? _terminalMetadataForBoards(
+  List<BoardDocument> boards,
+  String sessionKey,
+) {
   for (final board in boards) {
     for (final panel in board.panels) {
-      if (panel.type != 'board.terminal') continue;
-      final rawConfig = panel.state['config'];
-      if (rawConfig is! Map) continue;
-      final config = BoardTerminalConfig.fromJson(
-        Map<String, dynamic>.from(rawConfig),
-      );
-      if (config.sessionId != sessionKey) continue;
-      final sessionName = config.sessionName.trim();
-      final panelTitle =
-          panel.title.trim().isEmpty
-              ? (sessionName.isEmpty ? 'Terminal' : sessionName)
-              : panel.title.trim();
-      return session.copyWith(
-        metadata: ResourceSessionMetadata(
-          kind: 'terminal',
-          boardId: board.id,
-          boardName: board.name,
-          panelId: panel.id,
-          panelTitle: panelTitle,
-          panelType: panel.type,
-          workspacePath: config.workingDir.trim(),
-          provider: 'terminal',
-        ),
-      );
+      final metadata = _terminalPanelMetadata(board, panel, sessionKey);
+      if (metadata != null) return metadata;
     }
   }
-  return session;
+  return null;
+}
+
+ResourceSessionMetadata? _terminalPanelMetadata(
+  BoardDocument board,
+  BoardPanelInstance panel,
+  String sessionKey,
+) {
+  if (panel.type != 'board.terminal') return null;
+  final rawConfig = panel.state['config'];
+  if (rawConfig is! Map) return null;
+  final config = BoardTerminalConfig.fromJson(
+    Map<String, dynamic>.from(rawConfig),
+  );
+  if (config.sessionId != sessionKey) return null;
+  final sessionName = config.sessionName.trim();
+  final panelTitle =
+      panel.title.trim().isEmpty
+          ? (sessionName.isEmpty ? 'Terminal' : sessionName)
+          : panel.title.trim();
+  return ResourceSessionMetadata(
+    kind: 'terminal',
+    boardId: board.id,
+    boardName: board.name,
+    panelId: panel.id,
+    panelTitle: panelTitle,
+    panelType: panel.type,
+    workspacePath: config.workingDir.trim(),
+    provider: 'terminal',
+  );
 }
 
 @visibleForTesting

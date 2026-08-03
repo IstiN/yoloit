@@ -738,6 +738,94 @@ class _FileTreeNodeWidgetState extends State<_FileTreeNodeWidget> {
     }
   }
 
+  void _onTap() {
+    final node = widget.node;
+    if (node.isDirectory) {
+      context.read<ReviewCubit>().toggleNode(node.path);
+    } else {
+      context.read<ReviewCubit>().selectFile(node.path);
+      try {
+        context.read<FileEditorCubit>().openFile(node.path);
+      } catch (_) {}
+    }
+  }
+
+  Color _tileColor(AppColorScheme colors, bool isSelected) {
+    return isSelected
+        ? colors.primary.withAlpha(30)
+        : _hovering
+            ? colors.surfaceHighlight
+            : Colors.transparent;
+  }
+
+  Widget _expandIcon(AppColorScheme colors) {
+    final node = widget.node;
+    if (!node.isDirectory) return const SizedBox(width: 12);
+    return Icon(
+      node.isExpanded ? Icons.expand_more : Icons.chevron_right,
+      size: 12,
+      color: colors.textMuted,
+    );
+  }
+
+  Widget _nodeIcon(AppColorScheme colors) {
+    final node = widget.node;
+    if (node.isDirectory) {
+      return Icon(
+        node.isExpanded ? Icons.folder_open : Icons.folder,
+        size: 12,
+        color: colors.accentBlue.withAlpha(180),
+      );
+    }
+    final ft =
+        FileTypeUtils.forPath(node.path.isNotEmpty ? node.path : node.name);
+    return Icon(
+      ft.icon,
+      size: 12,
+      color: node.isModified ? colors.accentOrange : ft.color,
+    );
+  }
+
+  Widget _buildName(AppColorScheme colors, bool isSelected) {
+    final node = widget.node;
+    if (_renaming) {
+      return TextField(
+        controller: _renameCtrl,
+        focusNode: _renameFocus,
+        style: TextStyle(
+          color: colors.textPrimary,
+          fontSize: 12,
+        ),
+        decoration: InputDecoration(
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(3),
+            borderSide: BorderSide(color: colors.primary, width: 1),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(3),
+            borderSide: BorderSide(color: colors.primary, width: 1.5),
+          ),
+        ),
+        onSubmitted: (_) => _commitRename(),
+      );
+    }
+    return Text(
+      node.name,
+      style: TextStyle(
+        color: node.isModified
+            ? colors.accentOrange
+            : isSelected
+                ? colors.textPrimary
+                : colors.textSecondary,
+        fontSize: 12,
+        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+      ),
+      overflow: TextOverflow.ellipsis,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
@@ -752,16 +840,7 @@ class _FileTreeNodeWidgetState extends State<_FileTreeNodeWidget> {
           onExit: (_) => setState(() => _hovering = false),
           cursor: SystemMouseCursors.click,
           child: GestureDetector(
-            onTap: _renaming ? null : () {
-              if (node.isDirectory) {
-                context.read<ReviewCubit>().toggleNode(node.path);
-              } else {
-                context.read<ReviewCubit>().selectFile(node.path);
-                try {
-                  context.read<FileEditorCubit>().openFile(node.path);
-                } catch (_) {}
-              }
-            },
+            onTap: _renaming ? null : _onTap,
             onSecondaryTapDown: (d) => _showContextMenu(context, d.globalPosition),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 100),
@@ -771,75 +850,14 @@ class _FileTreeNodeWidgetState extends State<_FileTreeNodeWidget> {
                 top: 3,
                 bottom: 3,
               ),
-              color: isSelected
-                  ? colors.primary.withAlpha(30)
-                  : _hovering
-                      ? colors.surfaceHighlight
-                      : Colors.transparent,
+              color: _tileColor(colors, isSelected),
               child: Row(
                 children: [
-                  if (node.isDirectory)
-                    Icon(
-                      node.isExpanded ? Icons.expand_more : Icons.chevron_right,
-                      size: 12,
-                      color: colors.textMuted,
-                    )
-                  else
-                    const SizedBox(width: 12),
+                  _expandIcon(colors),
                   const SizedBox(width: 4),
-                  Builder(builder: (_) {
-                    if (node.isDirectory) {
-                      return Icon(
-                        node.isExpanded ? Icons.folder_open : Icons.folder,
-                        size: 12,
-                        color: colors.accentBlue.withAlpha(180),
-                      );
-                    }
-                    final ft = FileTypeUtils.forPath(node.path.isNotEmpty ? node.path : node.name);
-                    return Icon(
-                      ft.icon,
-                      size: 12,
-                      color: node.isModified ? colors.accentOrange : ft.color,
-                    );
-                  }),
+                  Builder(builder: (_) => _nodeIcon(colors)),
                   const SizedBox(width: 5),
-                  Expanded(
-                    child: _renaming
-                        ? TextField(
-                            controller: _renameCtrl,
-                            focusNode: _renameFocus,
-                            style: TextStyle(
-                              color: colors.textPrimary,
-                              fontSize: 12,
-                            ),
-                            decoration: InputDecoration(
-                              isDense: true,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(3),
-                                borderSide: BorderSide(color: colors.primary, width: 1),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(3),
-                                borderSide: BorderSide(color: colors.primary, width: 1.5),
-                              ),
-                            ),
-                            onSubmitted: (_) => _commitRename(),
-                          )
-                        : Text(
-                            node.name,
-                            style: TextStyle(
-                              color: node.isModified
-                                  ? colors.accentOrange
-                                  : isSelected
-                                      ? colors.textPrimary
-                                      : colors.textSecondary,
-                              fontSize: 12,
-                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                  ),
+                  Expanded(child: _buildName(colors, isSelected)),
                   if (node.isModified)
                     Container(
                       width: 5,

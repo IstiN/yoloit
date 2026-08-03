@@ -558,44 +558,140 @@ class _DependencyCardState extends State<_DependencyCard> {
     );
   }
 
+  ({Color color, IconData icon}) _statusStyle(AppColorScheme colors) {
+    final dep = widget.dep;
+    if (dep.isAvailable) {
+      return (color: colors.accentGreen, icon: Icons.check_circle_outline);
+    }
+    if (_phase == _Phase.installing) {
+      return (color: colors.accentBlue, icon: Icons.hourglass_top_rounded);
+    }
+    if (_phase == _Phase.done) {
+      return (color: colors.accentGreen, icon: Icons.check_circle_outline);
+    }
+    if (_phase == _Phase.failed) {
+      return (color: Colors.red.shade400, icon: Icons.error_outline);
+    }
+    return (
+      color: dep.isRequired ? Colors.red.shade400 : colors.accentOrange,
+      icon: Icons.warning_amber_rounded,
+    );
+  }
+
+  Color _borderColor(AppColorScheme colors, bool ok) {
+    final dep = widget.dep;
+    if (ok || _phase == _Phase.done) {
+      return colors.accentGreen.withAlpha(60);
+    }
+    if (_phase == _Phase.installing) {
+      return colors.accentBlue.withAlpha(60);
+    }
+    if (_phase == _Phase.failed) {
+      return Colors.red.withAlpha(60);
+    }
+    return dep.isRequired ? Colors.red.withAlpha(40) : colors.border;
+  }
+
+  Widget _buildStatusIndicator(
+    AppColorScheme colors,
+    Color statusColor,
+    IconData statusIcon,
+  ) {
+    if (_phase == _Phase.installing) {
+      return SizedBox(
+        width: 14, height: 14,
+        child: CircularProgressIndicator(
+          strokeWidth: 1.5,
+          color: colors.accentBlue,
+        ),
+      );
+    }
+    return Icon(statusIcon, size: 14, color: statusColor);
+  }
+
+  Widget _buildTitleRow(bool ok) {
+    final dep = widget.dep;
+    return Row(
+      children: [
+        Text(dep.name,
+            style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 12, fontWeight: FontWeight.w500)),
+        if (dep.isRequired)
+          Container(
+            margin: const EdgeInsets.only(left: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+            decoration: BoxDecoration(
+              color: Colors.red.withAlpha(25),
+              borderRadius: BorderRadius.circular(3),
+            ),
+            child: const Text('required', style: TextStyle(color: Colors.redAccent, fontSize: 8)),
+          ),
+        if ((ok || _phase == _Phase.done) && dep.version != null) ...[
+          const SizedBox(width: 8),
+          Caption(dep.version!, fontSize: 10),
+        ],
+      ],
+    );
+  }
+
+  List<Widget> _actionArea(AppColorScheme colors, bool ok) {
+    final dep = widget.dep;
+    if (ok || _phase == _Phase.done) {
+      return [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: colors.accentGreen.withAlpha(20),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Text('Available', style: TextStyle(color: colors.accentGreen, fontSize: 9, fontWeight: FontWeight.w600)),
+        ),
+      ];
+    }
+    if (_phase == _Phase.installing) {
+      return [_outputToggleButton(_showOutput)];
+    }
+    if (!ok) {
+      return [
+        if (dep.installAction != null) ...[
+          _InstallButton(onPressed: _install),
+          const SizedBox(width: 4),
+        ],
+        _CopyButton(hint: dep.installHint),
+      ];
+    }
+    return const [];
+  }
+
+  Widget _buildRetryDismiss(AppColorScheme colors) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          TextButton(
+            onPressed: () => setState(() { _phase = _Phase.idle; _output.clear(); _showOutput = false; }),
+            child: const Caption('Dismiss', fontSize: 10),
+          ),
+          const SizedBox(width: 4),
+          TextButton(
+            onPressed: _install,
+            child: Text('Retry', style: TextStyle(fontSize: 10, color: colors.accentBlue)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final dep = widget.dep;
     final ok = dep.isAvailable;
-
-    Color statusColor;
-    IconData statusIcon;
-    if (ok) {
-      statusColor = colors.accentGreen;
-      statusIcon = Icons.check_circle_outline;
-    } else if (_phase == _Phase.installing) {
-      statusColor = colors.accentBlue;
-      statusIcon = Icons.hourglass_top_rounded;
-    } else if (_phase == _Phase.done) {
-      statusColor = colors.accentGreen;
-      statusIcon = Icons.check_circle_outline;
-    } else if (_phase == _Phase.failed) {
-      statusColor = Colors.red.shade400;
-      statusIcon = Icons.error_outline;
-    } else {
-      statusColor = dep.isRequired ? Colors.red.shade400 : colors.accentOrange;
-      statusIcon = Icons.warning_amber_rounded;
-    }
-
-    final borderColor = ok || _phase == _Phase.done
-        ? colors.accentGreen.withAlpha(60)
-        : _phase == _Phase.installing
-            ? colors.accentBlue.withAlpha(60)
-            : _phase == _Phase.failed
-                ? Colors.red.withAlpha(60)
-                : dep.isRequired
-                    ? Colors.red.withAlpha(40)
-                    : colors.border;
+    final status = _statusStyle(colors);
 
     return _cardContainer(
       colors: colors,
-      borderColor: borderColor,
+      borderColor: _borderColor(colors, ok),
       child: Column(
         children: [
           // ── Main row ───────────────────────────────────────────────────
@@ -604,16 +700,7 @@ class _DependencyCardState extends State<_DependencyCard> {
             child: Row(
               children: [
                 // Status icon / spinner
-                if (_phase == _Phase.installing)
-                  SizedBox(
-                    width: 14, height: 14,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 1.5,
-                      color: colors.accentBlue,
-                    ),
-                  )
-                else
-                  Icon(statusIcon, size: 14, color: statusColor),
+                _buildStatusIndicator(colors, status.color, status.icon),
 
                 const SizedBox(width: 10),
 
@@ -621,26 +708,7 @@ class _DependencyCardState extends State<_DependencyCard> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Text(dep.name,
-                              style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 12, fontWeight: FontWeight.w500)),
-                          if (dep.isRequired)
-                            Container(
-                              margin: const EdgeInsets.only(left: 6),
-                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                              decoration: BoxDecoration(
-                                color: Colors.red.withAlpha(25),
-                                borderRadius: BorderRadius.circular(3),
-                              ),
-                              child: const Text('required', style: TextStyle(color: Colors.redAccent, fontSize: 8)),
-                            ),
-                          if ((ok || _phase == _Phase.done) && dep.version != null) ...[
-                            const SizedBox(width: 8),
-                            Caption(dep.version!, fontSize: 10),
-                          ],
-                        ],
-                      ),
+                      _buildTitleRow(ok),
                       const SizedBox(height: 1),
                       Caption(dep.description, fontSize: 10),
                     ],
@@ -648,24 +716,7 @@ class _DependencyCardState extends State<_DependencyCard> {
                 ),
 
                 // Action area
-                if (ok || _phase == _Phase.done)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: colors.accentGreen.withAlpha(20),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text('Available', style: TextStyle(color: colors.accentGreen, fontSize: 9, fontWeight: FontWeight.w600)),
-                  )
-                else if (_phase == _Phase.installing)
-                  _outputToggleButton(_showOutput)
-                else if (!ok) ...[
-                  if (dep.installAction != null) ...[
-                    _InstallButton(onPressed: _install),
-                    const SizedBox(width: 4),
-                  ],
-                  _CopyButton(hint: dep.installHint),
-                ],
+                ..._actionArea(colors, ok),
               ],
             ),
           ),
@@ -680,24 +731,7 @@ class _DependencyCardState extends State<_DependencyCard> {
             ),
 
           // ── Retry / dismiss ────────────────────────────────────────────
-          if (_phase == _Phase.failed)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () => setState(() { _phase = _Phase.idle; _output.clear(); _showOutput = false; }),
-                    child: const Caption('Dismiss', fontSize: 10),
-                  ),
-                  const SizedBox(width: 4),
-                  TextButton(
-                    onPressed: _install,
-                    child: Text('Retry', style: TextStyle(fontSize: 10, color: colors.accentBlue)),
-                  ),
-                ],
-              ),
-            ),
+          if (_phase == _Phase.failed) _buildRetryDismiss(colors),
         ],
       ),
     );

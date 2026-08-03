@@ -317,34 +317,43 @@ class GlobalEnvGroupsService {
   Map<String, String> parseEnvContent(String content) {
     final result = <String, String>{};
     final lines = content.split(RegExp(r'\r?\n'));
-    for (var line in lines) {
-      line = line.trim();
-      if (line.isEmpty || line.startsWith('#')) continue;
-      if (line.startsWith('export ')) {
-        line = line.substring(7).trim();
-      }
-      final eq = line.indexOf('=');
-      if (eq <= 0) continue;
-      final key = line.substring(0, eq).trim();
-      if (key.isEmpty) continue;
-      var value = line.substring(eq + 1).trim();
-      if (value.length >= 2 &&
-          ((value.startsWith('"') && value.endsWith('"')) ||
-              (value.startsWith("'") && value.endsWith("'")))) {
-        value = value.substring(1, value.length - 1);
-      } else {
-        final commentIndex = value.indexOf(' #');
-        if (commentIndex >= 0) {
-          value = value.substring(0, commentIndex).trimRight();
-        }
-      }
-      value = value
-          .replaceAll(r'\n', '\n')
-          .replaceAll(r'\r', '\r')
-          .replaceAll(r'\t', '\t');
-      result[key] = value;
+    for (final line in lines) {
+      final entry = _parseEnvLine(line);
+      if (entry != null) result[entry.key] = entry.value;
     }
     return result;
+  }
+
+  MapEntry<String, String>? _parseEnvLine(String rawLine) {
+    var line = rawLine.trim();
+    if (line.isEmpty || line.startsWith('#')) return null;
+    if (line.startsWith('export ')) {
+      line = line.substring(7).trim();
+    }
+    final eq = line.indexOf('=');
+    if (eq <= 0) return null;
+    final key = line.substring(0, eq).trim();
+    if (key.isEmpty) return null;
+    var value = _stripEnvValueDecorations(line.substring(eq + 1).trim());
+    value = value
+        .replaceAll(r'\n', '\n')
+        .replaceAll(r'\r', '\r')
+        .replaceAll(r'\t', '\t');
+    return MapEntry(key, value);
+  }
+
+  // Removes surrounding quotes, or the trailing ' # comment' for unquoted values.
+  String _stripEnvValueDecorations(String value) {
+    if (value.length >= 2 &&
+        ((value.startsWith('"') && value.endsWith('"')) ||
+            (value.startsWith("'") && value.endsWith("'")))) {
+      return value.substring(1, value.length - 1);
+    }
+    final commentIndex = value.indexOf(' #');
+    if (commentIndex >= 0) {
+      return value.substring(0, commentIndex).trimRight();
+    }
+    return value;
   }
 
   // ── Private helpers ──────────────────────────────────────────────────────

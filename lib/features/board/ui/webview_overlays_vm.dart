@@ -152,15 +152,7 @@ class _WebViewOverlaysState extends State<WebViewOverlays> {
 
   @override
   Widget build(BuildContext context) {
-    final webPanels =
-        widget.panels
-            .where(
-              (p) =>
-                  p.type == WebpagePluginBase.kTypeId &&
-                  !p.hidden &&
-                  WebpagePluginBase.controllers.containsKey(p.id),
-            )
-            .toList();
+    final webPanels = _visibleWebPanels();
 
     if (webPanels.isEmpty) return const SizedBox.shrink();
 
@@ -170,94 +162,135 @@ class _WebViewOverlaysState extends State<WebViewOverlays> {
     if (widget.isInteracting || _isSettling) return const SizedBox.shrink();
 
     return LayoutBuilder(
-      builder: (context, constraints) {
-        final viewportRect = Rect.fromLTWH(
-          0,
-          0,
-          constraints.maxWidth,
-          constraints.maxHeight,
-        );
+      builder:
+          (context, constraints) => _buildOverlays(context, webPanels, constraints),
+    );
+  }
 
-        final matrix = _matrix;
-        final scale = matrixScaleOf(matrix);
-        final children = <Widget>[];
+  List<BoardPanelInstance> _visibleWebPanels() {
+    return widget.panels
+        .where(
+          (p) =>
+              p.type == WebpagePluginBase.kTypeId &&
+              !p.hidden &&
+              WebpagePluginBase.controllers.containsKey(p.id),
+        )
+        .toList();
+  }
 
-        // Apply CSS zoom = boardScale so pages use desktop layout widths.
-        // pageZoom is NOT used — it shrinks content visually without
-        // changing window.innerWidth.
+  Widget _buildOverlays(
+    BuildContext context,
+    List<BoardPanelInstance> webPanels,
+    BoxConstraints constraints,
+  ) {
+    final viewportRect = Rect.fromLTWH(
+      0,
+      0,
+      constraints.maxWidth,
+      constraints.maxHeight,
+    );
 
-        // ── 1. Unfocused WebView overlays (bottom z-order) ──
-        for (final panel in webPanels) {
-          if (panel.id == widget.focusedPanelId) continue;
-          final rect = _screenRect(panel, matrix, scale);
-          if (rect == null) continue;
-          // Viewport culling — skip off-screen panels.
-          if (!rect.overlaps(viewportRect)) continue;
+    final matrix = _matrix;
+    final scale = matrixScaleOf(matrix);
 
-          final ctrl = WebpagePluginBase.controllers[panel.id]! as WebViewController;
+    // Apply CSS zoom = boardScale so pages use desktop layout widths.
+    // pageZoom is NOT used — it shrinks content visually without
+    // changing window.innerWidth.
+    final children = _unfocusedOverlays(
+      context,
+      webPanels,
+      viewportRect,
+      matrix,
+      scale,
+    );
+    final focused = _focusedOverlay(context, webPanels, matrix, scale);
+    if (focused != null) children.add(focused);
 
-          // pageZoom in Swift handles viewport width. No CSS zoom needed.
-          if (!WebpagePluginBase.pendingCssZoom.containsKey(panel.id)) {
-            WebpagePluginBase.pendingCssZoom[panel.id] = 1.0;
-          }
+    if (children.isEmpty) return const SizedBox.shrink();
+    return Stack(children: children);
+  }
 
-          children.add(
-            _webViewOverlay(
-              context,
-              panelId: 'wv-${panel.id}',
-              rect: rect,
-              scale: scale,
-              ctrl: ctrl,
-              backgroundColor: context.appColors.background,
-              extraChildren: [
-                GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () {
-                    if (kDebugMode) {
-                      debugPrint(
-                        '[BoardWebFocus] unfocused overlay tap -> focus panel=${panel.id}',
-                      );
-                    }
-                    context.read<BoardCubit>().focusPanel(panel.id);
-                    FocusManager.instance.primaryFocus?.unfocus();
-                  },
-                ),
-              ],
+  /// ── 1. Unfocused WebView overlays (bottom z-order) ──
+  List<Widget> _unfocusedOverlays(
+    BuildContext context,
+    List<BoardPanelInstance> webPanels,
+    Rect viewportRect,
+    Matrix4 matrix,
+    double scale,
+  ) {
+    final children = <Widget>[];
+    for (final panel in webPanels) {
+      if (panel.id == widget.focusedPanelId) continue;
+      final rect = _screenRect(panel, matrix, scale);
+      if (rect == null) continue;
+      // Viewport culling — skip off-screen panels.
+      if (!rect.overlaps(viewportRect)) continue;
+
+      final ctrl = WebpagePluginBase.controllers[panel.id]! as WebViewController;
+
+      // pageZoom in Swift handles viewport width. No CSS zoom needed.
+      if (!WebpagePluginBase.pendingCssZoom.containsKey(panel.id)) {
+        WebpagePluginBase.pendingCssZoom[panel.id] = 1.0;
+      }
+
+      children.add(
+        _webViewOverlay(
+          context,
+          panelId: 'wv-${panel.id}',
+          rect: rect,
+          scale: scale,
+          ctrl: ctrl,
+          backgroundColor: context.appColors.background,
+          extraChildren: [
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () {
+                if (kDebugMode) {
+                  debugPrint(
+                    '[BoardWebFocus] unfocused overlay tap -> focus panel=${panel.id}',
+                  );
+                }
+                context.read<BoardCubit>().focusPanel(panel.id);
+                FocusManager.instance.primaryFocus?.unfocus();
+              },
             ),
-          );
-        }
+          ],
+        ),
+      );
+    }
+    return children;
+  }
 
-        // ── 2. Focused WebView overlay (top z-order, full interaction) ──
-        // No full-screen background — the canvas Listener inside
-        // InteractiveViewer handles unfocusing when clicking empty space.
-        final focusedPanel =
-            webPanels.where((p) => p.id == widget.focusedPanelId).firstOrNull;
-        if (focusedPanel != null) {
-          final rect = _screenRect(focusedPanel, matrix, scale);
-          if (rect != null) {
-            final ctrl = WebpagePluginBase.controllers[focusedPanel.id]! as WebViewController;
+  /// ── 2. Focused WebView overlay (top z-order, full interaction) ──
+  /// No full-screen background — the canvas Listener inside
+  /// InteractiveViewer handles unfocusing when clicking empty space.
+  Widget? _focusedOverlay(
+    BuildContext context,
+    List<BoardPanelInstance> webPanels,
+    Matrix4 matrix,
+    double scale,
+  ) {
+    final focusedPanel =
+        webPanels.where((p) => p.id == widget.focusedPanelId).firstOrNull;
+    if (focusedPanel == null) return null;
+    final rect = _screenRect(focusedPanel, matrix, scale);
+    if (rect == null) return null;
 
-            // pageZoom in Swift handles viewport width via frame observer.
-            if (!WebpagePluginBase.pendingCssZoom.containsKey(focusedPanel.id)) {
-              WebpagePluginBase.pendingCssZoom[focusedPanel.id] = 1.0;
-            }
+    final ctrl =
+        WebpagePluginBase.controllers[focusedPanel.id]! as WebViewController;
 
-            children.add(
-              _webViewOverlay(
-                context,
-                panelId: 'wv-focused-${focusedPanel.id}',
-                rect: rect,
-                scale: scale,
-                ctrl: ctrl,
-                backgroundColor: context.appColors.surface,
-              ),
-            );
-          }
-        }
+    // pageZoom in Swift handles viewport width via frame observer.
+    if (!WebpagePluginBase.pendingCssZoom.containsKey(focusedPanel.id)) {
+      WebpagePluginBase.pendingCssZoom[focusedPanel.id] = 1.0;
+    }
 
-        if (children.isEmpty) return const SizedBox.shrink();
-        return Stack(children: children);
-      },
+    return _webViewOverlay(
+      context,
+      panelId: 'wv-focused-${focusedPanel.id}',
+      rect: rect,
+      scale: scale,
+      ctrl: ctrl,
+      backgroundColor: context.appColors.surface,
     );
   }
 }

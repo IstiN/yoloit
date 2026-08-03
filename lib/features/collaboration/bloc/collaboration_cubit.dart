@@ -284,22 +284,27 @@ class CollaborationCubit extends Cubit<CollaborationState> {
     _lastBroadcast = mmState;
     if (_server == null || _server!.clientCount == 0) return;
 
-    if (prev == null) {
+    if (prev == null || _requiresSnapshot(mmState, prev)) {
       _server!.broadcastRaw(_buildSnapshot(mmState));
       return;
     }
 
-    // When structural / non-delta-able fields change (hiddenTypes, connections,
-    // savedViews, nodes), broadcast a full snapshot rather than fine-grained
-    // deltas that cannot express these changes.
-    if (!identical(mmState.hiddenTypes, prev.hiddenTypes) ||
+    _broadcastPositionDeltas(mmState, prev);
+    _broadcastSizeDeltas(mmState, prev);
+    _broadcastHiddenDeltas(mmState, prev);
+  }
+
+  /// When structural / non-delta-able fields change (hiddenTypes, connections,
+  /// savedViews, nodes), a full snapshot must be broadcast rather than
+  /// fine-grained deltas that cannot express these changes.
+  static bool _requiresSnapshot(MindMapState mmState, MindMapState prev) {
+    return !identical(mmState.hiddenTypes, prev.hiddenTypes) ||
         !identical(mmState.connections, prev.connections) ||
         !identical(mmState.savedViews, prev.savedViews) ||
-        !identical(mmState.nodes, prev.nodes)) {
-      _server!.broadcastRaw(_buildSnapshot(mmState));
-      return;
-    }
+        !identical(mmState.nodes, prev.nodes);
+  }
 
+  void _broadcastPositionDeltas(MindMapState mmState, MindMapState prev) {
     for (final entry in mmState.positions.entries) {
       final old = prev.positions[entry.key];
       if (old == null || old != entry.value) {
@@ -308,6 +313,9 @@ class CollaborationCubit extends Cubit<CollaborationState> {
         );
       }
     }
+  }
+
+  void _broadcastSizeDeltas(MindMapState mmState, MindMapState prev) {
     for (final entry in mmState.sizes.entries) {
       final old = prev.sizes[entry.key];
       if (old == null || old != entry.value) {
@@ -316,6 +324,9 @@ class CollaborationCubit extends Cubit<CollaborationState> {
         );
       }
     }
+  }
+
+  void _broadcastHiddenDeltas(MindMapState mmState, MindMapState prev) {
     for (final id in mmState.hidden.difference(prev.hidden)) {
       _server!.broadcastRaw(SyncMessage.toggle(id, hidden: true));
     }
@@ -618,55 +629,88 @@ class CollaborationCubit extends Cubit<CollaborationState> {
 
   // ── Guest: received from host ─────────────────────────────────────────────
 
+  /// Message-type → handler registry for [SyncMessage]s received from the
+  /// host.  Unknown types are ignored (previous switch had no `default`).
+  late final Map<String, void Function(SyncMessage)> _hostMessageHandlers = {
+    SyncMessage.kSnapshot: _handleHostSnapshot,
+    SyncMessage.kDeltaMove: _handleHostDeltaMove,
+    SyncMessage.kDeltaResize: _handleHostDeltaResize,
+    SyncMessage.kDeltaToggle: _handleHostDeltaToggle,
+    SyncMessage.kNodeUpdate: _handleHostNodeUpdate,
+    SyncMessage.kTerminalOutput: _handleHostTerminalOutput,
+    SyncMessage.kPresence: _handleHostPresence,
+    SyncMessage.kCursorMove: _handleHostCursorMove,
+    SyncMessage.kConnected: _handleHostConnected,
+    SyncMessage.kDisconnected: _handleHostDisconnected,
+  };
+
   void _onMessageFromHost(SyncMessage msg) {
-    switch (msg.type) {
-      case SyncMessage.kSnapshot:
-        _applySnapshot(msg.payload);
-      case SyncMessage.kDeltaMove:
-        _applyMove(msg.payload);
-      case SyncMessage.kDeltaResize:
-        _applyResize(msg.payload);
-      case SyncMessage.kDeltaToggle:
-        _applyToggle(msg.payload);
-      case SyncMessage.kNodeUpdate:
-        final id = msg.payload['id'] as String;
-        final content = (msg.payload['content'] as Map<String, dynamic>?) ?? {};
-        mindMapCubit.updateNodeContent(id, content);
-      case SyncMessage.kTerminalOutput:
-        final id = msg.payload['id'] as String;
-        final data = (msg.payload['data'] as String?) ?? '';
-        GuestTerminalRegistry.instance.writeOutput(id, data);
-      case SyncMessage.kPresence:
-        // Full peer list from server — replace the peers map entirely.
-        final list = (msg.payload['peers'] as List?) ?? [];
-        final peers = <String, PeerInfo>{};
-        for (final raw in list) {
-          final m = raw as Map<String, dynamic>;
-          final id    = m['id'] as String? ?? '';
-          final name  = m['name'] as String? ?? 'Guest';
-          final color = m['color'] as String? ?? '#60A5FA';
-          if (id.isNotEmpty) peers[id] = PeerInfo(id: id, name: name, color: color);
-        }
-        emit(state.copyWith(peers: peers, peerCount: peers.length));
-      case SyncMessage.kCursorMove:
-        // Future: render peer cursor overlay.  No-op for now.
-        break;
-      case SyncMessage.kConnected:
-        final id    = msg.payload['id'] as String? ?? '';
-        final name  = msg.payload['name'] as String? ?? 'Guest';
-        final color = msg.payload['color'] as String? ?? '#60A5FA';
-        if (id.isEmpty) break;
-        final peers = Map<String, PeerInfo>.from(state.peers)
-          ..[id] = PeerInfo(id: id, name: name, color: color);
-        emit(state.copyWith(peers: peers, peerCount: peers.length));
-      case SyncMessage.kDisconnected:
-        if (msg.payload['id'] == 'server') {
-          disconnect();
-        } else {
-          final peers = Map<String, PeerInfo>.from(state.peers)
-            ..remove(msg.payload['id']);
-          emit(state.copyWith(peers: peers, peerCount: peers.length));
-        }
+    _hostMessageHandlers[msg.type]?.call(msg);
+  }
+
+  void _handleHostSnapshot(SyncMessage msg) {
+    _applySnapshot(msg.payload);
+  }
+
+  void _handleHostDeltaMove(SyncMessage msg) {
+    _applyMove(msg.payload);
+  }
+
+  void _handleHostDeltaResize(SyncMessage msg) {
+    _applyResize(msg.payload);
+  }
+
+  void _handleHostDeltaToggle(SyncMessage msg) {
+    _applyToggle(msg.payload);
+  }
+
+  void _handleHostNodeUpdate(SyncMessage msg) {
+    final id = msg.payload['id'] as String;
+    final content = (msg.payload['content'] as Map<String, dynamic>?) ?? {};
+    mindMapCubit.updateNodeContent(id, content);
+  }
+
+  void _handleHostTerminalOutput(SyncMessage msg) {
+    final id = msg.payload['id'] as String;
+    final data = (msg.payload['data'] as String?) ?? '';
+    GuestTerminalRegistry.instance.writeOutput(id, data);
+  }
+
+  void _handleHostPresence(SyncMessage msg) {
+    // Full peer list from server — replace the peers map entirely.
+    final list = (msg.payload['peers'] as List?) ?? [];
+    final peers = <String, PeerInfo>{};
+    for (final raw in list) {
+      final m = raw as Map<String, dynamic>;
+      final id    = m['id'] as String? ?? '';
+      final name  = m['name'] as String? ?? 'Guest';
+      final color = m['color'] as String? ?? '#60A5FA';
+      if (id.isNotEmpty) peers[id] = PeerInfo(id: id, name: name, color: color);
+    }
+    emit(state.copyWith(peers: peers, peerCount: peers.length));
+  }
+
+  void _handleHostCursorMove(SyncMessage msg) {
+    // Future: render peer cursor overlay.  No-op for now.
+  }
+
+  void _handleHostConnected(SyncMessage msg) {
+    final id    = msg.payload['id'] as String? ?? '';
+    final name  = msg.payload['name'] as String? ?? 'Guest';
+    final color = msg.payload['color'] as String? ?? '#60A5FA';
+    if (id.isEmpty) return;
+    final peers = Map<String, PeerInfo>.from(state.peers)
+      ..[id] = PeerInfo(id: id, name: name, color: color);
+    emit(state.copyWith(peers: peers, peerCount: peers.length));
+  }
+
+  void _handleHostDisconnected(SyncMessage msg) {
+    if (msg.payload['id'] == 'server') {
+      disconnect();
+    } else {
+      final peers = Map<String, PeerInfo>.from(state.peers)
+        ..remove(msg.payload['id']);
+      emit(state.copyWith(peers: peers, peerCount: peers.length));
     }
   }
 

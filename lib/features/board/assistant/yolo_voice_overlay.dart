@@ -263,56 +263,65 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
 
     if (wait > 0) {
       _pendingTransition = true;
-      Future.delayed(Duration(milliseconds: wait), () {
-        _pendingTransition = false;
-        if (!mounted) return;
-        final latest = _VS.from(widget.status);
-        // ignore: avoid_print
-        print(
-          '[VoiceOverlay] delayed fired: _shown=${_shown.name} latest=${latest.name}',
-        );
-        if (latest == _shown) return;
-
-        // Step to next sequential state, not jump to latest
-        final curIdx = _order.indexOf(_shown);
-        final latestIdx = _order.indexOf(latest);
-        final nextState =
-            (latestIdx > curIdx + 1) ? _order[curIdx + 1] : latest;
-
-        // ignore: avoid_print
-        print(
-          '[VoiceOverlay] delayed step: ${_shown.name} → ${nextState.name}',
-        );
-        setState(() {
-          _shown = nextState;
-          _shownAt = DateTime.now();
-        });
-        // If we stepped to intermediate, trigger another transition
-        if (nextState != latest) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) _maybeTransition();
-          });
-        }
-      });
-    } else {
-      // No min time required — but still step sequentially for forward moves
-      final curIdx = _order.indexOf(_shown);
-      final targetIdx = _order.indexOf(target);
-      final nextState = (targetIdx > curIdx + 1) ? _order[curIdx + 1] : target;
-
-      // ignore: avoid_print
-      print(
-        '[VoiceOverlay] immediate step: ${_shown.name} → ${nextState.name}',
+      Future.delayed(
+        Duration(milliseconds: wait),
+        _onDelayedTransitionFired,
       );
-      setState(() {
-        _shown = nextState;
-        _shownAt = DateTime.now();
+    } else {
+      _stepImmediately(target);
+    }
+  }
+
+  void _onDelayedTransitionFired() {
+    _pendingTransition = false;
+    if (!mounted) return;
+    final latest = _VS.from(widget.status);
+    // ignore: avoid_print
+    print(
+      '[VoiceOverlay] delayed fired: _shown=${_shown.name} latest=${latest.name}',
+    );
+    if (latest == _shown) return;
+
+    // Step to next sequential state, not jump to latest
+    final curIdx = _order.indexOf(_shown);
+    final latestIdx = _order.indexOf(latest);
+    final nextState =
+        (latestIdx > curIdx + 1) ? _order[curIdx + 1] : latest;
+
+    // ignore: avoid_print
+    print(
+      '[VoiceOverlay] delayed step: ${_shown.name} → ${nextState.name}',
+    );
+    setState(() {
+      _shown = nextState;
+      _shownAt = DateTime.now();
+    });
+    // If we stepped to intermediate, trigger another transition
+    if (nextState != latest) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _maybeTransition();
       });
-      if (nextState != target) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _maybeTransition();
-        });
-      }
+    }
+  }
+
+  void _stepImmediately(_VS target) {
+    // No min time required — but still step sequentially for forward moves
+    final curIdx = _order.indexOf(_shown);
+    final targetIdx = _order.indexOf(target);
+    final nextState = (targetIdx > curIdx + 1) ? _order[curIdx + 1] : target;
+
+    // ignore: avoid_print
+    print(
+      '[VoiceOverlay] immediate step: ${_shown.name} → ${nextState.name}',
+    );
+    setState(() {
+      _shown = nextState;
+      _shownAt = DateTime.now();
+    });
+    if (nextState != target) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _maybeTransition();
+      });
     }
   }
 

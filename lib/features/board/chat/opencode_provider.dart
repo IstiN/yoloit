@@ -498,7 +498,23 @@ class _OpenCodeLogWatcher {
     if (dir == null) return;
 
     // Find the log file created most recently (within last 10 seconds)
-    File? logFile;
+    final logFile = await _findRecentLogFile(dir);
+    if (logFile == null || _stopped) return;
+
+    debugPrint('[OpenCodeLog] Watching: ${logFile.path}');
+    // Start from beginning — the 429 error may already be in the file
+    // by the time we find it, and we don't want to miss it.
+    var offset = 0;
+
+    while (!_stopped) {
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+      if (_stopped) break;
+      offset = await _readNewLogContent(logFile, offset);
+    }
+  }
+
+  /// Polls [dir] for a recently-created `.log` file (up to 10 attempts).
+  Future<File?> _findRecentLogFile(Directory dir) async {
     final now = DateTime.now();
     for (int attempt = 0; attempt < 10 && !_stopped; attempt++) {
       await Future<void>.delayed(const Duration(milliseconds: 500));
@@ -515,38 +531,34 @@ class _OpenCodeLogWatcher {
         final newest = files.first;
         if (now.difference(newest.statSync().modified).abs() <
             const Duration(seconds: 30)) {
-          logFile = newest;
-          break;
+          return newest;
         }
       }
     }
-    if (logFile == null || _stopped) return;
+    return null;
+  }
 
-    debugPrint('[OpenCodeLog] Watching: ${logFile.path}');
-    // Start from beginning — the 429 error may already be in the file
-    // by the time we find it, and we don't want to miss it.
-    var offset = 0;
+  /// Reads bytes appended to [logFile] since [offset] and scans them for
+  /// error patterns. Returns the new offset (unchanged on read failure).
+  Future<int> _readNewLogContent(File logFile, int offset) async {
+    var newOffset = offset;
+    try {
+      final length = logFile.lengthSync();
+      if (length <= offset) return offset;
+      final raf = logFile.openSync();
+      raf.setPositionSync(offset);
+      final bytes = raf.readSync(length - offset);
+      raf.closeSync();
+      newOffset = length;
 
-    while (!_stopped) {
-      await Future<void>.delayed(const Duration(milliseconds: 500));
-      if (_stopped) break;
-      try {
-        final length = logFile.lengthSync();
-        if (length <= offset) continue;
-        final raf = logFile.openSync();
-        raf.setPositionSync(offset);
-        final bytes = raf.readSync(length - offset);
-        raf.closeSync();
-        offset = length;
-
-        final newContent = utf8.decode(bytes, allowMalformed: true);
-        // 429 log lines can be 37KB+ (full request body included).
-        // Don't split by '\n' — scan the raw chunk directly for error patterns.
-        _parseChunk(newContent);
-      } catch (e) {
-        debugPrint('[OpenCodeLog] read error: $e');
-      }
+      final newContent = utf8.decode(bytes, allowMalformed: true);
+      // 429 log lines can be 37KB+ (full request body included).
+      // Don't split by '\n' — scan the raw chunk directly for error patterns.
+      _parseChunk(newContent);
+    } catch (e) {
+      debugPrint('[OpenCodeLog] read error: $e');
     }
+    return newOffset;
   }
 
   void _parseChunk(String content) {

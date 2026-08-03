@@ -53,75 +53,91 @@ class ChatMessageMolecule extends StatelessWidget {
 
   bool _isSubAgent(String name) => isSubAgentToolCall?.call(name) ?? false;
 
+  Widget _buildUserMessage() {
+    return UserBubble(
+      content: message.content,
+      attachments: message.attachments,
+      onOpenFile: onOpenFile,
+    );
+  }
+
+  Widget _buildAssistantMessage() {
+    final visibleToolCalls = message.toolCalls
+        .map(
+          (tc) => tc.copyWith(
+            toolName: _resolveToolName(tc.toolName, content: tc.result),
+          ),
+        )
+        .where((tc) => !_isIgnored(tc.toolName))
+        .toList();
+    return AssistantBubble(
+      content: message.content,
+      toolCalls: visibleToolCalls,
+      tokenUsage: message.tokenUsage,
+      onLinkTap: onLinkTap,
+      onOpenFile: onOpenFile,
+    );
+  }
+
+  Widget _buildToolMessage() {
+    final resolvedToolName = _resolveToolName(
+      message.toolName,
+      content: message.content,
+    );
+    if (_isIgnored(resolvedToolName)) {
+      return const SizedBox.shrink();
+    }
+    final persistedSuccess = message.metadata?['success'] as bool?;
+    final toolArgs = activeToolCalls[message.toolCallId]?.arguments ?? {};
+    return ToolResultCard(
+      toolName: resolvedToolName,
+      toolCallId: message.toolCallId ?? '',
+      content: message.content,
+      success:
+          activeToolCalls[message.toolCallId]?.success ?? persistedSuccess,
+      onSendToPanel:
+          message.content.isNotEmpty && onSendToPanel != null
+              ? () => onSendToPanel!(
+                    toolName: resolvedToolName,
+                    arguments: toolArgs,
+                    content: message.content,
+                  )
+              : null,
+      onOpenAgentPanel:
+          _isSubAgent(resolvedToolName) &&
+                  subAgentPanels.containsKey(message.toolCallId) &&
+                  onFocusPanel != null
+              ? () => onFocusPanel!(subAgentPanels[message.toolCallId]!)
+              : null,
+    );
+  }
+
+  Widget _buildSystemMessage() {
+    final meta = message.metadata;
+    if (meta != null && meta['type'] == 'ask_user') {
+      return ChatAskUserCard(
+        question: message.content,
+        choices: (meta['choices'] as List?)?.cast<String>() ?? [],
+        onChoice: onAskUserChoice ?? (_) {},
+      );
+    }
+    return ChatSystemBubble(content: message.content);
+  }
+
   @override
   Widget build(BuildContext context) {
     switch (message.role) {
       case ChatRole.user:
-        return UserBubble(
-          content: message.content,
-          attachments: message.attachments,
-          onOpenFile: onOpenFile,
-        );
+        return _buildUserMessage();
 
       case ChatRole.assistant:
-        final visibleToolCalls = message.toolCalls
-            .map(
-              (tc) => tc.copyWith(
-                toolName: _resolveToolName(tc.toolName, content: tc.result),
-              ),
-            )
-            .where((tc) => !_isIgnored(tc.toolName))
-            .toList();
-        return AssistantBubble(
-          content: message.content,
-          toolCalls: visibleToolCalls,
-          tokenUsage: message.tokenUsage,
-          onLinkTap: onLinkTap,
-          onOpenFile: onOpenFile,
-        );
+        return _buildAssistantMessage();
 
       case ChatRole.tool:
-        final resolvedToolName = _resolveToolName(
-          message.toolName,
-          content: message.content,
-        );
-        if (_isIgnored(resolvedToolName)) {
-          return const SizedBox.shrink();
-        }
-        final persistedSuccess = message.metadata?['success'] as bool?;
-        final toolArgs = activeToolCalls[message.toolCallId]?.arguments ?? {};
-        return ToolResultCard(
-          toolName: resolvedToolName,
-          toolCallId: message.toolCallId ?? '',
-          content: message.content,
-          success:
-              activeToolCalls[message.toolCallId]?.success ?? persistedSuccess,
-          onSendToPanel:
-              message.content.isNotEmpty && onSendToPanel != null
-                  ? () => onSendToPanel!(
-                        toolName: resolvedToolName,
-                        arguments: toolArgs,
-                        content: message.content,
-                      )
-                  : null,
-          onOpenAgentPanel:
-              _isSubAgent(resolvedToolName) &&
-                      subAgentPanels.containsKey(message.toolCallId) &&
-                      onFocusPanel != null
-                  ? () => onFocusPanel!(subAgentPanels[message.toolCallId]!)
-                  : null,
-        );
+        return _buildToolMessage();
 
       case ChatRole.system:
-        final meta = message.metadata;
-        if (meta != null && meta['type'] == 'ask_user') {
-          return ChatAskUserCard(
-            question: message.content,
-            choices: (meta['choices'] as List?)?.cast<String>() ?? [],
-            onChoice: onAskUserChoice ?? (_) {},
-          );
-        }
-        return ChatSystemBubble(content: message.content);
+        return _buildSystemMessage();
     }
   }
 }

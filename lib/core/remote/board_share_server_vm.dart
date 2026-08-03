@@ -101,29 +101,10 @@ class BoardShareServer extends BoardShareServerBase with ServerProcessMixin {
 
     try {
       if (path.isEmpty) return htmlResponse(_dashboardHtml());
-      if (path.length == 2 && path[0] == 'api' && path[1] == 'health') {
-        return jsonResponse(<String, Object?>{
-          'ok': true,
-          'service': 'yoloit-board-share',
-          'boards': cubit.state.boards.length,
-        });
+      if (path.length >= 2 && path[0] == 'api') {
+        return _routeApi(request, method, path, cubit);
       }
-      if (path.length >= 2 && path[0] == 'api' && path[1] == 'boards') {
-        return _handleBoards(request, method, path.skip(2).toList(), cubit);
-      }
-      if (path.length >= 2 && path[0] == 'api' && path[1] == 'files') {
-        return _handleFiles(request, method, path.skip(2).toList());
-      }
-      if (path.length >= 2 && path[0] == 'api' && path[1] == 'setup') {
-        return _handleSetup(request, method, path.skip(2).toList());
-      }
-      if (path.length >= 2 && path[0] == 'api' && path[1] == 'terminals') {
-        return _handleTerminals(request, method, path.skip(2).toList());
-      }
-      return jsonResponse(<String, Object?>{
-        'ok': false,
-        'error': 'not found',
-      }, 404);
+      return _notFoundResponse();
     } catch (error, stackTrace) {
       debugPrint('[BoardShare] $error\n$stackTrace');
       return jsonResponse(<String, Object?>{
@@ -133,13 +114,77 @@ class BoardShareServer extends BoardShareServerBase with ServerProcessMixin {
     }
   }
 
+  Future<shelf.Response> _routeApi(
+    shelf.Request request,
+    String method,
+    List<String> path,
+    BoardCubit cubit,
+  ) async {
+    final sub = path.skip(2).toList();
+    switch (path[1]) {
+      case 'health':
+        return _handleHealth(path, cubit);
+      case 'boards':
+        return _handleBoards(request, method, sub, cubit);
+      case 'files':
+        return _handleFiles(request, method, sub);
+      case 'setup':
+        return _handleSetup(request, method, sub);
+      case 'terminals':
+        return _handleTerminals(request, method, sub);
+      default:
+        return _notFoundResponse();
+    }
+  }
+
+  Future<shelf.Response> _handleHealth(
+    List<String> path,
+    BoardCubit cubit,
+  ) async {
+    if (path.length != 2) return _notFoundResponse();
+    return jsonResponse(<String, Object?>{
+      'ok': true,
+      'service': 'yoloit-board-share',
+      'boards': cubit.state.boards.length,
+    });
+  }
+
+  shelf.Response _notFoundResponse() => jsonResponse(<String, Object?>{
+    'ok': false,
+    'error': 'not found',
+  }, 404);
+
   Future<shelf.Response> _handleBoards(
     shelf.Request request,
     String method,
     List<String> sub,
     BoardCubit cubit,
   ) async {
-    if (sub.isEmpty && method == 'GET') {
+    if (sub.isEmpty) return _handleBoardsRoot(request, method, cubit);
+
+    final board = _findBoardById(cubit, Uri.decodeComponent(sub[0]));
+    if (board == null) {
+      return jsonResponse(<String, Object?>{
+        'ok': false,
+        'error': 'board not found',
+      }, 404);
+    }
+
+    if (sub.length == 1) {
+      return _handleBoard(request, method, cubit, board);
+    }
+    if (sub.length == 4 && sub[1] == 'panels' && sub[3] == 'lock') {
+      return _handlePanelLock(request, method, sub, cubit, board);
+    }
+    return _notFoundResponse();
+  }
+
+  Future<shelf.Response> _handleBoardsRoot(
+    shelf.Request request,
+    String method,
+    BoardCubit cubit,
+  ) async {
+    if (method == 'GET') {
       final active = cubit.state.activeBoardId;
       return jsonResponse(<String, Object?>{
         'boards': cubit.state.boards
@@ -147,7 +192,7 @@ class BoardShareServer extends BoardShareServerBase with ServerProcessMixin {
             .toList(),
       });
     }
-    if (sub.isEmpty && method == 'POST') {
+    if (method == 'POST') {
       final body = await readJsonBody(request);
       final name = (body['name'] as String? ?? 'Remote Board').trim();
       final board = await cubit.createBoard(
@@ -158,32 +203,29 @@ class BoardShareServer extends BoardShareServerBase with ServerProcessMixin {
         if (board != null) 'board': _summary(board, activeId: board.id),
       });
     }
-    if (sub.isEmpty) {
-      return jsonResponse(<String, Object?>{
-        'ok': false,
-        'error': 'method not allowed',
-      }, 405);
-    }
+    return jsonResponse(<String, Object?>{
+      'ok': false,
+      'error': 'method not allowed',
+    }, 405);
+  }
 
-    final id = Uri.decodeComponent(sub[0]);
-    BoardDocument? board;
+  BoardDocument? _findBoardById(BoardCubit cubit, String id) {
     for (final candidate in cubit.state.boards) {
-      if (candidate.id == id) {
-        board = candidate;
-        break;
-      }
+      if (candidate.id == id) return candidate;
     }
-    if (board == null) {
-      return jsonResponse(<String, Object?>{
-        'ok': false,
-        'error': 'board not found',
-      }, 404);
-    }
+    return null;
+  }
 
-    if (sub.length == 1 && method == 'GET') {
+  Future<shelf.Response> _handleBoard(
+    shelf.Request request,
+    String method,
+    BoardCubit cubit,
+    BoardDocument board,
+  ) async {
+    if (method == 'GET') {
       return jsonResponse(_sharedBoard(board));
     }
-    if (sub.length == 1 && method == 'PUT') {
+    if (method == 'PUT') {
       final body = await readJsonBody(request);
       final expectedRevision = (body['expectedRevision'] as num?)?.toInt();
       final currentRevision =
@@ -212,96 +254,115 @@ class BoardShareServer extends BoardShareServerBase with ServerProcessMixin {
         'board': _sharedBoard(updated),
       });
     }
-    if (sub.length == 4 && sub[1] == 'panels' && sub[3] == 'lock') {
-      final panelId = Uri.decodeComponent(sub[2]);
-      final panel = board.panels
-              .where((p) => p.id == panelId)
-              .firstOrNull ??
-          board.panels
-              .where(
-                (p) => p.title.toLowerCase() == panelId.toLowerCase(),
-              )
-              .firstOrNull;
-      if (panel == null) {
-        return jsonResponse(
-          <String, Object?>{'ok': false, 'error': 'panel not found'},
-          404,
-        );
-      }
-      if (method == 'PUT') {
-        final body = await readJsonBody(request);
-        final actorId = (body['actorId'] as String? ?? '').trim();
-        final ttlSec = (body['ttlSec'] as num?)?.toInt() ?? 60;
-        if (actorId.isEmpty) {
-          return jsonResponse(
-            <String, Object?>{'ok': false, 'error': 'actorId required'},
-            400,
-          );
-        }
-        final now = DateTime.now().toUtc().millisecondsSinceEpoch;
-        final existing = (board.metadata['panelLocks'] as Map?)?[panelId];
-        if (existing is Map) {
-          final existingActor = existing['actorId'] as String?;
-          final existingExpires = existing['expiresAt'];
-          if (existingActor != actorId &&
-              existingExpires is int &&
-              existingExpires > now) {
-            return jsonResponse(
-              <String, Object?>{
-                'ok': false,
-                'error': 'panel locked by another actor',
-                'actorId': existingActor,
-              },
-              409,
-            );
-          }
-        }
-        final expires = now + ttlSec * 1000;
-        final locks =
-            board.metadata['panelLocks'] is Map
-                ? Map<String, dynamic>.from(
-                  board.metadata['panelLocks'] as Map,
-                )
-                : <String, dynamic>{};
-        locks[panelId] = {'actorId': actorId, 'expiresAt': expires};
-        final updated = board.copyWith(
-          metadata: <String, dynamic>{...board.metadata, 'panelLocks': locks},
-        );
-        await cubit.replaceBoardSnapshotFromShare(updated);
-        return jsonResponse(
-          <String, Object?>{'ok': true, 'panelId': panelId, 'actorId': actorId},
-        );
-      }
-      if (method == 'DELETE') {
-        final locks =
-            board.metadata['panelLocks'] is Map
-                ? Map<String, dynamic>.from(
-                  board.metadata['panelLocks'] as Map,
-                )
-                : <String, dynamic>{};
-        if (!locks.containsKey(panelId)) {
-          return jsonResponse(
-            <String, Object?>{'ok': true, 'panelId': panelId},
-          );
-        }
-        final next = Map<String, dynamic>.from(locks)..remove(panelId);
-        final updated = board.copyWith(
-          metadata: <String, dynamic>{...board.metadata, 'panelLocks': next},
-        );
-        await cubit.replaceBoardSnapshotFromShare(updated);
-        return jsonResponse(
-          <String, Object?>{'ok': true, 'panelId': panelId},
-        );
-      }
+    return _notFoundResponse();
+  }
+
+  Future<shelf.Response> _handlePanelLock(
+    shelf.Request request,
+    String method,
+    List<String> sub,
+    BoardCubit cubit,
+    BoardDocument board,
+  ) async {
+    final panelId = Uri.decodeComponent(sub[2]);
+    final panel = board.panels
+            .where((p) => p.id == panelId)
+            .firstOrNull ??
+        board.panels
+            .where(
+              (p) => p.title.toLowerCase() == panelId.toLowerCase(),
+            )
+            .firstOrNull;
+    if (panel == null) {
       return jsonResponse(
-        <String, Object?>{'ok': false, 'error': 'method not allowed'},
-        405,
+        <String, Object?>{'ok': false, 'error': 'panel not found'},
+        404,
       );
     }
-    return jsonResponse(<String, Object?>{
-      'ok': false,
-      'error': 'not found',
-    }, 404);
+    if (method == 'PUT') {
+      return _lockPanel(request, cubit, board, panelId);
+    }
+    if (method == 'DELETE') {
+      return _unlockPanel(cubit, board, panelId);
+    }
+    return jsonResponse(
+      <String, Object?>{'ok': false, 'error': 'method not allowed'},
+      405,
+    );
+  }
+
+  Future<shelf.Response> _lockPanel(
+    shelf.Request request,
+    BoardCubit cubit,
+    BoardDocument board,
+    String panelId,
+  ) async {
+    final body = await readJsonBody(request);
+    final actorId = (body['actorId'] as String? ?? '').trim();
+    final ttlSec = (body['ttlSec'] as num?)?.toInt() ?? 60;
+    if (actorId.isEmpty) {
+      return jsonResponse(
+        <String, Object?>{'ok': false, 'error': 'actorId required'},
+        400,
+      );
+    }
+    final now = DateTime.now().toUtc().millisecondsSinceEpoch;
+    final existing = (board.metadata['panelLocks'] as Map?)?[panelId];
+    if (existing is Map) {
+      final existingActor = existing['actorId'] as String?;
+      final existingExpires = existing['expiresAt'];
+      if (existingActor != actorId &&
+          existingExpires is int &&
+          existingExpires > now) {
+        return jsonResponse(
+          <String, Object?>{
+            'ok': false,
+            'error': 'panel locked by another actor',
+            'actorId': existingActor,
+          },
+          409,
+        );
+      }
+    }
+    final expires = now + ttlSec * 1000;
+    final locks = _panelLocks(board);
+    locks[panelId] = {'actorId': actorId, 'expiresAt': expires};
+    final updated = board.copyWith(
+      metadata: <String, dynamic>{...board.metadata, 'panelLocks': locks},
+    );
+    await cubit.replaceBoardSnapshotFromShare(updated);
+    return jsonResponse(
+      <String, Object?>{'ok': true, 'panelId': panelId, 'actorId': actorId},
+    );
+  }
+
+  Future<shelf.Response> _unlockPanel(
+    BoardCubit cubit,
+    BoardDocument board,
+    String panelId,
+  ) async {
+    final locks = _panelLocks(board);
+    if (!locks.containsKey(panelId)) {
+      return jsonResponse(
+        <String, Object?>{'ok': true, 'panelId': panelId},
+      );
+    }
+    final next = Map<String, dynamic>.from(locks)..remove(panelId);
+    final updated = board.copyWith(
+      metadata: <String, dynamic>{...board.metadata, 'panelLocks': next},
+    );
+    await cubit.replaceBoardSnapshotFromShare(updated);
+    return jsonResponse(
+      <String, Object?>{'ok': true, 'panelId': panelId},
+    );
+  }
+
+  Map<String, dynamic> _panelLocks(BoardDocument board) {
+    return board.metadata['panelLocks'] is Map
+        ? Map<String, dynamic>.from(
+          board.metadata['panelLocks'] as Map,
+        )
+        : <String, dynamic>{};
   }
 
   Future<shelf.Response> _handleFiles(

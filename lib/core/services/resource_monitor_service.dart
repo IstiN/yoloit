@@ -863,25 +863,9 @@ class ResourceMonitorService {
   Future<HostMetrics> _collectHostWindows() async {
     try {
       // Memory: wmic OS get FreePhysicalMemory,TotalVisibleMemorySize /value  (KB)
-      final memResult = await Process.run('wmic', [
-        'OS',
-        'get',
-        'FreePhysicalMemory,TotalVisibleMemorySize',
-        '/value',
-      ], runInShell: true);
-      int freeKb = 0, totalKb = 0;
-      if (memResult.exitCode == 0) {
-        for (final line in (memResult.stdout as String).split('\n')) {
-          final kv = line.trim().split('=');
-          if (kv.length != 2) continue;
-          final key = kv[0].trim();
-          final val = int.tryParse(kv[1].trim()) ?? 0;
-          if (key == 'FreePhysicalMemory') freeKb = val;
-          if (key == 'TotalVisibleMemorySize') totalKb = val;
-        }
-      }
-      final freeBytes = math.max(0, freeKb * 1024);
-      final totalBytes = math.max(0, totalKb * 1024);
+      final mem = await _collectHostMemoryWindows();
+      final freeBytes = math.max(0, mem.freeKb * 1024);
+      final totalBytes = math.max(0, mem.totalKb * 1024);
       final usedBytes = math.max(0, totalBytes - freeBytes);
       final usedPercent =
           totalBytes > 0
@@ -889,38 +873,10 @@ class ResourceMonitorService {
               : 0.0;
 
       // CPU load: wmic cpu get LoadPercentage /value
-      final cpuResult = await Process.run('wmic', [
-        'cpu',
-        'get',
-        'LoadPercentage',
-        '/value',
-      ], runInShell: true);
-      double cpuLoad = 0.0;
-      if (cpuResult.exitCode == 0) {
-        for (final line in (cpuResult.stdout as String).split('\n')) {
-          final kv = line.trim().split('=');
-          if (kv.length == 2 && kv[0].trim() == 'LoadPercentage') {
-            cpuLoad = math.max(0.0, double.tryParse(kv[1].trim()) ?? 0.0);
-          }
-        }
-      }
+      final cpuLoad = await _collectHostCpuLoadWindows();
 
       // Core count: wmic cpu get NumberOfLogicalProcessors /value
-      final coreResult = await Process.run('wmic', [
-        'cpu',
-        'get',
-        'NumberOfLogicalProcessors',
-        '/value',
-      ], runInShell: true);
-      int coreCount = 0;
-      if (coreResult.exitCode == 0) {
-        for (final line in (coreResult.stdout as String).split('\n')) {
-          final kv = line.trim().split('=');
-          if (kv.length == 2 && kv[0].trim() == 'NumberOfLogicalProcessors') {
-            coreCount = math.max(0, int.tryParse(kv[1].trim()) ?? 0);
-          }
-        }
-      }
+      final coreCount = await _collectHostCoreCountWindows();
 
       return HostMetrics(
         totalBytes: totalBytes,
@@ -934,6 +890,69 @@ class ResourceMonitorService {
     } catch (_) {
       return HostMetrics.empty;
     }
+  }
+
+  /// Memory totals via `wmic OS get FreePhysicalMemory,TotalVisibleMemorySize
+  /// /value` (values are in KB).
+  Future<({int freeKb, int totalKb})> _collectHostMemoryWindows() async {
+    final memResult = await Process.run('wmic', [
+      'OS',
+      'get',
+      'FreePhysicalMemory,TotalVisibleMemorySize',
+      '/value',
+    ], runInShell: true);
+    int freeKb = 0, totalKb = 0;
+    if (memResult.exitCode == 0) {
+      for (final line in (memResult.stdout as String).split('\n')) {
+        final kv = line.trim().split('=');
+        if (kv.length != 2) continue;
+        final key = kv[0].trim();
+        final val = int.tryParse(kv[1].trim()) ?? 0;
+        if (key == 'FreePhysicalMemory') freeKb = val;
+        if (key == 'TotalVisibleMemorySize') totalKb = val;
+      }
+    }
+    return (freeKb: freeKb, totalKb: totalKb);
+  }
+
+  /// Overall CPU load percent via `wmic cpu get LoadPercentage /value`.
+  Future<double> _collectHostCpuLoadWindows() async {
+    final cpuResult = await Process.run('wmic', [
+      'cpu',
+      'get',
+      'LoadPercentage',
+      '/value',
+    ], runInShell: true);
+    double cpuLoad = 0.0;
+    if (cpuResult.exitCode == 0) {
+      for (final line in (cpuResult.stdout as String).split('\n')) {
+        final kv = line.trim().split('=');
+        if (kv.length == 2 && kv[0].trim() == 'LoadPercentage') {
+          cpuLoad = math.max(0.0, double.tryParse(kv[1].trim()) ?? 0.0);
+        }
+      }
+    }
+    return cpuLoad;
+  }
+
+  /// Logical core count via `wmic cpu get NumberOfLogicalProcessors /value`.
+  Future<int> _collectHostCoreCountWindows() async {
+    final coreResult = await Process.run('wmic', [
+      'cpu',
+      'get',
+      'NumberOfLogicalProcessors',
+      '/value',
+    ], runInShell: true);
+    int coreCount = 0;
+    if (coreResult.exitCode == 0) {
+      for (final line in (coreResult.stdout as String).split('\n')) {
+        final kv = line.trim().split('=');
+        if (kv.length == 2 && kv[0].trim() == 'NumberOfLogicalProcessors') {
+          coreCount = math.max(0, int.tryParse(kv[1].trim()) ?? 0);
+        }
+      }
+    }
+    return coreCount;
   }
 }
 

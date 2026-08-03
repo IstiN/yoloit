@@ -4,6 +4,14 @@ import 'package:yoloit/core/cli/panel_cli_handler.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/builtin/webview_manager.dart';
 
+/// Signature of a webpage action handler: the CLI arguments plus the panel
+/// whose WebView is being read or driven.
+typedef _WebpageActionHandler =
+    Future<CliActionResult> Function(
+      Map<String, dynamic> args,
+      BoardPanelInstance panel,
+    );
+
 /// CLI handler for Webpage/Browser panels (`board.webpage`).
 class WebpageCliHandler extends PanelCliHandler {
   const WebpageCliHandler();
@@ -33,42 +41,52 @@ class WebpageCliHandler extends PanelCliHandler {
     };
   }
 
+  Map<String, _WebpageActionHandler> get _actionHandlers => {
+    'open': _handleOpen,
+    'get': _handleGet,
+    'exec': _handleExec,
+    'content': _handleContent,
+    'title': _handleTitle,
+    'url': _handleUrl,
+    'scroll': _handleScroll,
+    'click': _handleClick,
+  };
+
   @override
   Future<CliActionResult> handleAction(
     String action,
     Map<String, dynamic> args,
     BoardPanelInstance panel,
   ) async {
-    switch (action) {
-      case 'open':
-        final url = args['url'] as String?;
-        if (url == null || url.isEmpty) {
-          return const CliActionResult(
-            ok: false,
-            message: 'Missing "url" field',
-          );
-        }
-        return CliActionResult(
-          message: 'Opening $url',
-          stateUpdate: {'url': url},
-        );
-      case 'get':
-        return CliActionResult(data: getContent(panel));
-      case 'exec':
-        return _handleExec(args, panel);
-      case 'content':
-        return _handleContent(panel);
-      case 'title':
-        return _handleTitle(panel);
-      case 'url':
-        return _handleUrl(panel);
-      case 'scroll':
-        return _handleScroll(args, panel);
-      case 'click':
-        return _handleClick(args, panel);
-      default:
-        return CliActionResult(ok: false, message: 'Unknown action: $action');
+    final handler = _actionHandlers[action];
+    if (handler == null) {
+      return CliActionResult(ok: false, message: 'Unknown action: $action');
     }
+    return handler(args, panel);
+  }
+
+  Future<CliActionResult> _handleOpen(
+    Map<String, dynamic> args,
+    BoardPanelInstance panel,
+  ) async {
+    final url = args['url'] as String?;
+    if (url == null || url.isEmpty) {
+      return const CliActionResult(
+        ok: false,
+        message: 'Missing "url" field',
+      );
+    }
+    return CliActionResult(
+      message: 'Opening $url',
+      stateUpdate: {'url': url},
+    );
+  }
+
+  Future<CliActionResult> _handleGet(
+    Map<String, dynamic> args,
+    BoardPanelInstance panel,
+  ) async {
+    return CliActionResult(data: getContent(panel));
   }
 
   Future<CliActionResult> _handleExec(
@@ -88,7 +106,10 @@ class WebpageCliHandler extends PanelCliHandler {
     });
   }
 
-  Future<CliActionResult> _handleContent(BoardPanelInstance panel) {
+  Future<CliActionResult> _handleContent(
+    Map<String, dynamic> args,
+    BoardPanelInstance panel,
+  ) {
     return _withWebView(panel.id, () async {
       final html = await WebViewManager.instance.runJavaScriptReturningResult(
         panel.id,
@@ -98,14 +119,20 @@ class WebpageCliHandler extends PanelCliHandler {
     });
   }
 
-  Future<CliActionResult> _handleTitle(BoardPanelInstance panel) {
+  Future<CliActionResult> _handleTitle(
+    Map<String, dynamic> args,
+    BoardPanelInstance panel,
+  ) {
     return _withWebView(panel.id, () async {
       final title = await WebViewManager.instance.pageTitle(panel.id);
       return CliActionResult(data: {'title': title});
     });
   }
 
-  Future<CliActionResult> _handleUrl(BoardPanelInstance panel) {
+  Future<CliActionResult> _handleUrl(
+    Map<String, dynamic> args,
+    BoardPanelInstance panel,
+  ) {
     return _withWebView(panel.id, () async {
       final url = await WebViewManager.instance.currentUrl(panel.id);
       return CliActionResult(data: {'url': url});

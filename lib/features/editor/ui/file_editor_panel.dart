@@ -187,53 +187,11 @@ class _FileEditorPanelState extends State<FileEditorPanel>
         if (!state.isOpen) return _emptyState(context);
 
         final activeTab = state.activeTab!;
-        // Only create controller when content is available (not during loading).
-        CodeController? controller;
-        if (!activeTab.isDiff &&
-            !_isImage(activeTab.filePath) &&
-            !activeTab.isLoading) {
-          controller = _controllerFor(activeTab, context);
-        }
+        final controller = _activeController(activeTab, context);
+        _syncPathChange(activeTab);
 
-        // Wait one frame after switching files before showing the toggle bar —
-        // this lets CodeField finish its initial paint before the overlay appears.
-        if (activeTab.filePath != _lastRenderedPath) {
-          _lastRenderedPath = activeTab.filePath;
-          _editorReady = false;
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) setState(() => _editorReady = true);
-          });
-          // Auto-default to preview for previewable files the first time they open.
-          final path = activeTab.filePath;
-          if (!_seenPaths.contains(path)) {
-            _seenPaths.add(path);
-            if (!_previewPaths.contains(path) &&
-                (_isMarkdown(path) || _isSvg(path) || _isImage(path))) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (mounted) {
-                  setState(() => _previewPaths.add(path));
-                  SessionPrefs.savePreviewPaths(_previewPaths.toList());
-                }
-              });
-            }
-          }
-        }
-
-        final toggleVisible =
-            _editorReady &&
-            !activeTab.isDiff &&
-            !activeTab.isLoading &&
-            !_isImage(activeTab.filePath) &&
-            (_isMarkdown(activeTab.filePath) || _isSvg(activeTab.filePath));
-
-        final isVisualPreview =
-            !activeTab.isLoading &&
-            !activeTab.isDiff &&
-            (_isImage(activeTab.filePath) ||
-                _isSvg(activeTab.filePath) ||
-                _isMarkdown(activeTab.filePath)) &&
-            (_isImage(activeTab.filePath) ||
-                _previewPaths.contains(activeTab.filePath));
+        final toggleVisible = _toggleVisibleFor(activeTab);
+        final isVisualPreview = _isVisualPreviewFor(activeTab);
 
         final body = _buildBody(
           state,
@@ -242,16 +200,72 @@ class _FileEditorPanelState extends State<FileEditorPanel>
           isVisualPreview,
         );
         if (isVisualPreview) return body;
-        return GestureDetector(
-          onScaleStart: (d) => _scaleBase = _fontSizeNotifier.value,
-          onScaleUpdate: (d) {
-            final newSize = (_scaleBase * d.scale).clamp(8.0, 48.0);
-            _fontSizeNotifier.value = newSize;
-            SessionPrefs.saveEditorFontSize(newSize);
-          },
-          child: body,
-        );
+        return _wrapScaleGestures(body);
       },
+    );
+  }
+
+  /// Only create controller when content is available (not during loading).
+  CodeController? _activeController(EditorTab activeTab, BuildContext context) {
+    if (!activeTab.isDiff &&
+        !_isImage(activeTab.filePath) &&
+        !activeTab.isLoading) {
+      return _controllerFor(activeTab, context);
+    }
+    return null;
+  }
+
+  /// Wait one frame after switching files before showing the toggle bar —
+  /// this lets CodeField finish its initial paint before the overlay appears.
+  void _syncPathChange(EditorTab activeTab) {
+    if (activeTab.filePath == _lastRenderedPath) return;
+    _lastRenderedPath = activeTab.filePath;
+    _editorReady = false;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() => _editorReady = true);
+    });
+    // Auto-default to preview for previewable files the first time they open.
+    final path = activeTab.filePath;
+    if (_seenPaths.contains(path)) return;
+    _seenPaths.add(path);
+    if (!_previewPaths.contains(path) &&
+        (_isMarkdown(path) || _isSvg(path) || _isImage(path))) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() => _previewPaths.add(path));
+          SessionPrefs.savePreviewPaths(_previewPaths.toList());
+        }
+      });
+    }
+  }
+
+  bool _toggleVisibleFor(EditorTab activeTab) {
+    return _editorReady &&
+        !activeTab.isDiff &&
+        !activeTab.isLoading &&
+        !_isImage(activeTab.filePath) &&
+        (_isMarkdown(activeTab.filePath) || _isSvg(activeTab.filePath));
+  }
+
+  bool _isVisualPreviewFor(EditorTab activeTab) {
+    return !activeTab.isLoading &&
+        !activeTab.isDiff &&
+        (_isImage(activeTab.filePath) ||
+            _isSvg(activeTab.filePath) ||
+            _isMarkdown(activeTab.filePath)) &&
+        (_isImage(activeTab.filePath) ||
+            _previewPaths.contains(activeTab.filePath));
+  }
+
+  Widget _wrapScaleGestures(Widget body) {
+    return GestureDetector(
+      onScaleStart: (d) => _scaleBase = _fontSizeNotifier.value,
+      onScaleUpdate: (d) {
+        final newSize = (_scaleBase * d.scale).clamp(8.0, 48.0);
+        _fontSizeNotifier.value = newSize;
+        SessionPrefs.saveEditorFontSize(newSize);
+      },
+      child: body,
     );
   }
 
@@ -269,74 +283,86 @@ class _FileEditorPanelState extends State<FileEditorPanel>
         Expanded(
           child: Stack(
             children: [
-              Positioned.fill(
-                child:
-                    activeTab.isLoading
-                        ? const Center(child: CircularProgressIndicator())
-                        : activeTab.error != null
-                        ? _ErrorView(message: activeTab.error!)
-                        : activeTab.isDiff
-                        ? _DiffBody(tab: activeTab)
-                        : _isImage(activeTab.filePath)
-                        ? _ImagePreview(filePath: activeTab.filePath)
-                        : _previewPaths.contains(activeTab.filePath)
-                        ? (_isSvg(activeTab.filePath)
-                            ? _SvgPreview(filePath: activeTab.filePath)
-                            : _MarkdownPreview(content: activeTab.content ?? ''))
-                        : _EditorBody(
-                          key: ValueKey(activeTab.filePath),
-                          tab: activeTab,
-                          codeController: controller!,
-                          fontSizeNotifier: _fontSizeNotifier,
-                          isLargeFile: _isLargeFile(activeTab.content),
-                        ),
-              ),
-              if (!immersive)
-                Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  child: _AnimatedToggleBar(
-                    visible: toggleVisible,
-                    child: _MarkdownToggleBar(
-                      isPreview: _previewPaths.contains(activeTab.filePath),
-                      onToggle:
-                          () => setState(() {
-                            final path = activeTab.filePath;
-                            if (_previewPaths.contains(path)) {
-                              _previewPaths.remove(path);
-                            } else {
-                              _previewPaths.add(path);
-                            }
-                            SessionPrefs.savePreviewPaths(_previewPaths.toList());
-                          }),
-                    ),
-                  ),
-                ),
+              Positioned.fill(child: _mainContent(activeTab, controller)),
+              if (!immersive) _toggleBarOverlay(activeTab, toggleVisible),
               if (immersive && widget.onToggleImmersive != null)
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: _ImmersiveButton(
-                    icon: Icons.close_fullscreen_rounded,
-                    tooltip: 'Exit focus mode',
-                    onTap: widget.onToggleImmersive!,
-                  ),
-                ),
+                _exitImmersiveOverlay(),
               if (!immersive && isVisualPreview && widget.onToggleImmersive != null)
-                Positioned(
-                  bottom: 8,
-                  right: 8,
-                  child: _ImmersiveButton(
-                    icon: Icons.open_in_full_rounded,
-                    tooltip: 'Focus mode — hide chrome',
-                    onTap: widget.onToggleImmersive!,
-                  ),
-                ),
+                _enterImmersiveOverlay(),
             ],
           ),
         ),
       ],
+    );
+  }
+
+  Widget _mainContent(EditorTab activeTab, CodeController? controller) {
+    return activeTab.isLoading
+        ? const Center(child: CircularProgressIndicator())
+        : activeTab.error != null
+        ? _ErrorView(message: activeTab.error!)
+        : activeTab.isDiff
+        ? _DiffBody(tab: activeTab)
+        : _isImage(activeTab.filePath)
+        ? _ImagePreview(filePath: activeTab.filePath)
+        : _previewPaths.contains(activeTab.filePath)
+        ? (_isSvg(activeTab.filePath)
+            ? _SvgPreview(filePath: activeTab.filePath)
+            : _MarkdownPreview(content: activeTab.content ?? ''))
+        : _EditorBody(
+          key: ValueKey(activeTab.filePath),
+          tab: activeTab,
+          codeController: controller!,
+          fontSizeNotifier: _fontSizeNotifier,
+          isLargeFile: _isLargeFile(activeTab.content),
+        );
+  }
+
+  Widget _toggleBarOverlay(EditorTab activeTab, bool toggleVisible) {
+    return Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      child: _AnimatedToggleBar(
+        visible: toggleVisible,
+        child: _MarkdownToggleBar(
+          isPreview: _previewPaths.contains(activeTab.filePath),
+          onToggle:
+              () => setState(() {
+                final path = activeTab.filePath;
+                if (_previewPaths.contains(path)) {
+                  _previewPaths.remove(path);
+                } else {
+                  _previewPaths.add(path);
+                }
+                SessionPrefs.savePreviewPaths(_previewPaths.toList());
+              }),
+        ),
+      ),
+    );
+  }
+
+  Widget _exitImmersiveOverlay() {
+    return Positioned(
+      top: 8,
+      right: 8,
+      child: _ImmersiveButton(
+        icon: Icons.close_fullscreen_rounded,
+        tooltip: 'Exit focus mode',
+        onTap: widget.onToggleImmersive!,
+      ),
+    );
+  }
+
+  Widget _enterImmersiveOverlay() {
+    return Positioned(
+      bottom: 8,
+      right: 8,
+      child: _ImmersiveButton(
+        icon: Icons.open_in_full_rounded,
+        tooltip: 'Focus mode — hide chrome',
+        onTap: widget.onToggleImmersive!,
+      ),
     );
   }
 
@@ -1444,21 +1470,9 @@ class _EditorBodyState extends State<_EditorBody> {
   }
 
   bool _handleNativeSearchTypeahead(KeyEvent event) {
+    if (_shouldIgnoreTypeahead(event)) return false;
+    final ch = event.character!;
     final searchController = widget.codeController.searchController;
-    if (!searchController.shouldShow ||
-        searchController.patternFocusNode.hasFocus) {
-      return false;
-    }
-    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return false;
-    if (HardwareKeyboard.instance.isMetaPressed ||
-        HardwareKeyboard.instance.isControlPressed ||
-        HardwareKeyboard.instance.isAltPressed) {
-      return false;
-    }
-    final ch = event.character;
-    if (ch == null || ch.isEmpty || ch.codeUnits.any((u) => u < 0x20)) {
-      return false;
-    }
 
     final controller = searchController.settingsController.patternController;
     final value = controller.value;
@@ -1475,6 +1489,22 @@ class _EditorBodyState extends State<_EditorBody> {
     );
     searchController.patternFocusNode.requestFocus();
     return true;
+  }
+
+  bool _shouldIgnoreTypeahead(KeyEvent event) {
+    final searchController = widget.codeController.searchController;
+    if (!searchController.shouldShow ||
+        searchController.patternFocusNode.hasFocus) {
+      return true;
+    }
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return true;
+    if (HardwareKeyboard.instance.isMetaPressed ||
+        HardwareKeyboard.instance.isControlPressed ||
+        HardwareKeyboard.instance.isAltPressed) {
+      return true;
+    }
+    final ch = event.character;
+    return ch == null || ch.isEmpty || ch.codeUnits.any((u) => u < 0x20);
   }
 
   // ── Text editing helpers ────────────────────────────────────────────────

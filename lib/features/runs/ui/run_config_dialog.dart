@@ -626,27 +626,22 @@ class _QuickActionsEditor extends StatelessWidget {
     );
   }
 
+  static const _iconByName = <String, IconData>{
+    'local_fire_department': Icons.local_fire_department_rounded,
+    'fire': Icons.local_fire_department_rounded,
+    'hot_reload': Icons.local_fire_department_rounded,
+    'restart_alt': Icons.restart_alt_rounded,
+    'restart': Icons.restart_alt_rounded,
+    'hot_restart': Icons.restart_alt_rounded,
+    'play': Icons.play_arrow_rounded,
+    'play_arrow': Icons.play_arrow_rounded,
+    'pause': Icons.pause_rounded,
+    'stop': Icons.stop_rounded,
+    'bolt': Icons.bolt_rounded,
+  };
+
   static IconData _iconFromName(String raw) {
-    switch (raw.trim().toLowerCase()) {
-      case 'local_fire_department':
-      case 'fire':
-      case 'hot_reload':
-        return Icons.local_fire_department_rounded;
-      case 'restart_alt':
-      case 'restart':
-      case 'hot_restart':
-        return Icons.restart_alt_rounded;
-      case 'play':
-      case 'play_arrow':
-        return Icons.play_arrow_rounded;
-      case 'pause':
-        return Icons.pause_rounded;
-      case 'stop':
-        return Icons.stop_rounded;
-      case 'bolt':
-      default:
-        return Icons.bolt_rounded;
-    }
+    return _iconByName[raw.trim().toLowerCase()] ?? Icons.bolt_rounded;
   }
 
   Future<void> _pickIcon(

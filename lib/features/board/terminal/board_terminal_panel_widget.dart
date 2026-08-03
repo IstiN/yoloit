@@ -1193,156 +1193,14 @@ class _BoardTerminalSessionHistoryDialogState
         height: 420,
         child: AnimatedBuilder(
           animation: manager,
-          builder: (context, _) {
-            return FutureBuilder<List<BoardTerminalSessionEntry>>(
-              future: _entriesFuture,
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                final entries = snapshot.data!;
-                if (entries.isEmpty) {
-                  return Center(
-                    child: Text(
-                      'No terminal sessions yet.',
-                      style: TextStyle(color: mutedColor, fontSize: 13),
-                    ),
-                  );
-                }
-                return ListView.separated(
-                  itemCount: entries.length,
-                  separatorBuilder:
-                      (context, index) => const SizedBox(height: 4),
-                  itemBuilder: (context, index) {
-                    final entry = entries[index];
-                    final isCurrent = entry.id == widget.currentSessionId;
-                    final isLive = manager.isLive(entry.id);
-                    return GestureDetector(
-                      onTap:
-                          isCurrent
-                              ? null
-                              : () async {
-                                Navigator.pop(context);
-                                await context
-                                    .read<BoardCubit>()
-                                    .createTerminalPanel(
-                                      title: entry.sessionName,
-                                      sessionId: entry.id,
-                                      sessionName: entry.sessionName,
-                                      workingDir: entry.workingDir,
-                                      envGroupIds: entry.envGroupIds,
-                                    );
-                              },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color:
-                              isCurrent
-                                  ? colors.surfaceElevated
-                                  : colors.surface,
-                          borderRadius: BorderRadius.circular(10),
-                          border:
-                              isCurrent
-                                  ? Border.all(
-                                    color: colors.accentGreen,
-                                    width: 0.5,
-                                  )
-                                  : null,
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.terminal,
-                              size: 14,
-                              color: isLive ? colors.accentGreen : mutedColor,
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    entry.sessionName.isEmpty
-                                        ? 'Unnamed terminal'
-                                        : entry.sessionName,
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w500,
-                                      color:
-                                          isCurrent
-                                              ? colors.accentGreen
-                                              : onSurface,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    '${isLive ? 'live' : 'saved'} • ${entry.workingDir}',
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: mutedColor,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            if (!isCurrent)
-                              Padding(
-                                padding: const EdgeInsets.only(left: 6),
-                                child: ActionIconButton(
-                                  icon: Icons.restore,
-                                  color: colors.accentBlue,
-                                  tooltip: 'Restore as new terminal panel',
-                                  onTap: () async {
-                                    Navigator.pop(context);
-                                    await context
-                                        .read<BoardCubit>()
-                                        .createTerminalPanel(
-                                          title: entry.sessionName,
-                                          sessionId: entry.id,
-                                          sessionName: entry.sessionName,
-                                          workingDir: entry.workingDir,
-                                          envGroupIds: entry.envGroupIds,
-                                        );
-                                  },
-                                ),
-                              ),
-                            Padding(
-                              padding: const EdgeInsets.only(left: 6),
-                              child: ActionIconButton(
-                                icon:
-                                    isLive
-                                        ? Icons.stop_circle_outlined
-                                        : Icons.delete_outline,
-                                color:
-                                    isLive
-                                        ? colors.accentOrange
-                                        : colors.accentRed,
-                                tooltip:
-                                    isLive ? 'Kill session' : 'Delete history',
-                                onTap: () async {
-                                  if (isLive) {
-                                    await manager.killSession(entry.id);
-                                  } else {
-                                    await BoardTerminalSessionHistory.instance
-                                        .delete(entry.id);
-                                  }
-                                  _refresh();
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                );
-              },
-            );
-          },
+          builder:
+              (context, _) => _buildEntries(
+                context,
+                manager,
+                colors,
+                mutedColor,
+                onSurface,
+              ),
         ),
       ),
       actions: [
@@ -1351,6 +1209,179 @@ class _BoardTerminalSessionHistoryDialogState
           child: const Text('Close'),
         ),
       ],
+    );
+  }
+
+  Widget _buildEntries(
+    BuildContext context,
+    BoardTerminalSessionManager manager,
+    AppColorScheme colors,
+    Color mutedColor,
+    Color onSurface,
+  ) {
+    return FutureBuilder<List<BoardTerminalSessionEntry>>(
+      future: _entriesFuture,
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final entries = snapshot.data!;
+        if (entries.isEmpty) {
+          return Center(
+            child: Text(
+              'No terminal sessions yet.',
+              style: TextStyle(color: mutedColor, fontSize: 13),
+            ),
+          );
+        }
+        return ListView.separated(
+          itemCount: entries.length,
+          separatorBuilder:
+              (context, index) => const SizedBox(height: 4),
+          itemBuilder:
+              (context, index) => _buildEntryTile(
+                context,
+                entries[index],
+                manager,
+                colors,
+                mutedColor,
+                onSurface,
+              ),
+        );
+      },
+    );
+  }
+
+  Widget _buildEntryTile(
+    BuildContext context,
+    BoardTerminalSessionEntry entry,
+    BoardTerminalSessionManager manager,
+    AppColorScheme colors,
+    Color mutedColor,
+    Color onSurface,
+  ) {
+    final isCurrent = entry.id == widget.currentSessionId;
+    final isLive = manager.isLive(entry.id);
+    return GestureDetector(
+      onTap:
+          isCurrent
+              ? null
+              : () async {
+                Navigator.pop(context);
+                await context
+                    .read<BoardCubit>()
+                    .createTerminalPanel(
+                      title: entry.sessionName,
+                      sessionId: entry.id,
+                      sessionName: entry.sessionName,
+                      workingDir: entry.workingDir,
+                      envGroupIds: entry.envGroupIds,
+                    );
+              },
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 10,
+        ),
+        decoration: BoxDecoration(
+          color:
+              isCurrent
+                  ? colors.surfaceElevated
+                  : colors.surface,
+          borderRadius: BorderRadius.circular(10),
+          border:
+              isCurrent
+                  ? Border.all(
+                    color: colors.accentGreen,
+                    width: 0.5,
+                  )
+                  : null,
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.terminal,
+              size: 14,
+              color: isLive ? colors.accentGreen : mutedColor,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    entry.sessionName.isEmpty
+                        ? 'Unnamed terminal'
+                        : entry.sessionName,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color:
+                          isCurrent
+                              ? colors.accentGreen
+                              : onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${isLive ? 'live' : 'saved'} • ${entry.workingDir}',
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: mutedColor,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (!isCurrent)
+              Padding(
+                padding: const EdgeInsets.only(left: 6),
+                child: ActionIconButton(
+                  icon: Icons.restore,
+                  color: colors.accentBlue,
+                  tooltip: 'Restore as new terminal panel',
+                  onTap: () async {
+                    Navigator.pop(context);
+                    await context
+                        .read<BoardCubit>()
+                        .createTerminalPanel(
+                          title: entry.sessionName,
+                          sessionId: entry.id,
+                          sessionName: entry.sessionName,
+                          workingDir: entry.workingDir,
+                          envGroupIds: entry.envGroupIds,
+                        );
+                  },
+                ),
+              ),
+            Padding(
+              padding: const EdgeInsets.only(left: 6),
+              child: ActionIconButton(
+                icon:
+                    isLive
+                        ? Icons.stop_circle_outlined
+                        : Icons.delete_outline,
+                color:
+                    isLive
+                        ? colors.accentOrange
+                        : colors.accentRed,
+                tooltip:
+                    isLive ? 'Kill session' : 'Delete history',
+                onTap: () async {
+                  if (isLive) {
+                    await manager.killSession(entry.id);
+                  } else {
+                    await BoardTerminalSessionHistory.instance
+                        .delete(entry.id);
+                  }
+                  _refresh();
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

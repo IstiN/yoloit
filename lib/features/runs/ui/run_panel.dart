@@ -720,27 +720,22 @@ class _ConsoleHeader extends StatelessWidget {
     ];
   }
 
+  static const Map<String, IconData> _quickActionIcons = {
+    'local_fire_department': Icons.local_fire_department_rounded,
+    'fire': Icons.local_fire_department_rounded,
+    'hot_reload': Icons.local_fire_department_rounded,
+    'restart_alt': Icons.restart_alt_rounded,
+    'restart': Icons.restart_alt_rounded,
+    'hot_restart': Icons.restart_alt_rounded,
+    'play': Icons.play_arrow_rounded,
+    'play_arrow': Icons.play_arrow_rounded,
+    'pause': Icons.pause_rounded,
+    'stop': Icons.stop_rounded,
+    'bolt': Icons.bolt_rounded,
+  };
+
   IconData _quickActionIcon(String raw) {
-    switch (raw.trim().toLowerCase()) {
-      case 'local_fire_department':
-      case 'fire':
-      case 'hot_reload':
-        return Icons.local_fire_department_rounded;
-      case 'restart_alt':
-      case 'restart':
-      case 'hot_restart':
-        return Icons.restart_alt_rounded;
-      case 'play':
-      case 'play_arrow':
-        return Icons.play_arrow_rounded;
-      case 'pause':
-        return Icons.pause_rounded;
-      case 'stop':
-        return Icons.stop_rounded;
-      case 'bolt':
-      default:
-        return Icons.bolt_rounded;
-    }
+    return _quickActionIcons[raw.trim().toLowerCase()] ?? Icons.bolt_rounded;
   }
 
   Future<RunSession?> _pickAttachTarget(
@@ -1137,190 +1132,227 @@ class _ConfigList extends StatelessWidget {
       width: 180,
       child: Column(
         children: [
-          Container(
-            height: 28,
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            alignment: Alignment.centerLeft,
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'CONFIGURATIONS',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    softWrap: false,
-                    style: TextStyle(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withAlpha(120),
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.8,
-                    ),
-                  ),
-                ),
-                if (showGroupControls) ...[
-                  Tooltip(
-                    message: 'Group',
-                    child: Text(
-                      groupLabel,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 9,
-                        color:
-                            context.appColors.textMuted,
-                      ),
-                    ),
-                  ),
-                ],
-                if (showGroupControls && onGroupChanged != null) ...[
-                  const SizedBox(width: 4),
-                  GestureDetector(
-                    onTap: () async {
-                      final next = await _askGroupName(
-                        context,
-                        initialValue: groupId,
-                      );
-                      if (next == null || next.trim().isEmpty) return;
-                      onGroupChanged!(next.trim());
-                    },
-                    child: Icon(
-                      Icons.edit_outlined,
-                      size: 12,
-                      color:
-                          context.appColors.textMuted,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
+          _buildHeader(context, groupLabel),
           Expanded(
             child: ListView(
               padding: const EdgeInsets.only(bottom: 4),
               children: [
-                ...state.configs.map((c) {
-                  final runningSession = runningByConfig[c.id];
-                  final stoppedSession = stoppedByConfig[c.id];
-                  return _ConfigItem(
-                    config: c,
-                    isRunning: runningSession != null,
-                    onRun: () {
-                      if (runningSession != null) {
-                        // Already running — hot reload if flutter, else focus
-                        if (c.isFlutterRun) {
-                          cubit.sendHotReload(runningSession.id);
-                        }
-                        onAttachSession?.call(runningSession.id);
-                      } else if (stoppedSession != null) {
-                        cubit.restartSession(stoppedSession.id);
-                        onAttachSession?.call(stoppedSession.id);
-                      } else {
-                        cubit.startRun(c).then((started) {
-                          if (started != null) {
-                            onAttachSession?.call(started.id);
-                          }
-                        });
-                      }
-                    },
-                    onEdit: () async {
-                      final updated = await RunConfigDialog.show(
-                        context,
-                        initial: c,
-                      );
-                      if (updated != null) {
-                        cubit.updateConfig(updated.copyWith(group: groupId));
-                      }
-                    },
-                    onDelete: () => cubit.removeConfig(c.id),
-                  );
-                }),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 2,
-                  ),
-                  child: InkWell(
-                    onTap: () async {
-                      final config = await RunConfigDialog.show(context);
-                      if (config == null) return;
-                      final added = await cubit.addConfig(
-                        config.copyWith(group: groupId),
-                      );
-                      if (!context.mounted) return;
-                      if (added.id != config.id) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              'Configuration already exists: ${added.name}',
-                            ),
-                            duration: const Duration(seconds: 2),
-                          ),
-                        );
-                      }
-                    },
-                    borderRadius: BorderRadius.circular(4),
-                    child: Container(
-                      height: 28,
-                      padding: const EdgeInsets.symmetric(horizontal: 6),
-                      child: Row(
-                        children: [
-                          Icon(Icons.add, size: 12, color: colors.primary),
-                          const SizedBox(width: 6),
-                          Flexible(
-                            child: Text(
-                              'Add Configuration',
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: colors.primary,
-                                fontSize: 11,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                ...state.configs.map(
+                  (c) => _configItemFor(
+                    context,
+                    cubit,
+                    c,
+                    runningByConfig,
+                    stoppedByConfig,
                   ),
                 ),
-                if (state.sessions.isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Container(
-                    height: 24,
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'RUN SESSIONS',
-                      style: TextStyle(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.onSurface.withAlpha(120),
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.8,
-                      ),
-                    ),
-                  ),
-                  ...state.configs
-                      .where((c) => sessionsByConfig[c.id] != null)
-                      .map((config) {
-                        final sessions = sessionsByConfig[config.id]!;
-                        return _SessionGroup(
-                          config: config,
-                          sessions: sessions,
-                          activeSessionId: state.activeSessionId,
-                          onTapSession: (sessionId) {
-                            onAttachSession?.call(sessionId);
-                          },
-                          onDeleteSession: cubit.removeSession,
-                        );
-                      }),
-                ],
+                _buildAddConfigTile(context, cubit, colors),
+                ..._sessionSection(context, cubit, sessionsByConfig),
               ],
             ),
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildHeader(BuildContext context, String groupLabel) {
+    return Container(
+      height: 28,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      alignment: Alignment.centerLeft,
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              'CONFIGURATIONS',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              softWrap: false,
+              style: TextStyle(
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withAlpha(120),
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.8,
+              ),
+            ),
+          ),
+          if (showGroupControls) ...[
+            Tooltip(
+              message: 'Group',
+              child: Text(
+                groupLabel,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 9,
+                  color:
+                      context.appColors.textMuted,
+                ),
+              ),
+            ),
+          ],
+          if (showGroupControls && onGroupChanged != null) ...[
+            const SizedBox(width: 4),
+            GestureDetector(
+              onTap: () async {
+                final next = await _askGroupName(
+                  context,
+                  initialValue: groupId,
+                );
+                if (next == null || next.trim().isEmpty) return;
+                onGroupChanged!(next.trim());
+              },
+              child: Icon(
+                Icons.edit_outlined,
+                size: 12,
+                color:
+                    context.appColors.textMuted,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _configItemFor(
+    BuildContext context,
+    RunCubit cubit,
+    RunConfig c,
+    Map<String, RunSession> runningByConfig,
+    Map<String, RunSession> stoppedByConfig,
+  ) {
+    final runningSession = runningByConfig[c.id];
+    final stoppedSession = stoppedByConfig[c.id];
+    return _ConfigItem(
+      config: c,
+      isRunning: runningSession != null,
+      onRun: () {
+        if (runningSession != null) {
+          // Already running — hot reload if flutter, else focus
+          if (c.isFlutterRun) {
+            cubit.sendHotReload(runningSession.id);
+          }
+          onAttachSession?.call(runningSession.id);
+        } else if (stoppedSession != null) {
+          cubit.restartSession(stoppedSession.id);
+          onAttachSession?.call(stoppedSession.id);
+        } else {
+          cubit.startRun(c).then((started) {
+            if (started != null) {
+              onAttachSession?.call(started.id);
+            }
+          });
+        }
+      },
+      onEdit: () async {
+        final updated = await RunConfigDialog.show(
+          context,
+          initial: c,
+        );
+        if (updated != null) {
+          cubit.updateConfig(updated.copyWith(group: groupId));
+        }
+      },
+      onDelete: () => cubit.removeConfig(c.id),
+    );
+  }
+
+  Widget _buildAddConfigTile(
+    BuildContext context,
+    RunCubit cubit,
+    AppColorScheme colors,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 8,
+        vertical: 2,
+      ),
+      child: InkWell(
+        onTap: () async {
+          final config = await RunConfigDialog.show(context);
+          if (config == null) return;
+          final added = await cubit.addConfig(
+            config.copyWith(group: groupId),
+          );
+          if (!context.mounted) return;
+          if (added.id != config.id) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Configuration already exists: ${added.name}',
+                ),
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          }
+        },
+        borderRadius: BorderRadius.circular(4),
+        child: Container(
+          height: 28,
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          child: Row(
+            children: [
+              Icon(Icons.add, size: 12, color: colors.primary),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  'Add Configuration',
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: colors.primary,
+                    fontSize: 11,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _sessionSection(
+    BuildContext context,
+    RunCubit cubit,
+    Map<String, List<RunSession>> sessionsByConfig,
+  ) {
+    if (state.sessions.isEmpty) return const [];
+    return [
+      const SizedBox(height: 6),
+      Container(
+        height: 24,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        alignment: Alignment.centerLeft,
+        child: Text(
+          'RUN SESSIONS',
+          style: TextStyle(
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withAlpha(120),
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.8,
+          ),
+        ),
+      ),
+      ...state.configs
+          .where((c) => sessionsByConfig[c.id] != null)
+          .map((config) {
+            final sessions = sessionsByConfig[config.id]!;
+            return _SessionGroup(
+              config: config,
+              sessions: sessions,
+              activeSessionId: state.activeSessionId,
+              onTapSession: (sessionId) {
+                onAttachSession?.call(sessionId);
+              },
+              onDeleteSession: cubit.removeSession,
+            );
+          }),
+    ];
   }
 
   Future<String?> _askGroupName(

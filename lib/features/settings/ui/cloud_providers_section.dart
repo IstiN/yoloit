@@ -339,6 +339,201 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
     );
   }
 
+  Widget _buildEmptyState(ColorScheme colors, TextStyle? textStyle) {
+    return Material(
+      color: colors.surface,
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        onTap: _showAddPresetDialog,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: colors.outline.withAlpha(40)),
+          ),
+          child: Text(
+            'No cloud providers configured.\n'
+            'Tap + to add OpenRouter, Google Gemini, OpenAI, or a custom endpoint.',
+            style: textStyle?.copyWith(
+              fontSize: 12,
+              color: colors.onSurface.withAlpha(160),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildConfigTile(CloudLlmConfig config, ColorScheme colors) {
+    final isActive = config.id == _activeConfigId;
+    return Material(
+      color: isActive ? colors.primary.withAlpha(16) : colors.surface,
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        onTap: () => _showEditConfigDialog(config),
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color:
+                  isActive
+                      ? colors.primary.withAlpha(100)
+                      : colors.outline.withAlpha(40),
+            ),
+          ),
+          child: ListTile(
+            dense: true,
+            title: Text(
+              config.name,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            subtitle: Text(
+              '${config.model} • ${config.apiKey.isNotEmpty ? "key ✓" : "no key"}',
+              style: TextStyle(
+                fontSize: 12,
+                color: colors.onSurface.withAlpha(160),
+              ),
+            ),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.settings_outlined, size: 16),
+                  tooltip: 'Provider settings',
+                  onPressed: () => _showEditConfigDialog(config),
+                ),
+                IconButton(
+                  icon: Icon(Icons.delete, size: 16, color: colors.error),
+                  tooltip: 'Remove',
+                  onPressed: () => _deleteConfig(config.id),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildChatRouting() {
+    final chatProviderId =
+        _configById(_activeConfigId)?.id ??
+        (_configs.isNotEmpty ? _configs.first.id : null);
+    final chatConfig = _configById(chatProviderId);
+    final chatModelOptions = _modelOptionsForConfig(chatProviderId);
+    final chatModelValue =
+        chatModelOptions.any((m) => m.id == chatConfig?.model)
+            ? chatConfig?.model
+            : null;
+    return <Widget>[
+      _providerDropdown(
+        value: chatProviderId,
+        labelText: 'Chat provider',
+        onChanged: (v) {
+          if (v == null) return;
+          _setChatProvider(v);
+        },
+      ),
+      const SizedBox(height: 8),
+      Row(
+        children: [
+          Expanded(
+            child: DropdownButtonFormField<String>(
+              initialValue: chatModelValue,
+              hint: const Text('Select chat model'),
+              decoration: const InputDecoration(
+                labelText: 'Chat model',
+                isDense: true,
+                border: OutlineInputBorder(),
+              ),
+              items: _modelItems(chatModelOptions),
+              onChanged: (v) {
+                if (v == null || chatProviderId == null) return;
+                _setProviderModel(chatProviderId, v);
+              },
+            ),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            icon: const Icon(Icons.settings_outlined, size: 18),
+            tooltip: 'Chat provider settings',
+            onPressed:
+                chatConfig == null
+                    ? null
+                    : () => _showEditConfigDialog(chatConfig),
+          ),
+        ],
+      ),
+    ];
+  }
+
+  List<Widget> _buildAsrRouting() {
+    final asrConfigId = _effectiveAsrConfigId();
+    final asrOptions = _modelOptionsForConfig(asrConfigId);
+    final asrOptionsWithSelected = <({String id, String label})>[
+      ...asrOptions,
+      if (_voiceSettings.cloudAsrModel != null &&
+          _voiceSettings.cloudAsrModel!.trim().isNotEmpty &&
+          !asrOptions.any((m) => m.id == _voiceSettings.cloudAsrModel))
+        (
+          id: _voiceSettings.cloudAsrModel!.trim(),
+          label: _voiceSettings.cloudAsrModel!.trim(),
+        ),
+    ];
+    final asrValue =
+        asrOptionsWithSelected.any(
+            (m) => m.id == _voiceSettings.cloudAsrModel,
+          )
+            ? _voiceSettings.cloudAsrModel
+            : null;
+    return <Widget>[
+      _providerDropdown(
+        value: asrConfigId,
+        labelText: 'ASR provider',
+        onChanged: (v) {
+          if (v == null) return;
+          _setVoiceSettings(
+            _voiceSettings.copyWith(
+              useCloudAsr: true,
+              useChatModelForCloudAsr: false,
+              cloudAsrConfigId: v,
+            ),
+          );
+        },
+      ),
+      const SizedBox(height: 8),
+      DropdownButtonFormField<String>(
+        initialValue: asrValue,
+        hint: const Text(
+          'Select ASR model',
+          style: TextStyle(fontSize: 13),
+        ),
+        decoration: const InputDecoration(
+          labelText: 'ASR model',
+          isDense: true,
+          border: OutlineInputBorder(),
+        ),
+        items: _modelItems(asrOptionsWithSelected),
+        onChanged:
+            (v) => _setVoiceSettings(
+              _voiceSettings.copyWith(cloudAsrModel: v),
+            ),
+      ),
+      const SizedBox(height: 6),
+      Text(
+        'ASR uses the provider/model selected above.',
+        style: TextStyle(
+          fontSize: 11,
+          color: Theme.of(context).colorScheme.onSurface.withAlpha(160),
+        ),
+      ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -383,141 +578,16 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
         const SizedBox(height: 8),
 
         if (_configs.isEmpty)
-          Material(
-            color: colors.surface,
-            borderRadius: BorderRadius.circular(8),
-            child: InkWell(
-              onTap: _showAddPresetDialog,
-              borderRadius: BorderRadius.circular(8),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: colors.outline.withAlpha(40)),
-                ),
-                child: Text(
-                  'No cloud providers configured.\n'
-                  'Tap + to add OpenRouter, Google Gemini, OpenAI, or a custom endpoint.',
-                  style: textStyle?.copyWith(
-                    fontSize: 12,
-                    color: colors.onSurface.withAlpha(160),
-                  ),
-                ),
-              ),
-            ),
-          )
+          _buildEmptyState(colors, textStyle)
         else
-          ...List.generate(_configs.length, (i) {
-            final config = _configs[i];
-            final isActive = config.id == _activeConfigId;
-            return Material(
-              color: isActive ? colors.primary.withAlpha(16) : colors.surface,
-              borderRadius: BorderRadius.circular(8),
-              child: InkWell(
-                onTap: () => _showEditConfigDialog(config),
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color:
-                          isActive
-                              ? colors.primary.withAlpha(100)
-                              : colors.outline.withAlpha(40),
-                    ),
-                  ),
-                  child: ListTile(
-                    dense: true,
-                    title: Text(
-                      config.name,
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    subtitle: Text(
-                      '${config.model} • ${config.apiKey.isNotEmpty ? "key ✓" : "no key"}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: colors.onSurface.withAlpha(160),
-                      ),
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.settings_outlined, size: 16),
-                          tooltip: 'Provider settings',
-                          onPressed: () => _showEditConfigDialog(config),
-                        ),
-                        IconButton(
-                          icon: Icon(Icons.delete, size: 16, color: colors.error),
-                          tooltip: 'Remove',
-                          onPressed: () => _deleteConfig(config.id),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }),
+          ..._configs.map((config) => _buildConfigTile(config, colors)),
         const SizedBox(height: 24),
         Text(
           'Model Routing',
           style: textStyle?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
-        ...(() {
-          final chatProviderId =
-              _configById(_activeConfigId)?.id ??
-              (_configs.isNotEmpty ? _configs.first.id : null);
-          final chatConfig = _configById(chatProviderId);
-          final chatModelOptions = _modelOptionsForConfig(chatProviderId);
-          final chatModelValue =
-              chatModelOptions.any((m) => m.id == chatConfig?.model)
-                  ? chatConfig?.model
-                  : null;
-          return <Widget>[
-            _providerDropdown(
-              value: chatProviderId,
-              labelText: 'Chat provider',
-              onChanged: (v) {
-                if (v == null) return;
-                _setChatProvider(v);
-              },
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    initialValue: chatModelValue,
-                    hint: const Text('Select chat model'),
-                    decoration: const InputDecoration(
-                      labelText: 'Chat model',
-                      isDense: true,
-                      border: OutlineInputBorder(),
-                    ),
-                    items: _modelItems(chatModelOptions),
-                    onChanged: (v) {
-                      if (v == null || chatProviderId == null) return;
-                      _setProviderModel(chatProviderId, v);
-                    },
-                  ),
-                ),
-                const SizedBox(width: 8),
-                IconButton(
-                  icon: const Icon(Icons.settings_outlined, size: 18),
-                  tooltip: 'Chat provider settings',
-                  onPressed:
-                      chatConfig == null
-                          ? null
-                          : () => _showEditConfigDialog(chatConfig),
-                ),
-              ],
-            ),
-          ];
-        })(),
+        ..._buildChatRouting(),
         const SizedBox(height: 12),
         Text(
           'Voice / ASR Settings',
@@ -550,70 +620,7 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
           ),
           const SizedBox(height: 8),
         ],
-        if (!_voiceSettings.useChatModelForCloudAsr) ...[
-          ...(() {
-            final asrConfigId = _effectiveAsrConfigId();
-            final asrOptions = _modelOptionsForConfig(asrConfigId);
-            final asrOptionsWithSelected = <({String id, String label})>[
-              ...asrOptions,
-              if (_voiceSettings.cloudAsrModel != null &&
-                  _voiceSettings.cloudAsrModel!.trim().isNotEmpty &&
-                  !asrOptions.any((m) => m.id == _voiceSettings.cloudAsrModel))
-                (
-                  id: _voiceSettings.cloudAsrModel!.trim(),
-                  label: _voiceSettings.cloudAsrModel!.trim(),
-                ),
-            ];
-            final asrValue =
-                asrOptionsWithSelected.any(
-                      (m) => m.id == _voiceSettings.cloudAsrModel,
-                    )
-                    ? _voiceSettings.cloudAsrModel
-                    : null;
-            return <Widget>[
-              _providerDropdown(
-                value: asrConfigId,
-                labelText: 'ASR provider',
-                onChanged: (v) {
-                  if (v == null) return;
-                  _setVoiceSettings(
-                    _voiceSettings.copyWith(
-                      useCloudAsr: true,
-                      useChatModelForCloudAsr: false,
-                      cloudAsrConfigId: v,
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                initialValue: asrValue,
-                hint: const Text(
-                  'Select ASR model',
-                  style: TextStyle(fontSize: 13),
-                ),
-                decoration: const InputDecoration(
-                  labelText: 'ASR model',
-                  isDense: true,
-                  border: OutlineInputBorder(),
-                ),
-                items: _modelItems(asrOptionsWithSelected),
-                onChanged:
-                    (v) => _setVoiceSettings(
-                      _voiceSettings.copyWith(cloudAsrModel: v),
-                    ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'ASR uses the provider/model selected above.',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: colors.onSurface.withAlpha(160),
-                ),
-              ),
-            ];
-          })(),
-        ],
+        if (!_voiceSettings.useChatModelForCloudAsr) ..._buildAsrRouting(),
         if (_voiceSettings.useCloudAsr) ...[
           CheckboxListTile(
             dense: true,

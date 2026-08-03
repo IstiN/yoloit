@@ -517,37 +517,40 @@ class _BoardFilePickerDialogState extends State<_BoardFilePickerDialog> {
     }
     return ListView.builder(
       itemCount: entries.length,
-      itemBuilder: (context, index) {
-        final entry = entries[index];
-        final selected = _selectedFiles.contains(entry.path);
-        final canSelectFile =
-            !entry.isDirectory && widget.mode != BoardFilePickerMode.directory;
-        return ListTile(
-          key: Key('board-file-picker-entry-${entry.path}'),
-          leading: Icon(
-            entry.isDirectory
-                ? Icons.folder_outlined
-                : Icons.insert_drive_file_outlined,
-          ),
-          title: Text(entry.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-          selected: selected,
-          trailing:
-              widget.mode == BoardFilePickerMode.files && canSelectFile
-                  ? Checkbox(
-                    value: selected,
-                    onChanged: (_) => _toggleFile(entry),
-                  )
-                  : null,
-          onTap: () {
-            if (entry.isDirectory) {
-              unawaited(_load(entry.path));
-              return;
-            }
-            if (canSelectFile) _toggleFile(entry);
-          },
-        );
-      },
+      itemBuilder: (context, index) => _buildEntryTile(entries[index]),
     );
+  }
+
+  Widget _buildEntryTile(_FileEntry entry) {
+    final selected = _selectedFiles.contains(entry.path);
+    final canSelectFile =
+        !entry.isDirectory && widget.mode != BoardFilePickerMode.directory;
+    return ListTile(
+      key: Key('board-file-picker-entry-${entry.path}'),
+      leading: Icon(
+        entry.isDirectory
+            ? Icons.folder_outlined
+            : Icons.insert_drive_file_outlined,
+      ),
+      title: Text(entry.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+      selected: selected,
+      trailing:
+          widget.mode == BoardFilePickerMode.files && canSelectFile
+              ? Checkbox(
+                value: selected,
+                onChanged: (_) => _toggleFile(entry),
+              )
+              : null,
+      onTap: () => _onEntryTap(entry, canSelectFile),
+    );
+  }
+
+  void _onEntryTap(_FileEntry entry, bool canSelectFile) {
+    if (entry.isDirectory) {
+      unawaited(_load(entry.path));
+      return;
+    }
+    if (canSelectFile) _toggleFile(entry);
   }
 
   void _toggleFile(_FileEntry entry) {

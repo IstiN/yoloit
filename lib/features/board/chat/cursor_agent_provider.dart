@@ -170,17 +170,11 @@ class CursorAgentProvider extends CliProviderBase {
 
     switch (type) {
       case 'system':
-        return [
-          ChatEvent(
-            type: ChatEventType.sessionStatus,
-            rawType: 'cursor.system.$subtype',
-            data: Map<String, dynamic>.from(json),
-          ),
-        ];
+        return _parseSystemEvent(json, subtype);
 
       case 'user':
-        return [
-          const ChatEvent(
+        return const [
+          ChatEvent(
             type: ChatEventType.userMessage,
             rawType: 'cursor.user',
             data: {},
@@ -191,135 +185,173 @@ class CursorAgentProvider extends CliProviderBase {
         return [];
 
       case 'assistant':
-        final message = json['message'] as Map<String, dynamic>?;
-        final content = _extractTextContent(message?['content']);
-        final modelCallId = json['model_call_id'] as String?;
-        final hasTimestamp = json.containsKey('timestamp_ms');
-
-        if (hasTimestamp) {
-          // Delta chunk (--stream-partial-output).
-          // cursor-agent sends a MIX of incremental token-level deltas AND
-          // periodic cumulative snapshots (the full text so far).  We track
-          // the accumulated text in _cumulativeContent and detect which kind
-          // each event is to avoid duplicating text in the UI.
-          final isFirst = _currentStreamId == null;
-
-          String trueDelta;
-          if (content == _cumulativeContent) {
-            // Exact duplicate of accumulated content — skip entirely
-            trueDelta = '';
-          } else if (content.length > _cumulativeContent.length &&
-              content.startsWith(_cumulativeContent)) {
-            // Cumulative snapshot that extends past what we've seen — extract new portion
-            trueDelta = content.substring(_cumulativeContent.length);
-            _cumulativeContent = content;
-          } else {
-            // Incremental delta — append to accumulated text
-            trueDelta = content;
-            _cumulativeContent += content;
-          }
-
-          if (isFirst) {
-            final startId =
-                modelCallId ??
-                'cursor-${DateTime.now().millisecondsSinceEpoch}';
-            _currentStreamId = startId;
-            return [
-              ChatEvent(
-                type: ChatEventType.assistantMessageStart,
-                rawType: 'cursor.assistant.start',
-                data: {'messageId': startId},
-                id: startId,
-              ),
-              if (trueDelta.isNotEmpty)
-                ChatEvent(
-                  type: ChatEventType.assistantDelta,
-                  rawType: 'cursor.assistant.delta',
-                  data: {'deltaContent': trueDelta},
-                ),
-            ];
-          }
-          if (trueDelta.isEmpty) return [];
-          return [
-            ChatEvent(
-              type: ChatEventType.assistantDelta,
-              rawType: 'cursor.assistant.delta',
-              data: {'deltaContent': trueDelta},
-            ),
-          ];
-        } else {
-          // Final complete message (no timestamp_ms) — end of this turn.
-          final msgId =
-              modelCallId ??
-              _currentStreamId ??
-              'cursor-${DateTime.now().millisecondsSinceEpoch}';
-          _currentStreamId = null; // reset so next turn starts fresh
-          _cumulativeContent = ''; // reset cumulative tracker
-          return [
-            ChatEvent(
-              type: ChatEventType.assistantMessage,
-              rawType: 'cursor.assistant',
-              data: {'content': content, 'messageId': msgId},
-              id: msgId,
-            ),
-          ];
-        }
+        return _parseAssistantEvent(json);
 
       case 'tool_call':
-        if (subtype == 'started') {
-          final callId = _sanitizeCallId(json['call_id'] as String? ?? '');
-          final toolCall = json['tool_call'] as Map<String, dynamic>?;
-          final (description, command) = _extractToolInfo(toolCall);
-          return [
-            ChatEvent(
-              type: ChatEventType.toolStart,
-              rawType: 'cursor.tool_call.started',
-              data: {
-                'toolCallId': callId,
-                'toolName': description,
-                'arguments': {'command': command},
-              },
-            ),
-          ];
-        } else if (subtype == 'completed') {
-          final callId = _sanitizeCallId(json['call_id'] as String? ?? '');
-          final toolCall = json['tool_call'] as Map<String, dynamic>?;
-          final (description, _) = _extractToolInfo(toolCall);
-          final (isSuccess, output) = _extractToolResult(toolCall);
-          return [
-            ChatEvent(
-              type: ChatEventType.toolComplete,
-              rawType: 'cursor.tool_call.completed',
-              data: {
-                'toolCallId': callId,
-                'toolName': description,
-                'success': isSuccess,
-                'result': {'content': output},
-              },
-            ),
-          ];
-        }
-        return [];
+        return _parseToolCallEvent(json, subtype);
 
       case 'result':
-        final usage = json['usage'] as Map<String, dynamic>?;
-        return [
-          ChatEvent(
-            type: ChatEventType.result,
-            rawType: 'cursor.result',
-            data: {
-              'usage': {
-                'outputTokens': (usage?['outputTokens'] as num?)?.toInt() ?? 0,
-                'totalApiDurationMs':
-                    (json['duration_ms'] as num?)?.toInt() ?? 0,
-              },
-            },
-          ),
-        ];
+        return _parseResultEvent(json);
 
       default:
         return [];
     }
+  }
+
+  List<ChatEvent> _parseSystemEvent(
+    Map<String, dynamic> json,
+    String? subtype,
+  ) {
+    return [
+      ChatEvent(
+        type: ChatEventType.sessionStatus,
+        rawType: 'cursor.system.$subtype',
+        data: Map<String, dynamic>.from(json),
+      ),
+    ];
+  }
+
+  List<ChatEvent> _parseAssistantEvent(Map<String, dynamic> json) {
+    final message = json['message'] as Map<String, dynamic>?;
+    final content = _extractTextContent(message?['content']);
+    final modelCallId = json['model_call_id'] as String?;
+
+    if (json.containsKey('timestamp_ms')) {
+      return _parseAssistantDelta(content, modelCallId);
+    }
+    // Final complete message (no timestamp_ms) — end of this turn.
+    final msgId =
+        modelCallId ??
+        _currentStreamId ??
+        'cursor-${DateTime.now().millisecondsSinceEpoch}';
+    _currentStreamId = null; // reset so next turn starts fresh
+    _cumulativeContent = ''; // reset cumulative tracker
+    return [
+      ChatEvent(
+        type: ChatEventType.assistantMessage,
+        rawType: 'cursor.assistant',
+        data: {'content': content, 'messageId': msgId},
+        id: msgId,
+      ),
+    ];
+  }
+
+  /// Handles a delta chunk (--stream-partial-output).
+  List<ChatEvent> _parseAssistantDelta(String content, String? modelCallId) {
+    // cursor-agent sends a MIX of incremental token-level deltas AND
+    // periodic cumulative snapshots (the full text so far).  We track
+    // the accumulated text in _cumulativeContent and detect which kind
+    // each event is to avoid duplicating text in the UI.
+    final isFirst = _currentStreamId == null;
+
+    String trueDelta;
+    if (content == _cumulativeContent) {
+      // Exact duplicate of accumulated content — skip entirely
+      trueDelta = '';
+    } else if (content.length > _cumulativeContent.length &&
+        content.startsWith(_cumulativeContent)) {
+      // Cumulative snapshot that extends past what we've seen — extract new portion
+      trueDelta = content.substring(_cumulativeContent.length);
+      _cumulativeContent = content;
+    } else {
+      // Incremental delta — append to accumulated text
+      trueDelta = content;
+      _cumulativeContent += content;
+    }
+
+    if (isFirst) {
+      final startId =
+          modelCallId ?? 'cursor-${DateTime.now().millisecondsSinceEpoch}';
+      _currentStreamId = startId;
+      return [
+        ChatEvent(
+          type: ChatEventType.assistantMessageStart,
+          rawType: 'cursor.assistant.start',
+          data: {'messageId': startId},
+          id: startId,
+        ),
+        if (trueDelta.isNotEmpty)
+          ChatEvent(
+            type: ChatEventType.assistantDelta,
+            rawType: 'cursor.assistant.delta',
+            data: {'deltaContent': trueDelta},
+          ),
+      ];
+    }
+    if (trueDelta.isEmpty) return [];
+    return [
+      ChatEvent(
+        type: ChatEventType.assistantDelta,
+        rawType: 'cursor.assistant.delta',
+        data: {'deltaContent': trueDelta},
+      ),
+    ];
+  }
+
+  List<ChatEvent> _parseToolCallEvent(
+    Map<String, dynamic> json,
+    String? subtype,
+  ) {
+    if (subtype == 'started') {
+      return _parseToolCallStarted(json);
+    }
+    if (subtype == 'completed') {
+      return _parseToolCallCompleted(json);
+    }
+    return [];
+  }
+
+  List<ChatEvent> _parseToolCallStarted(Map<String, dynamic> json) {
+    final callId = _sanitizeCallId(json['call_id'] as String? ?? '');
+    final toolCall = json['tool_call'] as Map<String, dynamic>?;
+    final (description, command) = _extractToolInfo(toolCall);
+    return [
+      ChatEvent(
+        type: ChatEventType.toolStart,
+        rawType: 'cursor.tool_call.started',
+        data: {
+          'toolCallId': callId,
+          'toolName': description,
+          'arguments': {'command': command},
+        },
+      ),
+    ];
+  }
+
+  List<ChatEvent> _parseToolCallCompleted(Map<String, dynamic> json) {
+    final callId = _sanitizeCallId(json['call_id'] as String? ?? '');
+    final toolCall = json['tool_call'] as Map<String, dynamic>?;
+    final (description, _) = _extractToolInfo(toolCall);
+    final (isSuccess, output) = _extractToolResult(toolCall);
+    return [
+      ChatEvent(
+        type: ChatEventType.toolComplete,
+        rawType: 'cursor.tool_call.completed',
+        data: {
+          'toolCallId': callId,
+          'toolName': description,
+          'success': isSuccess,
+          'result': {'content': output},
+        },
+      ),
+    ];
+  }
+
+  List<ChatEvent> _parseResultEvent(Map<String, dynamic> json) {
+    final usage = json['usage'] as Map<String, dynamic>?;
+    return [
+      ChatEvent(
+        type: ChatEventType.result,
+        rawType: 'cursor.result',
+        data: {
+          'usage': {
+            'outputTokens': (usage?['outputTokens'] as num?)?.toInt() ?? 0,
+            'totalApiDurationMs':
+                (json['duration_ms'] as num?)?.toInt() ?? 0,
+          },
+        },
+      ),
+    ];
   }
 
   /// Extract concatenated text from a cursor message content array.

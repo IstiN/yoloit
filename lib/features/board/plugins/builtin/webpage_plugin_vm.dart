@@ -864,77 +864,9 @@ class _ViewportLabDialogState extends State<_ViewportLabDialog> {
       // This script overrides window.innerWidth as a belt-and-suspenders
       // measure for responsive breakpoints.
       final sb = StringBuffer('(function(){\n');
-      // Always override window.innerWidth to the fixed viewport target.
-      sb.writeln('  var iw = 1280;');
-      sb.writeln(
-        "  try{Object.defineProperty(window,'innerWidth',{get:function(){return iw;},configurable:true});}catch(e){}",
-      );
-      sb.writeln(
-        "  try{Object.defineProperty(window,'outerWidth',{get:function(){return iw;},configurable:true});}catch(e){}",
-      );
-      if (useInner && innerWidth.isNotEmpty && innerWidth != '1280') {
-        sb.writeln('  iw = $innerWidth;');
-      }
-      // Apply CSS zoom on every DOMContentLoaded so reflow happens before JS.
-      if (useZoom) {
-        sb.writeln(
-          "  var applyZoom = function(){ if(document.documentElement) document.documentElement.style.zoom='$cssZoom'; };",
-        );
-        sb.writeln('  applyZoom();');
-        sb.writeln(
-          "  document.addEventListener('DOMContentLoaded', applyZoom);",
-        );
-      }
-      if (useYtFix) {
-        sb.writeln('  var ytW = $ytPlayerWidth;');
-        sb.writeln('  var ytH = $ytPlayerHeight;');
-        sb.writeln(r"""
-  var installYtFix = function(){
-    var css = ''
-      + 'ytd-watch-flexy, ytd-watch-flexy[flexy], ytd-watch-flexy[fullscreen] {'
-      + '  --ytd-watch-flexy-player-width: '+ytW+'px !important;'
-      + '  --ytd-watch-flexy-player-height: '+ytH+'px !important;'
-      + '  --ytd-watch-flexy-width-ratio: 16 !important;'
-      + '  --ytd-watch-flexy-height-ratio: 9 !important;'
-      + '}'
-      + '#player, #player-container, #player-container-inner, #player-container-outer, ytd-player, #movie_player, .html5-video-player {'
-      + '  width: '+ytW+'px !important; max-width: '+ytW+'px !important;'
-      + '  height: '+ytH+'px !important; min-height: '+ytH+'px !important;'
-      + '}'
-      + '#player-container-outer { padding-top: 0 !important; }'
-      + 'video.html5-main-video { width: '+ytW+'px !important; height: '+ytH+'px !important; object-fit: contain !important; }';
-    var style = document.getElementById('yoloit-yt-player-fix');
-    if (!style) {
-      style = document.createElement('style');
-      style.id = 'yoloit-yt-player-fix';
-      (document.head || document.documentElement).appendChild(style);
-    }
-    style.textContent = css;
-    var applySize = function(){
-      ['#player', '#player-container', '#player-container-inner', '#player-container-outer', 'ytd-player', '#movie_player'].forEach(function(sel){
-        document.querySelectorAll(sel).forEach(function(el){
-          el.style.setProperty('width', ytW + 'px', 'important');
-          el.style.setProperty('max-width', ytW + 'px', 'important');
-          el.style.setProperty('height', ytH + 'px', 'important');
-          el.style.setProperty('min-height', ytH + 'px', 'important');
-        });
-      });
-      var player = document.getElementById('movie_player');
-      if (player && player.setSize) {
-        try { player.setSize(ytW, ytH); } catch(e) {}
-      }
-      window.dispatchEvent(new Event('resize'));
-    };
-    applySize();
-    setTimeout(applySize, 250);
-    setTimeout(applySize, 1000);
-    setTimeout(applySize, 2500);
-    setTimeout(applySize, 5000);
-  };
-  installYtFix();
-  document.addEventListener('DOMContentLoaded', installYtFix);
-""");
-      }
+      _appendInitInnerWidthOverride(sb, useInner, innerWidth);
+      _appendInitZoom(sb, useZoom, cssZoom);
+      _appendInitYtFix(sb, useYtFix, ytPlayerWidth, ytPlayerHeight);
       sb.writeln('})();');
 
       final installed = await WebViewZoomService.installInitScript(
@@ -982,6 +914,95 @@ JSON.stringify({
       setState(() {
         _applying = false;
       });
+    }
+  }
+
+  void _appendInitInnerWidthOverride(
+    StringBuffer sb,
+    bool useInner,
+    String innerWidth,
+  ) {
+    // Always override window.innerWidth to the fixed viewport target.
+    sb.writeln('  var iw = 1280;');
+    sb.writeln(
+      "  try{Object.defineProperty(window,'innerWidth',{get:function(){return iw;},configurable:true});}catch(e){}",
+    );
+    sb.writeln(
+      "  try{Object.defineProperty(window,'outerWidth',{get:function(){return iw;},configurable:true});}catch(e){}",
+    );
+    if (useInner && innerWidth.isNotEmpty && innerWidth != '1280') {
+      sb.writeln('  iw = $innerWidth;');
+    }
+  }
+
+  void _appendInitZoom(StringBuffer sb, bool useZoom, String cssZoom) {
+    // Apply CSS zoom on every DOMContentLoaded so reflow happens before JS.
+    if (useZoom) {
+      sb.writeln(
+        "  var applyZoom = function(){ if(document.documentElement) document.documentElement.style.zoom='$cssZoom'; };",
+      );
+      sb.writeln('  applyZoom();');
+      sb.writeln(
+        "  document.addEventListener('DOMContentLoaded', applyZoom);",
+      );
+    }
+  }
+
+  void _appendInitYtFix(
+    StringBuffer sb,
+    bool useYtFix,
+    String ytPlayerWidth,
+    String ytPlayerHeight,
+  ) {
+    if (useYtFix) {
+      sb.writeln('  var ytW = $ytPlayerWidth;');
+      sb.writeln('  var ytH = $ytPlayerHeight;');
+      sb.writeln(r"""
+  var installYtFix = function(){
+    var css = ''
+      + 'ytd-watch-flexy, ytd-watch-flexy[flexy], ytd-watch-flexy[fullscreen] {'
+      + '  --ytd-watch-flexy-player-width: '+ytW+'px !important;'
+      + '  --ytd-watch-flexy-player-height: '+ytH+'px !important;'
+      + '  --ytd-watch-flexy-width-ratio: 16 !important;'
+      + '  --ytd-watch-flexy-height-ratio: 9 !important;'
+      + '}'
+      + '#player, #player-container, #player-container-inner, #player-container-outer, ytd-player, #movie_player, .html5-video-player {'
+      + '  width: '+ytW+'px !important; max-width: '+ytW+'px !important;'
+      + '  height: '+ytH+'px !important; min-height: '+ytH+'px !important;'
+      + '}'
+      + '#player-container-outer { padding-top: 0 !important; }'
+      + 'video.html5-main-video { width: '+ytW+'px !important; height: '+ytH+'px !important; object-fit: contain !important; }';
+    var style = document.getElementById('yoloit-yt-player-fix');
+    if (!style) {
+      style = document.createElement('style');
+      style.id = 'yoloit-yt-player-fix';
+      (document.head || document.documentElement).appendChild(style);
+    }
+    style.textContent = css;
+    var applySize = function(){
+      ['#player', '#player-container', '#player-container-inner', '#player-container-outer', 'ytd-player', '#movie_player'].forEach(function(sel){
+        document.querySelectorAll(sel).forEach(function(el){
+          el.style.setProperty('width', ytW + 'px', 'important');
+          el.style.setProperty('max-width', ytW + 'px', 'important');
+          el.style.setProperty('height', ytH + 'px', 'important');
+          el.style.setProperty('min-height', ytH + 'px', 'important');
+        });
+      });
+      var player = document.getElementById('movie_player');
+      if (player && player.setSize) {
+        try { player.setSize(ytW, ytH); } catch(e) {}
+      }
+      window.dispatchEvent(new Event('resize'));
+    };
+    applySize();
+    setTimeout(applySize, 250);
+    setTimeout(applySize, 1000);
+    setTimeout(applySize, 2500);
+    setTimeout(applySize, 5000);
+  };
+  installYtFix();
+  document.addEventListener('DOMContentLoaded', installYtFix);
+""");
     }
   }
 

@@ -318,42 +318,54 @@ class YoloitCliToolCatalog {
       try {
         final raw = await rootBundle.loadString(assetPath);
         final doc = loadYaml(raw);
-        final commands = doc['commands'] as YamlList?;
-        if (commands == null) continue;
-        for (final cmd in commands) {
-          final id = cmd['id'] as String?;
-          if (id == null) continue;
-          final human = cmd['human'];
-          if (human == null) continue;
-          final locales = <String, List<String>>{};
-          if (human is YamlMap) {
-            for (final entry in human.entries) {
-              final locale = entry.key as String;
-              final phrases = entry.value;
-              if (phrases is YamlList) {
-                locales[locale] = phrases.whereType<String>().toList();
-              }
-            }
-          } else if (human is YamlList) {
-            // Flat list without locale — put under 'en'
-            locales['en'] = human.whereType<String>().toList();
-          }
-          if (locales.isNotEmpty) {
-            result.putIfAbsent(id, () => {});
-            for (final e in locales.entries) {
-              result[id]!.update(
-                e.key,
-                (existing) => [...existing, ...e.value],
-                ifAbsent: () => e.value,
-              );
-            }
-          }
-        }
+        _mergeYamlCommands(result, doc['commands'] as YamlList?);
       } catch (_) {
         // Skip missing/malformed YAML files
       }
     }
     return result;
+  }
+
+  /// Merges the `human` variants of each command in [commands] into
+  /// [result], appending phrases per locale.
+  static void _mergeYamlCommands(
+    Map<String, Map<String, List<String>>> result,
+    YamlList? commands,
+  ) {
+    if (commands == null) return;
+    for (final cmd in commands) {
+      final id = cmd['id'] as String?;
+      if (id == null) continue;
+      final locales = _parseHumanLocales(cmd['human']);
+      if (locales.isEmpty) continue;
+      result.putIfAbsent(id, () => {});
+      for (final e in locales.entries) {
+        result[id]!.update(
+          e.key,
+          (existing) => [...existing, ...e.value],
+          ifAbsent: () => e.value,
+        );
+      }
+    }
+  }
+
+  /// Parses a `human` YAML node into locale → phrases. A flat list without
+  /// locale keys is stored under 'en'.
+  static Map<String, List<String>> _parseHumanLocales(Object? human) {
+    final locales = <String, List<String>>{};
+    if (human is YamlMap) {
+      for (final entry in human.entries) {
+        final locale = entry.key as String;
+        final phrases = entry.value;
+        if (phrases is YamlList) {
+          locales[locale] = phrases.whereType<String>().toList();
+        }
+      }
+    } else if (human is YamlList) {
+      // Flat list without locale — put under 'en'
+      locales['en'] = human.whereType<String>().toList();
+    }
+    return locales;
   }
 }
 
@@ -397,29 +409,43 @@ class YoloitCliToolArgumentNormalizer {
   }
 
   static String? _redirectNoteFunctions(String functionName, String text) {
-    if (functionName == 'yoloit_note_create' &&
-        ((text.contains('create') && text.contains('panel')) ||
-            (text.contains('создай') && text.contains('панел')) ||
-            (text.contains('сделай') && text.contains('панел')))) {
+    if (_isPanelCreateRequest(functionName, text)) {
       return 'yoloit_panel_create';
     }
     if (functionName == 'yoloit_note_replace') {
       return 'yoloit_note';
     }
     // Model picks "note" (set text) when user wants "note:create" (new panel).
-    if ((functionName == 'nst' ||
-            functionName == 'yoloit_note' ||
-            functionName == 'note') &&
-        (text.contains('сделай заметку') ||
-            text.contains('создай заметку') ||
-            text.contains('новая заметка') ||
-            text.contains('добавь заметку') ||
-            (text.contains('create') && text.contains('note')) ||
-            (text.contains('make') && text.contains('note')) ||
-            (text.contains('new') && text.contains('note')))) {
+    if (_isNoteCreateRequest(functionName, text)) {
       return 'ncrt';
     }
     return null;
+  }
+
+  static bool _isPanelCreateRequest(String functionName, String text) {
+    if (functionName != 'yoloit_note_create') return false;
+    return (text.contains('create') && text.contains('panel')) ||
+        (text.contains('создай') && text.contains('панел')) ||
+        (text.contains('сделай') && text.contains('панел'));
+  }
+
+  static bool _isNoteCreateRequest(String functionName, String text) {
+    if (functionName != 'nst' &&
+        functionName != 'yoloit_note' &&
+        functionName != 'note') {
+      return false;
+    }
+    return _mentionsNewNote(text);
+  }
+
+  static bool _mentionsNewNote(String text) {
+    return text.contains('сделай заметку') ||
+        text.contains('создай заметку') ||
+        text.contains('новая заметка') ||
+        text.contains('добавь заметку') ||
+        (text.contains('create') && text.contains('note')) ||
+        (text.contains('make') && text.contains('note')) ||
+        (text.contains('new') && text.contains('note'));
   }
 
   static String? _redirectBoardFunctions(String functionName, String text) {

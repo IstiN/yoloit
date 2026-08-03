@@ -46,6 +46,49 @@ class ChatMessageList extends StatelessWidget {
   final ValueChanged<String> onAskUserChoice;
   final VoidCallback onSendMessage;
 
+  Widget _buildItem(
+    BuildContext context,
+    int index,
+    List<ChatToolCall> runningTools,
+    bool hasRunningTools,
+    bool showStreaming,
+    bool showThinking,
+  ) {
+    if (index < messages.length) {
+      return _buildMessageBubble(context, messages[index]);
+    }
+
+    final extra = index - messages.length;
+
+    if (hasRunningTools && extra == 0) {
+      return ChatRunningToolsCard(
+        tools: runningTools,
+        subAgents: subAgents,
+        subAgentPanels: subAgentPanels,
+        isSubAgentToolCall: isSubAgentToolCall,
+        onFocusPanel: (panelId) {
+          context.read<BoardCubit>().focusPanel(panelId);
+        },
+      );
+    }
+
+    if (showStreaming) {
+      return StreamingBubble(
+        content: streamingContent,
+        onLinkTap: onLinkTap,
+      );
+    }
+
+    if (showThinking) {
+      return const Padding(
+        padding: EdgeInsets.only(top: 6, bottom: 2, right: 48, left: 12),
+        child: ChatTypingIndicator(),
+      );
+    }
+
+    return const SizedBox.shrink();
+  }
+
   @override
   Widget build(BuildContext context) {
     final runningTools =
@@ -64,41 +107,15 @@ class ChatMessageList extends StatelessWidget {
           (showStreaming ? 1 : 0) +
           (hasRunningTools ? 1 : 0) +
           (showThinking ? 1 : 0),
-      itemBuilder: (context, index) {
-        if (index < messages.length) {
-          return _buildMessageBubble(context, messages[index]);
-        }
-
-        final extra = index - messages.length;
-
-        if (hasRunningTools && extra == 0) {
-          return ChatRunningToolsCard(
-            tools: runningTools,
-            subAgents: subAgents,
-            subAgentPanels: subAgentPanels,
-            isSubAgentToolCall: isSubAgentToolCall,
-            onFocusPanel: (panelId) {
-              context.read<BoardCubit>().focusPanel(panelId);
-            },
-          );
-        }
-
-        if (showStreaming) {
-          return StreamingBubble(
-            content: streamingContent,
-            onLinkTap: onLinkTap,
-          );
-        }
-
-        if (showThinking) {
-          return const Padding(
-            padding: EdgeInsets.only(top: 6, bottom: 2, right: 48, left: 12),
-            child: ChatTypingIndicator(),
-          );
-        }
-
-        return const SizedBox.shrink();
-      },
+      itemBuilder:
+          (context, index) => _buildItem(
+            context,
+            index,
+            runningTools,
+            hasRunningTools,
+            showStreaming,
+            showThinking,
+          ),
     );
   }
 

@@ -176,46 +176,9 @@ class _SetupGuidePanelState extends State<SetupGuidePanel> {
     try {
       final remote = widget.renderContext.remoteInfo;
       if (remote == null) {
-        final specialIds =
-            _selectedIds.where(SetupCatalog.isSpecialInstallTask).toList()
-              ..sort();
-        for (final id in specialIds) {
-          _appendLog('\$ ${SetupCatalog.specialInstallLabel(id)}');
-          await for (final line in SetupCatalog.runSpecialInstallTask(id)) {
-            if (!mounted) return;
-            _appendLog(line);
-          }
-        }
-        final script = SetupCatalog.installScript(
-          _selectedIds,
-          snapshot.runtime.os,
-        );
-        if (script.trim().isEmpty && specialIds.isEmpty) {
-          throw StateError(
-            'No install command for selected packages on this OS.',
-          );
-        }
-        _lastScript = script;
-        if (script.trim().isNotEmpty) {
-          _appendLog('\$ $script');
-          await for (final line in runSetupInstallScript(script)) {
-            if (!mounted) return;
-            _appendLog(line);
-          }
-        }
-        await _refresh();
+        await _installLocal(snapshot);
       } else {
-        final client = YoloitRemoteClient(
-          baseUrl: remote.url,
-          token: remote.token,
-        );
-        final run = await client.startSetupInstall(
-          _selectedIds.toList()..sort(),
-        );
-        _remoteRunId = run.id;
-        _lastScript = run.script;
-        _appendLog('\$ ${run.script}');
-        _pollRemoteInstall(client, run.id);
+        await _installRemote(remote);
       }
     } catch (error) {
       if (!mounted) return;
@@ -224,6 +187,59 @@ class _SetupGuidePanelState extends State<SetupGuidePanel> {
         _error = error.toString();
       });
     }
+  }
+
+  Future<void> _installLocal(SetupCheckSnapshot snapshot) async {
+    final specialIds =
+        _selectedIds.where(SetupCatalog.isSpecialInstallTask).toList()
+          ..sort();
+    if (!await _runSpecialInstallTasks(specialIds)) return;
+    final script = SetupCatalog.installScript(
+      _selectedIds,
+      snapshot.runtime.os,
+    );
+    if (script.trim().isEmpty && specialIds.isEmpty) {
+      throw StateError(
+        'No install command for selected packages on this OS.',
+      );
+    }
+    _lastScript = script;
+    if (script.trim().isNotEmpty) {
+      _appendLog('\$ $script');
+      await for (final line in runSetupInstallScript(script)) {
+        if (!mounted) return;
+        _appendLog(line);
+      }
+    }
+    await _refresh();
+  }
+
+  /// Runs the special install tasks, streaming their output to the log.
+  /// Returns false when the widget was unmounted mid-stream (mirrors the
+  /// original `return` inside `_installSelected`).
+  Future<bool> _runSpecialInstallTasks(List<String> specialIds) async {
+    for (final id in specialIds) {
+      _appendLog('\$ ${SetupCatalog.specialInstallLabel(id)}');
+      await for (final line in SetupCatalog.runSpecialInstallTask(id)) {
+        if (!mounted) return false;
+        _appendLog(line);
+      }
+    }
+    return true;
+  }
+
+  Future<void> _installRemote(RemoteBoardInfo remote) async {
+    final client = YoloitRemoteClient(
+      baseUrl: remote.url,
+      token: remote.token,
+    );
+    final run = await client.startSetupInstall(
+      _selectedIds.toList()..sort(),
+    );
+    _remoteRunId = run.id;
+    _lastScript = run.script;
+    _appendLog('\$ ${run.script}');
+    _pollRemoteInstall(client, run.id);
   }
 
   void _pollRemoteInstall(YoloitRemoteClient client, String runId) {

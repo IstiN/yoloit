@@ -236,22 +236,13 @@ class TerminalCubit extends Cubit<TerminalState> {
         savedSessionId ??
         '${type.name}_${DateTime.now().millisecondsSinceEpoch}';
 
-    String effectivePath = workspacePath;
-    if (worktreeContexts != null && workspaceId != null) {
-      effectivePath = await AgentWorkspaceDirService.instance.createAgentDir(
-        workspaceId,
-        sessionId,
-        worktreeContexts,
-      );
-      if (enabledSkills.isNotEmpty) {
-        unawaited(
-          SkillsInstallService.instance.syncSessionSkills(
-            sessionDir: effectivePath,
-            enabledSkillIds: enabledSkills,
-          ),
-        );
-      }
-    }
+    final effectivePath = await _prepareSessionDir(
+      sessionId,
+      workspacePath,
+      workspaceId,
+      worktreeContexts,
+      enabledSkills,
+    );
 
     final effectiveWorkspaceId = workspaceId ?? _activeWorkspaceId;
 
@@ -266,11 +257,7 @@ class TerminalCubit extends Cubit<TerminalState> {
       customName: customName,
     );
 
-    final secrets =
-        effectiveWorkspaceId != null
-            ? await WorkspaceSecretsService.instance.load(effectiveWorkspaceId)
-            : <String, String>{};
-    final extraEnv = secrets.isEmpty ? null : secrets;
+    final extraEnv = await _loadWorkspaceSecrets(effectiveWorkspaceId);
 
     final process = await _backendService.launch(
       sessionId: sessionId,
@@ -301,26 +288,79 @@ class TerminalCubit extends Cubit<TerminalState> {
       requestOpenPanel: requestOpenPanel,
     );
 
-    if (effectiveWorkspaceId != null) {
-      unawaited(
-        _persistence.save(
-          _allSessions
-              .where((s) => s.workspaceId == effectiveWorkspaceId)
-              .toList(),
-          effectiveWorkspaceId,
-        ),
-      );
-    }
+    _persistWorkspaceSessions(effectiveWorkspaceId);
 
     // Auto-run agent command (skip for plain terminal and when restoring tmux session).
+    await _autoRunAgentCommand(
+      sessionId,
+      type,
+      skipAutoRun: isRestore && (useTmux || attachedRuntime),
+    );
+  }
+
+  /// Creates the agent worktree dir when [worktreeContexts] are present and
+  /// syncs enabled skills into it. Returns the effective workspace path.
+  Future<String> _prepareSessionDir(
+    String sessionId,
+    String workspacePath,
+    String? workspaceId,
+    Map<String, String>? worktreeContexts,
+    List<String> enabledSkills,
+  ) async {
+    var effectivePath = workspacePath;
+    if (worktreeContexts != null && workspaceId != null) {
+      effectivePath = await AgentWorkspaceDirService.instance.createAgentDir(
+        workspaceId,
+        sessionId,
+        worktreeContexts,
+      );
+      if (enabledSkills.isNotEmpty) {
+        unawaited(
+          SkillsInstallService.instance.syncSessionSkills(
+            sessionDir: effectivePath,
+            enabledSkillIds: enabledSkills,
+          ),
+        );
+      }
+    }
+    return effectivePath;
+  }
+
+  /// Loads workspace secrets as extra env vars (null when none configured).
+  Future<Map<String, String>?> _loadWorkspaceSecrets(
+    String? workspaceId,
+  ) async {
+    final secrets =
+        workspaceId != null
+            ? await WorkspaceSecretsService.instance.load(workspaceId)
+            : <String, String>{};
+    return secrets.isEmpty ? null : secrets;
+  }
+
+  void _persistWorkspaceSessions(String? workspaceId) {
+    if (workspaceId == null) return;
+    unawaited(
+      _persistence.save(
+        _allSessions.where((s) => s.workspaceId == workspaceId).toList(),
+        workspaceId,
+      ),
+    );
+  }
+
+  /// Writes the agent's launch command into the session after a short delay,
+  /// unless [skipAutoRun] (restored tmux/runtime session) or no command is
+  /// configured (plain terminal).
+  Future<void> _autoRunAgentCommand(
+    String sessionId,
+    AgentType type, {
+    required bool skipAutoRun,
+  }) async {
     final effectiveCommand = AgentConfigService.instance.effectiveLaunchCommand(
       type,
     );
-    if (effectiveCommand.isNotEmpty &&
-        !(isRestore && (useTmux || attachedRuntime))) {
-      await Future<void>.delayed(const Duration(milliseconds: 1200));
-      _backendService.write(sessionId, '$effectiveCommand\n');
-    }
+    if (effectiveCommand.isEmpty || skipAutoRun) return;
+    await Future<void>.delayed(const Duration(milliseconds: 1200));
+    _backendService.write(sessionId, '$effectiveCommand\n');
   }
 
   /// Spawns a plain shell on a remote YoLoIT device (used from mobile/browser).
@@ -687,12 +727,20 @@ class TerminalCubit extends Cubit<TerminalState> {
     );
 
     // Play completion sound (interactive mode micro-completion).
+    _playCompletionSound();
+
+    _scheduleDonePhaseClear(sessionId);
+  }
+
+  void _playCompletionSound() {
     SessionPrefs.isCompletionSoundEnabled().then((enabled) {
       if (enabled && Platform.isMacOS) {
         Process.run('afplay', ['/System/Library/Sounds/Glass.aiff']);
       }
     });
+  }
 
+  void _scheduleDonePhaseClear(String sessionId) {
     Future.delayed(const Duration(seconds: 3), () {
       final i2 = _allSessions.indexWhere((s) => s.id == sessionId);
       if (i2 >= 0 && _allSessions[i2].hookPhase is DonePhase) {
@@ -777,20 +825,7 @@ class TerminalCubit extends Cubit<TerminalState> {
     // Approval dialog detected → AwaitingApprovalPhase + urgent sound.
     if (config.containsApproval(checkData) &&
         current.hookPhase is! AwaitingApprovalPhase) {
-      _ptyIdleTimers[sessionId]?.cancel();
-      _allSessions[i] = current.copyWith(
-        hookPhase: const AwaitingApprovalPhase(),
-      );
-      final cur = _loaded;
-      if (cur != null && !isClosed) {
-        _emitVisible();
-      }
-      // Urgent sound — different from completion sound.
-      SessionPrefs.isApprovalSoundEnabled().then((enabled) {
-        if (enabled && Platform.isMacOS) {
-          Process.run('afplay', ['/System/Library/Sounds/Sosumi.aiff']);
-        }
-      });
+      _enterAwaitingApproval(sessionId, i, current);
     }
 
     // If already awaiting approval, restart the fallback clear timer on every
@@ -798,22 +833,43 @@ class TerminalCubit extends Cubit<TerminalState> {
     // once the dialog is dismissed PTY data stops matching and the timer fires.
     if (current.hookPhase is AwaitingApprovalPhase ||
         config.containsApproval(checkData)) {
-      _approvalClearTimers[sessionId]?.cancel();
-      _approvalClearTimers[sessionId] = Timer(const Duration(seconds: 15), () {
-        _approvalClearTimers.remove(sessionId);
-        _ptyTailBuffers[sessionId]?.clear(); // reset buffer after dialog gone
-        final j = _allSessions.indexWhere((s) => s.id == sessionId);
-        if (j >= 0 && _allSessions[j].hookPhase is AwaitingApprovalPhase) {
-          _allSessions[j] = _allSessions[j].copyWith(clearHookPhase: true);
-          final cur = _loaded;
-          if (cur != null && !isClosed) {
-            _emitVisible();
-          }
-        }
-      });
+      _restartApprovalClearTimer(sessionId);
       if (config.containsApproval(checkData)) return true;
     }
     return false;
+  }
+
+  void _enterAwaitingApproval(String sessionId, int i, AgentSession current) {
+    _ptyIdleTimers[sessionId]?.cancel();
+    _allSessions[i] = current.copyWith(
+      hookPhase: const AwaitingApprovalPhase(),
+    );
+    final cur = _loaded;
+    if (cur != null && !isClosed) {
+      _emitVisible();
+    }
+    // Urgent sound — different from completion sound.
+    SessionPrefs.isApprovalSoundEnabled().then((enabled) {
+      if (enabled && Platform.isMacOS) {
+        Process.run('afplay', ['/System/Library/Sounds/Sosumi.aiff']);
+      }
+    });
+  }
+
+  void _restartApprovalClearTimer(String sessionId) {
+    _approvalClearTimers[sessionId]?.cancel();
+    _approvalClearTimers[sessionId] = Timer(const Duration(seconds: 15), () {
+      _approvalClearTimers.remove(sessionId);
+      _ptyTailBuffers[sessionId]?.clear(); // reset buffer after dialog gone
+      final j = _allSessions.indexWhere((s) => s.id == sessionId);
+      if (j >= 0 && _allSessions[j].hookPhase is AwaitingApprovalPhase) {
+        _allSessions[j] = _allSessions[j].copyWith(clearHookPhase: true);
+        final cur = _loaded;
+        if (cur != null && !isClosed) {
+          _emitVisible();
+        }
+      }
+    });
   }
 
   /// Resets the idle timer — clears the phase when the PTY goes quiet.

@@ -150,28 +150,48 @@ class KimiCliProvider extends CliProviderBase {
 
     final startTime = DateTime.now().subtract(const Duration(seconds: 2));
 
-    String? wirePath;
-    if (wireJsonlPath != null) {
-      if (wireJsonlPath!.isEmpty) {
-        // Explicitly disabled (e.g. in unit tests).
-        return;
-      }
-      wirePath = wireJsonlPath;
-    } else {
-      wirePath = await _findWireJsonl(startTime);
-    }
-
-    if (wirePath == null) {
-      debugPrint(
-        '$debugPrefix [$sessionName] wire.jsonl not found, '
-        'using stream-json fallback',
-      );
-      return;
-    }
+    final wirePath = await _resolveWireJsonlPath(startTime, sessionName);
+    if (wirePath == null) return;
 
     debugPrint('$debugPrefix [$sessionName] Found wire.jsonl: $wirePath');
     _state(sessionName).wireJsonlAvailable = true;
 
+    await _pollWireJsonl(process, sessionName, controller, wirePath, startTime);
+  }
+
+  /// Resolves the wire.jsonl path: explicit override, auto-discovery, or
+  /// null when explicitly disabled / not found.
+  Future<String?> _resolveWireJsonlPath(
+    DateTime startTime,
+    String sessionName,
+  ) async {
+    final overridePath = wireJsonlPath;
+    if (overridePath != null) {
+      if (overridePath.isEmpty) {
+        // Explicitly disabled (e.g. in unit tests).
+        return null;
+      }
+      return overridePath;
+    }
+    final discovered = await _findWireJsonl(startTime);
+    if (discovered == null) {
+      debugPrint(
+        '$debugPrefix [$sessionName] wire.jsonl not found, '
+        'using stream-json fallback',
+      );
+    }
+    return discovered;
+  }
+
+  /// Polls [wirePath] for appended bytes until the controller closes or the
+  /// process is replaced, then flushes any remaining bytes.
+  Future<void> _pollWireJsonl(
+    Process process,
+    String sessionName,
+    StreamController<ChatEvent> controller,
+    String wirePath,
+    DateTime startTime,
+  ) async {
     final file = File(wirePath);
     var lastSize = 0;
 
@@ -184,38 +204,14 @@ class KimiCliProvider extends CliProviderBase {
       final stat = await file.stat();
       if (stat.size <= lastSize) continue;
 
-      try {
-        final raf = await file.open(mode: FileMode.read);
-        await raf.setPosition(lastSize);
-        final bytes = await raf.read(stat.size - lastSize);
-        await raf.close();
-        lastSize = stat.size;
-
-        final text = utf8.decode(bytes);
-        for (final line in const LineSplitter().convert(text)) {
-          if (line.trim().isEmpty) continue;
-          try {
-            final events = _parseWireJsonlLine(
-              line,
-              startTime,
-              sessionName,
-            );
-            for (final event in events) {
-              if (!controller.isClosed) {
-                controller.add(event);
-              }
-            }
-          } catch (e) {
-            debugPrint(
-              '$debugPrefix [$sessionName] wire.jsonl parse error: $e',
-            );
-          }
-        }
-      } catch (e) {
-        debugPrint(
-          '$debugPrefix [$sessionName] wire.jsonl read error: $e',
-        );
-      }
+      lastSize = await _readWireJsonlChunk(
+        file,
+        lastSize,
+        stat.size,
+        startTime,
+        sessionName,
+        controller,
+      );
     }
 
     // Flush any remaining bytes after the loop exits.
@@ -226,6 +222,52 @@ class KimiCliProvider extends CliProviderBase {
       sessionName,
       controller,
     );
+  }
+
+  /// Reads bytes in `[lastSize, size)` from [file], parses each line and
+  /// emits events. Returns the new offset (unchanged on read failure).
+  Future<int> _readWireJsonlChunk(
+    File file,
+    int lastSize,
+    int size,
+    DateTime startTime,
+    String sessionName,
+    StreamController<ChatEvent> controller,
+  ) async {
+    var newSize = lastSize;
+    try {
+      final raf = await file.open(mode: FileMode.read);
+      await raf.setPosition(lastSize);
+      final bytes = await raf.read(size - lastSize);
+      await raf.close();
+      newSize = size;
+
+      final text = utf8.decode(bytes);
+      for (final line in const LineSplitter().convert(text)) {
+        if (line.trim().isEmpty) continue;
+        try {
+          final events = _parseWireJsonlLine(
+            line,
+            startTime,
+            sessionName,
+          );
+          for (final event in events) {
+            if (!controller.isClosed) {
+              controller.add(event);
+            }
+          }
+        } catch (e) {
+          debugPrint(
+            '$debugPrefix [$sessionName] wire.jsonl parse error: $e',
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint(
+        '$debugPrefix [$sessionName] wire.jsonl read error: $e',
+      );
+    }
+    return newSize;
   }
 
   Future<void> _flushRemainingWireJsonl(

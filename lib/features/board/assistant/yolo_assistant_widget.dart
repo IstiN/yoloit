@@ -1658,150 +1658,173 @@ $messagesJson
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           // Voice mode toggle
-          GestureDetector(
-            onTap: _toggleMode,
-            child: Container(
-              width: 28,
-              height: 28,
-              margin: const EdgeInsets.only(bottom: 2),
-              decoration: BoxDecoration(
-                color: colors.surfaceElevated,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(Icons.graphic_eq, size: 14, color: colors.primary),
-            ),
-          ),
+          _buildVoiceModeToggle(colors),
           const SizedBox(width: 8),
-          GestureDetector(
-            onTap: _showToolsDialog,
-            child: Tooltip(
-              message:
-                  'YoLo tools (${_enabledLocalToolCount()}/${YoloitCliToolCatalog.tools.length} enabled)',
-              child: Container(
-                width: 28,
-                height: 28,
-                margin: const EdgeInsets.only(bottom: 2),
-                decoration: BoxDecoration(
-                  color: colors.surfaceElevated,
-                  borderRadius: BorderRadius.circular(14),
-                  border:
-                      _disabledLocalToolNames.isEmpty
-                          ? null
-                          : Border.all(color: colors.primary.withAlpha(100)),
-                ),
-                child: Icon(
-                  Icons.settings_input_component_outlined,
-                  size: 14,
-                  color: colors.primary,
-                ),
-              ),
-            ),
-          ),
+          _buildToolsButton(colors),
 
-          Expanded(
-            child: Focus(
-              onKeyEvent: (node, event) {
-                if (event is! KeyDownEvent) return KeyEventResult.ignored;
-                final isEnter =
-                    event.logicalKey == LogicalKeyboardKey.enter ||
-                    event.logicalKey == LogicalKeyboardKey.numpadEnter;
-                if (isEnter && !HardwareKeyboard.instance.isShiftPressed) {
-                  unawaited(_sendMessage());
-                  return KeyEventResult.handled;
-                }
-                return KeyEventResult.ignored;
-              },
-              child: TextField(
-                controller: _inputController,
-                focusNode: _inputFocusNode,
-                style: TextStyle(fontSize: 13, color: textColor, height: 1.4),
-                decoration: InputDecoration(
-                  hintText: 'Ask YoLo…',
-                  hintStyle: TextStyle(fontSize: 13, color: hintColor),
-                  filled: true,
-                  fillColor: colors.surfaceElevated,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide(color: colors.primary, width: 0.8),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 10,
-                  ),
-                  isDense: true,
-                ),
-                maxLines: 4,
-                minLines: 1,
-              ),
-            ),
-          ),
+          _buildInputField(colors, textColor, hintColor),
           const SizedBox(width: 6),
           // Microphone button — tap to start recording, tap again to stop & send
-          GestureDetector(
-            onTap:
-                _isTranscribingMic
-                    ? null
-                    : () => unawaited(
-                      _isRecordingMic
-                          ? _stopAndSendMic()
-                          : _startPushToTalkMic(),
-                    ),
-            child: Container(
-              width: 28,
-              height: 28,
-              margin: const EdgeInsets.only(bottom: 2),
-              decoration: BoxDecoration(
-                color: colors.surfaceElevated,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(
-                _isRecordingMic
-                    ? Icons.mic_rounded
-                    : (_isTranscribingMic
-                        ? Icons.hourglass_top_rounded
-                        : Icons.mic_none),
-                size: 15,
-                color:
-                    _isRecordingMic
-                        ? Theme.of(context).colorScheme.error
-                        : colors.primary,
-              ),
-            ),
-          ),
+          _buildMicButton(colors),
           const SizedBox(width: 6),
           // Stop button (during generation) / Send button
-          GestureDetector(
-            onTap:
-                _isGeneratingReply
-                    ? _stopGeneration
-                    : () => unawaited(_sendMessage()),
-            child: Container(
-              width: 28,
-              height: 28,
-              margin: const EdgeInsets.only(bottom: 2),
-              decoration: BoxDecoration(
-                color:
-                    _isGeneratingReply
-                        ? Theme.of(context).colorScheme.error
-                        : colors.primary,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(
-                _isGeneratingReply ? Icons.stop_rounded : Icons.arrow_upward,
-                color: colors.textPrimary,
-                size: 16,
-              ),
-            ),
-          ),
+          _buildSendButton(colors),
         ],
+      ),
+    );
+  }
+
+  Widget _buildVoiceModeToggle(AppColorScheme colors) {
+    return GestureDetector(
+      onTap: _toggleMode,
+      child: Container(
+        width: 28,
+        height: 28,
+        margin: const EdgeInsets.only(bottom: 2),
+        decoration: BoxDecoration(
+          color: colors.surfaceElevated,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Icon(Icons.graphic_eq, size: 14, color: colors.primary),
+      ),
+    );
+  }
+
+  Widget _buildToolsButton(AppColorScheme colors) {
+    return GestureDetector(
+      onTap: _showToolsDialog,
+      child: Tooltip(
+        message:
+            'YoLo tools (${_enabledLocalToolCount()}/${YoloitCliToolCatalog.tools.length} enabled)',
+        child: Container(
+          width: 28,
+          height: 28,
+          margin: const EdgeInsets.only(bottom: 2),
+          decoration: BoxDecoration(
+            color: colors.surfaceElevated,
+            borderRadius: BorderRadius.circular(14),
+            border:
+                _disabledLocalToolNames.isEmpty
+                    ? null
+                    : Border.all(color: colors.primary.withAlpha(100)),
+          ),
+          child: Icon(
+            Icons.settings_input_component_outlined,
+            size: 14,
+            color: colors.primary,
+          ),
+        ),
+      ),
+    );
+  }
+
+  KeyEventResult _handleInputKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    final isEnter =
+        event.logicalKey == LogicalKeyboardKey.enter ||
+        event.logicalKey == LogicalKeyboardKey.numpadEnter;
+    if (isEnter && !HardwareKeyboard.instance.isShiftPressed) {
+      unawaited(_sendMessage());
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
+  Widget _buildInputField(
+    AppColorScheme colors,
+    Color textColor,
+    Color hintColor,
+  ) {
+    return Expanded(
+      child: Focus(
+        onKeyEvent: _handleInputKeyEvent,
+        child: TextField(
+          controller: _inputController,
+          focusNode: _inputFocusNode,
+          style: TextStyle(fontSize: 13, color: textColor, height: 1.4),
+          decoration: InputDecoration(
+            hintText: 'Ask YoLo…',
+            hintStyle: TextStyle(fontSize: 13, color: hintColor),
+            filled: true,
+            fillColor: colors.surfaceElevated,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide.none,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide.none,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(color: colors.primary, width: 0.8),
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 10,
+            ),
+            isDense: true,
+          ),
+          maxLines: 4,
+          minLines: 1,
+        ),
+      ),
+    );
+  }
+
+  void _onMicButtonTap() {
+    unawaited(_isRecordingMic ? _stopAndSendMic() : _startPushToTalkMic());
+  }
+
+  Widget _buildMicButton(AppColorScheme colors) {
+    return GestureDetector(
+      onTap: _isTranscribingMic ? null : _onMicButtonTap,
+      child: Container(
+        width: 28,
+        height: 28,
+        margin: const EdgeInsets.only(bottom: 2),
+        decoration: BoxDecoration(
+          color: colors.surfaceElevated,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Icon(
+          _isRecordingMic
+              ? Icons.mic_rounded
+              : (_isTranscribingMic
+                  ? Icons.hourglass_top_rounded
+                  : Icons.mic_none),
+          size: 15,
+          color:
+              _isRecordingMic
+                  ? Theme.of(context).colorScheme.error
+                  : colors.primary,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSendButton(AppColorScheme colors) {
+    return GestureDetector(
+      onTap:
+          _isGeneratingReply
+              ? _stopGeneration
+              : () => unawaited(_sendMessage()),
+      child: Container(
+        width: 28,
+        height: 28,
+        margin: const EdgeInsets.only(bottom: 2),
+        decoration: BoxDecoration(
+          color:
+              _isGeneratingReply
+                  ? Theme.of(context).colorScheme.error
+                  : colors.primary,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Icon(
+          _isGeneratingReply ? Icons.stop_rounded : Icons.arrow_upward,
+          color: colors.textPrimary,
+          size: 16,
+        ),
       ),
     );
   }
@@ -1877,40 +1900,65 @@ $messagesJson
   }
 
   Future<void> _startRecordingFromMic() async {
+    if (!await _ensureAsrModelReady()) return;
+    if (!await _ensureMicPermissions()) return;
+    if (!await _startMicStream()) return;
+    if (!mounted) return;
+    setState(() => _isRecordingMic = true);
+    // Stream real mic amplitude to the overlay waveform.
+    _amplitudeSub?.cancel();
+    _amplitudeSub = _micRecorder
+        .onAmplitudeChanged(const Duration(milliseconds: 60))
+        .listen((amp) {
+          // dBFS: 0 = max, ~-50 = silence for speech. Normalize to 0..1.
+          final normalized = ((amp.current + 50.0) / 50.0).clamp(0.0, 1.0);
+          widget.controller?._micAmplitudeCtrl.add(normalized);
+        });
+    _syncOverlayState(hiddenOverride: false);
+  }
+
+  /// Ensures an ASR model is available when cloud ASR is disabled.
+  /// Returns false when recording must not start (user was sent to Settings).
+  Future<bool> _ensureAsrModelReady() async {
     final voiceSettings =
         await CloudLlmSettingsService.instance.loadVoiceSettings();
-    if (!voiceSettings.useCloudAsr) {
-      await LocalAiModelsService.instance.initialize();
-      if (!LocalAiModelsService.instance.hasSelectedAsrInstalled) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Install ASR model first. Opening Settings → AI Models…',
-            ),
-            duration: Duration(seconds: 2),
-          ),
-        );
-        await SettingsPage.show(context, initialCategory: 'AI Models');
-        return;
-      }
-    }
+    if (voiceSettings.useCloudAsr) return true;
+    await LocalAiModelsService.instance.initialize();
+    if (LocalAiModelsService.instance.hasSelectedAsrInstalled) return true;
+    if (!mounted) return false;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Install ASR model first. Opening Settings → AI Models…',
+        ),
+        duration: Duration(seconds: 2),
+      ),
+    );
+    await SettingsPage.show(context, initialCategory: 'AI Models');
+    return false;
+  }
 
+  /// Checks native and recorder mic permissions, showing the hint dialog
+  /// when either is missing. Returns false when recording must not start.
+  Future<bool> _ensureMicPermissions() async {
     final nativeGranted =
         await MicrophonePermissionService.instance.ensureGranted();
     if (!nativeGranted) {
-      if (!mounted) return;
+      if (!mounted) return false;
       await _showMicrophonePermissionHint();
-      return;
+      return false;
     }
 
     final granted = await _micRecorder.hasPermission();
-    if (!granted) {
-      if (!mounted) return;
-      await _showMicrophonePermissionHint();
-      return;
-    }
+    if (granted) return true;
+    if (!mounted) return false;
+    await _showMicrophonePermissionHint();
+    return false;
+  }
 
+  /// Starts the PCM mic stream. Returns false when recording must not start
+  /// (permission lost or start failure — the user was already informed).
+  Future<bool> _startMicStream() async {
     try {
       _micStreamBytes = BytesBuilder(copy: false);
       final stream = await _micRecorder.startStream(
@@ -1925,32 +1973,21 @@ $messagesJson
         onError: (_) {},
         cancelOnError: false,
       );
+      return true;
     } on Exception catch (e) {
-      if (!mounted) return;
+      if (!mounted) return false;
       final stillNoPermission = !await _micRecorder.hasPermission();
-      if (!mounted) return;
+      if (!mounted) return false;
       if (stillNoPermission) {
         await _showMicrophonePermissionHint();
-        return;
+        return false;
       }
       await _showCopyableErrorDialog(
         title: 'Microphone error',
         message: 'Failed to start microphone:\n$e',
       );
-      return;
+      return false;
     }
-    if (!mounted) return;
-    setState(() => _isRecordingMic = true);
-    // Stream real mic amplitude to the overlay waveform.
-    _amplitudeSub?.cancel();
-    _amplitudeSub = _micRecorder
-        .onAmplitudeChanged(const Duration(milliseconds: 60))
-        .listen((amp) {
-          // dBFS: 0 = max, ~-50 = silence for speech. Normalize to 0..1.
-          final normalized = ((amp.current + 50.0) / 50.0).clamp(0.0, 1.0);
-          widget.controller?._micAmplitudeCtrl.add(normalized);
-        });
-    _syncOverlayState(hiddenOverride: false);
   }
 
   Future<void> _stopRecordingAndTranscribe({

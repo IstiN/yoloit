@@ -216,6 +216,14 @@ class WorkspacePanelState extends State<WorkspacePanel> {
     await cubit.addWorkspace(folder, customName: name);
 
     // Step 3 (optional): offer to add more folders
+    await _offerAdditionalFolders(context, name, cubit);
+  }
+
+  Future<void> _offerAdditionalFolders(
+    BuildContext context,
+    String name,
+    WorkspaceCubit cubit,
+  ) async {
     while (context.mounted) {
       final addMore = await _showConfirmDialog(
         context,
@@ -224,20 +232,29 @@ class WorkspacePanelState extends State<WorkspacePanel> {
         confirmLabel: 'Add Folder',
         isDestructive: false,
       );
-      if (!addMore || !context.mounted) break;
+      if (!addMore || !context.mounted) return;
       final extra = await BoardFilePicker.pickDirectory(
         context,
         title: 'Add Folder to "$name"',
       );
-      if (extra == null || !context.mounted) break;
+      if (extra == null || !context.mounted) return;
       await maybePromptGitInit(context, extra);
-      if (!context.mounted) break;
-      // Find the newly created workspace by name to get its id
-      final state = context.read<WorkspaceCubit>().state;
-      if (state is WorkspaceLoaded) {
-        final ws = state.workspaces.where((w) => w.name == name).lastOrNull;
-        if (ws != null) await cubit.addPathToWorkspace(ws.id, extra);
-      }
+      if (!context.mounted) return;
+      await _addFolderToWorkspace(context, name, cubit, extra);
+    }
+  }
+
+  Future<void> _addFolderToWorkspace(
+    BuildContext context,
+    String name,
+    WorkspaceCubit cubit,
+    String extra,
+  ) async {
+    // Find the newly created workspace by name to get its id
+    final state = context.read<WorkspaceCubit>().state;
+    if (state is WorkspaceLoaded) {
+      final ws = state.workspaces.where((w) => w.name == name).lastOrNull;
+      if (ws != null) await cubit.addPathToWorkspace(ws.id, extra);
     }
   }
 

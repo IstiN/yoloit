@@ -339,58 +339,53 @@ class CollaborationServer {
   /// Serves one HTTP request on [socket] using the same stream-listener pattern
   /// as [_handleWsSocket] — no `await for`, no subscription cancel.
   static Future<void> _serveHttpSocket(Socket socket, String webDir) async {
-    // Two completers: one fires when we have the full request headers, the
-    // other fires when the peer closes its write side (FIN received).
-    final requestDone = Completer<void>();
-    final peerEof = Completer<void>();
-    final buf = <int>[];
-
-    socket.listen(
-      (chunk) {
-        if (requestDone.isCompleted) return;
-        buf.addAll(chunk);
-        if (_findHttpBoundary(buf) != null) {
-          requestDone.complete();
-          return;
-        }
-        if (buf.length > 65536) requestDone.complete();
-      },
-      onError: (_) {
-        if (!requestDone.isCompleted) requestDone.complete();
-        if (!peerEof.isCompleted) peerEof.complete();
-      },
-      onDone: () {
-        if (!requestDone.isCompleted) requestDone.complete();
-        if (!peerEof.isCompleted) peerEof.complete();
-      },
-      cancelOnError: false,
-    );
-
-    await requestDone.future;
+    final reader = _HttpRequestReader(socket)..listen();
+    await reader.requestDone.future;
+    final buf = reader.buf;
     if (buf.length < 4) { socket.destroy(); return; }
 
     final headers = _parseHeaders(buf);
     final method = headers['_method'] ?? 'GET';
-    var path = headers['_path'] ?? '/';
+    final path = headers['_path'] ?? '/';
 
     if (method == 'OPTIONS') {
-      _writeRaw(
-        socket,
-        'HTTP/1.1 204 No Content\r\n'
-        'Access-Control-Allow-Origin: *\r\n'
-        'Access-Control-Allow-Methods: GET, OPTIONS\r\n'
-        'Access-Control-Allow-Headers: Content-Type\r\n'
-        'Connection: close\r\n'
-        '\r\n',
-      );
-      await _closeAfterFlush(socket, peerEof);
+      await _writeOptionsResponse(socket, reader.peerEof);
       return;
     }
 
-    if (path == '/' || path.isEmpty || !path.contains('.')) {
-      path = '/index.html';
+    await _serveStaticFile(socket, webDir, path, reader.peerEof);
+  }
+
+  /// Answers a CORS preflight (OPTIONS) request and closes the socket.
+  static Future<void> _writeOptionsResponse(
+    Socket socket,
+    Completer<void> peerEof,
+  ) async {
+    _writeRaw(
+      socket,
+      'HTTP/1.1 204 No Content\r\n'
+      'Access-Control-Allow-Origin: *\r\n'
+      'Access-Control-Allow-Methods: GET, OPTIONS\r\n'
+      'Access-Control-Allow-Headers: Content-Type\r\n'
+      'Connection: close\r\n'
+      '\r\n',
+    );
+    await _closeAfterFlush(socket, peerEof);
+  }
+
+  /// Serves the file at [path] from [webDir], falling back to index.html
+  /// for extension-less or missing paths (SPA-style routing).
+  static Future<void> _serveStaticFile(
+    Socket socket,
+    String webDir,
+    String path,
+    Completer<void> peerEof,
+  ) async {
+    var filePath = path;
+    if (filePath == '/' || filePath.isEmpty || !filePath.contains('.')) {
+      filePath = '/index.html';
     }
-    final safePath = Uri.decodeFull(path.split('?').first)
+    final safePath = Uri.decodeFull(filePath.split('?').first)
         .replaceAll(RegExp(r'\.\.[\\/]'), '');
 
     var file = File('$webDir$safePath');
@@ -763,5 +758,54 @@ class _WsClient {
     }
     frame.addAll(payload);
     return frame;
+  }
+}
+
+/// Buffers one incoming HTTP request on a socket until the request headers
+/// are complete (or the peer errors out / closes).
+///
+/// Two completers: one fires when we have the full request headers, the
+/// other fires when the peer closes its write side (FIN received).
+class _HttpRequestReader {
+  _HttpRequestReader(this._socket);
+
+  final Socket _socket;
+
+  /// Fires when we have the full request headers.
+  final Completer<void> requestDone = Completer<void>();
+
+  /// Fires when the peer closes its write side (FIN received).
+  final Completer<void> peerEof = Completer<void>();
+
+  /// Raw request bytes received so far.
+  final List<int> buf = <int>[];
+
+  void listen() {
+    _socket.listen(
+      _onChunk,
+      onError: _onError,
+      onDone: _onDone,
+      cancelOnError: false,
+    );
+  }
+
+  void _onChunk(List<int> chunk) {
+    if (requestDone.isCompleted) return;
+    buf.addAll(chunk);
+    if (CollaborationServer._findHttpBoundary(buf) != null) {
+      requestDone.complete();
+      return;
+    }
+    if (buf.length > 65536) requestDone.complete();
+  }
+
+  void _onError(Object _) {
+    if (!requestDone.isCompleted) requestDone.complete();
+    if (!peerEof.isCompleted) peerEof.complete();
+  }
+
+  void _onDone() {
+    if (!requestDone.isCompleted) requestDone.complete();
+    if (!peerEof.isCompleted) peerEof.complete();
   }
 }

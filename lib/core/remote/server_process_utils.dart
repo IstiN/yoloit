@@ -453,7 +453,58 @@ Future<shelf.Response> handleTerminalsRequest({
       onProcessStarted: onProcessStarted,
     );
   }
-  if (sub.length == 2 && sub[1] == 'log' && method == 'GET') {
+  if (sub.length != 2) {
+    return _notFoundResponse();
+  }
+  final handler = _TerminalSubRequest(
+    request: request,
+    sub: sub,
+    terminals: terminals,
+    terminalChunks: terminalChunks,
+    terminalExitCodes: terminalExitCodes,
+  );
+  final routes =
+      <String, Map<String, Future<shelf.Response> Function()>>{
+        'log': <String, Future<shelf.Response> Function()>{'GET': handler.log},
+        'input': <String, Future<shelf.Response> Function()>{
+          'POST': handler.input,
+        },
+        'resize': <String, Future<shelf.Response> Function()>{
+          'POST': handler.resize,
+        },
+        'stop': <String, Future<shelf.Response> Function()>{
+          'POST': handler.stop,
+        },
+      };
+  final route = routes[sub[1]]?[method];
+  if (route == null) {
+    return _notFoundResponse();
+  }
+  return route();
+}
+
+shelf.Response _notFoundResponse() => jsonResponse(<String, Object?>{
+  'ok': false,
+  'error': 'not found',
+}, 404);
+
+/// Per-request handler for `/api/terminals/{id}/...` sub-routes.
+class _TerminalSubRequest {
+  _TerminalSubRequest({
+    required this.request,
+    required this.sub,
+    required this.terminals,
+    required this.terminalChunks,
+    required this.terminalExitCodes,
+  });
+
+  final shelf.Request request;
+  final List<String> sub;
+  final Map<String, Process> terminals;
+  final Map<String, List<String>> terminalChunks;
+  final Map<String, int> terminalExitCodes;
+
+  Future<shelf.Response> log() async {
     final since =
         int.tryParse(request.url.queryParameters['since'] ?? '0') ?? 0;
     return terminalLogResponse(
@@ -464,7 +515,8 @@ Future<shelf.Response> handleTerminalsRequest({
       exitCode: terminalExitCodes[sub[0]],
     );
   }
-  if (sub.length == 2 && sub[1] == 'input' && method == 'POST') {
+
+  Future<shelf.Response> input() async {
     final process = terminals[sub[0]];
     if (process == null) {
       return jsonResponse(<String, Object?>{
@@ -477,7 +529,8 @@ Future<shelf.Response> handleTerminalsRequest({
     await process.stdin.flush();
     return jsonResponse(<String, Object?>{'ok': true});
   }
-  if (sub.length == 2 && sub[1] == 'resize' && method == 'POST') {
+
+  Future<shelf.Response> resize() async {
     final process = terminals[sub[0]];
     if (process == null) {
       return jsonResponse(<String, Object?>{
@@ -492,12 +545,12 @@ Future<shelf.Response> handleTerminalsRequest({
     await process.stdin.flush();
     return jsonResponse(<String, Object?>{'ok': true});
   }
-  if (sub.length == 2 && sub[1] == 'stop' && method == 'POST') {
+
+  Future<shelf.Response> stop() async {
     final process = terminals.remove(sub[0]);
     final ok = process?.kill() ?? false;
     return jsonResponse(<String, Object?>{'ok': ok});
   }
-  return jsonResponse(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
 }
 
 /// Returns `true` if the request carries the expected bearer/query token.

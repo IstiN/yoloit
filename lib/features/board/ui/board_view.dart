@@ -221,19 +221,37 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   void _syncViewport(BoardDocument board) {
     final vp = board.viewport;
     final boardSwitched = _syncedBoardId != board.id;
-    // Also re-apply when viewport changed externally (e.g. via CLI board:zoom)
-    // while the user is not actively interacting.
-    final externalChange =
-        !boardSwitched &&
+    final externalChange = _hasExternalViewportChange(board, vp);
+
+    if (!boardSwitched && !externalChange) return;
+    _syncedBoardId = board.id;
+    _syncedViewport = vp;
+    _noteViewportSynced(board, vp, boardSwitched, externalChange);
+    if (_shouldAutoFit(board)) {
+      _boardDebugLog('syncViewport.scheduleAutoFit board=${board.id}');
+      _scheduleAutoFitIfNeeded(board);
+      return;
+    }
+    _applyViewportTransform(board, vp);
+  }
+
+  /// Detects when the viewport changed externally (e.g. via CLI board:zoom)
+  /// while the user is not actively interacting.
+  bool _hasExternalViewportChange(BoardDocument board, BoardViewport vp) {
+    return _syncedBoardId == board.id &&
         _syncedViewport != null &&
         !_isViewportInteracting &&
         !_isPanelDragging &&
         (_syncedViewport!.scale != vp.scale ||
             _syncedViewport!.translation != vp.translation);
+  }
 
-    if (!boardSwitched && !externalChange) return;
-    _syncedBoardId = board.id;
-    _syncedViewport = vp;
+  void _noteViewportSynced(
+    BoardDocument board,
+    BoardViewport vp,
+    bool boardSwitched,
+    bool externalChange,
+  ) {
     if (boardSwitched) {
       // Suppress focus-panel auto-centering so the saved viewport is preserved.
       _suppressFocusVisibility = true;
@@ -244,21 +262,23 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
       'isDefault=${_isDefaultViewport(vp)} '
       '${externalChange ? "(external)" : "(board switch)"}',
     );
-    if (_shouldAutoFit(board)) {
-      _boardDebugLog('syncViewport.scheduleAutoFit board=${board.id}');
-      _scheduleAutoFitIfNeeded(board);
-      return;
-    }
+  }
+
+  void _applyViewportTransform(BoardDocument board, BoardViewport vp) {
     _stopPanAnimation();
     _transformController.value = _matrixFromViewport(vp);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _syncedBoardId != board.id) return;
-      if (_shouldAutoFit(board)) return;
-      if (_hasVisiblePanels(board) && !_hasAnyPanelInViewport(board)) {
-        _boardOverviewLog('syncViewport.recoverOffscreen board=${board.id}');
-        _fitBoardPanels(board, persist: true);
-      }
+      _recoverOffscreenPanelsIfNeeded(board);
     });
+  }
+
+  void _recoverOffscreenPanelsIfNeeded(BoardDocument board) {
+    if (!mounted || _syncedBoardId != board.id) return;
+    if (_shouldAutoFit(board)) return;
+    if (_hasVisiblePanels(board) && !_hasAnyPanelInViewport(board)) {
+      _boardOverviewLog('syncViewport.recoverOffscreen board=${board.id}');
+      _fitBoardPanels(board, persist: true);
+    }
   }
 
   Future<void> _persistViewport(BuildContext context, BoardDocument board) {
@@ -349,25 +369,39 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     final watch = Stopwatch()..start();
     final captured = <String, Uint8List>{};
     for (final board in missing) {
-      if (!mounted || _cancelBgCapture || !_isBoardOverviewOpen) {
-        cancelToken.cancel();
-        break;
-      }
-      final png = await BoardOffscreenRenderer.instance
-          .renderBoardOverviewPreview(board, cancelToken: cancelToken);
-      if (png != null) {
-        captured[board.id] = png;
-        _previewCache.save(board, png, themeKey: _previewThemeKey);
-      }
+      if (!await _captureMissingPreview(board, cancelToken, captured)) break;
     }
-    if (captured.isNotEmpty && mounted && _isBoardOverviewOpen) {
-      setState(() {
-        _boardPreviewPngs.addAll(captured);
-      });
-    }
+    _applyCapturedPreviews(captured);
     _boardOverviewLog(
       'offscreen.done count=${missing.length} elapsed=${watch.elapsedMilliseconds}ms',
     );
+  }
+
+  /// Renders one missing board preview. Returns false when the loop must
+  /// stop (unmounted, capture cancelled, or overview closed).
+  Future<bool> _captureMissingPreview(
+    BoardDocument board,
+    CancelToken cancelToken,
+    Map<String, Uint8List> captured,
+  ) async {
+    if (!mounted || _cancelBgCapture || !_isBoardOverviewOpen) {
+      cancelToken.cancel();
+      return false;
+    }
+    final png = await BoardOffscreenRenderer.instance
+        .renderBoardOverviewPreview(board, cancelToken: cancelToken);
+    if (png != null) {
+      captured[board.id] = png;
+      _previewCache.save(board, png, themeKey: _previewThemeKey);
+    }
+    return true;
+  }
+
+  void _applyCapturedPreviews(Map<String, Uint8List> captured) {
+    if (captured.isEmpty || !mounted || !_isBoardOverviewOpen) return;
+    setState(() {
+      _boardPreviewPngs.addAll(captured);
+    });
   }
 
   /// Refresh board previews in the background using offscreen rendering.
@@ -391,42 +425,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     final captured = <String, Uint8List>{};
 
     for (final board in toCapture) {
-      if (_cancelBgCapture || !mounted || !_isBoardOverviewOpen) {
-        cancelToken.cancel();
-        _boardOverviewLog('bgCapture.canceled loop broken (transition active)');
-        break;
-      }
-
-      final boardWatch = Stopwatch()..start();
-      try {
-        _boardOverviewLog(
-          'bgCapture.render board=${board.id} (${board.name}) started',
-        );
-        final png = await BoardOffscreenRenderer.instance
-            .renderBoardOverviewPreview(board, cancelToken: cancelToken);
-        if (_cancelBgCapture || !mounted || !_isBoardOverviewOpen) {
-          cancelToken.cancel();
-          _boardOverviewLog(
-            'bgCapture.render board=${board.id} completed but discarded (transition active)',
-          );
-          break;
-        }
-        if (png != null) {
-          captured[board.id] = png;
-          _previewCache.save(board, png, themeKey: _previewThemeKey);
-          _boardOverviewLog(
-            'bgCapture.captured board=${board.id} bytes=${png.length} elapsed=${boardWatch.elapsedMilliseconds}ms',
-          );
-        } else {
-          _boardOverviewLog(
-            'bgCapture.render board=${board.id} returned null elapsed=${boardWatch.elapsedMilliseconds}ms',
-          );
-        }
-      } catch (e) {
-        _boardOverviewLog(
-          'bgCapture.error board=${board.id} $e elapsed=${boardWatch.elapsedMilliseconds}ms',
-        );
-      }
+      if (!await _refreshPreviewForBoard(board, cancelToken, captured)) break;
     }
 
     if (captured.isNotEmpty && mounted) {
@@ -436,6 +435,61 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     }
 
     _boardOverviewLog('bgCapture.done elapsed=${watch.elapsedMilliseconds}ms');
+  }
+
+  /// Renders one board preview in the background. Returns false when the
+  /// loop must stop (capture cancelled, unmounted, or overview closed).
+  Future<bool> _refreshPreviewForBoard(
+    BoardDocument board,
+    CancelToken cancelToken,
+    Map<String, Uint8List> captured,
+  ) async {
+    if (_cancelBgCapture || !mounted || !_isBoardOverviewOpen) {
+      cancelToken.cancel();
+      _boardOverviewLog('bgCapture.canceled loop broken (transition active)');
+      return false;
+    }
+
+    final boardWatch = Stopwatch()..start();
+    try {
+      _boardOverviewLog(
+        'bgCapture.render board=${board.id} (${board.name}) started',
+      );
+      final png = await BoardOffscreenRenderer.instance
+          .renderBoardOverviewPreview(board, cancelToken: cancelToken);
+      if (_cancelBgCapture || !mounted || !_isBoardOverviewOpen) {
+        cancelToken.cancel();
+        _boardOverviewLog(
+          'bgCapture.render board=${board.id} completed but discarded (transition active)',
+        );
+        return false;
+      }
+      _storeRefreshedPreview(board, png, boardWatch, captured);
+    } catch (e) {
+      _boardOverviewLog(
+        'bgCapture.error board=${board.id} $e elapsed=${boardWatch.elapsedMilliseconds}ms',
+      );
+    }
+    return true;
+  }
+
+  void _storeRefreshedPreview(
+    BoardDocument board,
+    Uint8List? png,
+    Stopwatch boardWatch,
+    Map<String, Uint8List> captured,
+  ) {
+    if (png != null) {
+      captured[board.id] = png;
+      _previewCache.save(board, png, themeKey: _previewThemeKey);
+      _boardOverviewLog(
+        'bgCapture.captured board=${board.id} bytes=${png.length} elapsed=${boardWatch.elapsedMilliseconds}ms',
+      );
+    } else {
+      _boardOverviewLog(
+        'bgCapture.render board=${board.id} returned null elapsed=${boardWatch.elapsedMilliseconds}ms',
+      );
+    }
   }
 
   Future<void> _warmBoardPreviewCaptures(String activeBoardId) async {

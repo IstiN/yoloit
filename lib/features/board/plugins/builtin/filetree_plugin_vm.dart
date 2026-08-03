@@ -884,48 +884,59 @@ class _FileTreeContentState extends State<_FileTreeContent> {
   }
 
   List<Widget> _buildTreeEntries(Directory dir, int depth) {
-    final colors = context.appColors;
     final entries = <Widget>[];
     try {
-      final contents =
-          dir.listSync()..sort((a, b) {
-            final aIsDir = a is Directory;
-            final bIsDir = b is Directory;
-            if (aIsDir && !bIsDir) return -1;
-            if (!aIsDir && bIsDir) return 1;
-            return p
-                .basename(a.path)
-                .toLowerCase()
-                .compareTo(p.basename(b.path).toLowerCase());
-          });
+      final contents = dir.listSync()..sort(_compareTreeEntities);
 
       for (final entity in contents) {
-        final name = p.basename(entity.path);
-        // Skip hidden files/directories unless _showHidden is enabled.
-        if (!_showHidden && name.startsWith('.')) continue;
-
-        if (entity is Directory) {
-          final isExpanded = _expandedDirs.contains(entity.path);
-          entries.add(_buildDirTile(entity, name, depth, isExpanded));
-          if (isExpanded) {
-            entries.addAll(_buildTreeEntries(entity, depth + 1));
-          }
-        } else if (entity is File) {
-          entries.add(_buildFileTile(entity, name, depth));
-        }
+        _addTreeEntry(entries, entity, depth);
       }
     } on FileSystemException {
-      entries.add(
-        Padding(
-          padding: EdgeInsets.only(left: 16.0 + depth * 16),
-          child: Text(
-            'Permission denied',
-            style: TextStyle(color: colors.accentRed, fontSize: 11),
-          ),
-        ),
-      );
+      entries.add(_buildPermissionDenied(depth));
     }
     return entries;
+  }
+
+  static int _compareTreeEntities(FileSystemEntity a, FileSystemEntity b) {
+    final aIsDir = a is Directory;
+    final bIsDir = b is Directory;
+    if (aIsDir && !bIsDir) return -1;
+    if (!aIsDir && bIsDir) return 1;
+    return p
+        .basename(a.path)
+        .toLowerCase()
+        .compareTo(p.basename(b.path).toLowerCase());
+  }
+
+  void _addTreeEntry(
+    List<Widget> entries,
+    FileSystemEntity entity,
+    int depth,
+  ) {
+    final name = p.basename(entity.path);
+    // Skip hidden files/directories unless _showHidden is enabled.
+    if (!_showHidden && name.startsWith('.')) return;
+
+    if (entity is Directory) {
+      final isExpanded = _expandedDirs.contains(entity.path);
+      entries.add(_buildDirTile(entity, name, depth, isExpanded));
+      if (isExpanded) {
+        entries.addAll(_buildTreeEntries(entity, depth + 1));
+      }
+    } else if (entity is File) {
+      entries.add(_buildFileTile(entity, name, depth));
+    }
+  }
+
+  Widget _buildPermissionDenied(int depth) {
+    final colors = context.appColors;
+    return Padding(
+      padding: EdgeInsets.only(left: 16.0 + depth * 16),
+      child: Text(
+        'Permission denied',
+        style: TextStyle(color: colors.accentRed, fontSize: 11),
+      ),
+    );
   }
 
   Widget _buildDirTile(Directory dir, String name, int depth, bool isExpanded) {

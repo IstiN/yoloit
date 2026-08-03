@@ -59,6 +59,117 @@ class SessionSettingsState extends State<SessionSettings> {
     await _loadLogs();
   }
 
+  Future<void> _onTmuxChanged(bool v) async {
+    await _tmux.setEnabled(v);
+    if (mounted) setState(() => _tmuxOn = v);
+  }
+
+  Future<void> _onLoggingChanged(bool v) async {
+    await _logging.setEnabled(v);
+    if (mounted) {
+      setState(() {
+        _loggingOn = v;
+        if (!v) _showLogs = false;
+      });
+    }
+  }
+
+  void _toggleLogs() {
+    setState(() => _showLogs = !_showLogs);
+    if (!_showLogs) return;
+    _loadLogs();
+  }
+
+  Future<void> _onAppLoggingChanged(bool v) async {
+    await AppLogger.instance.setEnabled(v);
+    if (mounted) {
+      setState(() {
+        _appLoggingOn = v;
+        if (!v) _showAppLog = false;
+      });
+    }
+  }
+
+  void _toggleAppLog() {
+    setState(() => _showAppLog = !_showAppLog);
+    if (_showAppLog) _loadAppLog();
+  }
+
+  Future<void> _clearAppLog() async {
+    await AppLogger.instance.clearLog();
+    if (_showAppLog) _loadAppLog();
+  }
+
+  List<Widget> _buildTerminalLogsViewer(AppColorScheme colors) {
+    if (!_loggingOn) return const [];
+    return [
+      Divider(height: 1, color: colors.border),
+      InkWell(
+        onTap: _toggleLogs,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 10,
+          ),
+          child: Row(
+            children: [
+              Icon(
+                _showLogs ? Icons.expand_less : Icons.expand_more,
+                size: 16,
+                color: context.appColors.textMuted,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'View log files',
+                style: TextStyle(color: colors.primary, fontSize: 13),
+              ),
+            ],
+          ),
+        ),
+      ),
+      if (_showLogs) _buildLogsSection(context),
+    ];
+  }
+
+  List<Widget> _buildAppLogViewer(AppColorScheme colors) {
+    if (!_appLoggingOn) return const [];
+    return [
+      Divider(height: 1, color: colors.border),
+      InkWell(
+        onTap: _toggleAppLog,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 10,
+          ),
+          child: Row(
+            children: [
+              Icon(
+                _showAppLog ? Icons.expand_less : Icons.expand_more,
+                size: 16,
+                color: context.appColors.textMuted,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'View app log',
+                style: TextStyle(color: colors.primary, fontSize: 13),
+              ),
+              const Spacer(),
+              TextButton(
+                onPressed: _clearAppLog,
+                child: const Text(
+                  'Clear',
+                  style: TextStyle(fontSize: 12),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      if (_showAppLog) _buildAppLogSection(context),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
@@ -78,10 +189,7 @@ class SessionSettingsState extends State<SessionSettings> {
                     : 'Requires tmux — install with: brew install tmux',
             value: _tmuxOn && _tmux.available,
             enabled: _tmux.available,
-            onChanged: (v) async {
-              await _tmux.setEnabled(v);
-              if (mounted) setState(() => _tmuxOn = v);
-            },
+            onChanged: _onTmuxChanged,
           ),
           Divider(height: 1, color: colors.border),
           // Terminal logging toggle
@@ -90,48 +198,10 @@ class SessionSettingsState extends State<SessionSettings> {
             title: 'Log terminal output to files',
             subtitle: 'Saved to ~/.yoloit/logs/',
             value: _loggingOn,
-            onChanged: (v) async {
-              await _logging.setEnabled(v);
-              if (mounted) {
-                setState(() {
-                  _loggingOn = v;
-                  if (!v) _showLogs = false;
-                });
-              }
-            },
+            onChanged: _onLoggingChanged,
           ),
           // Terminal logs viewer
-          if (_loggingOn) ...[
-            Divider(height: 1, color: colors.border),
-            InkWell(
-              onTap: () {
-                setState(() => _showLogs = !_showLogs);
-                if (!_showLogs) return;
-                _loadLogs();
-              },
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 10,
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      _showLogs ? Icons.expand_less : Icons.expand_more,
-                      size: 16,
-                      color: context.appColors.textMuted,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'View log files',
-                      style: TextStyle(color: colors.primary, fontSize: 13),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            if (_showLogs) _buildLogsSection(context),
-          ],
+          ..._buildTerminalLogsViewer(colors),
           // App diagnostics logging
           Divider(height: 1, color: colors.border),
           ToggleRow(
@@ -140,57 +210,9 @@ class SessionSettingsState extends State<SessionSettings> {
             subtitle:
                 'Saved to ~/Library/Logs/yoloit/app.log (max 5 MB, rotates)',
             value: _appLoggingOn,
-            onChanged: (v) async {
-              await AppLogger.instance.setEnabled(v);
-              if (mounted) {
-                setState(() {
-                  _appLoggingOn = v;
-                  if (!v) _showAppLog = false;
-                });
-              }
-            },
+            onChanged: _onAppLoggingChanged,
           ),
-          if (_appLoggingOn) ...[
-            Divider(height: 1, color: colors.border),
-            InkWell(
-              onTap: () {
-                setState(() => _showAppLog = !_showAppLog);
-                if (_showAppLog) _loadAppLog();
-              },
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 10,
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      _showAppLog ? Icons.expand_less : Icons.expand_more,
-                      size: 16,
-                      color: context.appColors.textMuted,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'View app log',
-                      style: TextStyle(color: colors.primary, fontSize: 13),
-                    ),
-                    const Spacer(),
-                    TextButton(
-                      onPressed: () async {
-                        await AppLogger.instance.clearLog();
-                        if (_showAppLog) _loadAppLog();
-                      },
-                      child: const Text(
-                        'Clear',
-                        style: TextStyle(fontSize: 12),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            if (_showAppLog) _buildAppLogSection(context),
-          ],
+          ..._buildAppLogViewer(colors),
           Divider(height: 1, color: colors.border),
           const WorkspaceStorageRow(),
         ],

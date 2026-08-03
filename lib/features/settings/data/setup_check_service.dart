@@ -429,221 +429,243 @@ class SetupCheckService {
   static List<Future<DependencyStatus>> _commonAgents({
     required bool winget,
   }) => [
-    _checkTool(
-      id: 'codex',
-      name: 'Codex CLI',
-      description: 'OpenAI coding agent that runs locally in your terminal',
-      command: 'codex',
-      versionArgs: ['--version'],
-      installHint:
-          _isWindows
-              ? r'powershell -ExecutionPolicy ByPass -c "irm https://chatgpt.com/codex/install.ps1 | iex"'
-              : 'curl -fsSL https://chatgpt.com/codex/install.sh | sh',
-      installUrl: 'https://github.com/openai/codex',
-      isRequired: false,
-      installAction:
-          _isWindows
-              ? const InstallAction(
-                executable: 'powershell',
-                args: [
-                  '-ExecutionPolicy',
-                  'ByPass',
-                  '-c',
-                  'irm https://chatgpt.com/codex/install.ps1 | iex',
-                ],
-                requiresInteractiveTerminal: true,
-                interactiveScript:
-                    r'powershell -ExecutionPolicy ByPass -c "irm https://chatgpt.com/codex/install.ps1 | iex"',
-              )
-              : const InstallAction(
-                executable: 'sh',
-                args: [
-                  '-c',
-                  'curl -fsSL https://chatgpt.com/codex/install.sh | sh',
-                ],
-                requiresInteractiveTerminal: true,
-                interactiveScript:
-                    'curl -fsSL https://chatgpt.com/codex/install.sh | sh',
-              ),
-    ),
-    _checkTool(
-      id: 'copilot',
-      name: 'GitHub Copilot',
-      description: 'AI coding agent by GitHub — autonomous agentic CLI',
-      command: 'copilot',
-      versionArgs: ['--version'],
-      installHint:
-          winget
-              ? 'winget install GitHub.Copilot'
-              : 'npm install -g @github/copilot',
-      installUrl: 'https://github.com/github/copilot-cli',
-      isRequired: false,
-      installAction:
-          winget
-              ? const InstallAction(
-                executable: 'winget',
-                args: [
-                  'install',
-                  '--id',
-                  'GitHub.Copilot',
-                  '-e',
-                  '--source',
-                  'winget',
-                ],
-              )
-              : const InstallAction(
-                executable: 'npm',
-                args: ['install', '-g', '@github/copilot'],
-              ),
-    ),
-    _checkTool(
-      id: 'claude',
-      name: 'Claude Code',
-      description: 'AI coding agent by Anthropic',
-      command: 'claude',
-      versionArgs: ['--version'],
-      installHint: 'npm install -g @anthropic-ai/claude-code',
-      installUrl: 'https://claude.ai/code',
-      isRequired: false,
-      installAction: const InstallAction(
-        executable: 'npm',
-        args: ['install', '-g', '@anthropic-ai/claude-code'],
-      ),
-    ),
-    _checkTool(
-      id: 'gemini',
-      name: 'Gemini CLI',
-      description: 'AI coding agent by Google',
-      command: 'gemini',
-      versionArgs: ['--version'],
-      installHint: 'npm install -g @google/gemini-cli',
-      installUrl: 'https://gemini.google.com/cli',
-      isRequired: false,
-      installAction: const InstallAction(
-        executable: 'npm',
-        args: ['install', '-g', '@google/gemini-cli'],
-      ),
-    ),
-    _checkTool(
-      id: 'cursor',
-      name: 'Cursor Agent CLI',
-      description: 'Cursor autonomous coding agent for terminal and YoLo chats',
-      command: 'cursor-agent',
-      versionArgs: ['--version'],
-      fallbackCommand: 'cursor',
-      fallbackVersionArgs: ['--version'],
-      installHint:
-          winget
-              ? 'winget install Anysphere.Cursor'
-              : 'curl -fsSL https://cursor.com/install | bash',
-      installUrl: 'https://cursor.com',
-      isRequired: false,
-      installAction:
-          winget
-              ? const InstallAction(
-                executable: 'winget',
-                args: [
-                  'install',
-                  '--id',
-                  'Anysphere.Cursor',
-                  '-e',
-                  '--source',
-                  'winget',
-                ],
-              )
-              : const InstallAction(
-                executable: 'sh',
-                args: [
-                  '-c',
-                  'curl -fsSL https://cursor.com/install | bash',
-                ],
-                requiresInteractiveTerminal: true,
-                interactiveScript:
-                    'curl -fsSL https://cursor.com/install | bash',
-              ),
-    ),
-    _checkTool(
-      id: 'kimi',
-      name: 'Kimi Code CLI',
-      description: 'Moonshot AI terminal coding agent',
-      command: 'kimi',
-      versionArgs: ['--version'],
-      installHint:
-          _isWindows
-              ? r'powershell -ExecutionPolicy ByPass -c "irm https://code.kimi.com/kimi-code/install.ps1 | iex"'
-              : 'curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash',
-      installUrl: 'https://code.kimi.com',
-      isRequired: false,
-      installAction:
-          _isWindows
-              ? const InstallAction(
-                executable: 'powershell',
-                args: [
-                  '-ExecutionPolicy',
-                  'ByPass',
-                  '-c',
-                  'irm https://code.kimi.com/kimi-code/install.ps1 | iex',
-                ],
-                requiresInteractiveTerminal: true,
-              )
-              : const InstallAction(
-                executable: 'sh',
-                args: [
-                  '-c',
-                  'curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash',
-                ],
-                requiresInteractiveTerminal: true,
-                interactiveScript:
-                    'curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash',
-              ),
-    ),
-    _checkTool(
-      id: 'aider',
-      name: 'Aider',
-      description: 'AI pair programming in your terminal',
-      command: 'aider',
-      versionArgs: ['--version'],
-      installHint: 'pip install aider-chat',
-      installUrl: 'https://aider.chat',
-      isRequired: false,
-      installAction: const InstallAction(
-        executable: 'pip',
-        args: ['install', 'aider-chat'],
-      ),
-    ),
-    _checkTool(
-      id: 'opencode',
-      name: 'OpenCode',
-      description: 'AI coding agent for your terminal',
-      command: 'opencode',
-      versionArgs: ['--version'],
-      installHint:
-          winget
-              ? 'npm i -g opencode-ai'
-              : _isMacOS
-              ? 'brew install anomalyco/tap/opencode'
-              : 'curl -fsSL https://opencode.ai/install | bash',
-      installUrl: 'https://opencode.ai',
-      isRequired: false,
-      installAction:
-          winget
-              ? const InstallAction(
-                executable: 'npm',
-                args: ['i', '-g', 'opencode-ai'],
-              )
-              : _isMacOS
-              ? const InstallAction(
-                executable: 'brew',
-                args: ['install', 'anomalyco/tap/opencode'],
-              )
-              : const InstallAction(
-                executable: 'bash',
-                args: ['-c', 'curl -fsSL https://opencode.ai/install | bash'],
-                requiresInteractiveTerminal: true,
-              ),
-    ),
+    _checkCodexAgent(),
+    _checkCopilotAgent(winget: winget),
+    _checkClaudeAgent(),
+    _checkGeminiAgent(),
+    _checkCursorAgent(winget: winget),
+    _checkKimiAgent(),
+    _checkAiderAgent(),
+    _checkOpencodeAgent(winget: winget),
     _checkYoloitGlobalSkills(),
   ];
+
+  static Future<DependencyStatus> _checkCodexAgent() => _checkTool(
+    id: 'codex',
+    name: 'Codex CLI',
+    description: 'OpenAI coding agent that runs locally in your terminal',
+    command: 'codex',
+    versionArgs: ['--version'],
+    installHint:
+        _isWindows
+            ? r'powershell -ExecutionPolicy ByPass -c "irm https://chatgpt.com/codex/install.ps1 | iex"'
+            : 'curl -fsSL https://chatgpt.com/codex/install.sh | sh',
+    installUrl: 'https://github.com/openai/codex',
+    isRequired: false,
+    installAction:
+        _isWindows
+            ? const InstallAction(
+              executable: 'powershell',
+              args: [
+                '-ExecutionPolicy',
+                'ByPass',
+                '-c',
+                'irm https://chatgpt.com/codex/install.ps1 | iex',
+              ],
+              requiresInteractiveTerminal: true,
+              interactiveScript:
+                  r'powershell -ExecutionPolicy ByPass -c "irm https://chatgpt.com/codex/install.ps1 | iex"',
+            )
+            : const InstallAction(
+              executable: 'sh',
+              args: [
+                '-c',
+                'curl -fsSL https://chatgpt.com/codex/install.sh | sh',
+              ],
+              requiresInteractiveTerminal: true,
+              interactiveScript:
+                  'curl -fsSL https://chatgpt.com/codex/install.sh | sh',
+            ),
+  );
+
+  static Future<DependencyStatus> _checkCopilotAgent({
+    required bool winget,
+  }) => _checkTool(
+    id: 'copilot',
+    name: 'GitHub Copilot',
+    description: 'AI coding agent by GitHub — autonomous agentic CLI',
+    command: 'copilot',
+    versionArgs: ['--version'],
+    installHint:
+        winget
+            ? 'winget install GitHub.Copilot'
+            : 'npm install -g @github/copilot',
+    installUrl: 'https://github.com/github/copilot-cli',
+    isRequired: false,
+    installAction:
+        winget
+            ? const InstallAction(
+              executable: 'winget',
+              args: [
+                'install',
+                '--id',
+                'GitHub.Copilot',
+                '-e',
+                '--source',
+                'winget',
+              ],
+            )
+            : const InstallAction(
+              executable: 'npm',
+              args: ['install', '-g', '@github/copilot'],
+            ),
+  );
+
+  static Future<DependencyStatus> _checkClaudeAgent() => _checkTool(
+    id: 'claude',
+    name: 'Claude Code',
+    description: 'AI coding agent by Anthropic',
+    command: 'claude',
+    versionArgs: ['--version'],
+    installHint: 'npm install -g @anthropic-ai/claude-code',
+    installUrl: 'https://claude.ai/code',
+    isRequired: false,
+    installAction: const InstallAction(
+      executable: 'npm',
+      args: ['install', '-g', '@anthropic-ai/claude-code'],
+    ),
+  );
+
+  static Future<DependencyStatus> _checkGeminiAgent() => _checkTool(
+    id: 'gemini',
+    name: 'Gemini CLI',
+    description: 'AI coding agent by Google',
+    command: 'gemini',
+    versionArgs: ['--version'],
+    installHint: 'npm install -g @google/gemini-cli',
+    installUrl: 'https://gemini.google.com/cli',
+    isRequired: false,
+    installAction: const InstallAction(
+      executable: 'npm',
+      args: ['install', '-g', '@google/gemini-cli'],
+    ),
+  );
+
+  static Future<DependencyStatus> _checkCursorAgent({
+    required bool winget,
+  }) => _checkTool(
+    id: 'cursor',
+    name: 'Cursor Agent CLI',
+    description: 'Cursor autonomous coding agent for terminal and YoLo chats',
+    command: 'cursor-agent',
+    versionArgs: ['--version'],
+    fallbackCommand: 'cursor',
+    fallbackVersionArgs: ['--version'],
+    installHint:
+        winget
+            ? 'winget install Anysphere.Cursor'
+            : 'curl -fsSL https://cursor.com/install | bash',
+    installUrl: 'https://cursor.com',
+    isRequired: false,
+    installAction:
+        winget
+            ? const InstallAction(
+              executable: 'winget',
+              args: [
+                'install',
+                '--id',
+                'Anysphere.Cursor',
+                '-e',
+                '--source',
+                'winget',
+              ],
+            )
+            : const InstallAction(
+              executable: 'sh',
+              args: [
+                '-c',
+                'curl -fsSL https://cursor.com/install | bash',
+              ],
+              requiresInteractiveTerminal: true,
+              interactiveScript:
+                  'curl -fsSL https://cursor.com/install | bash',
+            ),
+  );
+
+  static Future<DependencyStatus> _checkKimiAgent() => _checkTool(
+    id: 'kimi',
+    name: 'Kimi Code CLI',
+    description: 'Moonshot AI terminal coding agent',
+    command: 'kimi',
+    versionArgs: ['--version'],
+    installHint:
+        _isWindows
+            ? r'powershell -ExecutionPolicy ByPass -c "irm https://code.kimi.com/kimi-code/install.ps1 | iex"'
+            : 'curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash',
+    installUrl: 'https://code.kimi.com',
+    isRequired: false,
+    installAction:
+        _isWindows
+            ? const InstallAction(
+              executable: 'powershell',
+              args: [
+                '-ExecutionPolicy',
+                'ByPass',
+                '-c',
+                'irm https://code.kimi.com/kimi-code/install.ps1 | iex',
+              ],
+              requiresInteractiveTerminal: true,
+            )
+            : const InstallAction(
+              executable: 'sh',
+              args: [
+                '-c',
+                'curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash',
+              ],
+              requiresInteractiveTerminal: true,
+              interactiveScript:
+                  'curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash',
+            ),
+  );
+
+  static Future<DependencyStatus> _checkAiderAgent() => _checkTool(
+    id: 'aider',
+    name: 'Aider',
+    description: 'AI pair programming in your terminal',
+    command: 'aider',
+    versionArgs: ['--version'],
+    installHint: 'pip install aider-chat',
+    installUrl: 'https://aider.chat',
+    isRequired: false,
+    installAction: const InstallAction(
+      executable: 'pip',
+      args: ['install', 'aider-chat'],
+    ),
+  );
+
+  static Future<DependencyStatus> _checkOpencodeAgent({
+    required bool winget,
+  }) => _checkTool(
+    id: 'opencode',
+    name: 'OpenCode',
+    description: 'AI coding agent for your terminal',
+    command: 'opencode',
+    versionArgs: ['--version'],
+    installHint:
+        winget
+            ? 'npm i -g opencode-ai'
+            : _isMacOS
+            ? 'brew install anomalyco/tap/opencode'
+            : 'curl -fsSL https://opencode.ai/install | bash',
+    installUrl: 'https://opencode.ai',
+    isRequired: false,
+    installAction:
+        winget
+            ? const InstallAction(
+              executable: 'npm',
+              args: ['i', '-g', 'opencode-ai'],
+            )
+            : _isMacOS
+            ? const InstallAction(
+              executable: 'brew',
+              args: ['install', 'anomalyco/tap/opencode'],
+            )
+            : const InstallAction(
+              executable: 'bash',
+              args: ['-c', 'curl -fsSL https://opencode.ai/install | bash'],
+              requiresInteractiveTerminal: true,
+            ),
+  );
 
   // ── Install (streaming) ──────────────────────────────────────────────────
 

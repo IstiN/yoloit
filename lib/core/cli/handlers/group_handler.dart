@@ -7,6 +7,48 @@ import 'package:yoloit/core/cli/handlers/server_helpers.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 
+/// Immutable bundle of everything a `/groups` route handler needs: the
+/// target board/cubit, the request, and the injected response callbacks.
+class _GroupRouteContext {
+  const _GroupRouteContext({
+    required this.board,
+    required this.cubit,
+    required this.request,
+    required this.deps,
+  });
+
+  final BoardDocument board;
+  final BoardCubit cubit;
+  final shelf.Request request;
+  final BoardRouteDependencies deps;
+}
+
+typedef _GroupCollectionHandler =
+    Future<shelf.Response> Function(_GroupRouteContext ctx);
+
+typedef _GroupItemHandler =
+    Future<shelf.Response> Function(
+      _GroupRouteContext ctx,
+      String groupId,
+      BoardPanelGroup group,
+    );
+
+/// Route table for the `/groups` collection root.
+final Map<String, _GroupCollectionHandler> _groupCollectionRoutes = {
+  'GET': _listGroups,
+  'POST': _createGroup,
+};
+
+/// Route table for `/groups/:groupId/...` — `''` is the group root, other
+/// keys are the single sub-path segment. (key, method) pairs are mutually
+/// exclusive, so table lookup is equivalent to the original route list.
+final Map<String, Map<String, _GroupItemHandler>> _groupItemRoutes = {
+  '': {'DELETE': _deleteGroup, 'PUT': _updateGroup},
+  'panels': {'POST': _addPanelsToGroup, 'DELETE': _removePanelsFromGroup},
+  'move': {'POST': _moveGroup},
+  'cycle-focus': {'POST': _cycleGroupFocus},
+};
+
 /// Handles `/api/boards/:id/groups/...` routes.
 Future<shelf.Response> handleGroup(
   String method,
@@ -16,59 +58,33 @@ Future<shelf.Response> handleGroup(
   shelf.Request request,
   BoardRouteDependencies deps,
 ) async {
-  final body = deps.body;
-  final json = deps.json;
-  final error = deps.error;
-  final notFound = deps.notFound;
-  final scheduleRebuild = deps.scheduleRebuild;
+  final ctx = _GroupRouteContext(
+    board: board,
+    cubit: cubit,
+    request: request,
+    deps: deps,
+  );
 
   // /api/boards/:id/groups collection routes
   if (sub.isEmpty) {
-    if (method == 'GET') return _listGroups(board, json);
-    if (method == 'POST') {
-      return _createGroup(board, cubit, request, body, json, error, scheduleRebuild);
-    }
-    return notFound(unknownRoute('group'));
+    final handler = _groupCollectionRoutes[method];
+    if (handler != null) return handler(ctx);
+    return deps.notFound(unknownRoute('group'));
   }
 
   // /api/boards/:id/groups/:groupId/...
   final groupId = sub[0];
   final group = _findGroup(board, groupId);
   if (group == null) {
-    return notFound('Group not found: $groupId');
+    return deps.notFound('Group not found: $groupId');
   }
-
-  final routes = <(bool Function(), Future<shelf.Response> Function())>[
-    (
-      () => sub.length == 1 && method == 'DELETE',
-      () => _deleteGroup(board, cubit, groupId, json, scheduleRebuild),
-    ),
-    (
-      () => sub.length == 1 && method == 'PUT',
-      () => _updateGroup(board, cubit, request, groupId, group, body, json, scheduleRebuild),
-    ),
-    (
-      () => sub.length == 2 && sub[1] == 'panels' && method == 'POST',
-      () => _addPanelsToGroup(board, cubit, request, groupId, body, json, error, scheduleRebuild),
-    ),
-    (
-      () => sub.length == 2 && sub[1] == 'panels' && method == 'DELETE',
-      () => _removePanelsFromGroup(board, cubit, request, groupId, body, json, error, scheduleRebuild),
-    ),
-    (
-      () => sub.length == 2 && sub[1] == 'move' && method == 'POST',
-      () => _moveGroup(board, cubit, request, groupId, body, json, scheduleRebuild),
-    ),
-    (
-      () => sub.length == 2 && sub[1] == 'cycle-focus' && method == 'POST',
-      () => _cycleGroupFocus(board, cubit, request, groupId, body, json, scheduleRebuild),
-    ),
-  ];
-  for (final (matches, run) in routes) {
-    if (matches()) return run();
+  if (sub.length > 2) {
+    return deps.notFound(unknownRoute('group'));
   }
-
-  return notFound(unknownRoute('group'));
+  final key = sub.length == 1 ? '' : sub[1];
+  final handler = _groupItemRoutes[key]?[method];
+  if (handler != null) return handler(ctx, groupId, group);
+  return deps.notFound(unknownRoute('group'));
 }
 
 BoardPanelGroup? _findGroup(BoardDocument board, String groupId) {
@@ -81,43 +97,32 @@ BoardPanelGroup? _findGroup(BoardDocument board, String groupId) {
 }
 
 // GET /api/boards/:id/groups → list groups
-shelf.Response _listGroups(
-  BoardDocument board,
-  shelf.Response Function(Object) json,
-) {
-  return json({
+Future<shelf.Response> _listGroups(_GroupRouteContext ctx) async {
+  return ctx.deps.json({
     'ok': true,
-    'groups': board.groups.map((group) => group.toJson()).toList(),
+    'groups': ctx.board.groups.map((group) => group.toJson()).toList(),
   });
 }
 
 // POST /api/boards/:id/groups → create group
-Future<shelf.Response> _createGroup(
-  BoardDocument board,
-  BoardCubit cubit,
-  shelf.Request request,
-  Future<Map<String, dynamic>> Function(shelf.Request) body,
-  shelf.Response Function(Object) json,
-  shelf.Response Function(String) error,
-  void Function() scheduleRebuild,
-) async {
-  final requestBody = await body(request);
+Future<shelf.Response> _createGroup(_GroupRouteContext ctx) async {
+  final requestBody = await ctx.deps.body(ctx.request);
   final name = requestBody['name'] as String?;
   if (name == null || name.trim().isEmpty) {
-    return error(missingField('name'));
+    return ctx.deps.error(missingField('name'));
   }
   final panelIds = _parsePanelIds(requestBody['panels']);
   final colorValue = _parseColor(requestBody['color']);
-  await cubit.createGroup(
-    board.id,
+  await ctx.cubit.createGroup(
+    ctx.board.id,
     name: name,
     panelIds: panelIds,
     color: colorValue,
   );
-  scheduleRebuild();
+  ctx.deps.scheduleRebuild();
   BoardDocument? updatedBoard;
-  for (final candidate in cubit.state.boards) {
-    if (candidate.id == board.id) {
+  for (final candidate in ctx.cubit.state.boards) {
+    if (candidate.id == ctx.board.id) {
       updatedBoard = candidate;
       break;
     }
@@ -125,7 +130,7 @@ Future<shelf.Response> _createGroup(
   BoardPanelGroup? created;
   final groups = updatedBoard?.groups;
   if (groups != null && groups.isNotEmpty) created = groups.last;
-  return json({
+  return ctx.deps.json({
     'ok': true,
     'message': 'Group "$name" created',
     'group': created?.toJson(),
@@ -134,45 +139,38 @@ Future<shelf.Response> _createGroup(
 
 // DELETE /api/boards/:id/groups/:groupId
 Future<shelf.Response> _deleteGroup(
-  BoardDocument board,
-  BoardCubit cubit,
+  _GroupRouteContext ctx,
   String groupId,
-  shelf.Response Function(Object) json,
-  void Function() scheduleRebuild,
+  BoardPanelGroup group,
 ) async {
-  await cubit.deleteGroup(board.id, groupId);
-  scheduleRebuild();
-  return json(okJson({'message': 'Group deleted'}));
+  await ctx.cubit.deleteGroup(ctx.board.id, groupId);
+  ctx.deps.scheduleRebuild();
+  return ctx.deps.json(okJson({'message': 'Group deleted'}));
 }
 
 // PUT /api/boards/:id/groups/:groupId → rename, color, collapse
 Future<shelf.Response> _updateGroup(
-  BoardDocument board,
-  BoardCubit cubit,
-  shelf.Request request,
+  _GroupRouteContext ctx,
   String groupId,
   BoardPanelGroup group,
-  Future<Map<String, dynamic>> Function(shelf.Request) body,
-  shelf.Response Function(Object) json,
-  void Function() scheduleRebuild,
 ) async {
-  final requestBody = await body(request);
+  final requestBody = await ctx.deps.body(ctx.request);
   final newName = requestBody['name'] as String?;
   final colorRaw = requestBody['color'];
   final collapsed = requestBody['collapsed'] as bool?;
   if (newName != null) {
-    await cubit.renameGroup(board.id, groupId, newName);
+    await ctx.cubit.renameGroup(ctx.board.id, groupId, newName);
   }
   if (colorRaw != null) {
-    await cubit.setGroupColor(board.id, groupId, _parseColor(colorRaw));
+    await ctx.cubit.setGroupColor(ctx.board.id, groupId, _parseColor(colorRaw));
   }
   if (collapsed != null && collapsed != group.collapsed) {
-    await cubit.toggleGroupCollapse(board.id, groupId);
+    await ctx.cubit.toggleGroupCollapse(ctx.board.id, groupId);
   }
-  scheduleRebuild();
+  ctx.deps.scheduleRebuild();
   BoardDocument? updatedBoard;
-  for (final candidate in cubit.state.boards) {
-    if (candidate.id == board.id) {
+  for (final candidate in ctx.cubit.state.boards) {
+    if (candidate.id == ctx.board.id) {
       updatedBoard = candidate;
       break;
     }
@@ -186,80 +184,62 @@ Future<shelf.Response> _updateGroup(
       }
     }
   }
-  return json(okJson({'group': updated?.toJson()}));
+  return ctx.deps.json(okJson({'group': updated?.toJson()}));
 }
 
 // POST /api/boards/:id/groups/:groupId/panels → add panels
 Future<shelf.Response> _addPanelsToGroup(
-  BoardDocument board,
-  BoardCubit cubit,
-  shelf.Request request,
+  _GroupRouteContext ctx,
   String groupId,
-  Future<Map<String, dynamic>> Function(shelf.Request) body,
-  shelf.Response Function(Object) json,
-  shelf.Response Function(String) error,
-  void Function() scheduleRebuild,
+  BoardPanelGroup group,
 ) async {
-  final requestBody = await body(request);
+  final requestBody = await ctx.deps.body(ctx.request);
   final panelIds = _parsePanelIds(requestBody['panels']);
-  if (panelIds.isEmpty) return error(missingField('panels'));
-  await cubit.addPanelsToGroup(board.id, groupId, panelIds);
-  scheduleRebuild();
-  return json(okJson({'message': 'Panels added to group'}));
+  if (panelIds.isEmpty) return ctx.deps.error(missingField('panels'));
+  await ctx.cubit.addPanelsToGroup(ctx.board.id, groupId, panelIds);
+  ctx.deps.scheduleRebuild();
+  return ctx.deps.json(okJson({'message': 'Panels added to group'}));
 }
 
 // DELETE /api/boards/:id/groups/:groupId/panels → remove panels
 Future<shelf.Response> _removePanelsFromGroup(
-  BoardDocument board,
-  BoardCubit cubit,
-  shelf.Request request,
+  _GroupRouteContext ctx,
   String groupId,
-  Future<Map<String, dynamic>> Function(shelf.Request) body,
-  shelf.Response Function(Object) json,
-  shelf.Response Function(String) error,
-  void Function() scheduleRebuild,
+  BoardPanelGroup group,
 ) async {
-  final requestBody = await body(request);
+  final requestBody = await ctx.deps.body(ctx.request);
   final panelIds = _parsePanelIds(requestBody['panels']);
-  if (panelIds.isEmpty) return error(missingField('panels'));
-  await cubit.removePanelsFromGroup(board.id, groupId, panelIds);
-  scheduleRebuild();
-  return json(okJson({'message': 'Panels removed from group'}));
+  if (panelIds.isEmpty) return ctx.deps.error(missingField('panels'));
+  await ctx.cubit.removePanelsFromGroup(ctx.board.id, groupId, panelIds);
+  ctx.deps.scheduleRebuild();
+  return ctx.deps.json(okJson({'message': 'Panels removed from group'}));
 }
 
 // POST /api/boards/:id/groups/:groupId/move → move group by delta
 Future<shelf.Response> _moveGroup(
-  BoardDocument board,
-  BoardCubit cubit,
-  shelf.Request request,
+  _GroupRouteContext ctx,
   String groupId,
-  Future<Map<String, dynamic>> Function(shelf.Request) body,
-  shelf.Response Function(Object) json,
-  void Function() scheduleRebuild,
+  BoardPanelGroup group,
 ) async {
-  final requestBody = await body(request);
+  final requestBody = await ctx.deps.body(ctx.request);
   final dx = (requestBody['dx'] as num?)?.toDouble() ?? 0.0;
   final dy = (requestBody['dy'] as num?)?.toDouble() ?? 0.0;
-  await cubit.moveGroup(board.id, groupId, Offset(dx, dy));
-  scheduleRebuild();
-  return json(okJson({'message': 'Group moved'}));
+  await ctx.cubit.moveGroup(ctx.board.id, groupId, Offset(dx, dy));
+  ctx.deps.scheduleRebuild();
+  return ctx.deps.json(okJson({'message': 'Group moved'}));
 }
 
 // POST /api/boards/:id/groups/:groupId/cycle-focus → cycle collapsed focus
 Future<shelf.Response> _cycleGroupFocus(
-  BoardDocument board,
-  BoardCubit cubit,
-  shelf.Request request,
+  _GroupRouteContext ctx,
   String groupId,
-  Future<Map<String, dynamic>> Function(shelf.Request) body,
-  shelf.Response Function(Object) json,
-  void Function() scheduleRebuild,
+  BoardPanelGroup group,
 ) async {
-  final requestBody = await body(request);
+  final requestBody = await ctx.deps.body(ctx.request);
   final direction = (requestBody['direction'] as num?)?.toInt() ?? 1;
-  await cubit.cycleGroupFocus(board.id, groupId, direction);
-  scheduleRebuild();
-  return json(okJson({'message': 'Group focus cycled'}));
+  await ctx.cubit.cycleGroupFocus(ctx.board.id, groupId, direction);
+  ctx.deps.scheduleRebuild();
+  return ctx.deps.json(okJson({'message': 'Group focus cycled'}));
 }
 
 List<String> _parsePanelIds(dynamic value) => parsePanelIds(value);

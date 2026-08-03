@@ -140,23 +140,25 @@ Map<String, dynamic> _content(RemotePanel panel) {
       'messages': _maps(panel.state['messages']),
       'configured': panel.state['configured'] ?? false,
     },
-    'board.ui' => () {
-      final tree =
-          UiViewPluginBase.treeFromState(panel.state) ??
-          UiViewPluginBase.defaultTree();
-      final storage = UiViewBindings.storageFromState(panel.state);
-      final resolved = UiViewBindings.applyTree(tree, storage);
-      return <String, dynamic>{
-        'tree': tree,
-        'resolvedTree': resolved,
-        'storage': storage,
-        'scripts': UiViewBindings.scriptsFromState(panel.state),
-        'text': AppCliUtils.extractTextLines(resolved),
-        if (panel.state['_lastEvent'] != null)
-          'lastEvent': panel.state['_lastEvent'],
-      };
-    }(),
+    'board.ui' => _uiViewContent(panel),
     _ => Map<String, dynamic>.from(panel.state),
+  };
+}
+
+Map<String, dynamic> _uiViewContent(RemotePanel panel) {
+  final tree =
+      UiViewPluginBase.treeFromState(panel.state) ??
+      UiViewPluginBase.defaultTree();
+  final storage = UiViewBindings.storageFromState(panel.state);
+  final resolved = UiViewBindings.applyTree(tree, storage);
+  return <String, dynamic>{
+    'tree': tree,
+    'resolvedTree': resolved,
+    'storage': storage,
+    'scripts': UiViewBindings.scriptsFromState(panel.state),
+    'text': AppCliUtils.extractTextLines(resolved),
+    if (panel.state['_lastEvent'] != null)
+      'lastEvent': panel.state['_lastEvent'],
   };
 }
 
@@ -249,6 +251,13 @@ RemotePanelActionResult _shape(
       : RemotePanelActionResult(stateUpdate: update);
 }
 
+typedef _KanbanHandler =
+    RemotePanelActionResult Function(
+      List<String> columns,
+      List<Map<String, dynamic>> cards,
+      Map<String, dynamic> args,
+    );
+
 RemotePanelActionResult _kanban(
   RemotePanel panel,
   String action,
@@ -256,121 +265,177 @@ RemotePanelActionResult _kanban(
 ) {
   final columns = _columns(panel);
   final cards = _cards(panel);
-  final handlers = <String, RemotePanelActionResult Function()>{
-    'columns': () => RemotePanelActionResult(data: {'columns': columns}),
-    'cards':
-        () => RemotePanelActionResult(
-          data: {'columns': columns, 'cards': cards},
-        ),
-    'add-column': () {
-      final name = args['name']?.toString().trim();
-      if (name == null || name.isEmpty) return _missing('name');
-      columns.add(name);
-      return RemotePanelActionResult(
-        stateUpdate: {'columns': columns},
-        data: {'columnIndex': columns.length - 1},
-      );
-    },
-    'rename-column': () {
-      final idx = _columnIndex(columns, args['columnId'] ?? args['column']);
-      final name = args['name']?.toString().trim();
-      if (idx < 0 || name == null || name.isEmpty) {
-        return _missing('columnId/name');
-      }
-      columns[idx] = name;
-      return RemotePanelActionResult(stateUpdate: {'columns': columns});
-    },
-    'remove-column': () {
-      final idx = _columnIndex(columns, args['columnId'] ?? args['column']);
-      if (idx < 0) return _notFound('column');
-      columns.removeAt(idx);
-      final kept = <Map<String, dynamic>>[];
-      for (final card in cards) {
-        final old = _int(
-          card['columnIndex'],
-          fallback: _columnIndex(columns, card['column']),
-        );
-        if (old == idx) continue;
-        kept.add(
-          {...card, 'columnIndex': old > idx ? old - 1 : old}..remove('column'),
-        );
-      }
-      return RemotePanelActionResult(
-        stateUpdate: {'columns': columns, 'cards': kept},
-      );
-    },
-    'add-card': () {
-      final colIndex = _columnIndex(
-        columns,
-        args['columnId'] ?? args['column'],
-      );
-      final title = args['title']?.toString().trim();
-      if (colIndex < 0 || title == null || title.isEmpty) {
-        return _missing('columnId/title');
-      }
-      final cardId = args['id']?.toString() ?? _timestampId('card');
-      cards.add({
-        'id': cardId,
-        'title': title,
-        'description': args['description']?.toString() ?? '',
-        'columnIndex': colIndex,
-        if (args['color'] != null) 'color': args['color'],
-      });
-      return RemotePanelActionResult(
-        stateUpdate: {'cards': cards},
-        data: {'cardId': cardId},
-      );
-    },
-    'move-card': () {
-      final cardId = args['cardId']?.toString();
-      final to = _columnIndex(
-        columns,
-        args['to'] ?? args['columnId'] ?? args['column'],
-      );
-      final index = cards.indexWhere((card) => card['id'] == cardId);
-      if (cardId == null || index < 0 || to < 0) return _missing('cardId/to');
-      cards[index] = {...cards[index], 'columnIndex': to}..remove('column');
-      return RemotePanelActionResult(stateUpdate: {'cards': cards});
-    },
-    'remove-card': () {
-      final cardId = args['cardId']?.toString();
-      if (cardId == null) return _missing('cardId');
-      cards.removeWhere((card) => card['id'] == cardId);
-      return RemotePanelActionResult(stateUpdate: {'cards': cards});
-    },
-    'update-card': () {
-      final cardId = args['cardId']?.toString();
-      final index = cards.indexWhere((card) => card['id'] == cardId);
-      if (cardId == null || index < 0) return _notFound('card');
-      cards[index] = {
-        ...cards[index],
-        ..._pick(args, ['title', 'description', 'color']),
-      };
-      return RemotePanelActionResult(stateUpdate: {'cards': cards});
-    },
-    'paste': () {
-      final text = args['text']?.toString();
-      if (text == null || text.trim().isEmpty) return _missing('text');
-      final lines = text.trim().split('\n');
-      final title = lines.first.trim();
-      final description = lines.skip(1).join('\n').trim();
-      final columnIndex = _int(args['columnIndex'], fallback: 0)
-          .clamp(0, columns.length - 1);
-      cards.add({
-        'id': _timestampId('card'),
-        'title': title.length > 120 ? '${title.substring(0, 120)}…' : title,
-        'description': description,
-        'columnIndex': columnIndex,
-      });
-      return RemotePanelActionResult(
-        stateUpdate: {'cards': cards},
-        data: {'columnIndex': columnIndex},
-      );
-    },
+  final handlers = <String, _KanbanHandler>{
+    'columns': _kanbanColumns,
+    'cards': _kanbanCards,
+    'add-column': _kanbanAddColumn,
+    'rename-column': _kanbanRenameColumn,
+    'remove-column': _kanbanRemoveColumn,
+    'add-card': _kanbanAddCard,
+    'move-card': _kanbanMoveCard,
+    'remove-card': _kanbanRemoveCard,
+    'update-card': _kanbanUpdateCard,
+    'paste': _kanbanPaste,
   };
   final handler = handlers[action];
   if (handler == null) return _unknown(action);
-  return handler();
+  return handler(columns, cards, args);
+}
+
+RemotePanelActionResult _kanbanColumns(
+  List<String> columns,
+  List<Map<String, dynamic>> cards,
+  Map<String, dynamic> args,
+) => RemotePanelActionResult(data: {'columns': columns});
+
+RemotePanelActionResult _kanbanCards(
+  List<String> columns,
+  List<Map<String, dynamic>> cards,
+  Map<String, dynamic> args,
+) => RemotePanelActionResult(data: {'columns': columns, 'cards': cards});
+
+RemotePanelActionResult _kanbanAddColumn(
+  List<String> columns,
+  List<Map<String, dynamic>> cards,
+  Map<String, dynamic> args,
+) {
+  final name = args['name']?.toString().trim();
+  if (name == null || name.isEmpty) return _missing('name');
+  columns.add(name);
+  return RemotePanelActionResult(
+    stateUpdate: {'columns': columns},
+    data: {'columnIndex': columns.length - 1},
+  );
+}
+
+RemotePanelActionResult _kanbanRenameColumn(
+  List<String> columns,
+  List<Map<String, dynamic>> cards,
+  Map<String, dynamic> args,
+) {
+  final idx = _columnIndex(columns, args['columnId'] ?? args['column']);
+  final name = args['name']?.toString().trim();
+  if (idx < 0 || name == null || name.isEmpty) {
+    return _missing('columnId/name');
+  }
+  columns[idx] = name;
+  return RemotePanelActionResult(stateUpdate: {'columns': columns});
+}
+
+RemotePanelActionResult _kanbanRemoveColumn(
+  List<String> columns,
+  List<Map<String, dynamic>> cards,
+  Map<String, dynamic> args,
+) {
+  final idx = _columnIndex(columns, args['columnId'] ?? args['column']);
+  if (idx < 0) return _notFound('column');
+  columns.removeAt(idx);
+  final kept = <Map<String, dynamic>>[];
+  for (final card in cards) {
+    final old = _int(
+      card['columnIndex'],
+      fallback: _columnIndex(columns, card['column']),
+    );
+    if (old == idx) continue;
+    kept.add(
+      {...card, 'columnIndex': old > idx ? old - 1 : old}..remove('column'),
+    );
+  }
+  return RemotePanelActionResult(
+    stateUpdate: {'columns': columns, 'cards': kept},
+  );
+}
+
+RemotePanelActionResult _kanbanAddCard(
+  List<String> columns,
+  List<Map<String, dynamic>> cards,
+  Map<String, dynamic> args,
+) {
+  final colIndex = _columnIndex(columns, args['columnId'] ?? args['column']);
+  final title = args['title']?.toString().trim();
+  if (colIndex < 0 || title == null || title.isEmpty) {
+    return _missing('columnId/title');
+  }
+  final cardId = args['id']?.toString() ?? _timestampId('card');
+  cards.add({
+    'id': cardId,
+    'title': title,
+    'description': args['description']?.toString() ?? '',
+    'columnIndex': colIndex,
+    if (args['color'] != null) 'color': args['color'],
+  });
+  return RemotePanelActionResult(
+    stateUpdate: {'cards': cards},
+    data: {'cardId': cardId},
+  );
+}
+
+RemotePanelActionResult _kanbanMoveCard(
+  List<String> columns,
+  List<Map<String, dynamic>> cards,
+  Map<String, dynamic> args,
+) {
+  final cardId = args['cardId']?.toString();
+  final to = _columnIndex(
+    columns,
+    args['to'] ?? args['columnId'] ?? args['column'],
+  );
+  final index = cards.indexWhere((card) => card['id'] == cardId);
+  if (cardId == null || index < 0 || to < 0) return _missing('cardId/to');
+  cards[index] = {...cards[index], 'columnIndex': to}..remove('column');
+  return RemotePanelActionResult(stateUpdate: {'cards': cards});
+}
+
+RemotePanelActionResult _kanbanRemoveCard(
+  List<String> columns,
+  List<Map<String, dynamic>> cards,
+  Map<String, dynamic> args,
+) {
+  final cardId = args['cardId']?.toString();
+  if (cardId == null) return _missing('cardId');
+  cards.removeWhere((card) => card['id'] == cardId);
+  return RemotePanelActionResult(stateUpdate: {'cards': cards});
+}
+
+RemotePanelActionResult _kanbanUpdateCard(
+  List<String> columns,
+  List<Map<String, dynamic>> cards,
+  Map<String, dynamic> args,
+) {
+  final cardId = args['cardId']?.toString();
+  final index = cards.indexWhere((card) => card['id'] == cardId);
+  if (cardId == null || index < 0) return _notFound('card');
+  cards[index] = {
+    ...cards[index],
+    ..._pick(args, ['title', 'description', 'color']),
+  };
+  return RemotePanelActionResult(stateUpdate: {'cards': cards});
+}
+
+RemotePanelActionResult _kanbanPaste(
+  List<String> columns,
+  List<Map<String, dynamic>> cards,
+  Map<String, dynamic> args,
+) {
+  final text = args['text']?.toString();
+  if (text == null || text.trim().isEmpty) return _missing('text');
+  final lines = text.trim().split('\n');
+  final title = lines.first.trim();
+  final description = lines.skip(1).join('\n').trim();
+  final columnIndex = _int(
+    args['columnIndex'],
+    fallback: 0,
+  ).clamp(0, columns.length - 1);
+  cards.add({
+    'id': _timestampId('card'),
+    'title': title.length > 120 ? '${title.substring(0, 120)}…' : title,
+    'description': description,
+    'columnIndex': columnIndex,
+  });
+  return RemotePanelActionResult(
+    stateUpdate: {'cards': cards},
+    data: {'columnIndex': columnIndex},
+  );
 }
 
 RemotePanelActionResult _checklist(
@@ -444,57 +509,119 @@ RemotePanelActionResult _webpage(
   );
 }
 
+typedef _PlaylistHandler =
+    RemotePanelActionResult Function(
+      RemotePanel panel,
+      String action,
+      Map<String, dynamic> args,
+      List<Map<String, dynamic>> tracks,
+    );
+
 RemotePanelActionResult _playlist(
   RemotePanel panel,
   String action,
   Map<String, dynamic> args,
 ) {
   final tracks = _maps(panel.state['tracks']);
-  final handlers = <String, RemotePanelActionResult Function()>{
-    'list': () => RemotePanelActionResult(data: _content(panel)),
-    'add': () {
-      final path = args['path'] ?? args['url'];
-      if (path == null) return _missing('path or url');
-      tracks.add({
-        'path': path.toString(),
-        'title': args['title']?.toString() ?? path.toString().split('/').last,
-      });
-      return RemotePanelActionResult(stateUpdate: {'tracks': tracks});
-    },
-    'remove': () {
-      final index = _int(args['index'], fallback: -1);
-      if (index < 0 || index >= tracks.length) return _notFound('track');
-      tracks.removeAt(index);
-      return RemotePanelActionResult(
-        stateUpdate: {
-          'tracks': tracks,
-          'currentIndex': tracks.isEmpty ? -1 : 0,
-        },
-      );
-    },
-    'play': () {
-      if (tracks.isEmpty) return _notFound('track');
-      final index = _int(
-        args['index'],
-        fallback: _int(panel.state['currentIndex'], fallback: 0),
-      ).clamp(0, tracks.length - 1);
-      return RemotePanelActionResult(
-        stateUpdate: {'currentIndex': index, 'playing': true},
-      );
-    },
-    'pause':
-        () => const RemotePanelActionResult(stateUpdate: {'playing': false}),
-    'stop':
-        () => const RemotePanelActionResult(
-          stateUpdate: {'playing': false, 'currentIndex': 0},
-        ),
-    'next': () => _playlistSkip(panel, action, tracks),
-    'prev': () => _playlistSkip(panel, action, tracks),
+  final handlers = <String, _PlaylistHandler>{
+    'list': _playlistList,
+    'add': _playlistAdd,
+    'remove': _playlistRemove,
+    'play': _playlistPlay,
+    'pause': _playlistPause,
+    'stop': _playlistStop,
+    'next': _playlistNext,
+    'prev': _playlistPrev,
   };
   final handler = handlers[action];
   if (handler == null) return _unknown(action);
-  return handler();
+  return handler(panel, action, args, tracks);
 }
+
+RemotePanelActionResult _playlistList(
+  RemotePanel panel,
+  String action,
+  Map<String, dynamic> args,
+  List<Map<String, dynamic>> tracks,
+) => RemotePanelActionResult(data: _content(panel));
+
+RemotePanelActionResult _playlistAdd(
+  RemotePanel panel,
+  String action,
+  Map<String, dynamic> args,
+  List<Map<String, dynamic>> tracks,
+) {
+  final path = args['path'] ?? args['url'];
+  if (path == null) return _missing('path or url');
+  tracks.add({
+    'path': path.toString(),
+    'title': args['title']?.toString() ?? path.toString().split('/').last,
+  });
+  return RemotePanelActionResult(stateUpdate: {'tracks': tracks});
+}
+
+RemotePanelActionResult _playlistRemove(
+  RemotePanel panel,
+  String action,
+  Map<String, dynamic> args,
+  List<Map<String, dynamic>> tracks,
+) {
+  final index = _int(args['index'], fallback: -1);
+  if (index < 0 || index >= tracks.length) return _notFound('track');
+  tracks.removeAt(index);
+  return RemotePanelActionResult(
+    stateUpdate: {
+      'tracks': tracks,
+      'currentIndex': tracks.isEmpty ? -1 : 0,
+    },
+  );
+}
+
+RemotePanelActionResult _playlistPlay(
+  RemotePanel panel,
+  String action,
+  Map<String, dynamic> args,
+  List<Map<String, dynamic>> tracks,
+) {
+  if (tracks.isEmpty) return _notFound('track');
+  final index = _int(
+    args['index'],
+    fallback: _int(panel.state['currentIndex'], fallback: 0),
+  ).clamp(0, tracks.length - 1);
+  return RemotePanelActionResult(
+    stateUpdate: {'currentIndex': index, 'playing': true},
+  );
+}
+
+RemotePanelActionResult _playlistPause(
+  RemotePanel panel,
+  String action,
+  Map<String, dynamic> args,
+  List<Map<String, dynamic>> tracks,
+) => const RemotePanelActionResult(stateUpdate: {'playing': false});
+
+RemotePanelActionResult _playlistStop(
+  RemotePanel panel,
+  String action,
+  Map<String, dynamic> args,
+  List<Map<String, dynamic>> tracks,
+) => const RemotePanelActionResult(
+  stateUpdate: {'playing': false, 'currentIndex': 0},
+);
+
+RemotePanelActionResult _playlistNext(
+  RemotePanel panel,
+  String action,
+  Map<String, dynamic> args,
+  List<Map<String, dynamic>> tracks,
+) => _playlistSkip(panel, action, tracks);
+
+RemotePanelActionResult _playlistPrev(
+  RemotePanel panel,
+  String action,
+  Map<String, dynamic> args,
+  List<Map<String, dynamic>> tracks,
+) => _playlistSkip(panel, action, tracks);
 
 RemotePanelActionResult _playlistSkip(
   RemotePanel panel,
@@ -562,46 +689,93 @@ RemotePanelActionResult _filePreview(
   );
 }
 
+typedef _FileTreeHandler =
+    RemotePanelActionResult Function(
+      RemotePanel panel,
+      Map<String, dynamic> args,
+      List<String> expanded,
+    );
+
 RemotePanelActionResult _fileTree(
   RemotePanel panel,
   String action,
   Map<String, dynamic> args,
 ) {
   final expanded = _strings(panel.state['expandedDirs']);
-  switch (action) {
-    case 'list':
-      return RemotePanelActionResult(data: _content(panel));
-    case 'open':
-      final path = args['path']?.toString();
-      if (path == null) return _missing('path');
-      return RemotePanelActionResult(stateUpdate: {'selectedFile': path});
-    case 'expand':
-      final dir = args['dir']?.toString();
-      if (dir == null) return _missing('dir');
-      if (!expanded.contains(dir)) expanded.add(dir);
-      return RemotePanelActionResult(stateUpdate: {'expandedDirs': expanded});
-    case 'collapse':
-      final dir = args['dir']?.toString();
-      if (dir == null) return _missing('dir');
-      expanded.remove(dir);
-      return RemotePanelActionResult(stateUpdate: {'expandedDirs': expanded});
-    case 'set-root':
-      final path = args['path']?.toString();
-      if (path == null) return _missing('path');
-      return RemotePanelActionResult(
-        stateUpdate: {
-          'rootPath': path,
-          'expandedDirs': <String>[],
-          'selectedFile': '',
-        },
-      );
-    case 'refresh':
-      return RemotePanelActionResult(
-        stateUpdate: {'_refreshAt': DateTime.now().toUtc().toIso8601String()},
-      );
-  }
-  return _unknown(action);
+  final handlers = <String, _FileTreeHandler>{
+    'list': _fileTreeList,
+    'open': _fileTreeOpen,
+    'expand': _fileTreeExpand,
+    'collapse': _fileTreeCollapse,
+    'set-root': _fileTreeSetRoot,
+    'refresh': _fileTreeRefresh,
+  };
+  final handler = handlers[action];
+  if (handler == null) return _unknown(action);
+  return handler(panel, args, expanded);
 }
+
+RemotePanelActionResult _fileTreeList(
+  RemotePanel panel,
+  Map<String, dynamic> args,
+  List<String> expanded,
+) => RemotePanelActionResult(data: _content(panel));
+
+RemotePanelActionResult _fileTreeOpen(
+  RemotePanel panel,
+  Map<String, dynamic> args,
+  List<String> expanded,
+) {
+  final path = args['path']?.toString();
+  if (path == null) return _missing('path');
+  return RemotePanelActionResult(stateUpdate: {'selectedFile': path});
+}
+
+RemotePanelActionResult _fileTreeExpand(
+  RemotePanel panel,
+  Map<String, dynamic> args,
+  List<String> expanded,
+) {
+  final dir = args['dir']?.toString();
+  if (dir == null) return _missing('dir');
+  if (!expanded.contains(dir)) expanded.add(dir);
+  return RemotePanelActionResult(stateUpdate: {'expandedDirs': expanded});
+}
+
+RemotePanelActionResult _fileTreeCollapse(
+  RemotePanel panel,
+  Map<String, dynamic> args,
+  List<String> expanded,
+) {
+  final dir = args['dir']?.toString();
+  if (dir == null) return _missing('dir');
+  expanded.remove(dir);
+  return RemotePanelActionResult(stateUpdate: {'expandedDirs': expanded});
+}
+
+RemotePanelActionResult _fileTreeSetRoot(
+  RemotePanel panel,
+  Map<String, dynamic> args,
+  List<String> expanded,
+) {
+  final path = args['path']?.toString();
+  if (path == null) return _missing('path');
+  return RemotePanelActionResult(
+    stateUpdate: {
+      'rootPath': path,
+      'expandedDirs': <String>[],
+      'selectedFile': '',
+    },
+  );
+}
+
+RemotePanelActionResult _fileTreeRefresh(
+  RemotePanel panel,
+  Map<String, dynamic> args,
+  List<String> expanded,
+) => RemotePanelActionResult(
+  stateUpdate: {'_refreshAt': DateTime.now().toUtc().toIso8601String()},
+);
 
 RemotePanelActionResult _terminal(
   RemotePanel panel,
@@ -790,6 +964,14 @@ RemotePanelActionResult _run(
   return _unknown(action);
 }
 
+typedef _TableHandler =
+    RemotePanelActionResult Function(
+      RemotePanel panel,
+      Map<String, dynamic> args,
+      List<Map<String, dynamic>> columns,
+      List<Map<String, dynamic>> rows,
+    );
+
 RemotePanelActionResult _table(
   RemotePanel panel,
   String action,
@@ -797,152 +979,220 @@ RemotePanelActionResult _table(
 ) {
   final columns = _tableColumns(panel);
   final rows = _tableRows(panel);
-  final handlers = <String, RemotePanelActionResult Function()>{
-    'get':
-        () => RemotePanelActionResult(
-          data: {
-            'tableId': _tableEffectiveId(panel),
-            'columns': columns,
-            'rows': rows,
-          },
-        ),
-    'set': () {
-      final newColumns = _maps(args['columns']);
-      final newRows =
-          _maps(args['rows']).map((row) => _normalizeTableRowInput(row)).toList();
-      if (newColumns.isEmpty) {
-        return _missing('columns');
-      }
-      return RemotePanelActionResult(
-        stateUpdate: {
-          'columns': newColumns,
-          'rows': newRows,
-        },
-      );
-    },
-    'set-id': () {
-      final tableId = _string(args['tableId'] ?? args['id']);
-      if (tableId == null || tableId.isEmpty) {
-        return _missing('tableId');
-      }
-      return RemotePanelActionResult(
-        stateUpdate: {
-          ...panel.state,
-          'tableId': tableId,
-        },
-      );
-    },
-    'add-column': () {
-      final id = _string(args['id'] ?? args['columnId']);
-      if (id == null || id.isEmpty) {
-        return _missing('id');
-      }
-      if (columns.any((column) => column['id'] == id)) {
-        return RemotePanelActionResult(
-          ok: false,
-          message: 'Column already exists: $id',
-        );
-      }
-      final title = _string(args['title'] ?? args['name']) ?? id;
-      final type = _string(args['type']) ?? 'text';
-      final newColumn = <String, dynamic>{
-        'id': id,
-        'title': title,
-        'type': type,
-        if (args['options'] is List) 'options': _strings(args['options']),
-      };
-      final defaultValue = _tableDefaultCellValue(type);
-      final updatedRows =
-          rows
-              .map(
-                (row) => <String, dynamic>{
-                  ...row,
-                  id: defaultValue,
-                },
-              )
-              .toList();
-      return RemotePanelActionResult(
-        stateUpdate: {
-          'columns': [...columns, newColumn],
-          'rows': updatedRows,
-        },
-      );
-    },
-    'rename-column': () {
-      final id = _string(args['id'] ?? args['columnId']);
-      final title = _string(args['title'] ?? args['name']);
-      if (id == null || id.isEmpty || title == null || title.isEmpty) {
-        return _missing('id/title');
-      }
-      final index = columns.indexWhere((column) => column['id'] == id);
-      if (index < 0) return _notFound('Column');
-      columns[index] = {...columns[index], 'title': title};
-      return RemotePanelActionResult(stateUpdate: {'columns': columns});
-    },
-    'remove-column': () {
-      final id = _string(args['id'] ?? args['columnId']);
-      if (id == null || id.isEmpty) return _missing('id');
-      final index = columns.indexWhere((column) => column['id'] == id);
-      if (index < 0) return _notFound('Column');
-      columns.removeAt(index);
-      final updatedRows =
-          rows
-              .map((row) => <String, dynamic>{...row}..remove(id))
-              .toList();
-      return RemotePanelActionResult(
-        stateUpdate: {'columns': columns, 'rows': updatedRows},
-      );
-    },
-    'add-row': () {
-      final cellInput = _normalizeTableCellInput(args, columns);
-      final cells = <String, dynamic>{
-        for (final column in columns)
-          column['id'] as String:
-              _tableCastCellValue(cellInput[column['id']], column['type']),
-      };
-      final newRow = <String, dynamic>{
-        'id': 'r-${DateTime.now().millisecondsSinceEpoch}',
-        ...cells,
-      };
-      return RemotePanelActionResult(
-        stateUpdate: {'rows': [...rows, newRow]},
-        data: {'rowId': newRow['id']},
-      );
-    },
-    'update-row': () {
-      final rowId = _string(args['id'] ?? args['rowId']);
-      if (rowId == null || rowId.isEmpty) return _missing('id');
-      final index = rows.indexWhere((row) => row['id'] == rowId);
-      if (index < 0) return _notFound('Row');
-      final cellInput = _normalizeTableCellInput(args, columns);
-      final updatedCells = Map<String, dynamic>.from(rows[index]);
-      for (final column in columns) {
-        final columnId = column['id'] as String;
-        if (cellInput.containsKey(columnId)) {
-          updatedCells[columnId] = _tableCastCellValue(
-            cellInput[columnId],
-            column['type'],
-          );
-        }
-      }
-      rows[index] = updatedCells;
-      return RemotePanelActionResult(stateUpdate: {'rows': rows});
-    },
-    'remove-row': () {
-      final rowId = _string(args['id'] ?? args['rowId']);
-      if (rowId == null || rowId.isEmpty) return _missing('id');
-      rows.removeWhere((row) => row['id'] == rowId);
-      return RemotePanelActionResult(stateUpdate: {'rows': rows});
-    },
-    'clear':
-        () => const RemotePanelActionResult(
-          stateUpdate: {'rows': <Map<String, dynamic>>[]},
-        ),
+  final handlers = <String, _TableHandler>{
+    'get': _tableGet,
+    'set': _tableSet,
+    'set-id': _tableSetId,
+    'add-column': _tableAddColumn,
+    'rename-column': _tableRenameColumn,
+    'remove-column': _tableRemoveColumn,
+    'add-row': _tableAddRow,
+    'update-row': _tableUpdateRow,
+    'remove-row': _tableRemoveRow,
+    'clear': _tableClear,
   };
   final handler = handlers[action];
   if (handler == null) return _unknown(action);
-  return handler();
+  return handler(panel, args, columns, rows);
 }
+
+RemotePanelActionResult _tableGet(
+  RemotePanel panel,
+  Map<String, dynamic> args,
+  List<Map<String, dynamic>> columns,
+  List<Map<String, dynamic>> rows,
+) => RemotePanelActionResult(
+  data: {
+    'tableId': _tableEffectiveId(panel),
+    'columns': columns,
+    'rows': rows,
+  },
+);
+
+RemotePanelActionResult _tableSet(
+  RemotePanel panel,
+  Map<String, dynamic> args,
+  List<Map<String, dynamic>> columns,
+  List<Map<String, dynamic>> rows,
+) {
+  final newColumns = _maps(args['columns']);
+  final newRows =
+      _maps(args['rows']).map((row) => _normalizeTableRowInput(row)).toList();
+  if (newColumns.isEmpty) {
+    return _missing('columns');
+  }
+  return RemotePanelActionResult(
+    stateUpdate: {
+      'columns': newColumns,
+      'rows': newRows,
+    },
+  );
+}
+
+RemotePanelActionResult _tableSetId(
+  RemotePanel panel,
+  Map<String, dynamic> args,
+  List<Map<String, dynamic>> columns,
+  List<Map<String, dynamic>> rows,
+) {
+  final tableId = _string(args['tableId'] ?? args['id']);
+  if (tableId == null || tableId.isEmpty) {
+    return _missing('tableId');
+  }
+  return RemotePanelActionResult(
+    stateUpdate: {
+      ...panel.state,
+      'tableId': tableId,
+    },
+  );
+}
+
+RemotePanelActionResult _tableAddColumn(
+  RemotePanel panel,
+  Map<String, dynamic> args,
+  List<Map<String, dynamic>> columns,
+  List<Map<String, dynamic>> rows,
+) {
+  final id = _string(args['id'] ?? args['columnId']);
+  if (id == null || id.isEmpty) {
+    return _missing('id');
+  }
+  if (columns.any((column) => column['id'] == id)) {
+    return RemotePanelActionResult(
+      ok: false,
+      message: 'Column already exists: $id',
+    );
+  }
+  final title = _string(args['title'] ?? args['name']) ?? id;
+  final type = _string(args['type']) ?? 'text';
+  final newColumn = <String, dynamic>{
+    'id': id,
+    'title': title,
+    'type': type,
+    if (args['options'] is List) 'options': _strings(args['options']),
+  };
+  final defaultValue = _tableDefaultCellValue(type);
+  final updatedRows =
+      rows
+          .map(
+            (row) => <String, dynamic>{
+              ...row,
+              id: defaultValue,
+            },
+          )
+          .toList();
+  return RemotePanelActionResult(
+    stateUpdate: {
+      'columns': [...columns, newColumn],
+      'rows': updatedRows,
+    },
+  );
+}
+
+RemotePanelActionResult _tableRenameColumn(
+  RemotePanel panel,
+  Map<String, dynamic> args,
+  List<Map<String, dynamic>> columns,
+  List<Map<String, dynamic>> rows,
+) {
+  final id = _string(args['id'] ?? args['columnId']);
+  final title = _string(args['title'] ?? args['name']);
+  if (id == null || id.isEmpty || title == null || title.isEmpty) {
+    return _missing('id/title');
+  }
+  final index = columns.indexWhere((column) => column['id'] == id);
+  if (index < 0) return _notFound('Column');
+  columns[index] = {...columns[index], 'title': title};
+  return RemotePanelActionResult(stateUpdate: {'columns': columns});
+}
+
+RemotePanelActionResult _tableRemoveColumn(
+  RemotePanel panel,
+  Map<String, dynamic> args,
+  List<Map<String, dynamic>> columns,
+  List<Map<String, dynamic>> rows,
+) {
+  final id = _string(args['id'] ?? args['columnId']);
+  if (id == null || id.isEmpty) return _missing('id');
+  final index = columns.indexWhere((column) => column['id'] == id);
+  if (index < 0) return _notFound('Column');
+  columns.removeAt(index);
+  final updatedRows =
+      rows
+          .map((row) => <String, dynamic>{...row}..remove(id))
+          .toList();
+  return RemotePanelActionResult(
+    stateUpdate: {'columns': columns, 'rows': updatedRows},
+  );
+}
+
+RemotePanelActionResult _tableAddRow(
+  RemotePanel panel,
+  Map<String, dynamic> args,
+  List<Map<String, dynamic>> columns,
+  List<Map<String, dynamic>> rows,
+) {
+  final cellInput = _normalizeTableCellInput(args, columns);
+  final cells = <String, dynamic>{
+    for (final column in columns)
+      column['id'] as String:
+          _tableCastCellValue(cellInput[column['id']], column['type']),
+  };
+  final newRow = <String, dynamic>{
+    'id': 'r-${DateTime.now().millisecondsSinceEpoch}',
+    ...cells,
+  };
+  return RemotePanelActionResult(
+    stateUpdate: {'rows': [...rows, newRow]},
+    data: {'rowId': newRow['id']},
+  );
+}
+
+RemotePanelActionResult _tableUpdateRow(
+  RemotePanel panel,
+  Map<String, dynamic> args,
+  List<Map<String, dynamic>> columns,
+  List<Map<String, dynamic>> rows,
+) {
+  final rowId = _string(args['id'] ?? args['rowId']);
+  if (rowId == null || rowId.isEmpty) return _missing('id');
+  final index = rows.indexWhere((row) => row['id'] == rowId);
+  if (index < 0) return _notFound('Row');
+  final cellInput = _normalizeTableCellInput(args, columns);
+  final updatedCells = Map<String, dynamic>.from(rows[index]);
+  for (final column in columns) {
+    final columnId = column['id'] as String;
+    if (cellInput.containsKey(columnId)) {
+      updatedCells[columnId] = _tableCastCellValue(
+        cellInput[columnId],
+        column['type'],
+      );
+    }
+  }
+  rows[index] = updatedCells;
+  return RemotePanelActionResult(stateUpdate: {'rows': rows});
+}
+
+RemotePanelActionResult _tableRemoveRow(
+  RemotePanel panel,
+  Map<String, dynamic> args,
+  List<Map<String, dynamic>> columns,
+  List<Map<String, dynamic>> rows,
+) {
+  final rowId = _string(args['id'] ?? args['rowId']);
+  if (rowId == null || rowId.isEmpty) return _missing('id');
+  rows.removeWhere((row) => row['id'] == rowId);
+  return RemotePanelActionResult(stateUpdate: {'rows': rows});
+}
+
+RemotePanelActionResult _tableClear(
+  RemotePanel panel,
+  Map<String, dynamic> args,
+  List<Map<String, dynamic>> columns,
+  List<Map<String, dynamic>> rows,
+) => const RemotePanelActionResult(
+  stateUpdate: {'rows': <Map<String, dynamic>>[]},
+);
 
 List<Map<String, dynamic>> _tableColumns(RemotePanel panel) => _maps(
   panel.state['columns'],
@@ -1038,115 +1288,161 @@ dynamic _tableCastCellValue(dynamic value, dynamic type) {
   }
 }
 
+typedef _CalendarHandler =
+    RemotePanelActionResult Function(
+      RemotePanel panel,
+      Map<String, dynamic> args,
+      List<Map<String, dynamic>> events,
+    );
+
 RemotePanelActionResult _calendar(
   RemotePanel panel,
   String action,
   Map<String, dynamic> args,
 ) {
   final events = _maps(panel.state['events']);
-  RemotePanelActionResult createEvent() {
-    final title = _string(args['title']);
-    if (title == null || title.isEmpty) return _missing('title');
-    final start = DateTime.tryParse(args['start']?.toString() ?? '');
-    if (start == null) return _missing('start');
-    final event = <String, dynamic>{
-      'id': _timestampId('ev'),
-      'title': title,
-      'start': start.toUtc().toIso8601String(),
-      'end': _parseOptionalDate(args['end'])?.toUtc().toIso8601String(),
-      'allDay': args['allDay'] == true ||
-          args['allDay']?.toString().toLowerCase() == 'true',
-      'description': _string(args['description']) ?? '',
-      'color': _string(args['color']) ?? '',
-      'meetingUrl': _string(args['meetingUrl'] ?? args['url']) ?? '',
-    };
-    events.add(event);
-    return RemotePanelActionResult(
-      stateUpdate: {'events': events, 'eventCount': events.length},
-      data: {'event': event},
-    );
-  }
-
-  final handlers = <String, RemotePanelActionResult Function()>{
-    'events':
-        () => RemotePanelActionResult(
-          data: {'events': events, 'count': events.length},
-        ),
-    'create-event': createEvent,
-    'add-event': createEvent,
-    'update-event': () {
-      final eventId = _string(args['eventId'] ?? args['id']);
-      if (eventId == null || eventId.isEmpty) return _missing('eventId');
-      final index = events.indexWhere((event) => event['id'] == eventId);
-      if (index < 0) return _notFound('Event');
-      final existing = events[index];
-      events[index] = <String, dynamic>{
-        ...existing,
-        if (args.containsKey('title')) 'title': _string(args['title']) ?? '',
-        if (args.containsKey('start'))
-          'start':
-              _parseOptionalDate(args['start'])?.toUtc().toIso8601String() ??
-              existing['start'],
-        if (args.containsKey('end'))
-          'end': _parseOptionalDate(args['end'])?.toUtc().toIso8601String(),
-        if (args.containsKey('allDay'))
-          'allDay': args['allDay'] == true ||
-              args['allDay']?.toString().toLowerCase() == 'true',
-        if (args.containsKey('description'))
-          'description': _string(args['description']) ?? '',
-        if (args.containsKey('color')) 'color': _string(args['color']) ?? '',
-        if (args.containsKey('meetingUrl') || args.containsKey('url'))
-          'meetingUrl': _string(args['meetingUrl'] ?? args['url']) ?? '',
-      };
-      return RemotePanelActionResult(
-        stateUpdate: {'events': events, 'eventCount': events.length},
-        data: {'event': events[index]},
-      );
-    },
-    'delete-event': () {
-      final eventId = _string(args['eventId'] ?? args['id']);
-      if (eventId == null || eventId.isEmpty) return _missing('eventId');
-      events.removeWhere((event) => event['id'] == eventId);
-      return RemotePanelActionResult(
-        stateUpdate: {'events': events, 'eventCount': events.length},
-      );
-    },
-    'set-view': () {
-      final view = _string(args['view']);
-      const allowed = {'month', 'week', 'workWeek', 'day', 'threeDay', 'list'};
-      if (view == null || !allowed.contains(view)) {
-        return RemotePanelActionResult(
-          ok: false,
-          message: 'Invalid view. Allowed: ${allowed.join(', ')}',
-        );
-      }
-      return RemotePanelActionResult(
-        stateUpdate: {...panel.state, 'view': view},
-      );
-    },
-    'focus-date': () {
-      final date = _parseOptionalDate(args['date'] ?? args['focusedDate']);
-      if (date == null) return _missing('date');
-      return RemotePanelActionResult(
-        stateUpdate: {
-          ...panel.state,
-          'focusedDate': _dateOnly(date).toUtc().toIso8601String(),
-        },
-      );
-    },
-    'scroll-to-time': () {
-      final hour = int.tryParse(args['hour']?.toString() ?? '');
-      if (hour == null || hour < 0 || hour > 23) {
-        return _missing('hour (0-23)');
-      }
-      return RemotePanelActionResult(
-        stateUpdate: {...panel.state, 'scrollHour': hour},
-      );
-    },
+  final handlers = <String, _CalendarHandler>{
+    'events': _calendarEvents,
+    'create-event': _calendarCreateEvent,
+    'add-event': _calendarCreateEvent,
+    'update-event': _calendarUpdateEvent,
+    'delete-event': _calendarDeleteEvent,
+    'set-view': _calendarSetView,
+    'focus-date': _calendarFocusDate,
+    'scroll-to-time': _calendarScrollToTime,
   };
   final handler = handlers[action];
   if (handler == null) return _unknown(action);
-  return handler();
+  return handler(panel, args, events);
+}
+
+RemotePanelActionResult _calendarEvents(
+  RemotePanel panel,
+  Map<String, dynamic> args,
+  List<Map<String, dynamic>> events,
+) => RemotePanelActionResult(
+  data: {'events': events, 'count': events.length},
+);
+
+RemotePanelActionResult _calendarCreateEvent(
+  RemotePanel panel,
+  Map<String, dynamic> args,
+  List<Map<String, dynamic>> events,
+) {
+  final title = _string(args['title']);
+  if (title == null || title.isEmpty) return _missing('title');
+  final start = DateTime.tryParse(args['start']?.toString() ?? '');
+  if (start == null) return _missing('start');
+  final event = <String, dynamic>{
+    'id': _timestampId('ev'),
+    'title': title,
+    'start': start.toUtc().toIso8601String(),
+    'end': _parseOptionalDate(args['end'])?.toUtc().toIso8601String(),
+    'allDay': args['allDay'] == true ||
+        args['allDay']?.toString().toLowerCase() == 'true',
+    'description': _string(args['description']) ?? '',
+    'color': _string(args['color']) ?? '',
+    'meetingUrl': _string(args['meetingUrl'] ?? args['url']) ?? '',
+  };
+  events.add(event);
+  return RemotePanelActionResult(
+    stateUpdate: {'events': events, 'eventCount': events.length},
+    data: {'event': event},
+  );
+}
+
+RemotePanelActionResult _calendarUpdateEvent(
+  RemotePanel panel,
+  Map<String, dynamic> args,
+  List<Map<String, dynamic>> events,
+) {
+  final eventId = _string(args['eventId'] ?? args['id']);
+  if (eventId == null || eventId.isEmpty) return _missing('eventId');
+  final index = events.indexWhere((event) => event['id'] == eventId);
+  if (index < 0) return _notFound('Event');
+  final existing = events[index];
+  events[index] = <String, dynamic>{
+    ...existing,
+    if (args.containsKey('title')) 'title': _string(args['title']) ?? '',
+    if (args.containsKey('start'))
+      'start':
+          _parseOptionalDate(args['start'])?.toUtc().toIso8601String() ??
+          existing['start'],
+    if (args.containsKey('end'))
+      'end': _parseOptionalDate(args['end'])?.toUtc().toIso8601String(),
+    if (args.containsKey('allDay'))
+      'allDay': args['allDay'] == true ||
+          args['allDay']?.toString().toLowerCase() == 'true',
+    if (args.containsKey('description'))
+      'description': _string(args['description']) ?? '',
+    if (args.containsKey('color')) 'color': _string(args['color']) ?? '',
+    if (args.containsKey('meetingUrl') || args.containsKey('url'))
+      'meetingUrl': _string(args['meetingUrl'] ?? args['url']) ?? '',
+  };
+  return RemotePanelActionResult(
+    stateUpdate: {'events': events, 'eventCount': events.length},
+    data: {'event': events[index]},
+  );
+}
+
+RemotePanelActionResult _calendarDeleteEvent(
+  RemotePanel panel,
+  Map<String, dynamic> args,
+  List<Map<String, dynamic>> events,
+) {
+  final eventId = _string(args['eventId'] ?? args['id']);
+  if (eventId == null || eventId.isEmpty) return _missing('eventId');
+  events.removeWhere((event) => event['id'] == eventId);
+  return RemotePanelActionResult(
+    stateUpdate: {'events': events, 'eventCount': events.length},
+  );
+}
+
+RemotePanelActionResult _calendarSetView(
+  RemotePanel panel,
+  Map<String, dynamic> args,
+  List<Map<String, dynamic>> events,
+) {
+  final view = _string(args['view']);
+  const allowed = {'month', 'week', 'workWeek', 'day', 'threeDay', 'list'};
+  if (view == null || !allowed.contains(view)) {
+    return RemotePanelActionResult(
+      ok: false,
+      message: 'Invalid view. Allowed: ${allowed.join(', ')}',
+    );
+  }
+  return RemotePanelActionResult(
+    stateUpdate: {...panel.state, 'view': view},
+  );
+}
+
+RemotePanelActionResult _calendarFocusDate(
+  RemotePanel panel,
+  Map<String, dynamic> args,
+  List<Map<String, dynamic>> events,
+) {
+  final date = _parseOptionalDate(args['date'] ?? args['focusedDate']);
+  if (date == null) return _missing('date');
+  return RemotePanelActionResult(
+    stateUpdate: {
+      ...panel.state,
+      'focusedDate': _dateOnly(date).toUtc().toIso8601String(),
+    },
+  );
+}
+
+RemotePanelActionResult _calendarScrollToTime(
+  RemotePanel panel,
+  Map<String, dynamic> args,
+  List<Map<String, dynamic>> events,
+) {
+  final hour = int.tryParse(args['hour']?.toString() ?? '');
+  if (hour == null || hour < 0 || hour > 23) {
+    return _missing('hour (0-23)');
+  }
+  return RemotePanelActionResult(
+    stateUpdate: {...panel.state, 'scrollHour': hour},
+  );
 }
 
 DateTime? _parseOptionalDate(dynamic value) {
@@ -1156,79 +1452,117 @@ DateTime? _parseOptionalDate(dynamic value) {
 
 DateTime _dateOnly(DateTime date) => DateTime(date.year, date.month, date.day);
 
+typedef _ChartHandler =
+    RemotePanelActionResult Function(
+      RemotePanel panel,
+      Map<String, dynamic> args,
+    );
+
 RemotePanelActionResult _chart(
   RemotePanel panel,
   String action,
   Map<String, dynamic> args,
 ) {
-  final handlers = <String, RemotePanelActionResult Function()>{
-    'get':
-        () => RemotePanelActionResult(
-          data: {
-            'type': panel.state['type'] ?? 'line',
-            'data': panel.state['data'] ?? const <Map<String, dynamic>>[],
-            'xKey': panel.state['xKey'] ?? 'month',
-            'yKey': panel.state['yKey'] ?? 'sales',
-            'groupKey': panel.state['groupKey'],
-            'tablePanelId': panel.state['tablePanelId'],
-            'animated': panel.state['animated'] ?? true,
-          },
-        ),
-    'set-data': () {
-      final data = _maps(args['data'] ?? args['json']);
-      return RemotePanelActionResult(
-        stateUpdate: {...panel.state, 'data': data},
-      );
-    },
-    'set-type': () {
-      final type = _string(args['type']);
-      const allowed = {'line', 'bar', 'pie', 'scatter', 'radar', 'area'};
-      if (type == null || !allowed.contains(type)) {
-        return RemotePanelActionResult(
-          ok: false,
-          message: 'Invalid type. Allowed: ${allowed.join(', ')}',
-        );
-      }
-      return RemotePanelActionResult(
-        stateUpdate: {...panel.state, 'type': type},
-      );
-    },
-    'set-options': () {
-      final next = Map<String, dynamic>.from(panel.state);
-      final xKey = _string(args['xKey'] ?? args['x']);
-      final yKey = _string(args['yKey'] ?? args['y']);
-      final groupKey = _string(args['groupKey'] ?? args['group']);
-      if (xKey != null) next['xKey'] = xKey;
-      if (yKey != null) next['yKey'] = yKey;
-      if (groupKey != null) {
-        next['groupKey'] = groupKey.isEmpty ? null : groupKey;
-      }
-      if (args['animated'] is bool) next['animated'] = args['animated'];
-      return RemotePanelActionResult(stateUpdate: next);
-    },
-    'link-table': () {
-      final tablePanelId = _string(args['tablePanelId'] ?? args['table']);
-      if (tablePanelId == null || tablePanelId.isEmpty) {
-        return _missing('tablePanelId');
-      }
-      return RemotePanelActionResult(
-        stateUpdate: {...panel.state, 'tablePanelId': tablePanelId},
-      );
-    },
-    'unlink-table':
-        () => RemotePanelActionResult(
-          stateUpdate: {...panel.state, 'tablePanelId': null},
-        ),
-    'refresh':
-        () => RemotePanelActionResult(
-          message: 'Refresh requires board context; state unchanged',
-          data: {'tablePanelId': panel.state['tablePanelId']},
-        ),
+  final handlers = <String, _ChartHandler>{
+    'get': _chartGet,
+    'set-data': _chartSetData,
+    'set-type': _chartSetType,
+    'set-options': _chartSetOptions,
+    'link-table': _chartLinkTable,
+    'unlink-table': _chartUnlinkTable,
+    'refresh': _chartRefresh,
   };
   final handler = handlers[action];
   if (handler == null) return _unknown(action);
-  return handler();
+  return handler(panel, args);
 }
+
+RemotePanelActionResult _chartGet(
+  RemotePanel panel,
+  Map<String, dynamic> args,
+) => RemotePanelActionResult(
+  data: {
+    'type': panel.state['type'] ?? 'line',
+    'data': panel.state['data'] ?? const <Map<String, dynamic>>[],
+    'xKey': panel.state['xKey'] ?? 'month',
+    'yKey': panel.state['yKey'] ?? 'sales',
+    'groupKey': panel.state['groupKey'],
+    'tablePanelId': panel.state['tablePanelId'],
+    'animated': panel.state['animated'] ?? true,
+  },
+);
+
+RemotePanelActionResult _chartSetData(
+  RemotePanel panel,
+  Map<String, dynamic> args,
+) {
+  final data = _maps(args['data'] ?? args['json']);
+  return RemotePanelActionResult(
+    stateUpdate: {...panel.state, 'data': data},
+  );
+}
+
+RemotePanelActionResult _chartSetType(
+  RemotePanel panel,
+  Map<String, dynamic> args,
+) {
+  final type = _string(args['type']);
+  const allowed = {'line', 'bar', 'pie', 'scatter', 'radar', 'area'};
+  if (type == null || !allowed.contains(type)) {
+    return RemotePanelActionResult(
+      ok: false,
+      message: 'Invalid type. Allowed: ${allowed.join(', ')}',
+    );
+  }
+  return RemotePanelActionResult(
+    stateUpdate: {...panel.state, 'type': type},
+  );
+}
+
+RemotePanelActionResult _chartSetOptions(
+  RemotePanel panel,
+  Map<String, dynamic> args,
+) {
+  final next = Map<String, dynamic>.from(panel.state);
+  final xKey = _string(args['xKey'] ?? args['x']);
+  final yKey = _string(args['yKey'] ?? args['y']);
+  final groupKey = _string(args['groupKey'] ?? args['group']);
+  if (xKey != null) next['xKey'] = xKey;
+  if (yKey != null) next['yKey'] = yKey;
+  if (groupKey != null) {
+    next['groupKey'] = groupKey.isEmpty ? null : groupKey;
+  }
+  if (args['animated'] is bool) next['animated'] = args['animated'];
+  return RemotePanelActionResult(stateUpdate: next);
+}
+
+RemotePanelActionResult _chartLinkTable(
+  RemotePanel panel,
+  Map<String, dynamic> args,
+) {
+  final tablePanelId = _string(args['tablePanelId'] ?? args['table']);
+  if (tablePanelId == null || tablePanelId.isEmpty) {
+    return _missing('tablePanelId');
+  }
+  return RemotePanelActionResult(
+    stateUpdate: {...panel.state, 'tablePanelId': tablePanelId},
+  );
+}
+
+RemotePanelActionResult _chartUnlinkTable(
+  RemotePanel panel,
+  Map<String, dynamic> args,
+) => RemotePanelActionResult(
+  stateUpdate: {...panel.state, 'tablePanelId': null},
+);
+
+RemotePanelActionResult _chartRefresh(
+  RemotePanel panel,
+  Map<String, dynamic> args,
+) => RemotePanelActionResult(
+  message: 'Refresh requires board context; state unchanged',
+  data: {'tablePanelId': panel.state['tablePanelId']},
+);
 
 RemotePanelActionResult _uiView(
   RemotePanel panel,
