@@ -684,6 +684,139 @@ String? terminalUrlAtWrappedCell(
 
 const _terminalUrlTrailingChars = '.,;:)]}';
 
+/// Whether a normalized (CR-stripped, left-trimmed) terminal row starts with
+/// a prompt/choice prefix typical of interactive agent TUIs.
+@visibleForTesting
+bool terminalRowHasInterestingPrefix(String normalized) {
+  return normalized.startsWith('>') ||
+      normalized.startsWith('}') ||
+      normalized.startsWith('1.') ||
+      normalized.startsWith('2.') ||
+      normalized.startsWith('3.') ||
+      normalized.startsWith('◆') ||
+      normalized.startsWith('❯');
+}
+
+/// Whether a normalized terminal row contains a marker typical of interactive
+/// agent TUIs (trust prompts, yes/no choices, box-drawing glyphs).
+@visibleForTesting
+bool terminalRowHasInterestingMarker(String normalized) {
+  return normalized.contains('Confirm folder trust') ||
+      normalized.contains('Do you trust') ||
+      normalized.contains('Yes') ||
+      normalized.contains('No (Esc)') ||
+      normalized.contains('◆') ||
+      normalized.contains('❯') ||
+      normalized.contains('→') ||
+      normalized.contains('┌') ||
+      normalized.contains('├') ||
+      normalized.contains('└') ||
+      normalized.contains('│');
+}
+
+/// Whether a raw terminal row looks like an interactive TUI row worth
+/// dumping in verbose diagnostics.
+@visibleForTesting
+bool isInterestingTerminalRow(String text) {
+  final normalized = text.replaceAll('\r', '').trimLeft();
+  return terminalRowHasInterestingPrefix(normalized) ||
+      terminalRowHasInterestingMarker(normalized);
+}
+
+/// Picks which buffer rows to dump in verbose diagnostics: rows around the
+/// cursor and the visible edges, plus all visible rows when any of them looks
+/// like an interactive TUI row. Capped at 30 rows to avoid log spam.
+@visibleForTesting
+List<int> collectTerminalDiagnosticRows({
+  required int visibleStart,
+  required int visibleEnd,
+  required int cursorRow,
+  required int lineCount,
+  required String Function(int row) textAt,
+}) {
+  final rows = <int>{};
+  void addAround(int row) {
+    for (var delta = -1; delta <= 1; delta++) {
+      final candidate = row + delta;
+      if (candidate >= 0 && candidate < lineCount) {
+        rows.add(candidate);
+      }
+    }
+  }
+
+  addAround(cursorRow);
+  addAround(visibleStart);
+  addAround(visibleEnd);
+
+  bool hasInteresting = false;
+  for (var row = visibleStart; row <= visibleEnd; row++) {
+    final text = textAt(row);
+    if (isInterestingTerminalRow(text)) {
+      addAround(row);
+      hasInteresting = true;
+    }
+  }
+
+  // When TUI is active dump ALL visible rows for full diagnostics.
+  if (hasInteresting) {
+    for (var row = visibleStart; row <= visibleEnd; row++) {
+      rows.add(row);
+    }
+  }
+
+  final sorted = rows.toList()..sort();
+  // Cap at 30 rows to avoid excessive log spam.
+  if (sorted.length <= 30) return sorted;
+  return sorted.sublist(0, 30);
+}
+
+/// Makes raw terminal text safe for a single log line and truncates it.
+@visibleForTesting
+String sanitizeTerminalLogText(String text) {
+  final sanitized = text
+      .replaceAll('\x1b', r'\x1b')
+      .replaceAll('\r', r'\r')
+      .replaceAll('\n', r'\n');
+  return sanitized.length <= 160
+      ? sanitized
+      : '${sanitized.substring(0, 160)}...';
+}
+
+/// Renders a single cell codepoint for diagnostics logs.
+@visibleForTesting
+String debugTerminalCellChar(int code) {
+  if (code == 0) return '0x0';
+  if (code == 0x20) return '<sp>';
+  final char = String.fromCharCode(code);
+  if (RegExp(r'^[ -~]$').hasMatch(char)) return char;
+  return '0x${code.toRadixString(16)}';
+}
+
+/// Dumps per-cell content/attribute data of a buffer line for diagnostics.
+@visibleForTesting
+String dumpXtermCellDiagnostics(
+  xterm_buffer.BufferLine line, {
+  required int maxCols,
+}) {
+  final cell = xterm_core.CellData.empty();
+  final parts = <String>[];
+  for (var col = 0; col < maxCols && col < line.length; col++) {
+    line.getCellData(col, cell);
+    final code = cell.content & xterm_core.CellContent.codepointMask;
+    final width = cell.content >> xterm_core.CellContent.widthShift;
+    if (parts.length >= 40) break;
+    if (code == 0 && width <= 0) continue;
+    if (code == 0 && cell.flags == 0 && cell.background == 0 && col >= 6) {
+      continue;
+    }
+    parts.add(
+      '$col:${debugTerminalCellChar(code)}'
+      '/w$width/f${cell.flags}/fg${cell.foreground}/bg${cell.background}',
+    );
+  }
+  return parts.isEmpty ? '-' : parts.join(' | ');
+}
+
 class _TerminalScrollChrome extends StatelessWidget {
   const _TerminalScrollChrome({
     required this.controller,
@@ -1071,7 +1204,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
     // in debug builds when output is continuous. Only emit them when the
     // explicit verbose flag is set.
     if (TerminalWidgetState.enableTerminalDiagnostics) {
-      for (final row in _collectDiagnosticRows(
+      for (final row in collectTerminalDiagnosticRows(
         visibleStart: visibleStart,
         visibleEnd: visibleEnd,
         cursorRow: buffer.absoluteCursorY,
@@ -1081,122 +1214,11 @@ class TerminalWidgetState extends State<TerminalWidget> {
         final line = lines[row];
         _debugTerminalLog(
           'xterm row=$row wrapped=${line.isWrapped} '
-          'text="${_sanitizeTerminalText(line.getText())}" '
-          'cells=${_dumpXtermCells(line, maxCols: terminal.viewWidth.clamp(0, 80).toInt())}',
+          'text="${sanitizeTerminalLogText(line.getText())}" '
+          'cells=${dumpXtermCellDiagnostics(line, maxCols: terminal.viewWidth.clamp(0, 80).toInt())}',
         );
       }
     }
-  }
-
-  List<int> _collectDiagnosticRows({
-    required int visibleStart,
-    required int visibleEnd,
-    required int cursorRow,
-    required int lineCount,
-    required String Function(int row) textAt,
-  }) {
-    final rows = <int>{};
-    void addAround(int row) {
-      for (var delta = -1; delta <= 1; delta++) {
-        final candidate = row + delta;
-        if (candidate >= 0 && candidate < lineCount) {
-          rows.add(candidate);
-        }
-      }
-    }
-
-    addAround(cursorRow);
-    addAround(visibleStart);
-    addAround(visibleEnd);
-
-    bool hasInteresting = false;
-    for (var row = visibleStart; row <= visibleEnd; row++) {
-      final text = textAt(row);
-      if (_isInterestingTerminalRow(text)) {
-        addAround(row);
-        hasInteresting = true;
-      }
-    }
-
-    // When TUI is active dump ALL visible rows for full diagnostics.
-    if (hasInteresting) {
-      for (var row = visibleStart; row <= visibleEnd; row++) {
-        rows.add(row);
-      }
-    }
-
-    final sorted = rows.toList()..sort();
-    // Cap at 30 rows to avoid excessive log spam.
-    if (sorted.length <= 30) return sorted;
-    return sorted.sublist(0, 30);
-  }
-
-  bool _isInterestingTerminalRow(String text) {
-    final normalized = text.replaceAll('\r', '').trimLeft();
-    return _hasInterestingRowPrefix(normalized) ||
-        _hasInterestingRowMarker(normalized);
-  }
-
-  bool _hasInterestingRowPrefix(String normalized) {
-    return normalized.startsWith('>') ||
-        normalized.startsWith('}') ||
-        normalized.startsWith('1.') ||
-        normalized.startsWith('2.') ||
-        normalized.startsWith('3.') ||
-        normalized.startsWith('◆') ||
-        normalized.startsWith('❯');
-  }
-
-  bool _hasInterestingRowMarker(String normalized) {
-    return normalized.contains('Confirm folder trust') ||
-        normalized.contains('Do you trust') ||
-        normalized.contains('Yes') ||
-        normalized.contains('No (Esc)') ||
-        normalized.contains('◆') ||
-        normalized.contains('❯') ||
-        normalized.contains('→') ||
-        normalized.contains('┌') ||
-        normalized.contains('├') ||
-        normalized.contains('└') ||
-        normalized.contains('│');
-  }
-
-  String _sanitizeTerminalText(String text) {
-    final sanitized = text
-        .replaceAll('\x1b', r'\x1b')
-        .replaceAll('\r', r'\r')
-        .replaceAll('\n', r'\n');
-    return sanitized.length <= 160
-        ? sanitized
-        : '${sanitized.substring(0, 160)}...';
-  }
-
-  String _dumpXtermCells(xterm_buffer.BufferLine line, {required int maxCols}) {
-    final cell = xterm_core.CellData.empty();
-    final parts = <String>[];
-    for (var col = 0; col < maxCols && col < line.length; col++) {
-      line.getCellData(col, cell);
-      final code = cell.content & xterm_core.CellContent.codepointMask;
-      final width = cell.content >> xterm_core.CellContent.widthShift;
-      if (parts.length >= 40) break;
-      if (code == 0 && width <= 0) continue;
-      if (code == 0 && cell.flags == 0 && cell.background == 0 && col >= 6) {
-        continue;
-      }
-      parts.add(
-        '$col:${_debugCellChar(code)}'
-        '/w$width/f${cell.flags}/fg${cell.foreground}/bg${cell.background}',
-      );
-    }
-    return parts.isEmpty ? '-' : parts.join(' | ');
-  }
-
-  String _debugCellChar(int code) {
-    if (code == 0) return '0x0';
-    if (code == 0x20) return '<sp>';
-    final char = String.fromCharCode(code);
-    if (RegExp(r'^[ -~]$').hasMatch(char)) return char;
-    return '0x${code.toRadixString(16)}';
   }
 
   /// Intercepts macOS keyboard shortcuts and translates them to PTY control

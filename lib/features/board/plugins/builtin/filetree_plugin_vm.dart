@@ -414,40 +414,13 @@ class _FileTreeContentState extends State<_FileTreeContent> {
     String title,
     String hint, [
     String initialValue = '',
-  ]) async {
-    final colors = context.appColors;
-    final controller = TextEditingController(text: initialValue);
-    final result = await showDialog<String>(
+  ]) {
+    return showDialog<String>(
       context: context,
       builder:
-          (ctx) => AlertDialog(
-            backgroundColor: colors.background,
-            title: Text(title, style: const TextStyle(fontSize: 14)),
-            content: TextField(
-              controller: controller,
-              autofocus: true,
-              style: const TextStyle(fontSize: 12),
-              decoration: InputDecoration(
-                hintText: hint,
-                hintStyle: TextStyle(fontSize: 12, color: colors.textMuted),
-                isDense: true,
-              ),
-              onSubmitted: (v) => Navigator.pop(ctx, v),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, controller.text),
-                child: const Text('OK'),
-              ),
-            ],
-          ),
+          (ctx) =>
+              _InputDialog(title: title, hint: hint, initialValue: initialValue),
     );
-    controller.dispose();
-    return result;
   }
 
   // ── Build ──────────────────────────────────────────────────────────────────
@@ -1360,4 +1333,69 @@ class _DiffEntry {
   const _DiffEntry({required this.status, required this.filePath});
   final String status;
   final String filePath;
+}
+
+/// Alert dialog with a single text input. Owns its [TextEditingController]
+/// so the controller lives exactly as long as the dialog is in the tree
+/// (disposing it right after `showDialog` returns races with the pop
+/// transition still building the field).
+class _InputDialog extends StatefulWidget {
+  const _InputDialog({
+    required this.title,
+    required this.hint,
+    this.initialValue = '',
+  });
+
+  final String title;
+  final String hint;
+  final String initialValue;
+
+  @override
+  State<_InputDialog> createState() => _InputDialogState();
+}
+
+class _InputDialogState extends State<_InputDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialValue);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return AlertDialog(
+      backgroundColor: colors.background,
+      title: Text(widget.title, style: const TextStyle(fontSize: 14)),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        style: const TextStyle(fontSize: 12),
+        decoration: InputDecoration(
+          hintText: widget.hint,
+          hintStyle: TextStyle(fontSize: 12, color: colors.textMuted),
+          isDense: true,
+        ),
+        onSubmitted: (v) => Navigator.pop(context, v),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context, _controller.text),
+          child: const Text('OK'),
+        ),
+      ],
+    );
+  }
 }

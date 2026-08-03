@@ -68,6 +68,55 @@ List<Map<String, dynamic>> _parseTracks(BoardPanelInstance panel) =>
         .toList() ??
     [];
 
+/// Test seam: when set, this factory is used instead of
+/// [PlaylistPlayerRegistry] to obtain the [Player] for a panel, so widget
+/// tests can inject a fake player (the real one needs native libmpv).
+@visibleForTesting
+Player Function(String panelId)? debugPlaylistPlayerFactory;
+
+/// Result of reordering a playlist: the reordered [tracks] plus the adjusted
+/// [currentIndex] so it keeps pointing at the same track.
+({List<Map<String, dynamic>> tracks, int currentIndex}) reorderPlaylistTracks(
+  List<Map<String, dynamic>> tracks,
+  int currentIndex,
+  int oldIdx,
+  int newIdx,
+) {
+  final updated = List<Map<String, dynamic>>.from(tracks);
+  if (newIdx > oldIdx) newIdx--;
+  final item = updated.removeAt(oldIdx);
+  updated.insert(newIdx, item);
+  var newCurrent = currentIndex;
+  if (oldIdx == currentIndex) {
+    newCurrent = newIdx;
+  } else if (oldIdx < currentIndex && newIdx >= currentIndex) {
+    newCurrent--;
+  } else if (oldIdx > currentIndex && newIdx <= currentIndex) {
+    newCurrent++;
+  }
+  return (tracks: updated, currentIndex: newCurrent);
+}
+
+/// Builds track entries for [picked] files that are not already in
+/// [existing] (deduplicated by path).
+List<Map<String, dynamic>> newPlaylistTracksFromPicks(
+  List<Map<String, dynamic>> existing,
+  List<BoardFileSelection> picked,
+) {
+  final existingPaths = existing.map((t) => t['path']).toSet();
+  final now = DateTime.now().millisecondsSinceEpoch;
+  return picked
+      .where((f) => !existingPaths.contains(f.path))
+      .map(
+        (f) => <String, dynamic>{
+          'id': '$now${f.name}',
+          'path': f.path,
+          'name': f.name,
+        },
+      )
+      .toList();
+}
+
 // ─── Main content widget ──────────────────────────────────────────────────────
 
 class _PlaylistContent extends StatefulWidget {
@@ -108,7 +157,9 @@ class _PlaylistContentState extends State<_PlaylistContent> {
   void initState() {
     super.initState();
     // Use registry so the player survives board switches (widget dispose/remount).
-    _player = PlaylistPlayerRegistry.instance.acquire(widget.panel.id);
+    _player =
+        debugPlaylistPlayerFactory?.call(widget.panel.id) ??
+        PlaylistPlayerRegistry.instance.acquire(widget.panel.id);
     _subscribeToPlayer();
     // Only open the track if nothing is currently playing (i.e. first mount).
     if (!_player.state.playing) {
@@ -312,131 +363,17 @@ class _PlaylistContentState extends State<_PlaylistContent> {
 
   Future<void> _addUrl() async {
     final colors = context.appColors;
-    final ctrl = TextEditingController();
-    final nameCtrl = TextEditingController();
-    final confirmed = await showDialog<bool>(
+    final result = await showDialog<({String url, String name})>(
       context: context,
       barrierColor: colors.background.withValues(alpha: 0.45),
-      builder: (dctx) {
-        final colors = dctx.appColors;
-        final onSurface = Theme.of(dctx).colorScheme.onSurface;
-        return Dialog(
-          backgroundColor: colors.surfaceElevated,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Add URL',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: onSurface,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                TextField(
-                  controller: ctrl,
-                  autofocus: true,
-                  style: TextStyle(fontSize: 13, color: onSurface),
-                  decoration: InputDecoration(
-                    hintText: 'https://example.com/audio.mp3',
-                    hintStyle: TextStyle(
-                      fontSize: 12,
-                      color: onSurface.withAlpha(100),
-                    ),
-                    prefixIcon: Icon(
-                      Icons.link_rounded,
-                      size: 16,
-                      color: onSurface.withAlpha(150),
-                    ),
-                    border: OutlineInputBorder(
-                      borderSide: BorderSide(color: colors.border),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: colors.border),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: colors.primary, width: 1.5),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
-                    ),
-                    isDense: true,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: nameCtrl,
-                  style: TextStyle(fontSize: 13, color: onSurface),
-                  decoration: InputDecoration(
-                    hintText: 'Title (optional)',
-                    hintStyle: TextStyle(
-                      fontSize: 12,
-                      color: onSurface.withAlpha(100),
-                    ),
-                    border: OutlineInputBorder(
-                      borderSide: BorderSide(color: colors.border),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: colors.border),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: colors.primary, width: 1.5),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
-                    ),
-                    isDense: true,
-                  ),
-                  onSubmitted: (_) => Navigator.of(dctx).pop(true),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(
-                      onPressed: () => Navigator.of(dctx).pop(false),
-                      child: Text(
-                        'Cancel',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: onSurface.withAlpha(150),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    FilledButton(
-                      onPressed: () => Navigator.of(dctx).pop(true),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: colors.primary,
-                        minimumSize: const Size(0, 32),
-                      ),
-                      child: const Text('Add', style: TextStyle(fontSize: 12)),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+      builder: (dctx) => const _AddUrlDialog(),
     );
-    ctrl.dispose();
-    nameCtrl.dispose();
-    if (confirmed != true) return;
-    final url = ctrl.text.trim();
+    if (result == null) return;
+    final url = result.url.trim();
     if (url.isEmpty) return;
     final name =
-        nameCtrl.text.trim().isNotEmpty
-            ? nameCtrl.text.trim()
+        result.name.trim().isNotEmpty
+            ? result.name.trim()
             : url.split('/').last;
     final existing = _tracks;
     final track = {
@@ -463,18 +400,7 @@ class _PlaylistContentState extends State<_PlaylistContent> {
     );
     if (result == null || result.isEmpty) return;
     final existing = _tracks;
-    final existingPaths = existing.map((t) => t['path']).toSet();
-    final newTracks =
-        result
-            .where((f) => !existingPaths.contains(f.path))
-            .map(
-              (f) => {
-                'id': '${DateTime.now().millisecondsSinceEpoch}${f.name}',
-                'path': f.path,
-                'name': f.name,
-              },
-            )
-            .toList();
+    final newTracks = newPlaylistTracksFromPicks(existing, result);
     if (newTracks.isEmpty) return;
     final updated = [...existing, ...newTracks];
     _saveState(
@@ -851,19 +777,8 @@ class _PlaylistContentState extends State<_PlaylistContent> {
   }
 
   void _onReorder(List<Map<String, dynamic>> tracks, int oldIdx, int newIdx) {
-    final updated = List<Map<String, dynamic>>.from(tracks);
-    if (newIdx > oldIdx) newIdx--;
-    final item = updated.removeAt(oldIdx);
-    updated.insert(newIdx, item);
-    int newCurrent = _currentIndex;
-    if (oldIdx == _currentIndex) {
-      newCurrent = newIdx;
-    } else if (oldIdx < _currentIndex && newIdx >= _currentIndex) {
-      newCurrent--;
-    } else if (oldIdx > _currentIndex && newIdx <= _currentIndex) {
-      newCurrent++;
-    }
-    _saveState(tracks: updated, currentIndex: newCurrent);
+    final result = reorderPlaylistTracks(tracks, _currentIndex, oldIdx, newIdx);
+    _saveState(tracks: result.tracks, currentIndex: result.currentIndex);
   }
 
   Widget _buildTrackItem(List<Map<String, dynamic>> tracks, int index) {
@@ -1010,6 +925,148 @@ class _TrackTileState extends State<_TrackTile> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+
+// ─── Add URL dialog ─────────────────────────────────────────────────────────
+
+/// Dialog that collects a stream URL and an optional display name. Owns its
+/// [TextEditingController]s so they live exactly as long as the dialog is in
+/// the tree (disposing them right after `showDialog` returns races with the
+/// pop transition still building the fields). Pops with the entered values,
+/// or null when cancelled.
+class _AddUrlDialog extends StatefulWidget {
+  const _AddUrlDialog();
+
+  @override
+  State<_AddUrlDialog> createState() => _AddUrlDialogState();
+}
+
+class _AddUrlDialogState extends State<_AddUrlDialog> {
+  final TextEditingController _urlCtrl = TextEditingController();
+  final TextEditingController _nameCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _urlCtrl.dispose();
+    _nameCtrl.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    Navigator.of(context).pop((url: _urlCtrl.text, name: _nameCtrl.text));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    return Dialog(
+      backgroundColor: colors.surfaceElevated,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Add URL',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: onSurface,
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _urlCtrl,
+              autofocus: true,
+              style: TextStyle(fontSize: 13, color: onSurface),
+              decoration: InputDecoration(
+                hintText: 'https://example.com/audio.mp3',
+                hintStyle: TextStyle(
+                  fontSize: 12,
+                  color: onSurface.withAlpha(100),
+                ),
+                prefixIcon: Icon(
+                  Icons.link_rounded,
+                  size: 16,
+                  color: onSurface.withAlpha(150),
+                ),
+                border: OutlineInputBorder(
+                  borderSide: BorderSide(color: colors.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: colors.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: colors.primary, width: 1.5),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                isDense: true,
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _nameCtrl,
+              style: TextStyle(fontSize: 13, color: onSurface),
+              decoration: InputDecoration(
+                hintText: 'Title (optional)',
+                hintStyle: TextStyle(
+                  fontSize: 12,
+                  color: onSurface.withAlpha(100),
+                ),
+                border: OutlineInputBorder(
+                  borderSide: BorderSide(color: colors.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: colors.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: colors.primary, width: 1.5),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                isDense: true,
+              ),
+              onSubmitted: (_) => _submit(),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text(
+                    'Cancel',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: onSurface.withAlpha(150),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(
+                  onPressed: _submit,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: colors.primary,
+                    minimumSize: const Size(0, 32),
+                  ),
+                  child: const Text('Add', style: TextStyle(fontSize: 12)),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );

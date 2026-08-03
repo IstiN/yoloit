@@ -7,7 +7,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
-import 'package:local_models_flutter/runtime/embedded_gemma_tool_calls.dart';
 import 'package:record/record.dart';
 import 'package:yoloit/core/platform/microphone_permission_service.dart';
 import 'package:yoloit/core/platform/platform_dirs.dart';
@@ -18,11 +17,11 @@ import 'package:yoloit/core/utils/clipboard_utils.dart';
 import 'package:yoloit/core/utils/json_utils.dart';
 import 'package:yoloit/core/utils/string_utils.dart';
 
+import 'package:yoloit/features/board/assistant/assistant_message_utils.dart';
 import 'package:yoloit/features/board/assistant/assistant_voice_visualizer.dart';
 import 'package:yoloit/features/board/assistant/widgets/assistant_history_dialog.dart';
 import 'package:yoloit/features/board/assistant/widgets/assistant_thinking_indicator.dart';
 import 'package:yoloit/features/board/assistant/widgets/assistant_tool_executor.dart';
-import 'package:yoloit/features/board/assistant/yolo_assistant_tool_errors.dart';
 import 'package:yoloit/features/board/assistant/widgets/debug_logs_dialog.dart';
 import 'package:yoloit/features/board/assistant/widgets/session_bar_button.dart';
 import 'package:yoloit/features/board/assistant/widgets/tools_dialog.dart';
@@ -395,19 +394,18 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
     List<String> overlayToolLogs = const [],
   }) {
     final current = _messageDraft ?? _messages;
-    final idx = current.indexWhere((m) => m['id'] == assistantMessageId);
-    if (idx == -1) return;
+    if (!replaceMessageContentInPlace(current, assistantMessageId, content)) {
+      return;
+    }
     if (_isGeneratingReply && content.trim().isNotEmpty) {
       _receivedAssistantToken = true;
     }
-    current[idx] = {...current[idx], 'content': content};
     _messageDraft = current;
-    final newStatus =
-        _isGeneratingReply && content.trim().isEmpty && overlayToolLogs.isEmpty
-            ? 'processing'
-            : _isGeneratingReply
-            ? 'responding'
-            : 'output';
+    final newStatus = assistantOverlayStatus(
+      isGenerating: _isGeneratingReply,
+      content: content,
+      overlayToolLogs: overlayToolLogs,
+    );
     // ignore: avoid_print
     if (mirrorToOverlay && !_voiceOverlayHidden) {
       print(
@@ -417,7 +415,10 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
     _updateState({
       'messages': current,
       if (mirrorToOverlay && !_voiceOverlayHidden) ...{
-        'voiceResponse': _composeOverlayResponse(content, overlayToolLogs),
+        'voiceResponse': composeAssistantOverlayResponse(
+          content,
+          overlayToolLogs,
+        ),
         'assistantStatus': newStatus,
       },
     });
@@ -427,35 +428,7 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
   String _composeOverlayResponse(
     String assistantContent,
     List<String> toolLogs,
-  ) {
-    final text = assistantContent.trim();
-
-    // Show up to 5 recent tool calls as compact lines (⚙️ tool:name).
-    if (toolLogs.isEmpty) return text;
-    final recent =
-        toolLogs.length > 5 ? toolLogs.sublist(toolLogs.length - 5) : toolLogs;
-    final toolText = recent
-        .map((entry) {
-          // Normalize: strip leading emoji/status prefixes, keep just tool name
-          final clean =
-              entry
-                  .replaceAll(RegExp(r'^[⏳✅❌]\s*running:\s*'), '')
-                  .replaceAll(RegExp(r'^[⏳✅❌]\s*'), '')
-                  .trim();
-          final isDone = entry.startsWith('✅') || entry.startsWith('❌');
-          final icon =
-              entry.startsWith('❌')
-                  ? '❌'
-                  : isDone
-                  ? '✅'
-                  : '⚙️';
-          return '$icon $clean';
-        })
-        .join('\n');
-
-    if (text.isEmpty) return toolText;
-    return '$toolText\n\n$text';
-  }
+  ) => composeAssistantOverlayResponse(assistantContent, toolLogs);
 
   BoardDocument? _currentBoard() =>
       context.read<BoardCubit>().state.activeBoard;
@@ -506,97 +479,18 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
     required String? toolCommand,
     required Map<String, Object?> arguments,
     required String result,
-  }) {
-    if (_toolResultReportedFailure(result)) return const {};
-    if (toolCommand == 'panel:create') {
-      return _panelCreateTargetPatch(arguments: arguments, result: result);
-    }
-    if (toolCommand == 'note' || toolCommand?.startsWith('note:') == true) {
-      final panel = '${arguments['panel'] ?? ''}'.trim();
-      if (panel.isEmpty || panel == widget.panel.id) return const {};
-      return {
-        'lastTargetNotePanelId': panel,
-        'lastTargetNotePanelTitle': panel,
-      };
-    }
-    return const {};
-  }
+  }) => toolTargetPatchIfNeeded(
+    toolCommand: toolCommand,
+    arguments: arguments,
+    result: result,
+    selfPanelId: widget.panel.id,
+  );
 
-  bool _toolResultReportedFailure(String result) {
-    try {
-      final decoded = jsonDecode(result);
-      if (decoded is Map && decoded['ok'] == false) return true;
-    } catch (_) {}
-    return false;
-  }
+  String _cleanAssistantToolEchoes(String content, List<String> calledTools) =>
+      cleanAssistantToolEchoes(content, calledTools);
 
-  Map<String, dynamic> _panelCreateTargetPatch({
-    required Map<String, Object?> arguments,
-    required String result,
-  }) {
-    final type = '${arguments['type'] ?? ''}'.trim();
-    if (type != 'board.note.markdown') return const {};
-    try {
-      final decoded = jsonDecode(result);
-      if (decoded is! Map) return const {};
-      final stdout = decoded['stdout'];
-      final payload = stdout is String ? jsonDecode(stdout) : decoded;
-      if (payload is! Map) return const {};
-      final panel = payload['panel'];
-      if (panel is! Map) return const {};
-      final id = '${panel['id'] ?? ''}'.trim();
-      final title = '${panel['title'] ?? id}'.trim();
-      if (id.isEmpty) return const {};
-      return {
-        'lastTargetNotePanelId': id,
-        'lastTargetNotePanelTitle': title.isEmpty ? id : title,
-      };
-    } catch (_) {
-      return const {};
-    }
-  }
-
-  String _cleanAssistantToolEchoes(String content, List<String> calledTools) {
-    var cleaned = stripEmbeddedGemmaToolCallBlocks(content).trim();
-    if (cleaned.startsWith(RegExp(r'\[yoloit_[^\]]+\]')) &&
-        (cleaned.contains('"ok"') || cleaned.contains('"command"'))) {
-      cleaned = '';
-    }
-    cleaned = cleaned.replaceAll(
-      RegExp(r'^\s*\[yoloit_[^\]]+\]\s*\{[\s\S]*?\}\s*$', multiLine: true),
-      '',
-    );
-    cleaned = cleaned.replaceAll(
-      RegExp(r'^\s*\[yoloit_[^\]]+\].*$', multiLine: true),
-      '',
-    );
-    cleaned = cleaned.trim();
-    if (cleaned.isNotEmpty) return cleaned;
-    if (calledTools.isEmpty) return '';
-    final unique = <String>[];
-    for (final tool in calledTools) {
-      if (!unique.contains(tool)) unique.add(tool);
-    }
-    return 'Готово — выполнил через ${unique.join(', ')}.';
-  }
-
-  String _compactToolResult(String toolName, String result, bool success) {
-    String? command;
-    String? error;
-    try {
-      final decoded = jsonDecode(result);
-      if (decoded is Map) {
-        command = decoded['command'] as String?;
-        error = extractYoloAssistantToolError(decoded);
-      }
-    } catch (_) {}
-    if (!success) {
-      return error == null || error.isEmpty
-          ? 'Tool failed: $toolName'
-          : 'Tool failed: $error';
-    }
-    return command == null || command.isEmpty ? 'Done: $toolName' : command;
-  }
+  String _compactToolResult(String toolName, String result, bool success) =>
+      compactAssistantToolResult(toolName, result, success);
 
   void _appendToolMessage({
     required String callId,
@@ -676,24 +570,10 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
       ..writeln('Focus panel id: ${target?.id ?? 'none'}.');
     final systemContent = buffer.toString().trim();
 
-    final result = <Map<String, String>>[
+    return <Map<String, String>>[
       {'role': 'system', 'content': systemContent},
+      ...conversationMessagesForRequest(chatMessages),
     ];
-
-    for (final m in chatMessages) {
-      final role = (m['role'] as String? ?? '').toLowerCase();
-      final content = (m['content'] as String? ?? '').trim();
-      if (role == 'user') {
-        if (content.isEmpty) continue;
-        result.add({'role': 'user', 'content': content});
-      } else if (role == 'assistant') {
-        if (content.isEmpty) continue;
-        result.add({'role': 'assistant', 'content': content});
-      } else if (role == 'tool') {
-        result.add({'role': 'tool', 'content': _formatToolMessageForPrompt(m)});
-      }
-    }
-    return result;
   }
 
   String _buildContextSnapshotMarkdown() {
@@ -783,19 +663,6 @@ $toolSchemas
 $messagesJson
 ```
 ''';
-  }
-
-  String _formatToolMessageForPrompt(Map<String, dynamic> message) {
-    final toolName = (message['toolName'] as String? ?? 'tool').trim();
-    final success = message['success'] as bool? ?? true;
-    final arguments = compactPromptJson(
-      message['arguments'],
-      600,
-    );
-    final result = compactToolResultForPrompt(message['rawResult']);
-    return '\nTool $toolName ${success ? 'succeeded' : 'failed'}'
-        '\nTool arguments: $arguments'
-        '\nTool result: $result';
   }
 
   int _estimateTokens(String text) {
@@ -1235,7 +1102,7 @@ $messagesJson
                       children: [
                         Icon(Icons.manage_search_outlined, size: 18),
                         SizedBox(width: 8),
-                        Text('Preview next LLM request'),
+                        Flexible(child: Text('Preview next LLM request')),
                       ],
                     ),
                   ),
@@ -1245,7 +1112,7 @@ $messagesJson
                       children: [
                         Icon(Icons.bug_report_outlined, size: 18),
                         SizedBox(width: 8),
-                        Text('LLM debug logs'),
+                        Flexible(child: Text('LLM debug logs')),
                       ],
                     ),
                   ),
@@ -1255,7 +1122,7 @@ $messagesJson
                       children: [
                         Icon(Icons.content_copy_outlined, size: 18),
                         SizedBox(width: 8),
-                        Text('Copy chat log'),
+                        Flexible(child: Text('Copy chat log')),
                       ],
                     ),
                   ),
@@ -2106,42 +1973,11 @@ $messagesJson
   }
 
   Future<void> _copyFullLogsToClipboard() async {
-    final buf = StringBuffer();
-    buf.writeln('=== YoLoIT Chat Logs ===');
-    buf.writeln('Messages: ${_messages.length}');
-    buf.writeln('');
-    for (final msg in _messages) {
-      final role = msg['role'] ?? 'unknown';
-      final content = msg['content'] as String? ?? '';
-      buf.writeln('--- [$role] ---');
-      buf.writeln(content);
-      final toolCalls = msg['toolCalls'] as List<dynamic>?;
-      if (toolCalls != null && toolCalls.isNotEmpty) {
-        for (final tc in toolCalls) {
-          if (tc is Map) {
-            buf.writeln('  [tool] ${tc['toolName']}(${tc['arguments']})');
-            if (tc['result'] != null) buf.writeln('  [result] ${tc['result']}');
-          }
-        }
-      }
-      buf.writeln('');
-    }
-    // Also append debug session data if available.
-    if (_debugSessions.isNotEmpty) {
-      buf.writeln('=== LLM Debug Sessions ===');
-      for (final dbg in _debugSessions) {
-        buf.writeln('User: ${dbg['userMessage'] ?? ''}');
-        if (dbg['error'] != null) buf.writeln('ERROR: ${dbg['error']}');
-        final resp = dbg['response'] as String? ?? '';
-        if (resp.isNotEmpty) {
-          buf.writeln(
-            'Response: ${resp.substring(0, resp.length.clamp(0, 500))}',
-          );
-        }
-        buf.writeln('');
-      }
-    }
-    await copyToClipboard(buf.toString());
+    final text = buildFullChatLogsText(
+      messages: _messages,
+      debugSessions: _debugSessions,
+    );
+    await copyToClipboard(text);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -2168,26 +2004,20 @@ $messagesJson
     final appName = await MicrophonePermissionService.instance.displayName();
     final bundleId =
         await MicrophonePermissionService.instance.bundleIdentifier();
-    final resetCommand = 'tccutil reset Microphone $bundleId';
+    final resetCommand = microphonePermissionResetCommand(bundleId);
     final status = await MicrophonePermissionService.instance.status();
     if (!mounted) return;
+    final hintText = buildMicrophonePermissionHintText(
+      appName: appName,
+      bundleId: bundleId,
+      status: status,
+    );
     await showDialog<void>(
       context: context,
       builder:
           (dialogContext) => AlertDialog(
             title: const Text('Microphone access required'),
-            content: SizedBox(
-              width: 560,
-              child: SelectableText(
-                'YoLoIT needs microphone access to record audio for local ASR.\n\n'
-                'App shown to macOS: $appName\n'
-                'Bundle id: $bundleId\n'
-                'macOS status: $status\n\n'
-                'If the system prompt does not appear, macOS has already saved a decision for this exact debug bundle. '
-                'Open Privacy & Security → Microphone and enable $appName. If it is missing from the list, reset the saved decision and press Request again:\n\n'
-                '$resetCommand',
-              ),
-            ),
+            content: SizedBox(width: 560, child: SelectableText(hintText)),
             actions: [
               TextButton.icon(
                 onPressed: () async {

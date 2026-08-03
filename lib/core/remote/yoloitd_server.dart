@@ -241,6 +241,13 @@ class YoloitdServer with ServerProcessMixin {
         const <String?>[null, 'snapshot'],
         () => _boardSnapshot(board),
       ),
+      // The lock route must precede the `panels` prefix route below, or it is
+      // shadowed and unreachable.
+      _RouteEntry(
+        null,
+        const <String?>[null, 'panels', null, 'lock'],
+        () => _handlePanelLock(request, method, board, sub),
+      ),
       _RouteEntry(
         null,
         const <String?>[null, 'panels'],
@@ -272,11 +279,6 @@ class YoloitdServer with ServerProcessMixin {
         const <String?>[null, 'groups'],
         () => _handleGroups(request, method, board, sub.skip(2).toList()),
         prefix: true,
-      ),
-      _RouteEntry(
-        null,
-        const <String?>[null, 'panels', null, 'lock'],
-        () => _handlePanelLock(request, method, board, sub),
       ),
     ]);
     if (response != null) return response;
@@ -523,79 +525,92 @@ class YoloitdServer with ServerProcessMixin {
         404,
       );
     }
-    if (method == 'PUT') {
-      final body = await readJsonBody(request);
-      final actorId = (body['actorId'] as String? ?? '').trim();
-      final ttlSec = (body['ttlSec'] as num?)?.toInt() ?? 60;
-      if (actorId.isEmpty) {
-        return jsonResponse(
-          <String, Object?>{'ok': false, 'error': 'actorId required'},
-          400,
-        );
-      }
-      final now = DateTime.now().toUtc().millisecondsSinceEpoch;
-      final existing =
-          (board.metadata['panelLocks'] as Map?)?[panelId];
-      if (existing is Map) {
-        final existingActor = existing['actorId'] as String?;
-        final existingExpires = existing['expiresAt'];
-        if (existingActor != actorId &&
-            existingExpires is int &&
-            existingExpires > now) {
-          return jsonResponse(
-            <String, Object?>{
-              'ok': false,
-              'error': 'panel locked by another actor',
-              'actorId': existingActor,
-            },
-            409,
-          );
-        }
-      }
-      final expires = now + ttlSec * 1000;
-      await store.updateBoard(
-        board.id,
-        (current) {
-          final locks =
-              current.metadata['panelLocks'] is Map
-                  ? Map<String, dynamic>.from(
-                    current.metadata['panelLocks'] as Map,
-                  )
-                  : <String, dynamic>{};
-          locks[panelId] = {'actorId': actorId, 'expiresAt': expires};
-          return current.copyWith(
-            metadata: <String, dynamic>{...current.metadata, 'panelLocks': locks},
-          );
-        },
-      );
-      return jsonResponse(
-        <String, Object?>{'ok': true, 'panelId': panelId, 'actorId': actorId},
-      );
-    }
-    if (method == 'DELETE') {
-      await store.updateBoard(
-        board.id,
-        (current) {
-          final locks =
-              current.metadata['panelLocks'] is Map
-                  ? Map<String, dynamic>.from(
-                    current.metadata['panelLocks'] as Map,
-                  )
-                  : <String, dynamic>{};
-          if (!locks.containsKey(panelId)) return current;
-          final next = Map<String, dynamic>.from(locks)..remove(panelId);
-          return current.copyWith(
-            metadata: <String, dynamic>{...current.metadata, 'panelLocks': next},
-          );
-        },
-      );
-      return jsonResponse(
-        <String, Object?>{'ok': true, 'panelId': panelId},
-      );
-    }
+    if (method == 'PUT') return _putPanelLock(request, board, panelId);
+    if (method == 'DELETE') return _deletePanelLock(board, panelId);
     return jsonResponse(
       <String, Object?>{'ok': false, 'error': 'method not allowed'},
       405,
+    );
+  }
+
+  Future<shelf.Response> _putPanelLock(
+    shelf.Request request,
+    RemoteBoard board,
+    String panelId,
+  ) async {
+    final body = await readJsonBody(request);
+    final actorId = (body['actorId'] as String? ?? '').trim();
+    final ttlSec = (body['ttlSec'] as num?)?.toInt() ?? 60;
+    if (actorId.isEmpty) {
+      return jsonResponse(
+        <String, Object?>{'ok': false, 'error': 'actorId required'},
+        400,
+      );
+    }
+    final now = DateTime.now().toUtc().millisecondsSinceEpoch;
+    final existing = (board.metadata['panelLocks'] as Map?)?[panelId];
+    if (existing is Map) {
+      final existingActor = existing['actorId'] as String?;
+      final existingExpires = existing['expiresAt'];
+      if (existingActor != actorId &&
+          existingExpires is int &&
+          existingExpires > now) {
+        return jsonResponse(
+          <String, Object?>{
+            'ok': false,
+            'error': 'panel locked by another actor',
+            'actorId': existingActor,
+          },
+          409,
+        );
+      }
+    }
+    final expires = now + ttlSec * 1000;
+    await store.updateBoard(
+      board.id,
+      (current) => _withPanelLock(current, panelId, actorId, expires),
+    );
+    return jsonResponse(
+      <String, Object?>{'ok': true, 'panelId': panelId, 'actorId': actorId},
+    );
+  }
+
+  Future<shelf.Response> _deletePanelLock(
+    RemoteBoard board,
+    String panelId,
+  ) async {
+    await store.updateBoard(
+      board.id,
+      (current) => _withoutPanelLock(current, panelId),
+    );
+    return jsonResponse(<String, Object?>{'ok': true, 'panelId': panelId});
+  }
+
+  static RemoteBoard _withPanelLock(
+    RemoteBoard board,
+    String panelId,
+    String actorId,
+    int expiresAt,
+  ) {
+    final locks =
+        board.metadata['panelLocks'] is Map
+            ? Map<String, dynamic>.from(board.metadata['panelLocks'] as Map)
+            : <String, dynamic>{};
+    locks[panelId] = {'actorId': actorId, 'expiresAt': expiresAt};
+    return board.copyWith(
+      metadata: <String, dynamic>{...board.metadata, 'panelLocks': locks},
+    );
+  }
+
+  static RemoteBoard _withoutPanelLock(RemoteBoard board, String panelId) {
+    final locks =
+        board.metadata['panelLocks'] is Map
+            ? Map<String, dynamic>.from(board.metadata['panelLocks'] as Map)
+            : <String, dynamic>{};
+    if (!locks.containsKey(panelId)) return board;
+    final next = Map<String, dynamic>.from(locks)..remove(panelId);
+    return board.copyWith(
+      metadata: <String, dynamic>{...board.metadata, 'panelLocks': next},
     );
   }
 
@@ -1262,63 +1277,74 @@ class YoloitdServer with ServerProcessMixin {
     String method,
     List<String> sub,
   ) async {
-    if (sub.isEmpty && method == 'GET') {
-      final ids =
-          <String>{
-              ...runs.keys,
-              ...runExitCodes.keys,
-              ...runLogs.keys,
-            }.toList()
-            ..sort();
-      return jsonResponse(<String, Object?>{
-        'runs':
-            ids
-                .map(
-                  (id) => <String, Object?>{
-                    'id': id,
-                    'running':
-                        runs.containsKey(id) || activeTaskRuns.contains(id),
-                    if (runExitCodes.containsKey(id)) 'exitCode': runExitCodes[id],
-                    'logLines': runLogs[id]?.length ?? 0,
-                  },
-                )
-                .toList(),
-      });
-    }
-    if (sub.isEmpty && method == 'POST') {
-      final body = await readJsonBody(request);
-      final command = (body['command'] as String? ?? '').trim();
-      if (command.isEmpty) {
-        return jsonResponse(<String, Object?>{
-          'ok': false,
-          'error': 'command required',
-        }, 400);
-      }
-      final id = body['id'] as String? ?? _nextId('run');
-      final process = await Process.start(
-        Platform.environment['SHELL'] ?? '/bin/sh',
-        <String>['-lc', command],
-        workingDirectory: body['cwd'] as String?,
-      );
-      runs[id] = process;
-      runLogs[id] = <String>[];
-      unawaited(collectRun(id, process));
-      return jsonResponse(
-        <String, Object?>{'ok': true, 'id': id, 'pid': process.pid},
-      );
-    }
-    if (sub.length == 2 && sub[1] == 'log' && method == 'GET') {
-      return jsonResponse(<String, Object?>{
-        'id': sub[0],
-        'lines': runLogs[sub[0]] ?? const <String>[],
-      });
-    }
-    if (sub.length == 2 && sub[1] == 'stop' && method == 'POST') {
-      final process = runs.remove(sub[0]);
-      final ok = process?.kill() ?? false;
-      return jsonResponse(<String, Object?>{'ok': ok});
-    }
+    final response = await _dispatch(method, sub, <_RouteEntry>[
+      _RouteEntry('GET', const <String?>[], _listRuns),
+      _RouteEntry('POST', const <String?>[], () => _startRun(request)),
+      _RouteEntry('GET', const <String?>[null, 'log'], () => _runLog(sub[0])),
+      _RouteEntry('POST', const <String?>[null, 'stop'], () => _stopRun(sub[0])),
+    ]);
+    if (response != null) return response;
     return jsonResponse(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
+  }
+
+  Future<shelf.Response> _listRuns() async {
+    final ids =
+        <String>{
+            ...runs.keys,
+            ...runExitCodes.keys,
+            ...runLogs.keys,
+          }.toList()
+          ..sort();
+    return jsonResponse(<String, Object?>{
+      'runs':
+          ids
+              .map(
+                (id) => <String, Object?>{
+                  'id': id,
+                  'running':
+                      runs.containsKey(id) || activeTaskRuns.contains(id),
+                  if (runExitCodes.containsKey(id)) 'exitCode': runExitCodes[id],
+                  'logLines': runLogs[id]?.length ?? 0,
+                },
+              )
+              .toList(),
+    });
+  }
+
+  Future<shelf.Response> _startRun(shelf.Request request) async {
+    final body = await readJsonBody(request);
+    final command = (body['command'] as String? ?? '').trim();
+    if (command.isEmpty) {
+      return jsonResponse(<String, Object?>{
+        'ok': false,
+        'error': 'command required',
+      }, 400);
+    }
+    final id = body['id'] as String? ?? _nextId('run');
+    final process = await Process.start(
+      Platform.environment['SHELL'] ?? '/bin/sh',
+      <String>['-lc', command],
+      workingDirectory: body['cwd'] as String?,
+    );
+    runs[id] = process;
+    runLogs[id] = <String>[];
+    unawaited(collectRun(id, process));
+    return jsonResponse(
+      <String, Object?>{'ok': true, 'id': id, 'pid': process.pid},
+    );
+  }
+
+  Future<shelf.Response> _runLog(String runId) async {
+    return jsonResponse(<String, Object?>{
+      'id': runId,
+      'lines': runLogs[runId] ?? const <String>[],
+    });
+  }
+
+  Future<shelf.Response> _stopRun(String runId) async {
+    final process = runs.remove(runId);
+    final ok = process?.kill() ?? false;
+    return jsonResponse(<String, Object?>{'ok': ok});
   }
 
   Future<shelf.Response> _handleSetup(

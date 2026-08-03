@@ -17,12 +17,19 @@ import 'package:yoloit/core/session/session_prefs.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/editor/bloc/file_editor_cubit.dart';
 import 'package:yoloit/features/editor/bloc/file_editor_state.dart';
-import 'package:yoloit/features/editor/utils/editor_language_registry.dart';
 import 'package:yoloit/features/editor/ui/widgets/search_replace_bar.dart';
+import 'package:yoloit/features/editor/utils/editor_language_registry.dart';
+import 'package:yoloit/features/editor/utils/editor_panel_logic.dart';
 import 'package:yoloit/features/editor/utils/file_type_utils.dart';
 import 'package:yoloit/features/preview/widgets/markdown_document_preview.dart';
 import 'package:yoloit/features/review/models/review_models.dart';
 import 'package:yoloit/ui/components/typography/caption.dart';
+
+/// Test seam for [FileEditorPanel]'s format action — spawns `dart format`.
+/// Matches the repo's `ProcessRunner` idiom and is replaced by a fake in tests.
+@visibleForTesting
+Future<ProcessResult> Function(String executable, List<String> arguments)
+formatDocumentProcessRunner = Process.run;
 
 class FileEditorPanel extends StatefulWidget {
   const FileEditorPanel({
@@ -104,24 +111,10 @@ class _FileEditorPanelState extends State<FileEditorPanel>
     return spec.mode;
   }
 
-  static const int _kLargeFileLineThreshold = 3000;
-  static const int _kLargeFileByteThreshold = 100 * 1024;
-
-  static bool _isLargeFile(String? content) {
-    if (content == null) return false;
-    if (content.length > _kLargeFileByteThreshold) return true;
-    var lines = 0;
-    for (var i = 0; i < content.length; i++) {
-      if (content[i] == '\n') lines++;
-      if (lines > _kLargeFileLineThreshold) return true;
-    }
-    return false;
-  }
-
   /// Returns the controller for [tab], creating it if needed.
   CodeController _controllerFor(EditorTab tab, BuildContext context) {
     if (!_controllers.containsKey(tab.filePath)) {
-      final large = _isLargeFile(tab.content);
+      final large = isLargeEditorFile(tab.content);
       final ctrl = CodeController(
         text: tab.content ?? '',
         // Disable syntax highlighting for large files — the highlight package
@@ -170,8 +163,9 @@ class _FileEditorPanelState extends State<FileEditorPanel>
   /// Dispose controllers for tabs that are no longer open.
   void _cleanupControllers(List<EditorTab> openTabs) {
     final openPaths = openTabs.map((t) => t.filePath).toSet();
-    final toRemove =
-        _controllers.keys.where((p) => !openPaths.contains(p)).toList();
+    final toRemove = _controllers.keys
+        .where((p) => !openPaths.contains(p))
+        .toList();
     for (final path in toRemove) {
       _controllers.remove(path)?.dispose();
       _loadedContent.remove(path);
@@ -208,7 +202,7 @@ class _FileEditorPanelState extends State<FileEditorPanel>
   /// Only create controller when content is available (not during loading).
   CodeController? _activeController(EditorTab activeTab, BuildContext context) {
     if (!activeTab.isDiff &&
-        !_isImage(activeTab.filePath) &&
+        !isEditorImagePath(activeTab.filePath) &&
         !activeTab.isLoading) {
       return _controllerFor(activeTab, context);
     }
@@ -229,7 +223,7 @@ class _FileEditorPanelState extends State<FileEditorPanel>
     if (_seenPaths.contains(path)) return;
     _seenPaths.add(path);
     if (!_previewPaths.contains(path) &&
-        (_isMarkdown(path) || _isSvg(path) || _isImage(path))) {
+        (isMarkdownPath(path) || isSvgPath(path) || isEditorImagePath(path))) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           setState(() => _previewPaths.add(path));
@@ -243,17 +237,17 @@ class _FileEditorPanelState extends State<FileEditorPanel>
     return _editorReady &&
         !activeTab.isDiff &&
         !activeTab.isLoading &&
-        !_isImage(activeTab.filePath) &&
-        (_isMarkdown(activeTab.filePath) || _isSvg(activeTab.filePath));
+        !isEditorImagePath(activeTab.filePath) &&
+        (isMarkdownPath(activeTab.filePath) || isSvgPath(activeTab.filePath));
   }
 
   bool _isVisualPreviewFor(EditorTab activeTab) {
     return !activeTab.isLoading &&
         !activeTab.isDiff &&
-        (_isImage(activeTab.filePath) ||
-            _isSvg(activeTab.filePath) ||
-            _isMarkdown(activeTab.filePath)) &&
-        (_isImage(activeTab.filePath) ||
+        (isEditorImagePath(activeTab.filePath) ||
+            isSvgPath(activeTab.filePath) ||
+            isMarkdownPath(activeTab.filePath)) &&
+        (isEditorImagePath(activeTab.filePath) ||
             _previewPaths.contains(activeTab.filePath));
   }
 
@@ -287,7 +281,9 @@ class _FileEditorPanelState extends State<FileEditorPanel>
               if (!immersive) _toggleBarOverlay(activeTab, toggleVisible),
               if (immersive && widget.onToggleImmersive != null)
                 _exitImmersiveOverlay(),
-              if (!immersive && isVisualPreview && widget.onToggleImmersive != null)
+              if (!immersive &&
+                  isVisualPreview &&
+                  widget.onToggleImmersive != null)
                 _enterImmersiveOverlay(),
             ],
           ),
@@ -303,19 +299,19 @@ class _FileEditorPanelState extends State<FileEditorPanel>
         ? _ErrorView(message: activeTab.error!)
         : activeTab.isDiff
         ? _DiffBody(tab: activeTab)
-        : _isImage(activeTab.filePath)
+        : isEditorImagePath(activeTab.filePath)
         ? _ImagePreview(filePath: activeTab.filePath)
         : _previewPaths.contains(activeTab.filePath)
-        ? (_isSvg(activeTab.filePath)
-            ? _SvgPreview(filePath: activeTab.filePath)
-            : _MarkdownPreview(content: activeTab.content ?? ''))
+        ? (isSvgPath(activeTab.filePath)
+              ? _SvgPreview(filePath: activeTab.filePath)
+              : _MarkdownPreview(content: activeTab.content ?? ''))
         : _EditorBody(
-          key: ValueKey(activeTab.filePath),
-          tab: activeTab,
-          codeController: controller!,
-          fontSizeNotifier: _fontSizeNotifier,
-          isLargeFile: _isLargeFile(activeTab.content),
-        );
+            key: ValueKey(activeTab.filePath),
+            tab: activeTab,
+            codeController: controller!,
+            fontSizeNotifier: _fontSizeNotifier,
+            isLargeFile: isLargeEditorFile(activeTab.content),
+          );
   }
 
   Widget _toggleBarOverlay(EditorTab activeTab, bool toggleVisible) {
@@ -327,16 +323,15 @@ class _FileEditorPanelState extends State<FileEditorPanel>
         visible: toggleVisible,
         child: _MarkdownToggleBar(
           isPreview: _previewPaths.contains(activeTab.filePath),
-          onToggle:
-              () => setState(() {
-                final path = activeTab.filePath;
-                if (_previewPaths.contains(path)) {
-                  _previewPaths.remove(path);
-                } else {
-                  _previewPaths.add(path);
-                }
-                SessionPrefs.savePreviewPaths(_previewPaths.toList());
-              }),
+          onToggle: () => setState(() {
+            final path = activeTab.filePath;
+            if (_previewPaths.contains(path)) {
+              _previewPaths.remove(path);
+            } else {
+              _previewPaths.add(path);
+            }
+            SessionPrefs.savePreviewPaths(_previewPaths.toList());
+          }),
         ),
       ),
     );
@@ -382,27 +377,6 @@ class _FileEditorPanelState extends State<FileEditorPanel>
       ),
     );
   }
-
-  static bool _isMarkdown(String filePath) {
-    final ext = filePath.split('.').last.toLowerCase();
-    return ext == 'md' || ext == 'mdx' || ext == 'markdown';
-  }
-
-  static bool _isImage(String filePath) {
-    final ext = filePath.split('.').last.toLowerCase();
-    return const {
-      'png',
-      'jpg',
-      'jpeg',
-      'gif',
-      'webp',
-      'bmp',
-      'ico',
-    }.contains(ext);
-  }
-
-  static bool _isSvg(String filePath) =>
-      filePath.split('.').last.toLowerCase() == 'svg';
 }
 
 // ── Animated wrapper for the markdown toggle bar ───────────────────────────
@@ -589,14 +563,14 @@ class _ImmersiveButtonState extends State<_ImmersiveButton> {
             width: 26,
             height: 26,
             decoration: BoxDecoration(
-              color:
-                  _hovered
-                      ? colors.surfaceHighlight
-                      : colors.surface.withAlpha(0xCC),
+              color: _hovered
+                  ? colors.surfaceHighlight
+                  : colors.surface.withAlpha(0xCC),
               borderRadius: BorderRadius.circular(6),
               border: Border.all(
-                color:
-                    _hovered ? colors.primary : colors.primary.withAlpha(0x40),
+                color: _hovered
+                    ? colors.primary
+                    : colors.primary.withAlpha(0x40),
               ),
             ),
             child: Icon(
@@ -679,17 +653,16 @@ class _ImagePreview extends StatelessWidget {
                 child: Image.file(
                   File(filePath),
                   gaplessPlayback: true,
-                  errorBuilder:
-                      (context, error, stackTrace) => Center(
-                        child: Text(
-                          'Cannot load image',
-                          style: TextStyle(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurface.withAlpha(120),
-                          ),
-                        ),
+                  errorBuilder: (context, error, stackTrace) => Center(
+                    child: Text(
+                      'Cannot load image',
+                      style: TextStyle(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withAlpha(120),
                       ),
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -744,15 +717,14 @@ class _TabBar extends StatelessWidget {
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
               itemCount: state.tabs.length,
-              itemBuilder:
-                  (context, i) => _Tab(
-                    tab: state.tabs[i],
-                    isActive: i == state.activeIndex,
-                    onTap: () => context.read<FileEditorCubit>().switchTab(i),
-                    onClose: () => context.read<FileEditorCubit>().closeTab(i),
-                    onCloseOthers:
-                        () => context.read<FileEditorCubit>().closeOthers(i),
-                  ),
+              itemBuilder: (context, i) => _Tab(
+                tab: state.tabs[i],
+                isActive: i == state.activeIndex,
+                onTap: () => context.read<FileEditorCubit>().switchTab(i),
+                onClose: () => context.read<FileEditorCubit>().closeTab(i),
+                onCloseOthers: () =>
+                    context.read<FileEditorCubit>().closeOthers(i),
+              ),
             ),
           ),
         ],
@@ -826,12 +798,12 @@ class _TabState extends State<_Tab> {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    final fileInfo =
-        widget.tab.isDiff ? null : FileTypeUtils.forPath(widget.tab.filePath);
-    final displayName =
-        widget.tab.isDiff
-            ? '${widget.tab.filePath.replaceFirst('diff:', '').split('/').last} (diff)'
-            : widget.tab.fileName;
+    final fileInfo = widget.tab.isDiff
+        ? null
+        : FileTypeUtils.forPath(widget.tab.filePath);
+    final displayName = widget.tab.isDiff
+        ? '${widget.tab.filePath.replaceFirst('diff:', '').split('/').last} (diff)'
+        : widget.tab.fileName;
 
     // Close button is placed OUTSIDE the tap-to-switch GestureDetector so
     // clicking × closes the tab instead of switching to it.
@@ -854,8 +826,9 @@ class _TabState extends State<_Tab> {
                 color: widget.isActive ? colors.background : Colors.transparent,
                 border: Border(
                   bottom: BorderSide(
-                    color:
-                        widget.isActive ? colors.primary : Colors.transparent,
+                    color: widget.isActive
+                        ? colors.primary
+                        : Colors.transparent,
                     width: 2,
                   ),
                 ),
@@ -866,29 +839,24 @@ class _TabState extends State<_Tab> {
                   Icon(
                     widget.tab.isDiff ? Icons.difference : fileInfo!.icon,
                     size: 12,
-                    color:
-                        widget.tab.isDiff
-                            ? Theme.of(
-                              context,
-                            ).colorScheme.onSurface.withAlpha(120)
-                            : fileInfo!.color,
+                    color: widget.tab.isDiff
+                        ? Theme.of(context).colorScheme.onSurface.withAlpha(120)
+                        : fileInfo!.color,
                   ),
                   const SizedBox(width: 5),
                   Flexible(
                     child: Text(
                       displayName,
                       style: TextStyle(
-                        color:
-                            widget.isActive
-                                ? colors.primaryLight
-                                : Theme.of(
-                                  context,
-                                ).colorScheme.onSurface.withAlpha(120),
+                        color: widget.isActive
+                            ? colors.primaryLight
+                            : Theme.of(
+                                context,
+                              ).colorScheme.onSurface.withAlpha(120),
                         fontSize: 12,
-                        fontWeight:
-                            widget.isActive
-                                ? FontWeight.w600
-                                : FontWeight.normal,
+                        fontWeight: widget.isActive
+                            ? FontWeight.w600
+                            : FontWeight.normal,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -930,19 +898,17 @@ class _TabCloseButtonState extends State<_TabCloseButton> {
           width: 16,
           height: 16,
           decoration: BoxDecoration(
-            color:
-                _hovering
-                    ? context.appColors.textPrimary.withAlpha(30)
-                    : Colors.transparent,
+            color: _hovering
+                ? context.appColors.textPrimary.withAlpha(30)
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(3),
           ),
           child: Icon(
             Icons.close,
             size: 11,
-            color:
-                _hovering
-                    ? Theme.of(context).colorScheme.onSurface
-                    : Theme.of(context).colorScheme.onSurface.withAlpha(180),
+            color: _hovering
+                ? Theme.of(context).colorScheme.onSurface
+                : Theme.of(context).colorScheme.onSurface.withAlpha(180),
           ),
         ),
       ),
@@ -986,7 +952,11 @@ class _LargeFileBanner extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       child: Row(
         children: [
-          Icon(Icons.warning_amber_rounded, size: 14, color: colors.accentOrange),
+          Icon(
+            Icons.warning_amber_rounded,
+            size: 14,
+            color: colors.accentOrange,
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -1039,7 +1009,7 @@ class _EditorBodyState extends State<_EditorBody> {
   TextEditingValue? _lastValue;
 
   // ── Git gutter ───────────────────────────────────────────────────────────
-  Map<int, _GutterMarkerType> _gitMarkers = {};
+  Map<int, GutterMarkerType> _gitMarkers = {};
   final ValueNotifier<double> _codeScrollOffset = ValueNotifier(0);
 
   late final Map<ShortcutActivator, VoidCallback> _shortcutBindings = {
@@ -1057,8 +1027,8 @@ class _EditorBodyState extends State<_EditorBody> {
         _indentLine,
     const SingleActivator(LogicalKeyboardKey.bracketLeft, meta: true):
         _outdentLine,
-    const SingleActivator(LogicalKeyboardKey.keyG, meta: true):
-        () => _showGoToLine(context),
+    const SingleActivator(LogicalKeyboardKey.keyG, meta: true): () =>
+        _showGoToLine(context),
     const SingleActivator(LogicalKeyboardKey.keyF, meta: true, shift: true):
         _formatDocument,
     const SingleActivator(LogicalKeyboardKey.keyO, meta: true, shift: true):
@@ -1123,39 +1093,25 @@ class _EditorBodyState extends State<_EditorBody> {
     _lastValue = cur;
 
     if (prev == null) return;
-    if (!cur.selection.isCollapsed) return;
-    if (cur.text.length != prev.text.length + 1) return;
-
-    final pos = cur.selection.baseOffset;
-    if (pos < 1) return;
-    final ch = cur.text[pos - 1];
-    final closing = _closingBracket(ch);
-    if (closing == null) return;
-
-    // Don't double-close when next char is already the closer.
-    final nextCh = pos < cur.text.length ? cur.text[pos] : '';
-    if (nextCh == closing) return;
+    final paired = applyAutoPair(
+      prevText: prev.text,
+      curText: cur.text,
+      selectionCollapsed: cur.selection.isCollapsed,
+      cursorPos: cur.selection.baseOffset,
+    );
+    if (paired == null) return;
 
     _suppressPairInsert = true;
     try {
-      final newText =
-          cur.text.substring(0, pos) + closing + cur.text.substring(pos);
       widget.codeController.value = TextEditingValue(
-        text: newText,
-        selection: TextSelection.collapsed(offset: pos),
+        text: paired.text,
+        selection: TextSelection.collapsed(offset: paired.cursor),
       );
       _lastValue = widget.codeController.value;
     } finally {
       _suppressPairInsert = false;
     }
   }
-
-  static String? _closingBracket(String ch) => switch (ch) {
-    '(' => ')',
-    '[' => ']',
-    '{' => '}',
-    _ => null,
-  };
 
   // ── Git gutter ───────────────────────────────────────────────────────────
 
@@ -1168,34 +1124,9 @@ class _EditorBodyState extends State<_EditorBody> {
         widget.tab.filePath,
       );
       if (mounted && diff.isNotEmpty) {
-        setState(() => _gitMarkers = _parseDiffMarkers(diff));
+        setState(() => _gitMarkers = parseDiffMarkers(diff));
       }
     } catch (_) {}
-  }
-
-  /// Parses unified diff output into a line-number → marker type map.
-  static Map<int, _GutterMarkerType> _parseDiffMarkers(String diff) {
-    final result = <int, _GutterMarkerType>{};
-    int newLine = 0;
-
-    for (final line in diff.split('\n')) {
-      if (line.startsWith('@@')) {
-        final match = RegExp(r'\+(\d+)').firstMatch(line);
-        if (match != null) newLine = int.parse(match.group(1)!) - 1;
-      } else if (line.startsWith('+') && !line.startsWith('+++')) {
-        newLine++;
-        result[newLine] = _GutterMarkerType.added;
-      } else if (line.startsWith('-') && !line.startsWith('---')) {
-        // Removed line — mark the next new-file line as a deletion indicator.
-        final nextLine = newLine + 1;
-        if (!result.containsKey(nextLine)) {
-          result[nextLine] = _GutterMarkerType.removed;
-        }
-      } else if (!line.startsWith('\\')) {
-        newLine++;
-      }
-    }
-    return result;
   }
 
   // ── Language helpers ────────────────────────────────────────────────────
@@ -1204,13 +1135,6 @@ class _EditorBodyState extends State<_EditorBody> {
 
   static String _commentPrefix(String filePath) {
     return EditorLanguageRegistry.forPath(filePath).commentPrefix;
-  }
-
-  // ── Line helpers ────────────────────────────────────────────────────────
-  ({int start, int end}) _lineRange(String text, int pos) {
-    final s = pos == 0 ? 0 : text.lastIndexOf('\n', pos - 1) + 1;
-    final rawEnd = text.indexOf('\n', pos);
-    return (start: s, end: rawEnd == -1 ? text.length : rawEnd);
   }
 
   // ── Find & replace ──────────────────────────────────────────────────────
@@ -1289,35 +1213,20 @@ class _EditorBodyState extends State<_EditorBody> {
   }
 
   void _updateQuickFindQuery(String query) {
-    final nextQuery = query;
     final currentSelection = widget.codeController.selection.start;
-    final searchOrigin =
-        _quickFindOffsets.isEmpty || currentSelection < 0
-            ? _quickFindOrigin
-            : currentSelection.clamp(0, widget.codeController.text.length);
-    final offsets = <int>[];
-    if (nextQuery.isNotEmpty) {
-      final text = widget.codeController.text.toLowerCase();
-      final needle = nextQuery.toLowerCase();
-      var start = 0;
-      while (true) {
-        final index = text.indexOf(needle, start);
-        if (index == -1) break;
-        offsets.add(index);
-        start = index + 1;
-      }
-    }
-
-    var current = 0;
-    if (offsets.isNotEmpty) {
-      final nearest = offsets.indexWhere((offset) => offset >= searchOrigin);
-      current = nearest == -1 ? 0 : nearest;
-    }
+    final searchOrigin = _quickFindOffsets.isEmpty || currentSelection < 0
+        ? _quickFindOrigin
+        : currentSelection.clamp(0, widget.codeController.text.length);
+    final matches = computeQuickFindMatches(
+      text: widget.codeController.text,
+      query: query,
+      searchOrigin: searchOrigin,
+    );
 
     setState(() {
-      _quickFindQuery = nextQuery;
-      _quickFindOffsets = offsets;
-      _quickFindCurrent = current;
+      _quickFindQuery = query;
+      _quickFindOffsets = matches.offsets;
+      _quickFindCurrent = matches.current;
     });
     _selectQuickFindCurrent();
   }
@@ -1347,11 +1256,11 @@ class _EditorBodyState extends State<_EditorBody> {
     widget.codeController.fullSearchResult = SearchResult(matches: matches);
     widget.codeController.searchController.navigationController.value =
         matches.isEmpty
-            ? SearchNavigationState.noMatches
-            : SearchNavigationState(
-              totalMatchCount: matches.length,
-              currentMatchIndex: _quickFindCurrent,
-            );
+        ? SearchNavigationState.noMatches
+        : SearchNavigationState(
+            totalMatchCount: matches.length,
+            currentMatchIndex: _quickFindCurrent,
+          );
   }
 
   void _clearQuickFindSearchResult({
@@ -1433,14 +1342,10 @@ class _EditorBodyState extends State<_EditorBody> {
 
   late final Map<LogicalKeyboardKey, void Function()> _quickFindKeyActions = {
     LogicalKeyboardKey.escape: _closeQuickFind,
-    LogicalKeyboardKey.arrowLeft:
-        () => _closeQuickFind(
-          selection: _QuickFindCloseSelection.collapsedStart,
-        ),
-    LogicalKeyboardKey.arrowRight:
-        () => _closeQuickFind(
-          selection: _QuickFindCloseSelection.collapsedEnd,
-        ),
+    LogicalKeyboardKey.arrowLeft: () =>
+        _closeQuickFind(selection: _QuickFindCloseSelection.collapsedStart),
+    LogicalKeyboardKey.arrowRight: () =>
+        _closeQuickFind(selection: _QuickFindCloseSelection.collapsedEnd),
     LogicalKeyboardKey.arrowDown: _quickFindNext,
     LogicalKeyboardKey.enter: _quickFindNext,
     LogicalKeyboardKey.arrowUp: _quickFindPrev,
@@ -1456,16 +1361,17 @@ class _EditorBodyState extends State<_EditorBody> {
   }
 
   bool _handleQuickFindCharacter(KeyEvent event) {
-    if (HardwareKeyboard.instance.isMetaPressed ||
+    final modifierPressed =
+        HardwareKeyboard.instance.isMetaPressed ||
         HardwareKeyboard.instance.isControlPressed ||
-        HardwareKeyboard.instance.isAltPressed) {
+        HardwareKeyboard.instance.isAltPressed;
+    if (!shouldAcceptQuickFindCharacter(
+      modifierPressed: modifierPressed,
+      character: event.character,
+    )) {
       return false;
     }
-    final ch = event.character;
-    if (ch == null || ch.isEmpty || ch.codeUnits.any((u) => u < 0x20)) {
-      return false;
-    }
-    _updateQuickFindQuery(_quickFindQuery + ch);
+    _updateQuickFindQuery(_quickFindQuery + event.character!);
     return true;
   }
 
@@ -1476,10 +1382,9 @@ class _EditorBodyState extends State<_EditorBody> {
 
     final controller = searchController.settingsController.patternController;
     final value = controller.value;
-    final selection =
-        value.selection.isValid
-            ? value.selection
-            : TextSelection.collapsed(offset: value.text.length);
+    final selection = value.selection.isValid
+        ? value.selection
+        : TextSelection.collapsed(offset: value.text.length);
     final start = selection.start.clamp(0, value.text.length);
     final end = selection.end.clamp(0, value.text.length);
     final nextText = value.text.replaceRange(start, end, ch);
@@ -1493,165 +1398,88 @@ class _EditorBodyState extends State<_EditorBody> {
 
   bool _shouldIgnoreTypeahead(KeyEvent event) {
     final searchController = widget.codeController.searchController;
-    if (!searchController.shouldShow ||
-        searchController.patternFocusNode.hasFocus) {
-      return true;
-    }
-    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return true;
-    if (HardwareKeyboard.instance.isMetaPressed ||
+    final modifierPressed =
+        HardwareKeyboard.instance.isMetaPressed ||
         HardwareKeyboard.instance.isControlPressed ||
-        HardwareKeyboard.instance.isAltPressed) {
-      return true;
-    }
-    final ch = event.character;
-    return ch == null || ch.isEmpty || ch.codeUnits.any((u) => u < 0x20);
+        HardwareKeyboard.instance.isAltPressed;
+    return shouldIgnoreTypeahead(
+      searchVisible: searchController.shouldShow,
+      patternFocused: searchController.patternFocusNode.hasFocus,
+      isKeyDownOrRepeat: event is KeyDownEvent || event is KeyRepeatEvent,
+      modifierPressed: modifierPressed,
+      character: event.character,
+    );
   }
 
   // ── Text editing helpers ────────────────────────────────────────────────
   void _toggleComment() {
     final ctrl = widget.codeController;
-    final text = ctrl.text;
-    final sel = ctrl.selection;
-    final r = _lineRange(text, sel.start);
-    final lineContent = text.substring(r.start, r.end);
-    final prefix = _commentPrefix(widget.tab.filePath);
-    final trimmed = lineContent.trimLeft();
-    final indent = lineContent.length - trimmed.length;
-    String newLine;
-    int delta;
-    if (trimmed.startsWith(prefix)) {
-      newLine =
-          lineContent.substring(0, indent) + trimmed.substring(prefix.length);
-      delta = -prefix.length;
-    } else {
-      newLine = lineContent.substring(0, indent) + prefix + trimmed;
-      delta = prefix.length;
-    }
-    final newText =
-        text.substring(0, r.start) + newLine + text.substring(r.end);
+    final result = toggleCommentLine(
+      ctrl.text,
+      ctrl.selection.start,
+      _commentPrefix(widget.tab.filePath),
+    );
     ctrl.value = TextEditingValue(
-      text: newText,
-      selection: TextSelection.collapsed(
-        offset: (sel.start + delta).clamp(r.start, r.start + newLine.length),
-      ),
+      text: result.text,
+      selection: TextSelection.collapsed(offset: result.cursor),
     );
   }
 
   void _duplicateLine() {
     final ctrl = widget.codeController;
-    final text = ctrl.text;
-    final r = _lineRange(text, ctrl.selection.start);
-    final lineContent = text.substring(r.start, r.end);
-    final newText =
-        '${text.substring(0, r.end)}\n$lineContent${text.substring(r.end)}';
+    final result = duplicateLineInText(ctrl.text, ctrl.selection.start);
     ctrl.value = TextEditingValue(
-      text: newText,
-      selection: TextSelection.collapsed(
-        offset: r.end + 1 + (ctrl.selection.start - r.start),
-      ),
+      text: result.text,
+      selection: TextSelection.collapsed(offset: result.cursor),
     );
   }
 
   void _deleteLine() {
     final ctrl = widget.codeController;
-    final text = ctrl.text;
-    final r = _lineRange(text, ctrl.selection.start);
-    String newText;
-    int newCursor;
-    if (r.end < text.length) {
-      newText = text.substring(0, r.start) + text.substring(r.end + 1);
-      newCursor = r.start;
-    } else if (r.start > 0) {
-      newText = text.substring(0, r.start - 1);
-      newCursor = r.start - 1;
-    } else {
-      return;
-    }
+    final result = deleteLineInText(ctrl.text, ctrl.selection.start);
+    if (result == null) return;
     ctrl.value = TextEditingValue(
-      text: newText,
-      selection: TextSelection.collapsed(
-        offset: newCursor.clamp(0, newText.length),
-      ),
+      text: result.text,
+      selection: TextSelection.collapsed(offset: result.cursor),
     );
   }
 
   void _moveLineUp() {
     final ctrl = widget.codeController;
-    final text = ctrl.text;
-    final r = _lineRange(text, ctrl.selection.start);
-    if (r.start == 0) return;
-    final prev = _lineRange(text, r.start - 1);
-    final cur = text.substring(r.start, r.end);
-    final above = text.substring(prev.start, prev.end);
-    final before = text.substring(0, prev.start);
-    final after = r.end < text.length ? text.substring(r.end) : '';
-    final newText = '$before$cur\n$above$after';
-    final off = ctrl.selection.start - r.start;
+    final result = moveLineUpInText(ctrl.text, ctrl.selection.start);
+    if (result == null) return;
     ctrl.value = TextEditingValue(
-      text: newText,
-      selection: TextSelection.collapsed(
-        offset: prev.start + off.clamp(0, cur.length),
-      ),
+      text: result.text,
+      selection: TextSelection.collapsed(offset: result.cursor),
     );
   }
 
   void _moveLineDown() {
     final ctrl = widget.codeController;
-    final text = ctrl.text;
-    final r = _lineRange(text, ctrl.selection.start);
-    if (r.end >= text.length) return;
-    final next = _lineRange(text, r.end + 1);
-    final cur = text.substring(r.start, r.end);
-    final below = text.substring(next.start, next.end);
-    final before = text.substring(0, r.start);
-    final after = next.end < text.length ? text.substring(next.end) : '';
-    final newText = '$before$below\n$cur$after';
-    final off = ctrl.selection.start - r.start;
-    final newLineStart = r.start + below.length + 1;
+    final result = moveLineDownInText(ctrl.text, ctrl.selection.start);
+    if (result == null) return;
     ctrl.value = TextEditingValue(
-      text: newText,
-      selection: TextSelection.collapsed(
-        offset: newLineStart + off.clamp(0, cur.length),
-      ),
+      text: result.text,
+      selection: TextSelection.collapsed(offset: result.cursor),
     );
   }
 
   void _indentLine() {
     final ctrl = widget.codeController;
-    final text = ctrl.text;
-    final r = _lineRange(text, ctrl.selection.start);
-    const sp = '  ';
+    final result = indentLineInText(ctrl.text, ctrl.selection.start);
     ctrl.value = TextEditingValue(
-      text: text.substring(0, r.start) + sp + text.substring(r.start),
-      selection: TextSelection.collapsed(
-        offset: ctrl.selection.start + sp.length,
-      ),
+      text: result.text,
+      selection: TextSelection.collapsed(offset: result.cursor),
     );
   }
 
   void _outdentLine() {
     final ctrl = widget.codeController;
-    final text = ctrl.text;
-    final r = _lineRange(text, ctrl.selection.start);
-    final line = text.substring(r.start, r.end);
-    final strip =
-        line.startsWith('  ')
-            ? 2
-            : line.startsWith(' ')
-            ? 1
-            : 0;
-    if (strip == 0) return;
+    final result = outdentLineInText(ctrl.text, ctrl.selection.start);
+    if (result == null) return;
     ctrl.value = TextEditingValue(
-      text:
-          text.substring(0, r.start) +
-          line.substring(strip) +
-          text.substring(r.end),
-      selection: TextSelection.collapsed(
-        offset: (ctrl.selection.start - strip).clamp(
-          r.start,
-          text.length - strip,
-        ),
-      ),
+      text: result.text,
+      selection: TextSelection.collapsed(offset: result.cursor),
     );
   }
 
@@ -1660,7 +1488,11 @@ class _EditorBodyState extends State<_EditorBody> {
     final path = widget.tab.filePath;
     if (!path.endsWith('.dart')) return;
     try {
-      final result = await Process.run('dart', ['format', '--fix', path]);
+      final result = await formatDocumentProcessRunner('dart', [
+        'format',
+        '--fix',
+        path,
+      ]);
       if (result.exitCode == 0 && mounted) {
         final newContent = await File(path).readAsString();
         if (!mounted) return;
@@ -1743,13 +1575,8 @@ class _EditorBodyState extends State<_EditorBody> {
   }
 
   void _jumpToLine(CodeController ctrl, int lineNumber) {
-    final lines = ctrl.text.split('\n');
-    int offset = 0;
-    for (int i = 0; i < lineNumber - 1 && i < lines.length; i++) {
-      offset += lines[i].length + 1;
-    }
     ctrl.selection = TextSelection.collapsed(
-      offset: offset.clamp(0, ctrl.text.length),
+      offset: lineStartOffset(ctrl.text, lineNumber),
     );
   }
 
@@ -1767,12 +1594,10 @@ class _EditorBodyState extends State<_EditorBody> {
       child: Focus(
         focusNode: _editorFocus,
         descendantsAreFocusable: !_showQuickFind,
-        onKeyEvent:
-            (_, event) =>
-                _handleQuickFindKey(event) ||
-                        _handleNativeSearchTypeahead(event)
-                    ? KeyEventResult.handled
-                    : KeyEventResult.ignored,
+        onKeyEvent: (_, event) =>
+            _handleQuickFindKey(event) || _handleNativeSearchTypeahead(event)
+            ? KeyEventResult.handled
+            : KeyEventResult.ignored,
         child: Column(
           children: [
             _EditorToolbar(
@@ -1852,15 +1677,11 @@ class _EditorBodyState extends State<_EditorBody> {
         Expanded(
           child: ValueListenableBuilder<double>(
             valueListenable: widget.fontSizeNotifier,
-            builder:
-                (context, fontSize, _) =>
-                    _buildCodeScrollArea(context, colors, fontSize),
+            builder: (context, fontSize, _) =>
+                _buildCodeScrollArea(context, colors, fontSize),
           ),
         ),
-        _EditorStatusBar(
-          controller: widget.codeController,
-          language: language,
-        ),
+        _EditorStatusBar(controller: widget.codeController, language: language),
       ],
     );
   }
@@ -1992,8 +1813,6 @@ class _EditorBodyState extends State<_EditorBody> {
 
 // ── Git gutter types & painter ────────────────────────────────────────────────
 
-enum _GutterMarkerType { added, removed }
-
 class _GitGutterPainter extends StatelessWidget {
   const _GitGutterPainter({
     required this.markers,
@@ -2001,7 +1820,7 @@ class _GitGutterPainter extends StatelessWidget {
     required this.scrollOffset,
   });
 
-  final Map<int, _GutterMarkerType> markers;
+  final Map<int, GutterMarkerType> markers;
   final double lineHeight;
   final double scrollOffset;
 
@@ -2009,17 +1828,16 @@ class _GitGutterPainter extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     return LayoutBuilder(
-      builder:
-          (_, constraints) => CustomPaint(
-            size: Size(3, constraints.maxHeight),
-            painter: _GutterPaint(
-              markers: markers,
-              lineHeight: lineHeight,
-              scrollOffset: scrollOffset,
-              addedColor: colors.diffAddText,
-              removedColor: colors.diffRemoveText,
-            ),
-          ),
+      builder: (_, constraints) => CustomPaint(
+        size: Size(3, constraints.maxHeight),
+        painter: _GutterPaint(
+          markers: markers,
+          lineHeight: lineHeight,
+          scrollOffset: scrollOffset,
+          addedColor: colors.diffAddText,
+          removedColor: colors.diffRemoveText,
+        ),
+      ),
     );
   }
 }
@@ -2033,7 +1851,7 @@ class _GutterPaint extends CustomPainter {
     required this.removedColor,
   });
 
-  final Map<int, _GutterMarkerType> markers;
+  final Map<int, GutterMarkerType> markers;
   final double lineHeight;
   final double scrollOffset;
   final Color addedColor;
@@ -2056,7 +1874,7 @@ class _GutterPaint extends CustomPainter {
           3,
           bottom.clamp(0, size.height),
         ),
-        entry.value == _GutterMarkerType.added ? addedPaint : removedPaint,
+        entry.value == GutterMarkerType.added ? addedPaint : removedPaint,
       );
     }
   }
@@ -2183,12 +2001,11 @@ class _QuickFindHint extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final hasQuery = query.isNotEmpty;
-    final status =
-        !hasQuery
-            ? ''
-            : matchCount == 0
-            ? '  no matches'
-            : '  ${currentMatch + 1}/$matchCount';
+    final status = !hasQuery
+        ? ''
+        : matchCount == 0
+        ? '  no matches'
+        : '  ${currentMatch + 1}/$matchCount';
     return DecoratedBox(
       key: const Key('editor-quick-find-hint'),
       decoration: BoxDecoration(
@@ -2207,10 +2024,9 @@ class _QuickFindHint extends StatelessWidget {
         child: Text(
           'Search for: $query$status',
           style: TextStyle(
-            color:
-                matchCount == 0 && hasQuery
-                    ? colors.statusError
-                    : colors.textPrimary,
+            color: matchCount == 0 && hasQuery
+                ? colors.statusError
+                : colors.textPrimary,
             fontSize: 12,
             fontWeight: FontWeight.w600,
           ),
@@ -2303,156 +2119,9 @@ class _SBar extends StatelessWidget {
 
 // ── Symbol outline ───────────────────────────────────────────────────────────
 
-class _OutlineSymbol {
-  const _OutlineSymbol({
-    required this.name,
-    required this.line,
-    required this.isClass,
-  });
-  final String name;
-  final int line;
-  final bool isClass;
-}
-
-// Cache key: content length + hash + path → symbols.
-// This avoids re-parsing the entire file on every build when _showOutline is true.
-final _symbolCache = <String, List<_OutlineSymbol>>{};
-
-String _symbolCacheKey(String content, String filePath) {
-  return '${content.length}:${content.hashCode}:$filePath';
-}
-
-List<_OutlineSymbol> _parseSymbols(String content, String filePath) {
-  final key = _symbolCacheKey(content, filePath);
-  final cached = _symbolCache[key];
-  if (cached != null) return cached;
-
-  final ext = filePath.split('.').last.toLowerCase();
-  final lines = content.split('\n');
-  final symbols = <_OutlineSymbol>[];
-  for (int i = 0; i < lines.length; i++) {
-    final line = lines[i];
-    final t = line.trim();
-    switch (ext) {
-      case 'dart':
-        _parseDartSymbolLine(line, t, i, symbols);
-      case 'js' || 'ts' || 'jsx' || 'tsx':
-        _parseJsSymbolLine(t, i, symbols);
-      case 'py':
-        _parsePySymbolLine(t, i, symbols);
-    }
-  }
-
-  // Trim cache if it grows too large (leak prevention).
-  if (_symbolCache.length > 50) {
-    _symbolCache.remove(_symbolCache.keys.first);
-  }
-  _symbolCache[key] = symbols;
-  return symbols;
-}
-
-void _parseDartSymbolLine(
-  String line,
-  String t,
-  int i,
-  List<_OutlineSymbol> symbols,
-) {
-  if (RegExp(
-    r'^(abstract\s+)?(?:class|enum|mixin|extension)\s+\w+',
-  ).hasMatch(t)) {
-    final m = RegExp(
-      r'(?:class|enum|mixin|extension)\s+(\w+)',
-    ).firstMatch(t);
-    if (m != null) {
-      symbols.add(
-        _OutlineSymbol(name: m.group(1)!, line: i + 1, isClass: true),
-      );
-    }
-  } else {
-    final m = RegExp(
-      r'(?:Future(?:<[^>]*>)?|Widget|void|String|int|bool|double|List|Map|dynamic)\s+(\w+)\s*[\(<]',
-    ).firstMatch(line);
-    if (m != null &&
-        ![
-          'if',
-          'for',
-          'while',
-          'switch',
-          'return',
-        ].contains(m.group(1))) {
-      symbols.add(
-        _OutlineSymbol(
-          name: '${m.group(1)!}()',
-          line: i + 1,
-          isClass: false,
-        ),
-      );
-    }
-  }
-}
-
-void _parseJsSymbolLine(String t, int i, List<_OutlineSymbol> symbols) {
-  if (t.startsWith('class ')) {
-    final m = RegExp(r'class\s+(\w+)').firstMatch(t);
-    if (m != null) {
-      symbols.add(
-        _OutlineSymbol(name: m.group(1)!, line: i + 1, isClass: true),
-      );
-    }
-  } else if (RegExp(
-    r'^(?:export\s+)?(?:async\s+)?function\s+\w+',
-  ).hasMatch(t)) {
-    final m = RegExp(r'function\s+(\w+)').firstMatch(t);
-    if (m != null) {
-      symbols.add(
-        _OutlineSymbol(
-          name: '${m.group(1)!}()',
-          line: i + 1,
-          isClass: false,
-        ),
-      );
-    }
-  } else if (RegExp(
-    r'^(?:const|let|var)\s+\w+\s*=\s*(?:async\s+)?\(',
-  ).hasMatch(t)) {
-    final m = RegExp(r'(?:const|let|var)\s+(\w+)').firstMatch(t);
-    if (m != null) {
-      symbols.add(
-        _OutlineSymbol(
-          name: '${m.group(1)!}()',
-          line: i + 1,
-          isClass: false,
-        ),
-      );
-    }
-  }
-}
-
-void _parsePySymbolLine(String t, int i, List<_OutlineSymbol> symbols) {
-  if (t.startsWith('class ')) {
-    final m = RegExp(r'class\s+(\w+)').firstMatch(t);
-    if (m != null) {
-      symbols.add(
-        _OutlineSymbol(name: m.group(1)!, line: i + 1, isClass: true),
-      );
-    }
-  } else if (t.startsWith('def ') || t.startsWith('async def ')) {
-    final m = RegExp(r'def\s+(\w+)').firstMatch(t);
-    if (m != null) {
-      symbols.add(
-        _OutlineSymbol(
-          name: '${m.group(1)!}()',
-          line: i + 1,
-          isClass: false,
-        ),
-      );
-    }
-  }
-}
-
 class _OutlineItem extends StatelessWidget {
   const _OutlineItem({required this.symbol, required this.onTap});
-  final _OutlineSymbol symbol;
+  final OutlineSymbol symbol;
   final ValueChanged<int> onTap;
 
   @override
@@ -2472,10 +2141,9 @@ class _OutlineItem extends StatelessWidget {
             Icon(
               symbol.isClass ? Icons.category_outlined : Icons.functions,
               size: 11,
-              color:
-                  symbol.isClass
-                      ? context.appColors.accentOrange
-                      : context.appColors.accentBlue,
+              color: symbol.isClass
+                  ? context.appColors.accentOrange
+                  : context.appColors.accentBlue,
             ),
             const SizedBox(width: 5),
             Expanded(
@@ -2513,7 +2181,7 @@ class _SymbolOutline extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    final symbols = _parseSymbols(content, filePath);
+    final symbols = parseOutlineSymbols(content, filePath);
     return Container(
       width: 185,
       decoration: BoxDecoration(
@@ -2542,19 +2210,13 @@ class _SymbolOutline extends StatelessWidget {
             ),
           ),
           Expanded(
-            child:
-                symbols.isEmpty
-                    ? const Center(
-                      child: Caption('No symbols'),
-                    )
-                    : ListView.builder(
-                      itemCount: symbols.length,
-                      itemBuilder:
-                          (_, i) => _OutlineItem(
-                            symbol: symbols[i],
-                            onTap: onJumpToLine,
-                          ),
-                    ),
+            child: symbols.isEmpty
+                ? const Center(child: Caption('No symbols'))
+                : ListView.builder(
+                    itemCount: symbols.length,
+                    itemBuilder: (_, i) =>
+                        _OutlineItem(symbol: symbols[i], onTap: onJumpToLine),
+                  ),
           ),
         ],
       ),
@@ -2573,7 +2235,11 @@ class _DiffEmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.difference_outlined, size: 32, color: colors.textSecondary),
+          Icon(
+            Icons.difference_outlined,
+            size: 32,
+            color: colors.textSecondary,
+          ),
           const SizedBox(height: 12),
           Text(
             'No diff available',
@@ -2584,7 +2250,10 @@ class _DiffEmptyState extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
-          Caption(filePath.replaceFirst('diff:', ''), textAlign: TextAlign.center),
+          Caption(
+            filePath.replaceFirst('diff:', ''),
+            textAlign: TextAlign.center,
+          ),
         ],
       ),
     );

@@ -52,6 +52,14 @@ class MainShell extends StatefulWidget {
 
 enum _CanvasMode { panes, board }
 
+/// Open ↔ closed toggle used by the panel hotkey actions.
+@visibleForTesting
+PanelVisibility toggledPanelVisibility(PanelVisibility current) {
+  return current == PanelVisibility.open
+      ? PanelVisibility.closed
+      : PanelVisibility.open;
+}
+
 class _MainShellState extends State<MainShell> with WindowListener {
   final _workspacePanelKey = GlobalKey<WorkspacePanelState>();
   final _terminalFocusNode = FocusNode();
@@ -284,31 +292,19 @@ class _MainShellState extends State<MainShell> with WindowListener {
       ),
       ToggleWorkspacePanelIntent: CallbackAction<ToggleWorkspacePanelIntent>(
         onInvoke: (_) {
-          final next =
-              _workspaceVis == PanelVisibility.open
-                  ? PanelVisibility.closed
-                  : PanelVisibility.open;
-          _setPanelVis('workspace', next);
+          _setPanelVis('workspace', toggledPanelVisibility(_workspaceVis));
           return null;
         },
       ),
       ToggleTerminalPanelIntent: CallbackAction<ToggleTerminalPanelIntent>(
         onInvoke: (_) {
-          final next =
-              _agentsVis == PanelVisibility.open
-                  ? PanelVisibility.closed
-                  : PanelVisibility.open;
-          _setPanelVis('agents', next);
+          _setPanelVis('agents', toggledPanelVisibility(_agentsVis));
           return null;
         },
       ),
       ToggleReviewPanelIntent: CallbackAction<ToggleReviewPanelIntent>(
         onInvoke: (_) {
-          final next =
-              _fileTreeVis == PanelVisibility.open
-                  ? PanelVisibility.closed
-                  : PanelVisibility.open;
-          _setPanelVis('filetree', next);
+          _setPanelVis('filetree', toggledPanelVisibility(_fileTreeVis));
           return null;
         },
       ),
@@ -680,7 +676,9 @@ class _FourPaneLayoutState extends State<_FourPaneLayout> {
     bool agentsCollapsed,
     double totalHeight,
   ) {
-    if (!showAgents && !agentsCollapsed) return const [];
+    if (!fourPaneAgentsSectionPresent(showAgents, agentsCollapsed)) {
+      return const [];
+    }
     return [
       Expanded(
         child: AnimatedOpacity(
@@ -900,97 +898,131 @@ class _FourPaneLayoutState extends State<_FourPaneLayout> {
     required bool showEditor,
     required bool showFileTree,
   }) {
-    if (showAgents || agentsCollapsed || showEditor || showFileTree) {
+    if (!fourPaneShowsEmptyState(
+      showAgents: showAgents,
+      agentsCollapsed: agentsCollapsed,
+      showEditor: showEditor,
+      showFileTree: showFileTree,
+    )) {
       return const [];
     }
     return [const Expanded(child: SizedBox.shrink())];
   }
 }
 
+/// The agents pane is present when it is open or collapsed into the rail.
+@visibleForTesting
+bool fourPaneAgentsSectionPresent(bool showAgents, bool agentsCollapsed) {
+  return showAgents || agentsCollapsed;
+}
+
+/// The filler pane only shows when every other pane is fully closed
+/// (a collapsed pane still occupies the activity rail).
+@visibleForTesting
+bool fourPaneShowsEmptyState({
+  required bool showAgents,
+  required bool agentsCollapsed,
+  required bool showEditor,
+  required bool showFileTree,
+}) {
+  return !showAgents && !agentsCollapsed && !showEditor && !showFileTree;
+}
+
 /// Content of the Agents panel: listens to workspace changes and hosts TerminalPanel.
 class _AgentsContent extends StatelessWidget {
   const _AgentsContent();
-
-  // Workspace switch: reinitialize terminal, run, review, editor
-  bool _workspaceListenWhen(WorkspaceState prev, WorkspaceState curr) {
-    if (curr is! WorkspaceLoaded) return false;
-    if (prev is! WorkspaceLoaded) return true;
-    return prev.activeWorkspaceId != curr.activeWorkspaceId &&
-        curr.activeWorkspaceId != null;
-  }
-
-  void _onWorkspaceChanged(BuildContext context, WorkspaceState state) {
-    if (state is! WorkspaceLoaded) return;
-    final wsId = state.activeWorkspaceId;
-    if (wsId == null) return;
-    final ws = state.workspaces.firstWhere(
-      (w) => w.id == wsId,
-      orElse: () => state.workspaces.first,
-    );
-    context.read<TerminalCubit>().setActiveWorkspace(
-      workspaceId: wsId,
-      workspacePath: ws.workspaceDir,
-      workspacePaths: ws.paths,
-    );
-    context.read<RunCubit>().loadForWorkspace(ws.path);
-    context.read<ReviewCubit>().loadWorkspace(ws.paths, workspaceId: wsId);
-    context.read<FileEditorCubit>().setWorkspace(wsId);
-  }
-
-  // Session switch: sync file tree and editor tabs to the active session
-  bool _sessionListenWhen(TerminalState prev, TerminalState curr) {
-    if (curr is! TerminalLoaded) return false;
-    if (prev is! TerminalLoaded) return true;
-    return prev.activeSession?.id != curr.activeSession?.id;
-  }
-
-  void _onSessionChanged(BuildContext context, TerminalState state) {
-    if (state is! TerminalLoaded) return;
-    final session = state.activeSession;
-    if (session == null) return;
-    final paths = _resolveSessionPaths(context, session);
-    context.read<ReviewCubit>().loadSession(paths, session.id);
-    context.read<FileEditorCubit>().setSession(session.id);
-    // Reload run configs for the session's active worktree path so
-    // each session/worktree shows its own configurations and run history.
-    if (paths.isNotEmpty) {
-      context.read<RunCubit>().loadForWorkspace(paths.first);
-    }
-  }
-
-  // Resolve file tree paths: worktreeContexts values if set, else workspace paths
-  List<String> _resolveSessionPaths(BuildContext context, AgentSession session) {
-    final worktreeContexts = session.worktreeContexts;
-    if (worktreeContexts != null && worktreeContexts.isNotEmpty) {
-      return worktreeContexts.values.toList();
-    }
-    final wsState = context.read<WorkspaceCubit>().state;
-    if (wsState is WorkspaceLoaded && wsState.activeWorkspaceId != null) {
-      final ws = wsState.workspaces.firstWhere(
-        (w) => w.id == wsState.activeWorkspaceId,
-        orElse: () => wsState.workspaces.first,
-      );
-      return ws.paths;
-    }
-    return [];
-  }
 
   @override
   Widget build(BuildContext context) {
     return MultiBlocListener(
       listeners: [
         BlocListener<WorkspaceCubit, WorkspaceState>(
-          listenWhen: _workspaceListenWhen,
-          listener: _onWorkspaceChanged,
+          listenWhen: agentsWorkspaceListenWhen,
+          listener: handleAgentWorkspaceChanged,
         ),
         BlocListener<TerminalCubit, TerminalState>(
-          listenWhen: _sessionListenWhen,
-          listener: _onSessionChanged,
+          listenWhen: agentsSessionListenWhen,
+          listener: handleAgentSessionChanged,
         ),
       ],
       child: const TerminalPanel(),
     );
   }
+}
+
+/// Workspace switch trigger: fire when a workspace becomes active or the
+/// active workspace id changes.
+@visibleForTesting
+bool agentsWorkspaceListenWhen(WorkspaceState prev, WorkspaceState curr) {
+  if (curr is! WorkspaceLoaded) return false;
+  if (prev is! WorkspaceLoaded) return true;
+  return prev.activeWorkspaceId != curr.activeWorkspaceId &&
+      curr.activeWorkspaceId != null;
+}
+
+/// Session switch trigger: fire on the first loaded state and whenever the
+/// active session id changes.
+@visibleForTesting
+bool agentsSessionListenWhen(TerminalState prev, TerminalState curr) {
+  if (curr is! TerminalLoaded) return false;
+  if (prev is! TerminalLoaded) return true;
+  return prev.activeSession?.id != curr.activeSession?.id;
+}
+
+/// Workspace switch: reinitialize terminal, run, review, editor.
+@visibleForTesting
+void handleAgentWorkspaceChanged(BuildContext context, WorkspaceState state) {
+  if (state is! WorkspaceLoaded) return;
+  final wsId = state.activeWorkspaceId;
+  if (wsId == null) return;
+  final ws = state.workspaces.firstWhere(
+    (w) => w.id == wsId,
+    orElse: () => state.workspaces.first,
+  );
+  context.read<TerminalCubit>().setActiveWorkspace(
+    workspaceId: wsId,
+    workspacePath: ws.workspaceDir,
+    workspacePaths: ws.paths,
+  );
+  context.read<RunCubit>().loadForWorkspace(ws.path);
+  context.read<ReviewCubit>().loadWorkspace(ws.paths, workspaceId: wsId);
+  context.read<FileEditorCubit>().setWorkspace(wsId);
+}
+
+/// Session switch: sync file tree and editor tabs to the active session.
+@visibleForTesting
+void handleAgentSessionChanged(BuildContext context, TerminalState state) {
+  if (state is! TerminalLoaded) return;
+  final session = state.activeSession;
+  if (session == null) return;
+  final paths = resolveSessionPaths(
+    context.read<WorkspaceCubit>().state,
+    session,
+  );
+  context.read<ReviewCubit>().loadSession(paths, session.id);
+  context.read<FileEditorCubit>().setSession(session.id);
+  // Reload run configs for the session's active worktree path so
+  // each session/worktree shows its own configurations and run history.
+  if (paths.isNotEmpty) {
+    context.read<RunCubit>().loadForWorkspace(paths.first);
+  }
+}
+
+/// Resolve file tree paths: worktreeContexts values if set, else workspace paths.
+@visibleForTesting
+List<String> resolveSessionPaths(WorkspaceState wsState, AgentSession session) {
+  final worktreeContexts = session.worktreeContexts;
+  if (worktreeContexts != null && worktreeContexts.isNotEmpty) {
+    return worktreeContexts.values.toList();
+  }
+  if (wsState is WorkspaceLoaded && wsState.activeWorkspaceId != null) {
+    final ws = wsState.workspaces.firstWhere(
+      (w) => w.id == wsState.activeWorkspaceId,
+      orElse: () => wsState.workspaces.first,
+    );
+    return ws.paths;
+  }
+  return [];
 }
 
 /// Thin draggable divider between panes.
@@ -1144,14 +1176,10 @@ class _WinBtnState extends State<_WinBtn> {
 
   @override
   Widget build(BuildContext context) {
-    final mutedColor =
-        context.appColors.textMuted;
     final secondaryColor =
         Theme.of(context).textTheme.bodyMedium?.color ??
         Theme.of(context).colorScheme.onSurface;
     final colors = context.appColors;
-    final hoverColor =
-        widget.isClose ? colors.statusError : mutedColor.withAlpha(40);
     return Tooltip(
       message: widget.tooltip,
       child: MouseRegion(
@@ -1162,20 +1190,44 @@ class _WinBtnState extends State<_WinBtn> {
           child: Container(
             width: 46,
             height: 44,
-            color: _hovered ? hoverColor : Colors.transparent,
+            color:
+                _hovered
+                    ? winBtnHoverColor(isClose: widget.isClose, colors: colors)
+                    : Colors.transparent,
             child: Icon(
               widget.icon,
               size: 14,
-              color:
-                  _hovered && widget.isClose
-                      ? colors.textPrimary
-                      : secondaryColor,
+              color: winBtnIconColor(
+                hovered: _hovered,
+                isClose: widget.isClose,
+                colors: colors,
+                fallbackColor: secondaryColor,
+              ),
             ),
           ),
         ),
       ),
     );
   }
+}
+
+/// Hover background for a window control button: red for close, subtle
+/// muted wash otherwise.
+@visibleForTesting
+Color winBtnHoverColor({required bool isClose, required AppColorScheme colors}) {
+  return isClose ? colors.statusError : colors.textMuted.withAlpha(40);
+}
+
+/// Icon color for a window control button: highlighted only when the close
+/// button is hovered.
+@visibleForTesting
+Color winBtnIconColor({
+  required bool hovered,
+  required bool isClose,
+  required AppColorScheme colors,
+  required Color fallbackColor,
+}) {
+  return hovered && isClose ? colors.textPrimary : fallbackColor;
 }
 
 // ── Resource Monitor Chip ────────────────────────────────────────────────────
@@ -1371,19 +1423,8 @@ class _ResourcePanelState extends State<_ResourcePanel> {
     final mutedColor =
         context.appColors.textMuted;
     final host = _snap.host;
-    final ramSharePercent =
-        host.totalBytes > 0
-            ? (_snap.totalMemoryBytes / host.totalBytes * 100).clamp(0.0, 100.0)
-            : 0.0;
-
-    final Color memBarColor;
-    if (host.usedPercent >= 90) {
-      memBarColor = colors.statusError;
-    } else if (host.usedPercent >= 70) {
-      memBarColor = colors.statusWarning;
-    } else {
-      memBarColor = colors.primary;
-    }
+    final ramSharePercent = resourceRamSharePercent(_snap);
+    final memBarColor = resourceMemoryBarColor(colors, host.usedPercent);
 
     // Separate registered sessions from agent-scanned ones.
     final monitorService = ResourceMonitorService.instance;
@@ -1866,6 +1907,22 @@ class _PanelTypeRow extends StatelessWidget {
   }
 }
 
+/// Percentage of total host RAM consumed by the app and its sessions.
+@visibleForTesting
+double resourceRamSharePercent(ResourceSnapshot snap) {
+  final totalBytes = snap.host.totalBytes;
+  if (totalBytes <= 0) return 0.0;
+  return (snap.totalMemoryBytes / totalBytes * 100).clamp(0.0, 100.0);
+}
+
+/// Host RAM progress bar color: error ≥90%, warning ≥70%, primary otherwise.
+@visibleForTesting
+Color resourceMemoryBarColor(AppColorScheme colors, double usedPercent) {
+  if (usedPercent >= 90) return colors.statusError;
+  if (usedPercent >= 70) return colors.statusWarning;
+  return colors.primary;
+}
+
 @visibleForTesting
 Map<String, int> resourcePanelTypeCounts(List<BoardPanelInstance> panels) {
   final counts = <String, int>{};
@@ -1992,27 +2049,11 @@ class _SessionRow extends StatelessWidget {
   final VoidCallback? onClose;
 
   Future<void> _open(BuildContext context) async {
-    onClose?.call();
-    final resolved = enrichResourceSessionFromBoards(
-      session,
-      boardCubit.state.boards,
-    );
-    final panelId = resolved.metadata?.panelId;
-    final boardId = resolved.metadata?.boardId;
-    if (panelId != null && panelId.isNotEmpty) {
-      if (boardId != null &&
-          boardId.isNotEmpty &&
-          boardCubit.state.activeBoardId != boardId) {
-        await boardCubit.setActiveBoard(boardId);
-      }
-      await boardCubit.focusPanel(panelId, boardId: boardId, zoomOnFocus: true);
-      return;
-    }
-    final messenger = ScaffoldMessenger.maybeOf(context);
-    messenger?.showSnackBar(
-      const SnackBar(
-        content: Text('Could not find a board terminal panel for this process'),
-      ),
+    await openResourceSessionPanel(
+      context: context,
+      boardCubit: boardCubit,
+      session: session,
+      onClose: onClose,
     );
   }
 
@@ -2111,6 +2152,40 @@ class _SessionRow extends StatelessWidget {
   }
 }
 
+/// Opens the board terminal panel linked to a resource session, switching
+/// boards first when needed. Falls back to a snackbar when the session is
+/// not linked to any board panel.
+@visibleForTesting
+Future<void> openResourceSessionPanel({
+  required BuildContext context,
+  required BoardCubit boardCubit,
+  required SessionStat session,
+  VoidCallback? onClose,
+}) async {
+  onClose?.call();
+  final resolved = enrichResourceSessionFromBoards(
+    session,
+    boardCubit.state.boards,
+  );
+  final panelId = resolved.metadata?.panelId;
+  final boardId = resolved.metadata?.boardId;
+  if (panelId != null && panelId.isNotEmpty) {
+    if (boardId != null &&
+        boardId.isNotEmpty &&
+        boardCubit.state.activeBoardId != boardId) {
+      await boardCubit.setActiveBoard(boardId);
+    }
+    await boardCubit.focusPanel(panelId, boardId: boardId, zoomOnFocus: true);
+    return;
+  }
+  final messenger = ScaffoldMessenger.maybeOf(context);
+  messenger?.showSnackBar(
+    const SnackBar(
+      content: Text('Could not find a board terminal panel for this process'),
+    ),
+  );
+}
+
 class _StopResourceSessionButton extends StatelessWidget {
   const _StopResourceSessionButton({required this.session});
 
@@ -2127,14 +2202,16 @@ class _StopResourceSessionButton extends StatelessWidget {
         constraints: const BoxConstraints.tightFor(width: 24, height: 24),
         iconSize: 14,
         color: Theme.of(context).colorScheme.error,
-        onPressed: () => _confirmStopResourceSession(context, session),
+        onPressed: () => confirmStopResourceSession(context, session),
         icon: const Icon(Icons.stop_circle_outlined),
       ),
     );
   }
 }
 
-Future<void> _confirmStopResourceSession(
+/// Confirmation dialog → kill flow for stopping a resource session.
+@visibleForTesting
+Future<void> confirmStopResourceSession(
   BuildContext context,
   SessionStat session,
 ) async {

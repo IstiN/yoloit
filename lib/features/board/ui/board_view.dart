@@ -947,6 +947,29 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     context.read<BoardCubit>().createGenericPanel(value);
   }
 
+  // ── Test hooks ────────────────────────────────────────────────────────────
+  // Widget tests drive these paths through public forwarders: Dart library
+  // privacy applies to dynamic invocations too, so the private members below
+  // are unreachable from the test library.
+
+  @visibleForTesting
+  void debugHandleGenericToolSelection(BuildContext context, String value) =>
+      _handleGenericToolSelection(context, value);
+
+  @visibleForTesting
+  BoardToolId get debugActiveTool => _activeTool;
+
+  @visibleForTesting
+  ConnectSettings get debugConnectSettings => _connectSettings;
+
+  @visibleForTesting
+  Future<void> debugWarmBoardPreviewCaptures(String activeBoardId) =>
+      _warmBoardPreviewCaptures(activeBoardId);
+
+  @visibleForTesting
+  Future<void> debugRefreshBoardPreviewsInBackground(String activeBoardId) =>
+      _refreshBoardPreviewsInBackground(activeBoardId);
+
   Future<void> _restoreLatestPanelHistory(
     BuildContext context,
     BoardDocument board,
@@ -1368,41 +1391,16 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
       }
     }
     if (group == null) return;
+    final groupName = group.name;
 
-    final controller = TextEditingController(text: group.name);
     await showDialog<void>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Rename group'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(hintText: 'Group name'),
-          onSubmitted: (value) {
-            context.read<BoardCubit>().renameGroup(boardId, groupId, value);
-            Navigator.of(dialogContext).pop();
-          },
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              context.read<BoardCubit>().renameGroup(
-                boardId,
-                groupId,
-                controller.text,
-              );
-              Navigator.of(dialogContext).pop();
-            },
-            child: const Text('Rename'),
-          ),
-        ],
+      builder: (dialogContext) => _RenameGroupDialog(
+        initialName: groupName,
+        onSubmit: (value) =>
+            context.read<BoardCubit>().renameGroup(boardId, groupId, value),
       ),
     );
-    controller.dispose();
   }
 
   void _boardDebugLog(String message) {
@@ -1744,6 +1742,66 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
           ],
         );
       },
+    );
+  }
+}
+
+/// Rename-group dialog that owns its [TextEditingController].
+///
+/// Owning the controller inside the dialog's [State] keeps it alive for the
+/// whole exit animation — disposing it right after `showDialog` resolves
+/// leaves the still-visible [TextField] holding a disposed controller.
+class _RenameGroupDialog extends StatefulWidget {
+  const _RenameGroupDialog({required this.initialName, required this.onSubmit});
+
+  final String initialName;
+  final ValueChanged<String> onSubmit;
+
+  @override
+  State<_RenameGroupDialog> createState() => _RenameGroupDialogState();
+}
+
+class _RenameGroupDialogState extends State<_RenameGroupDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialName);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Rename group'),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        decoration: const InputDecoration(hintText: 'Group name'),
+        onSubmitted: (value) {
+          widget.onSubmit(value);
+          Navigator.of(context).pop();
+        },
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () {
+            widget.onSubmit(_controller.text);
+            Navigator.of(context).pop();
+          },
+          child: const Text('Rename'),
+        ),
+      ],
     );
   }
 }

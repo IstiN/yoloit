@@ -1,0 +1,603 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:yoloit/core/theme/app_theme.dart';
+import 'package:yoloit/core/ui/adaptive_dialog.dart';
+import 'package:yoloit/features/board/bloc/board_cubit.dart';
+import 'package:yoloit/features/board/bloc/board_state.dart';
+import 'package:yoloit/features/board/model/board_models.dart';
+import 'package:yoloit/features/board/plugins/builtin/markdown_note_plugin.dart';
+import 'package:yoloit/features/board/tools/board_tool.dart';
+import 'package:yoloit/features/board/ui/board_view.dart';
+
+/// Seeded cubit that keeps remote operations offline and records connect
+/// attempts so `_connectRemoteYoloit` can be exercised end to end.
+class _TestBoardCubit extends BoardCubit {
+  _TestBoardCubit(BoardState state) {
+    emit(state);
+  }
+
+  Object? connectError;
+  String? connectedUrl;
+  String? connectedToken;
+  List<BoardDocument> connectResult = const [];
+
+  @override
+  Future<void> refreshRemoteBoards({String? url}) async {}
+
+  @override
+  Future<List<BoardDocument>> connectRemoteBoards({
+    required String url,
+    String? token,
+  }) async {
+    final error = connectError;
+    if (error != null) throw error;
+    connectedUrl = url;
+    connectedToken = token;
+    return connectResult;
+  }
+}
+
+BoardPanelInstance _note(
+  String id,
+  String title, {
+  double x = 56,
+  double y = 74,
+  double width = 520,
+  double height = 300,
+  bool hidden = false,
+}) {
+  return BoardPanelInstance(
+    id: id,
+    type: MarkdownNotePlugin.kTypeId,
+    title: title,
+    bounds: BoardPanelBounds(x: x, y: y, width: width, height: height),
+    hidden: hidden,
+    state: {'markdown': title},
+  );
+}
+
+BoardDocument _board({
+  String id = 'board',
+  String name = 'Board',
+  bool archived = false,
+  List<BoardPanelInstance> panels = const [],
+  List<BoardPanelGroup> groups = const [],
+}) {
+  return BoardDocument(
+    id: id,
+    name: name,
+    archived: archived,
+    viewport: const BoardViewport(scale: 1),
+    panels: panels,
+    groups: groups,
+  );
+}
+
+void _setSurface(WidgetTester tester) {
+  tester.view.physicalSize = const Size(1200, 760);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+}
+
+Future<void> _pumpBoard(
+  WidgetTester tester,
+  BoardCubit cubit, {
+  bool skipOverviewPreviewCapture = true,
+}) async {
+  await tester.pumpWidget(
+    MaterialApp(
+      theme: AppThemePreset.neonPurple.theme,
+      home: Scaffold(
+        body: BlocProvider.value(
+          value: cubit,
+          child: BoardView(
+            skipOverviewPreviewCapture: skipOverviewPreviewCapture,
+          ),
+        ),
+      ),
+    ),
+  );
+  await tester.pump(const Duration(milliseconds: 450));
+}
+
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets('shape catalog entry creates a frame panel', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    _setSurface(tester);
+
+    final cubit = _TestBoardCubit(
+      BoardState(boards: [_board()], activeBoardId: 'board', isLoaded: true),
+    );
+    addTearDown(cubit.close);
+    await _pumpBoard(tester, cubit);
+
+    await tester.tap(find.byTooltip('Miro basics'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(find.text('Shape / Frame'), findsOneWidget);
+
+    await tester.tap(find.text('Shape / Frame'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+
+    final panels = cubit.state.activeBoard!.panels;
+    expect(
+      panels.any((p) => p.type == 'board.shape' && p.title == 'Frame'),
+      isTrue,
+    );
+  });
+
+  testWidgets('plugin catalog entry falls through to generic panel creation', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    _setSurface(tester);
+
+    final cubit = _TestBoardCubit(
+      BoardState(boards: [_board()], activeBoardId: 'board', isLoaded: true),
+    );
+    addTearDown(cubit.close);
+    await _pumpBoard(tester, cubit);
+
+    await tester.tap(find.byTooltip('Miro basics'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+
+    await tester.tap(find.text('Sticky Note'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+
+    expect(
+      cubit.state.activeBoard!.panels.any((p) => p.type == 'board.sticky'),
+      isTrue,
+    );
+  });
+
+  testWidgets('connector tool values update tool and connect settings', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    _setSurface(tester);
+
+    final cubit = _TestBoardCubit(
+      BoardState(boards: [_board()], activeBoardId: 'board', isLoaded: true),
+    );
+    addTearDown(cubit.close);
+    await _pumpBoard(tester, cubit);
+
+    final state =
+        tester.state(find.byType(BoardView)) as dynamic; // ignore: avoid_dynamic_calls
+    final context = tester.element(find.byType(BoardView));
+
+    // ignore: avoid_dynamic_calls
+    state.debugHandleGenericToolSelection(context, '__connector:straight:line');
+    await tester.pump();
+    // ignore: avoid_dynamic_calls
+    expect(state.debugActiveTool, BoardToolId.connect);
+    // ignore: avoid_dynamic_calls
+    expect(state.debugConnectSettings.geometry, BoardLinkGeometry.straight);
+    // ignore: avoid_dynamic_calls
+    expect(state.debugConnectSettings.showArrow, isFalse);
+
+    // ignore: avoid_dynamic_calls
+    state.debugHandleGenericToolSelection(context, '__connector:elbow:arrow');
+    await tester.pump();
+    // ignore: avoid_dynamic_calls
+    expect(state.debugConnectSettings.geometry, BoardLinkGeometry.elbow);
+    // ignore: avoid_dynamic_calls
+    expect(state.debugConnectSettings.showArrow, isTrue);
+
+    // Unknown geometry falls back to bezier and defaults to an arrow.
+    // ignore: avoid_dynamic_calls
+    state.debugHandleGenericToolSelection(context, '__connector:wavy');
+    await tester.pump();
+    // ignore: avoid_dynamic_calls
+    expect(state.debugConnectSettings.geometry, BoardLinkGeometry.bezier);
+    // ignore: avoid_dynamic_calls
+    expect(state.debugConnectSettings.showArrow, isTrue);
+  });
+
+  testWidgets('divider and shape variants create titled shape panels', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    _setSurface(tester);
+
+    final cubit = _TestBoardCubit(
+      BoardState(boards: [_board()], activeBoardId: 'board', isLoaded: true),
+    );
+    addTearDown(cubit.close);
+    await _pumpBoard(tester, cubit);
+
+    final state =
+        tester.state(find.byType(BoardView)) as dynamic; // ignore: avoid_dynamic_calls
+    final context = tester.element(find.byType(BoardView));
+
+    // ignore: avoid_dynamic_calls
+    state.debugHandleGenericToolSelection(context, '__divider');
+    // ignore: avoid_dynamic_calls
+    state.debugHandleGenericToolSelection(context, '__shape:circle');
+    // ignore: avoid_dynamic_calls
+    state.debugHandleGenericToolSelection(context, '__shape:diamond');
+    // ignore: avoid_dynamic_calls
+    state.debugHandleGenericToolSelection(context, '__shape:hexagon');
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+
+    final panels = cubit.state.activeBoard!.panels;
+    bool hasShape(String title) =>
+        panels.any((p) => p.type == 'board.shape' && p.title == title);
+    expect(hasShape('Divider'), isTrue);
+    expect(hasShape('Oval'), isTrue);
+    expect(hasShape('Rhombus'), isTrue);
+    expect(hasShape('Hexagon'), isTrue);
+  });
+
+  testWidgets('connect tool creates a styled link between two panels', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    _setSurface(tester);
+
+    final board = _board(
+      panels: [
+        _note('p1', 'Source'),
+        _note('p2', 'Target', x: 640, width: 260, height: 180),
+      ],
+    );
+    final cubit = _TestBoardCubit(
+      BoardState(boards: [board], activeBoardId: 'board', isLoaded: true),
+    );
+    addTearDown(cubit.close);
+    await _pumpBoard(tester, cubit);
+
+    await tester.tap(find.byTooltip('Connect (C)'));
+    await tester.pump();
+    expect(find.byIcon(Icons.add_link), findsWidgets);
+
+    // First tap picks the source panel.
+    await tester.tap(find.byKey(const ValueKey('p1')));
+    await tester.pump();
+    expect(find.textContaining('Cancel connection'), findsOneWidget);
+
+    // Tapping the same panel again cancels the pending connection.
+    await tester.tap(find.byKey(const ValueKey('p1')));
+    await tester.pump();
+    expect(find.textContaining('Cancel connection'), findsNothing);
+
+    // Source + target opens the style dialog; cancelling creates no link.
+    await tester.tap(find.byKey(const ValueKey('p1')));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('p2')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(find.text('Link style'), findsOneWidget);
+
+    await tester.tap(find.text('Cancel'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(cubit.state.activeBoard!.links, isEmpty);
+    expect(find.textContaining('Cancel connection'), findsNothing);
+
+    // Source + target + confirm creates the link.
+    await tester.tap(find.byKey(const ValueKey('p1')));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('p2')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(find.text('Link style'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Connect'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+
+    final links = cubit.state.activeBoard!.links;
+    expect(links, hasLength(1));
+    expect(links.single.fromPanelId, 'p1');
+    expect(links.single.toPanelId, 'p2');
+    expect(links.single.style, BoardLinkStyle.arrow);
+    expect(find.textContaining('Cancel connection'), findsNothing);
+  });
+
+  testWidgets('fullscreen action zooms the viewport to the panel', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    _setSurface(tester);
+
+    final board = _board(panels: [_note('target', 'Article draft')]);
+    final cubit = _TestBoardCubit(
+      BoardState(boards: [board], activeBoardId: 'board', isLoaded: true),
+    );
+    addTearDown(cubit.close);
+    await _pumpBoard(tester, cubit);
+
+    await tester.tap(find.byTooltip('More actions'));
+    await tester.pump();
+    expect(find.byTooltip('Fullscreen'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Fullscreen'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    // _zoomToPanel targets ~70% screen fill (scale ≈ 1.6 for this panel),
+    // clearly above the auto-fit scale (0.95) applied on load.
+    expect(
+      cubit.state.activeBoard!.viewport.scale,
+      greaterThan(1.3),
+    );
+  });
+
+  testWidgets('rename group dialog renames the group', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    _setSurface(tester);
+
+    final board = _board(
+      panels: [_note('p1', 'Grouped note')],
+      groups: const [
+        BoardPanelGroup(id: 'g1', name: 'Sprint', panelIds: ['p1']),
+      ],
+    );
+    final cubit = _TestBoardCubit(
+      BoardState(boards: [board], activeBoardId: 'board', isLoaded: true),
+    );
+    addTearDown(cubit.close);
+    await _pumpBoard(tester, cubit);
+
+    await tester.tap(find.byTooltip('Rename'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(find.text('Rename group'), findsOneWidget);
+
+    await tester.enterText(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(TextField),
+      ),
+      'QA group',
+    );
+    await tester.tap(find.text('Rename'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+
+    expect(cubit.state.activeBoard!.groups.single.name, 'QA group');
+  });
+
+  testWidgets('rename group dialog cancel keeps the group name', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    _setSurface(tester);
+
+    final board = _board(
+      panels: [_note('p1', 'Grouped note')],
+      groups: const [
+        BoardPanelGroup(id: 'g1', name: 'Sprint', panelIds: ['p1']),
+      ],
+    );
+    final cubit = _TestBoardCubit(
+      BoardState(boards: [board], activeBoardId: 'board', isLoaded: true),
+    );
+    addTearDown(cubit.close);
+    await _pumpBoard(tester, cubit);
+
+    await tester.tap(find.byTooltip('Rename'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(find.text('Rename group'), findsOneWidget);
+
+    await tester.enterText(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(TextField),
+      ),
+      'Discarded',
+    );
+    await tester.tap(find.text('Cancel'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+
+    expect(cubit.state.activeBoard!.groups.single.name, 'Sprint');
+  });
+
+  testWidgets('board settings saves name, folder and archive flag', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    // Extra-wide surface: after saving, the default-folder chip appears in
+    // the toolbar and it no longer fits at 1200px (full-width actions row).
+    tester.view.physicalSize = const Size(1600, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final cubit = _TestBoardCubit(
+      BoardState(boards: [_board()], activeBoardId: 'board', isLoaded: true),
+    );
+    addTearDown(cubit.close);
+    await _pumpBoard(tester, cubit);
+
+    await tester.tap(find.text('Settings'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(find.text('Board settings'), findsOneWidget);
+
+    final settingsFields = find.descendant(
+      of: find.byType(AdaptiveDialogScaffold),
+      matching: find.byType(TextField),
+    );
+    await tester.enterText(settingsFields.first, 'Renamed board');
+    await tester.enterText(settingsFields.at(1), '/tmp/yolo-boards');
+    await tester.tap(find.byType(SwitchListTile));
+    await tester.pump();
+    await tester.tap(find.text('Save'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+
+    final saved = cubit.state.boards.singleWhere((b) => b.id == 'board');
+    expect(saved.name, 'Renamed board');
+    expect(saved.defaultFolder, '/tmp/yolo-boards');
+    expect(saved.archived, isTrue);
+  });
+
+  testWidgets('board settings unarchives an archived board', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    _setSurface(tester);
+
+    final cubit = _TestBoardCubit(
+      BoardState(
+        boards: [_board(archived: true)],
+        activeBoardId: 'board',
+        isLoaded: true,
+      ),
+    );
+    addTearDown(cubit.close);
+    await _pumpBoard(tester, cubit);
+
+    await tester.tap(find.text('Settings'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(find.text('Board settings'), findsOneWidget);
+
+    await tester.tap(find.byType(SwitchListTile));
+    await tester.pump();
+    await tester.tap(find.text('Save'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+
+    expect(cubit.state.boards.singleWhere((b) => b.id == 'board').archived, isFalse);
+  });
+
+  testWidgets('board settings cancel leaves the board unchanged', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    _setSurface(tester);
+
+    final cubit = _TestBoardCubit(
+      BoardState(boards: [_board()], activeBoardId: 'board', isLoaded: true),
+    );
+    addTearDown(cubit.close);
+    await _pumpBoard(tester, cubit);
+
+    await tester.tap(find.text('Settings'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(find.text('Board settings'), findsOneWidget);
+
+    await tester.enterText(
+      find
+          .descendant(
+            of: find.byType(AdaptiveDialogScaffold),
+            matching: find.byType(TextField),
+          )
+          .first,
+      'Discarded name',
+    );
+    await tester.tap(find.text('Cancel'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+
+    final saved = cubit.state.boards.singleWhere((b) => b.id == 'board');
+    expect(saved.name, 'Board');
+    expect(saved.archived, isFalse);
+  });
+
+  testWidgets('connect remote success shows snackbar and opens overview', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    _setSurface(tester);
+
+    final cubit = _TestBoardCubit(
+      BoardState(boards: [_board()], activeBoardId: 'board', isLoaded: true),
+    );
+    cubit.connectResult = const [
+      BoardDocument(id: 'remote-1', name: 'Remote One'),
+      BoardDocument(id: 'remote-2', name: 'Remote Two'),
+    ];
+    addTearDown(cubit.close);
+    await _pumpBoard(tester, cubit);
+
+    await tester.tap(find.text('Remote'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(find.text('Connect remote YoLoIT'), findsOneWidget);
+
+    await tester.enterText(
+      find
+          .descendant(
+            of: find.byType(AdaptiveDialogScaffold),
+            matching: find.byType(TextField),
+          )
+          .at(1),
+      'secret-token',
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Connect'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 450));
+
+    expect(cubit.connectedUrl, 'http://127.0.0.1:43110');
+    expect(cubit.connectedToken, 'secret-token');
+    expect(find.text('Connected 2 remote boards'), findsOneWidget);
+    // A successful connect reopens the boards overview.
+    expect(find.text('Local boards'), findsOneWidget);
+  });
+
+  testWidgets('connect remote failure surfaces an error snackbar', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    _setSurface(tester);
+
+    final cubit = _TestBoardCubit(
+      BoardState(boards: [_board()], activeBoardId: 'board', isLoaded: true),
+    );
+    cubit.connectError = StateError('server unreachable');
+    addTearDown(cubit.close);
+    await _pumpBoard(tester, cubit);
+
+    await tester.tap(find.text('Remote'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Connect'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 450));
+
+    expect(
+      find.textContaining('Remote YoLoIT connection failed'),
+      findsOneWidget,
+    );
+    // The overview stays closed on failure.
+    expect(find.text('Local boards'), findsNothing);
+  });
+
+  testWidgets('connect remote cancel performs no connection', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    _setSurface(tester);
+
+    final cubit = _TestBoardCubit(
+      BoardState(boards: [_board()], activeBoardId: 'board', isLoaded: true),
+    );
+    addTearDown(cubit.close);
+    await _pumpBoard(tester, cubit);
+
+    await tester.tap(find.text('Remote'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(find.text('Connect remote YoLoIT'), findsOneWidget);
+
+    await tester.tap(find.text('Cancel'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+
+    expect(cubit.connectedUrl, isNull);
+    expect(find.text('Connect remote YoLoIT'), findsNothing);
+  });
+}

@@ -24,12 +24,36 @@ import 'package:yoloit/features/workspaces/data/agent_workspace_dir_service.dart
 import 'package:yoloit/features/workspaces/data/workspace_secrets_service.dart';
 
 class TerminalCubit extends Cubit<TerminalState> {
-  TerminalCubit() : super(const TerminalInitial());
+  TerminalCubit({
+    TerminalBackendService? backendService,
+    SessionPersistenceService? persistence,
+    LoggingService? logging,
+    TmuxService? tmux,
+    AgentHookService? hookService,
+    AgentConfigService? agentConfig,
+    WorkspaceSecretsService? secretsService,
+    AgentWorkspaceDirService? workspaceDirs,
+    Future<void> Function(String workspacePath)? hookInstaller,
+  }) : _backendService = backendService ?? TerminalBackendService.instance,
+       _persistence = persistence ?? SessionPersistenceService.instance,
+       _logging = logging ?? LoggingService.instance,
+       _tmux = tmux ?? TmuxService.instance,
+       _hookService = hookService ?? AgentHookService.instance,
+       _agentConfig = agentConfig ?? AgentConfigService.instance,
+       _secretsService = secretsService ?? WorkspaceSecretsService.instance,
+       _workspaceDirs = workspaceDirs ?? AgentWorkspaceDirService.instance,
+       _hookInstaller = hookInstaller ?? AgentHookService.installHooks,
+       super(const TerminalInitial());
 
-  final _backendService = TerminalBackendService.instance;
-  final _persistence = SessionPersistenceService.instance;
-  final _logging = LoggingService.instance;
-  final _tmux = TmuxService.instance;
+  final TerminalBackendService _backendService;
+  final SessionPersistenceService _persistence;
+  final LoggingService _logging;
+  final TmuxService _tmux;
+  final AgentHookService _hookService;
+  final AgentConfigService _agentConfig;
+  final WorkspaceSecretsService _secretsService;
+  final AgentWorkspaceDirService _workspaceDirs;
+  final Future<void> Function(String workspacePath) _hookInstaller;
 
   /// All sessions across all workspaces (PTYs kept alive when switching workspaces).
   final List<AgentSession> _allSessions = [];
@@ -59,10 +83,17 @@ class TerminalCubit extends Cubit<TerminalState> {
   List<AgentSession> get _workspaceSessions =>
       _allSessions.where((s) => s.workspaceId == _activeWorkspaceId).toList();
 
+  /// Re-emits the current state with the visible (workspace) sessions and the
+  /// full session list, picking up in-place mutations of `_allSessions`.
   void _emitVisible() {
     final cur = _loaded;
     if (cur != null && !isClosed) {
-      _emitVisible();
+      emit(
+        cur.copyWith(
+          sessions: _workspaceSessions,
+          allSessions: List.unmodifiable(_allSessions),
+        ),
+      );
     }
   }
 
@@ -87,7 +118,7 @@ class TerminalCubit extends Cubit<TerminalState> {
     await Future.wait([
       _logging.init(),
       _tmux.init(),
-      AgentConfigService.instance.load(), // pre-load agent configs + default
+      _agentConfig.load(), // pre-load agent configs + default
     ]);
     _emitLoaded([], 0);
 
@@ -111,8 +142,8 @@ class TerminalCubit extends Cubit<TerminalState> {
         }
       }
     });
-    AgentHookService.instance.start();
-    _hookSub = AgentHookService.instance.events.listen(_onHookEvent);
+    _hookService.start();
+    _hookSub = _hookService.events.listen(_onHookEvent);
   }
 
   /// Loads persisted session metadata for other (non-active) workspaces so
@@ -191,12 +222,11 @@ class TerminalCubit extends Cubit<TerminalState> {
 
         // Recover worktreeContexts from symlinks if not persisted (old format).
         var worktreeContexts = s.worktreeContexts;
-        worktreeContexts ??= await AgentWorkspaceDirService.instance
-              .readWorktreeContexts(
-                s.workspaceId ?? workspaceId,
-                s.id,
-                allWsPaths,
-              );
+        worktreeContexts ??= await _workspaceDirs.readWorktreeContexts(
+          s.workspaceId ?? workspaceId,
+          s.id,
+          allWsPaths,
+        );
 
         await spawnSession(
           type: s.type,
@@ -210,7 +240,7 @@ class TerminalCubit extends Cubit<TerminalState> {
       }
     } else {
       // No saved sessions → spawn the user-configured default agent.
-      final defaultType = AgentConfigService.instance.defaultAgentType;
+      final defaultType = _agentConfig.defaultAgentType;
       await spawnSession(
         type: defaultType,
         workspacePath: workspacePath,
@@ -276,7 +306,7 @@ class TerminalCubit extends Cubit<TerminalState> {
     _attachProcessToSession(process, session);
 
     // Install YoLoIT hooks into the workspace so Copilot CLI can pick them up.
-    unawaited(AgentHookService.installHooks(effectivePath));
+    unawaited(_hookInstaller(effectivePath));
 
     // Remove any idle metadata stub with the same id (from loadPersistedMetadata).
     _allSessions.removeWhere((s) => s.id == sessionId);
@@ -309,7 +339,7 @@ class TerminalCubit extends Cubit<TerminalState> {
   ) async {
     var effectivePath = workspacePath;
     if (worktreeContexts != null && workspaceId != null) {
-      effectivePath = await AgentWorkspaceDirService.instance.createAgentDir(
+      effectivePath = await _workspaceDirs.createAgentDir(
         workspaceId,
         sessionId,
         worktreeContexts,
@@ -330,10 +360,9 @@ class TerminalCubit extends Cubit<TerminalState> {
   Future<Map<String, String>?> _loadWorkspaceSecrets(
     String? workspaceId,
   ) async {
-    final secrets =
-        workspaceId != null
-            ? await WorkspaceSecretsService.instance.load(workspaceId)
-            : <String, String>{};
+    final secrets = workspaceId != null
+        ? await _secretsService.load(workspaceId)
+        : <String, String>{};
     return secrets.isEmpty ? null : secrets;
   }
 
@@ -355,9 +384,7 @@ class TerminalCubit extends Cubit<TerminalState> {
     AgentType type, {
     required bool skipAutoRun,
   }) async {
-    final effectiveCommand = AgentConfigService.instance.effectiveLaunchCommand(
-      type,
-    );
+    final effectiveCommand = _agentConfig.effectiveLaunchCommand(type);
     if (effectiveCommand.isEmpty || skipAutoRun) return;
     await Future<void>.delayed(const Duration(milliseconds: 1200));
     _backendService.write(sessionId, '$effectiveCommand\n');
@@ -371,8 +398,7 @@ class TerminalCubit extends Cubit<TerminalState> {
   }) async {
     if (state is! TerminalLoaded) return;
 
-    final sessionId =
-        'remote_${DateTime.now().millisecondsSinceEpoch}';
+    final sessionId = 'remote_${DateTime.now().millisecondsSinceEpoch}';
     final session = AgentSession(
       id: sessionId,
       type: AgentType.terminal,
@@ -469,14 +495,13 @@ class TerminalCubit extends Cubit<TerminalState> {
     // Find session before removing it (needed for cleanup).
     final session = _allSessions.firstWhere(
       (s) => s.id == sessionId,
-      orElse:
-          () => AgentSession(
-            id: sessionId,
-            type: AgentType.claude,
-            workspacePath: '',
-            status: AgentStatus.live,
-            sessionId: '',
-          ),
+      orElse: () => AgentSession(
+        id: sessionId,
+        type: AgentType.claude,
+        workspacePath: '',
+        status: AgentStatus.live,
+        sessionId: '',
+      ),
     );
 
     _backendService.kill(sessionId);
@@ -484,18 +509,14 @@ class TerminalCubit extends Cubit<TerminalState> {
 
     // Delete the agent dir if one was created (session had worktree contexts).
     if (session.worktreeContexts != null && session.workspaceId != null) {
-      unawaited(
-        AgentWorkspaceDirService.instance.deleteAgentDir(
-          session.workspaceId!,
-          sessionId,
-        ),
-      );
+      unawaited(_workspaceDirs.deleteAgentDir(session.workspaceId!, sessionId));
     }
 
     _allSessions.removeWhere((s) => s.id == sessionId);
     final visible = _workspaceSessions;
-    final newIndex =
-        visible.isEmpty ? 0 : current.activeIndex.clamp(0, visible.length - 1);
+    final newIndex = visible.isEmpty
+        ? 0
+        : current.activeIndex.clamp(0, visible.length - 1);
     _emitLoaded(visible, newIndex);
     final wsId = _activeWorkspaceId;
     if (wsId != null) unawaited(_persistence.save(visible, wsId));
@@ -531,8 +552,8 @@ class TerminalCubit extends Cubit<TerminalState> {
   void _onHookEvent(HookEvent event) {
     assert(() {
       debugPrint(
-      '[HookEvent] event=${event.event} phase=${event.phase} cwd=${event.workspacePath}',
-    );
+        '[HookEvent] event=${event.event} phase=${event.phase} cwd=${event.workspacePath}',
+      );
       return true;
     }());
 
@@ -541,9 +562,9 @@ class TerminalCubit extends Cubit<TerminalState> {
       if (_allSessions.isEmpty) return;
       assert(() {
         debugPrint(
-        '[HookEvent] NO MATCH for cwd=${event.workspacePath}  '
-        'sessions: ${_allSessions.map((s) => s.workspacePath).toList()}',
-      );
+          '[HookEvent] NO MATCH for cwd=${event.workspacePath}  '
+          'sessions: ${_allSessions.map((s) => s.workspacePath).toList()}',
+        );
         return true;
       }());
       return;
@@ -554,20 +575,28 @@ class TerminalCubit extends Cubit<TerminalState> {
 
     assert(() {
       debugPrint(
-      '[HookEvent] MATCHED session[${_allSessions[idx].id}] → newPhase=$newPhase',
-    );
+        '[HookEvent] MATCHED session[${_allSessions[idx].id}] → newPhase=$newPhase',
+      );
       return true;
     }());
 
     // ThinkingPhase auto-clears after 15s if no other event fires.
     // PTY idle-timer (5s) will usually clear it sooner via spinner detection.
     if (newPhase is ThinkingPhase) {
-      _schedulePhaseClear(event.workspacePath, ThinkingPhase, const Duration(seconds: 15));
+      _schedulePhaseClear(
+        event.workspacePath,
+        ThinkingPhase,
+        const Duration(seconds: 15),
+      );
     }
 
     // DonePhase auto-clears after 3s (brief green flash).
     if (newPhase is DonePhase) {
-      _schedulePhaseClear(event.workspacePath, DonePhase, const Duration(seconds: 3));
+      _schedulePhaseClear(
+        event.workspacePath,
+        DonePhase,
+        const Duration(seconds: 3),
+      );
     }
 
     _allSessions[idx] = _allSessions[idx].copyWith(
@@ -619,7 +648,11 @@ class TerminalCubit extends Cubit<TerminalState> {
     return normalized;
   }
 
-  void _schedulePhaseClear(String workspacePath, Type phaseType, Duration delay) {
+  void _schedulePhaseClear(
+    String workspacePath,
+    Type phaseType,
+    Duration delay,
+  ) {
     Future.delayed(delay, () {
       final i = _findSessionIndexForWorkspacePath(workspacePath);
       if (i >= 0 && _allSessions[i].hookPhase.runtimeType == phaseType) {
@@ -941,7 +974,7 @@ class TerminalCubit extends Cubit<TerminalState> {
     }
     _batchFlushTimers.clear();
     _batchedOutput.clear();
-    AgentHookService.instance.stop();
+    _hookService.stop();
     // Local PTY sessions are owned by their backend. Runtime sessions are
     // intentionally left alive across app shutdowns.
     return super.close();

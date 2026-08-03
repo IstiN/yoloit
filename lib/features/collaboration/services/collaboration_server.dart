@@ -98,7 +98,9 @@ class CollaborationServer {
   }
 
   Future<void> stop() async {
-    for (final client in _clients.values) {
+    // Iterate over a copy: closing a client can trigger _onDisconnect
+    // callbacks that mutate _clients concurrently.
+    for (final client in List<_WsClient>.of(_clients.values)) {
       try {
         client.closeNow();
       } catch (_) {}
@@ -476,7 +478,8 @@ class CollaborationServer {
 
   /// Reads HTTP request headers from [socket] using a single await-for loop.
   /// Safe to use when you won't re-subscribe (e.g. static HTTP handler).
-  static Future<Map<String, String>?> _readHeaders(Socket socket) async {
+  @visibleForTesting
+  static Future<Map<String, String>?> readHeaders(Socket socket) async {
     final buf = <int>[];
     try {
       await for (final chunk in socket) {
@@ -523,13 +526,22 @@ class CollaborationServer {
 
   // ── Web client installation ────────────────────────────────────────────────
 
-  static Future<void> _ensureWebClientInstalled() async {
-    final home = Platform.environment['HOME'];
+  static Future<void> _ensureWebClientInstalled() => installWebClient(
+        home: Platform.environment['HOME'],
+        exe: Platform.resolvedExecutable,
+      );
+
+  /// Test-visible implementation of [_ensureWebClientInstalled] with the
+  /// home directory and executable path passed in explicitly.
+  @visibleForTesting
+  static Future<void> installWebClient({
+    required String? home,
+    required String exe,
+  }) async {
     if (home == null) return;
     final dest = '$home/.yoloit/web_client';
     if (await File('$dest/index.html').exists()) return;
 
-    final exe = Platform.resolvedExecutable;
     var dir = File(exe).parent;
     for (int i = 0; i < 12; i++) {
       final candidate = '${dir.path}/build/web';
@@ -547,7 +559,10 @@ class CollaborationServer {
   static Future<void> _copyDirectory(Directory src, Directory dest) async {
     await dest.create(recursive: true);
     await for (final entity in src.list(recursive: false)) {
-      final target = '${dest.path}/${entity.uri.pathSegments.last}';
+      // Directory URIs end with '/', so the last segment can be empty.
+      final name =
+          entity.uri.pathSegments.where((s) => s.isNotEmpty).last;
+      final target = '${dest.path}/$name';
       if (entity is Directory) {
         await _copyDirectory(entity, Directory(target));
       } else if (entity is File) {
@@ -556,9 +571,28 @@ class CollaborationServer {
     }
   }
 
-  static Future<String?> _findWebClientDir() async {
-    final home = Platform.environment['HOME'] ?? '';
-    final exe = Platform.resolvedExecutable;
+  /// When set, overrides all web-client directory discovery (tests only).
+  @visibleForTesting
+  static String? debugWebClientDirOverride;
+
+  static Future<String?> _findWebClientDir() {
+    final override = debugWebClientDirOverride;
+    if (override != null) return Future<String?>.value(override);
+    return findWebClientDir(
+      home: Platform.environment['HOME'] ?? '',
+      exe: Platform.resolvedExecutable,
+      currentDir: Directory.current.path,
+    );
+  }
+
+  /// Test-visible implementation of [_findWebClientDir] with the environment
+  /// values (home dir, executable path, working dir) passed in explicitly.
+  @visibleForTesting
+  static Future<String?> findWebClientDir({
+    required String home,
+    required String exe,
+    required String currentDir,
+  }) async {
     final appDir = File(exe).parent.path;
 
     // Release: web client is bundled inside .app/Contents/Resources/web_client
@@ -573,7 +607,7 @@ class CollaborationServer {
       '$appDir/../Resources/web_client',
       '$appDir/web_client',
       '$home/.yoloit/web_client',
-      '${Directory.current.path}/build/web',
+      '$currentDir/build/web',
     ];
     for (final path in devCandidates) {
       if (await File('$path/index.html').exists()) return _resolved(path);
