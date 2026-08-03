@@ -1264,39 +1264,13 @@ class _BoardTerminalSessionHistoryDialogState
     final isLive = manager.isLive(entry.id);
     return GestureDetector(
       onTap:
-          isCurrent
-              ? null
-              : () async {
-                Navigator.pop(context);
-                await context
-                    .read<BoardCubit>()
-                    .createTerminalPanel(
-                      title: entry.sessionName,
-                      sessionId: entry.id,
-                      sessionName: entry.sessionName,
-                      workingDir: entry.workingDir,
-                      envGroupIds: entry.envGroupIds,
-                    );
-              },
+          isCurrent ? null : () => _openSessionAsPanel(context, entry),
       child: Container(
         padding: const EdgeInsets.symmetric(
           horizontal: 12,
           vertical: 10,
         ),
-        decoration: BoxDecoration(
-          color:
-              isCurrent
-                  ? colors.surfaceElevated
-                  : colors.surface,
-          borderRadius: BorderRadius.circular(10),
-          border:
-              isCurrent
-                  ? Border.all(
-                    color: colors.accentGreen,
-                    width: 0.5,
-                  )
-                  : null,
-        ),
+        decoration: _entryDecoration(isCurrent, colors),
         child: Row(
           children: [
             Icon(
@@ -1305,83 +1279,124 @@ class _BoardTerminalSessionHistoryDialogState
               color: isLive ? colors.accentGreen : mutedColor,
             ),
             const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    entry.sessionName.isEmpty
-                        ? 'Unnamed terminal'
-                        : entry.sessionName,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color:
-                          isCurrent
-                              ? colors.accentGreen
-                              : onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${isLive ? 'live' : 'saved'} • ${entry.workingDir}',
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: mutedColor,
-                    ),
-                  ),
-                ],
-              ),
+            _buildEntryInfo(
+              entry,
+              isCurrent,
+              isLive,
+              colors,
+              mutedColor,
+              onSurface,
             ),
-            if (!isCurrent)
-              Padding(
-                padding: const EdgeInsets.only(left: 6),
-                child: ActionIconButton(
-                  icon: Icons.restore,
-                  color: colors.accentBlue,
-                  tooltip: 'Restore as new terminal panel',
-                  onTap: () async {
-                    Navigator.pop(context);
-                    await context
-                        .read<BoardCubit>()
-                        .createTerminalPanel(
-                          title: entry.sessionName,
-                          sessionId: entry.id,
-                          sessionName: entry.sessionName,
-                          workingDir: entry.workingDir,
-                          envGroupIds: entry.envGroupIds,
-                        );
-                  },
-                ),
-              ),
-            Padding(
-              padding: const EdgeInsets.only(left: 6),
-              child: ActionIconButton(
-                icon:
-                    isLive
-                        ? Icons.stop_circle_outlined
-                        : Icons.delete_outline,
-                color:
-                    isLive
-                        ? colors.accentOrange
-                        : colors.accentRed,
-                tooltip:
-                    isLive ? 'Kill session' : 'Delete history',
-                onTap: () async {
-                  if (isLive) {
-                    await manager.killSession(entry.id);
-                  } else {
-                    await BoardTerminalSessionHistory.instance
-                        .delete(entry.id);
-                  }
-                  _refresh();
-                },
-              ),
-            ),
+            if (!isCurrent) _buildRestoreButton(context, entry, colors),
+            _buildSessionActionButton(manager, entry, isLive, colors),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _openSessionAsPanel(
+    BuildContext context,
+    BoardTerminalSessionEntry entry,
+  ) async {
+    Navigator.pop(context);
+    await context.read<BoardCubit>().createTerminalPanel(
+      title: entry.sessionName,
+      sessionId: entry.id,
+      sessionName: entry.sessionName,
+      workingDir: entry.workingDir,
+      envGroupIds: entry.envGroupIds,
+    );
+  }
+
+  BoxDecoration _entryDecoration(bool isCurrent, AppColorScheme colors) {
+    return BoxDecoration(
+      color: isCurrent ? colors.surfaceElevated : colors.surface,
+      borderRadius: BorderRadius.circular(10),
+      border:
+          isCurrent
+              ? Border.all(color: colors.accentGreen, width: 0.5)
+              : null,
+    );
+  }
+
+  Widget _buildEntryInfo(
+    BoardTerminalSessionEntry entry,
+    bool isCurrent,
+    bool isLive,
+    AppColorScheme colors,
+    Color mutedColor,
+    Color onSurface,
+  ) {
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            entry.sessionName.isEmpty
+                ? 'Unnamed terminal'
+                : entry.sessionName,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: isCurrent ? colors.accentGreen : onSurface,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '${isLive ? 'live' : 'saved'} • ${entry.workingDir}',
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 10, color: mutedColor),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRestoreButton(
+    BuildContext context,
+    BoardTerminalSessionEntry entry,
+    AppColorScheme colors,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 6),
+      child: ActionIconButton(
+        icon: Icons.restore,
+        color: colors.accentBlue,
+        tooltip: 'Restore as new terminal panel',
+        onTap: () => _openSessionAsPanel(context, entry),
+      ),
+    );
+  }
+
+  Widget _buildSessionActionButton(
+    BoardTerminalSessionManager manager,
+    BoardTerminalSessionEntry entry,
+    bool isLive,
+    AppColorScheme colors,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 6),
+      child: ActionIconButton(
+        icon:
+            isLive ? Icons.stop_circle_outlined : Icons.delete_outline,
+        color: isLive ? colors.accentOrange : colors.accentRed,
+        tooltip: isLive ? 'Kill session' : 'Delete history',
+        onTap: () => _onSessionActionTap(manager, entry, isLive),
+      ),
+    );
+  }
+
+  Future<void> _onSessionActionTap(
+    BoardTerminalSessionManager manager,
+    BoardTerminalSessionEntry entry,
+    bool isLive,
+  ) async {
+    if (isLive) {
+      await manager.killSession(entry.id);
+    } else {
+      await BoardTerminalSessionHistory.instance.delete(entry.id);
+    }
+    _refresh();
   }
 }

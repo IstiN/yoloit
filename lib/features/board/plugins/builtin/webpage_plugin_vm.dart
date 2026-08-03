@@ -596,15 +596,7 @@ class _ViewportLabDialogState extends State<_ViewportLabDialog> {
     final ctrl = widget.controller;
     try {
       // A: User Agent
-      if (_useDesktopUA) {
-        await ctrl.setUserAgent(
-          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) '
-          'AppleWebKit/537.36 (KHTML, like Gecko) '
-          'Chrome/124.0.0.0 Safari/537.36',
-        );
-      } else {
-        await ctrl.setUserAgent(null);
-      }
+      await _applyUserAgent(ctrl);
 
       // Build JS that applies all enabled options at once, then reads state
       final cssZoom = _cssZoomCtrl.text.trim();
@@ -617,107 +609,18 @@ class _ViewportLabDialogState extends State<_ViewportLabDialog> {
       final sb = StringBuffer('(function(){\n');
 
       // B: CSS zoom
-      if (_cssZoomEnabled && cssZoom.isNotEmpty) {
-        sb.writeln("  document.documentElement.style.zoom='$cssZoom';");
-      } else {
-        sb.writeln("  document.documentElement.style.zoom='';");
-      }
+      _writeCssZoom(sb, cssZoom);
 
       // C: body transform scale
-      if (_bodyScaleEnabled && bodyScale.isNotEmpty) {
-        sb.writeln('  var b=document.body;');
-        sb.writeln("  b.style.transform='scale($bodyScale)';");
-        sb.writeln("  b.style.transformOrigin='top left';");
-        sb.writeln("  b.style.width=(100/parseFloat('$bodyScale'))+'%';");
-        // Compensate height so video players / fixed-height containers render correctly
-        sb.writeln("  b.style.minHeight=(100/parseFloat('$bodyScale'))+'vh';");
-      } else {
-        sb.writeln("  document.body.style.transform='';");
-        sb.writeln("  document.body.style.transformOrigin='';");
-        sb.writeln("  document.body.style.width='';");
-        sb.writeln("  document.body.style.minHeight='';");
-      }
+      _writeBodyScale(sb, bodyScale);
 
       // D: minWidth
-      if (_minWidthEnabled && minWidth.isNotEmpty) {
-        sb.writeln("  document.body.style.minWidth='${minWidth}px';");
-      } else {
-        sb.writeln("  document.body.style.minWidth='';");
-      }
+      _writeMinWidth(sb, minWidth);
 
       // E: override innerWidth
-      if (_overrideInnerWidthEnabled && innerWidth.isNotEmpty) {
-        sb.writeln("  var iw=parseInt('$innerWidth');");
-        sb.writeln(
-          "  try{Object.defineProperty(window,'innerWidth',{get:function(){return iw;},configurable:true});}catch(e){}",
-        );
-        sb.writeln(
-          "  try{Object.defineProperty(window,'outerWidth',{get:function(){return iw;},configurable:true});}catch(e){}",
-        );
-      } else {
-        sb.writeln(
-          "  try{Object.defineProperty(window,'innerWidth',{get:undefined,configurable:true});}catch(e){}",
-        );
-        sb.writeln(
-          "  try{Object.defineProperty(window,'outerWidth',{get:undefined,configurable:true});}catch(e){}",
-        );
-      }
+      _writeInnerWidthOverride(sb, innerWidth);
 
-      if (_ytPlayerFixEnabled &&
-          ytPlayerWidth.isNotEmpty &&
-          ytPlayerHeight.isNotEmpty) {
-        sb.writeln("  window.__yoloitYtPlayerW=parseInt('$ytPlayerWidth');");
-        sb.writeln("  window.__yoloitYtPlayerH=parseInt('$ytPlayerHeight');");
-        sb.writeln(r"""
-  (function(){
-    var w = window.__yoloitYtPlayerW;
-    var h = window.__yoloitYtPlayerH;
-    var css = ''
-      + 'ytd-watch-flexy, ytd-watch-flexy[flexy], ytd-watch-flexy[fullscreen] {'
-      + '  --ytd-watch-flexy-player-width: '+w+'px !important;'
-      + '  --ytd-watch-flexy-player-height: '+h+'px !important;'
-      + '  --ytd-watch-flexy-width-ratio: 16 !important;'
-      + '  --ytd-watch-flexy-height-ratio: 9 !important;'
-      + '}'
-      + '#player, #player-container, #player-container-inner, #player-container-outer, ytd-player, #movie_player, .html5-video-player {'
-      + '  width: '+w+'px !important; max-width: '+w+'px !important;'
-      + '  height: '+h+'px !important; min-height: '+h+'px !important;'
-      + '}'
-      + '#player-container-outer { padding-top: 0 !important; }'
-      + 'video.html5-main-video { width: '+w+'px !important; height: '+h+'px !important; object-fit: contain !important; }';
-    var style = document.getElementById('yoloit-yt-player-fix');
-    if (!style) {
-      style = document.createElement('style');
-      style.id = 'yoloit-yt-player-fix';
-      (document.head || document.documentElement).appendChild(style);
-    }
-    style.textContent = css;
-    var apply = function(){
-      ['#player', '#player-container', '#player-container-inner', '#player-container-outer', 'ytd-player', '#movie_player'].forEach(function(sel){
-        document.querySelectorAll(sel).forEach(function(el){
-          el.style.setProperty('width', w + 'px', 'important');
-          el.style.setProperty('max-width', w + 'px', 'important');
-          el.style.setProperty('height', h + 'px', 'important');
-          el.style.setProperty('min-height', h + 'px', 'important');
-        });
-      });
-      var player = document.getElementById('movie_player');
-      if (player && player.setSize) {
-        try { player.setSize(w, h); } catch(e) {}
-      }
-      window.dispatchEvent(new Event('resize'));
-    };
-    apply();
-    setTimeout(apply, 250);
-    setTimeout(apply, 1000);
-    setTimeout(apply, 2500);
-  })();
-""");
-      } else {
-        sb.writeln(
-          "  var oldStyle=document.getElementById('yoloit-yt-player-fix'); if(oldStyle) oldStyle.remove();",
-        );
-      }
+      _writeYtPlayerFix(sb, ytPlayerWidth, ytPlayerHeight);
 
       sb.writeln("  window.dispatchEvent(new Event('resize'));");
       // After CSS applied, force video players to recalculate their size
@@ -792,6 +695,137 @@ class _ViewportLabDialogState extends State<_ViewportLabDialog> {
       setState(() {
         _applying = false;
       });
+    }
+  }
+
+  // A: User Agent
+  Future<void> _applyUserAgent(WebViewController ctrl) async {
+    if (_useDesktopUA) {
+      await ctrl.setUserAgent(
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) '
+        'AppleWebKit/537.36 (KHTML, like Gecko) '
+        'Chrome/124.0.0.0 Safari/537.36',
+      );
+    } else {
+      await ctrl.setUserAgent(null);
+    }
+  }
+
+  // B: CSS zoom
+  void _writeCssZoom(StringBuffer sb, String cssZoom) {
+    if (_cssZoomEnabled && cssZoom.isNotEmpty) {
+      sb.writeln("  document.documentElement.style.zoom='$cssZoom';");
+    } else {
+      sb.writeln("  document.documentElement.style.zoom='';");
+    }
+  }
+
+  // C: body transform scale
+  void _writeBodyScale(StringBuffer sb, String bodyScale) {
+    if (_bodyScaleEnabled && bodyScale.isNotEmpty) {
+      sb.writeln('  var b=document.body;');
+      sb.writeln("  b.style.transform='scale($bodyScale)';");
+      sb.writeln("  b.style.transformOrigin='top left';");
+      sb.writeln("  b.style.width=(100/parseFloat('$bodyScale'))+'%';");
+      // Compensate height so video players / fixed-height containers render correctly
+      sb.writeln("  b.style.minHeight=(100/parseFloat('$bodyScale'))+'vh';");
+    } else {
+      sb.writeln("  document.body.style.transform='';");
+      sb.writeln("  document.body.style.transformOrigin='';");
+      sb.writeln("  document.body.style.width='';");
+      sb.writeln("  document.body.style.minHeight='';");
+    }
+  }
+
+  // D: minWidth
+  void _writeMinWidth(StringBuffer sb, String minWidth) {
+    if (_minWidthEnabled && minWidth.isNotEmpty) {
+      sb.writeln("  document.body.style.minWidth='${minWidth}px';");
+    } else {
+      sb.writeln("  document.body.style.minWidth='';");
+    }
+  }
+
+  // E: override innerWidth
+  void _writeInnerWidthOverride(StringBuffer sb, String innerWidth) {
+    if (_overrideInnerWidthEnabled && innerWidth.isNotEmpty) {
+      sb.writeln("  var iw=parseInt('$innerWidth');");
+      sb.writeln(
+        "  try{Object.defineProperty(window,'innerWidth',{get:function(){return iw;},configurable:true});}catch(e){}",
+      );
+      sb.writeln(
+        "  try{Object.defineProperty(window,'outerWidth',{get:function(){return iw;},configurable:true});}catch(e){}",
+      );
+    } else {
+      sb.writeln(
+        "  try{Object.defineProperty(window,'innerWidth',{get:undefined,configurable:true});}catch(e){}",
+      );
+      sb.writeln(
+        "  try{Object.defineProperty(window,'outerWidth',{get:undefined,configurable:true});}catch(e){}",
+      );
+    }
+  }
+
+  // F: force YouTube player dimensions
+  void _writeYtPlayerFix(
+    StringBuffer sb,
+    String ytPlayerWidth,
+    String ytPlayerHeight,
+  ) {
+    if (_ytPlayerFixEnabled &&
+        ytPlayerWidth.isNotEmpty &&
+        ytPlayerHeight.isNotEmpty) {
+      sb.writeln("  window.__yoloitYtPlayerW=parseInt('$ytPlayerWidth');");
+      sb.writeln("  window.__yoloitYtPlayerH=parseInt('$ytPlayerHeight');");
+      sb.writeln(r"""
+  (function(){
+    var w = window.__yoloitYtPlayerW;
+    var h = window.__yoloitYtPlayerH;
+    var css = ''
+      + 'ytd-watch-flexy, ytd-watch-flexy[flexy], ytd-watch-flexy[fullscreen] {'
+      + '  --ytd-watch-flexy-player-width: '+w+'px !important;'
+      + '  --ytd-watch-flexy-player-height: '+h+'px !important;'
+      + '  --ytd-watch-flexy-width-ratio: 16 !important;'
+      + '  --ytd-watch-flexy-height-ratio: 9 !important;'
+      + '}'
+      + '#player, #player-container, #player-container-inner, #player-container-outer, ytd-player, #movie_player, .html5-video-player {'
+      + '  width: '+w+'px !important; max-width: '+w+'px !important;'
+      + '  height: '+h+'px !important; min-height: '+h+'px !important;'
+      + '}'
+      + '#player-container-outer { padding-top: 0 !important; }'
+      + 'video.html5-main-video { width: '+w+'px !important; height: '+h+'px !important; object-fit: contain !important; }';
+    var style = document.getElementById('yoloit-yt-player-fix');
+    if (!style) {
+      style = document.createElement('style');
+      style.id = 'yoloit-yt-player-fix';
+      (document.head || document.documentElement).appendChild(style);
+    }
+    style.textContent = css;
+    var apply = function(){
+      ['#player', '#player-container', '#player-container-inner', '#player-container-outer', 'ytd-player', '#movie_player'].forEach(function(sel){
+        document.querySelectorAll(sel).forEach(function(el){
+          el.style.setProperty('width', w + 'px', 'important');
+          el.style.setProperty('max-width', w + 'px', 'important');
+          el.style.setProperty('height', h + 'px', 'important');
+          el.style.setProperty('min-height', h + 'px', 'important');
+        });
+      });
+      var player = document.getElementById('movie_player');
+      if (player && player.setSize) {
+        try { player.setSize(w, h); } catch(e) {}
+      }
+      window.dispatchEvent(new Event('resize'));
+    };
+    apply();
+    setTimeout(apply, 250);
+    setTimeout(apply, 1000);
+    setTimeout(apply, 2500);
+  })();
+""");
+    } else {
+      sb.writeln(
+        "  var oldStyle=document.getElementById('yoloit-yt-player-fix'); if(oldStyle) oldStyle.remove();",
+      );
     }
   }
 

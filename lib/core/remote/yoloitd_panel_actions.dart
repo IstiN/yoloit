@@ -438,43 +438,90 @@ RemotePanelActionResult _kanbanPaste(
   );
 }
 
+typedef _ChecklistHandler =
+    RemotePanelActionResult Function(
+      List<Map<String, dynamic>> items,
+      Map<String, dynamic> args,
+    );
+
 RemotePanelActionResult _checklist(
   RemotePanel panel,
   String action,
   Map<String, dynamic> args,
 ) {
   final items = _items(panel);
-  switch (action) {
-    case 'items':
-      return RemotePanelActionResult(data: {'items': items});
-    case 'add':
-      final text = args['text']?.toString();
-      if (text == null) return _missing('text');
-      items.add({
-        'id': args['id']?.toString() ?? _timestampId('item'),
-        'text': text,
-        'done': false,
-      });
-      return RemotePanelActionResult(stateUpdate: {'items': items});
-    case 'check':
-    case 'uncheck':
-      final index = _itemIndex(items, args);
-      if (index < 0) return _notFound('item');
-      items[index] = {...items[index], 'done': action == 'check'};
-      return RemotePanelActionResult(stateUpdate: {'items': items});
-    case 'remove':
-      final index = _itemIndex(items, args);
-      if (index < 0) return _notFound('item');
-      items.removeAt(index);
-      return RemotePanelActionResult(stateUpdate: {'items': items});
-    case 'rename':
-      final index = _itemIndex(items, args);
-      final text = (args['newText'] ?? args['text'])?.toString();
-      if (index < 0 || text == null) return _missing('index/id/text');
-      items[index] = {...items[index], 'text': text};
-      return RemotePanelActionResult(stateUpdate: {'items': items});
-  }
-  return _unknown(action);
+  final handlers = <String, _ChecklistHandler>{
+    'items': _checklistItems,
+    'add': _checklistAdd,
+    'check': _checklistCheck,
+    'uncheck': _checklistUncheck,
+    'remove': _checklistRemove,
+    'rename': _checklistRename,
+  };
+  final handler = handlers[action];
+  if (handler == null) return _unknown(action);
+  return handler(items, args);
+}
+
+RemotePanelActionResult _checklistItems(
+  List<Map<String, dynamic>> items,
+  Map<String, dynamic> args,
+) => RemotePanelActionResult(data: {'items': items});
+
+RemotePanelActionResult _checklistAdd(
+  List<Map<String, dynamic>> items,
+  Map<String, dynamic> args,
+) {
+  final text = args['text']?.toString();
+  if (text == null) return _missing('text');
+  items.add({
+    'id': args['id']?.toString() ?? _timestampId('item'),
+    'text': text,
+    'done': false,
+  });
+  return RemotePanelActionResult(stateUpdate: {'items': items});
+}
+
+RemotePanelActionResult _checklistCheck(
+  List<Map<String, dynamic>> items,
+  Map<String, dynamic> args,
+) => _checklistSetDone(items, args, done: true);
+
+RemotePanelActionResult _checklistUncheck(
+  List<Map<String, dynamic>> items,
+  Map<String, dynamic> args,
+) => _checklistSetDone(items, args, done: false);
+
+RemotePanelActionResult _checklistSetDone(
+  List<Map<String, dynamic>> items,
+  Map<String, dynamic> args, {
+  required bool done,
+}) {
+  final index = _itemIndex(items, args);
+  if (index < 0) return _notFound('item');
+  items[index] = {...items[index], 'done': done};
+  return RemotePanelActionResult(stateUpdate: {'items': items});
+}
+
+RemotePanelActionResult _checklistRemove(
+  List<Map<String, dynamic>> items,
+  Map<String, dynamic> args,
+) {
+  final index = _itemIndex(items, args);
+  if (index < 0) return _notFound('item');
+  items.removeAt(index);
+  return RemotePanelActionResult(stateUpdate: {'items': items});
+}
+
+RemotePanelActionResult _checklistRename(
+  List<Map<String, dynamic>> items,
+  Map<String, dynamic> args,
+) {
+  final index = _itemIndex(items, args);
+  final text = (args['newText'] ?? args['text'])?.toString();
+  if (index < 0 || text == null) return _missing('index/id/text');
+  items[index] = {...items[index], 'text': text};
+  return RemotePanelActionResult(stateUpdate: {'items': items});
 }
 
 RemotePanelActionResult _code(
