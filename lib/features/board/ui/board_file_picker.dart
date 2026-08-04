@@ -300,33 +300,10 @@ class _BoardFilePickerDialogState extends State<_BoardFilePickerDialog> {
   }
 
   Future<void> _createFolder() async {
-    final controller = TextEditingController();
     final name = await showDialog<String>(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('New folder'),
-            content: TextField(
-              key: const Key('board-file-picker-new-folder-name'),
-              controller: controller,
-              autofocus: true,
-              decoration: const InputDecoration(labelText: 'Folder name'),
-              onSubmitted: (value) => Navigator.of(context).pop(value),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                key: const Key('board-file-picker-create-folder-confirm'),
-                onPressed: () => Navigator.of(context).pop(controller.text),
-                child: const Text('Create'),
-              ),
-            ],
-          ),
+      builder: (context) => const _NewFolderDialog(),
     );
-    controller.dispose();
     final trimmed = name?.trim() ?? '';
     if (trimmed.isEmpty) return;
     try {
@@ -584,6 +561,57 @@ class _BoardFilePickerDialogState extends State<_BoardFilePickerDialog> {
         value.startsWith('~\\') ||
         p.isAbsolute(value) ||
         RegExp(r'^[a-zA-Z]:[\\/]').hasMatch(value);
+  }
+}
+
+/// Prompt for a new folder name. Owns its [TextEditingController] so it is
+/// disposed only after the route has fully dismissed (disposing it right
+/// after `showDialog` returns crashes the route's exit animation).
+class _NewFolderDialog extends StatefulWidget {
+  const _NewFolderDialog();
+
+  @override
+  State<_NewFolderDialog> createState() => _NewFolderDialogState();
+}
+
+class _NewFolderDialogState extends State<_NewFolderDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('New folder'),
+      content: TextField(
+        key: const Key('board-file-picker-new-folder-name'),
+        controller: _controller,
+        autofocus: true,
+        decoration: const InputDecoration(labelText: 'Folder name'),
+        onSubmitted: (value) => Navigator.of(context).pop(value),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          key: const Key('board-file-picker-create-folder-confirm'),
+          onPressed: () => Navigator.of(context).pop(_controller.text),
+          child: const Text('Create'),
+        ),
+      ],
+    );
   }
 }
 

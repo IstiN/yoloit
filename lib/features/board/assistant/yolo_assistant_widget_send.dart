@@ -52,22 +52,13 @@ extension _AssistantSendPhases on _YoloAssistantWidgetState {
 
     // When sending audio directly to LLM: no voice-prefix, show mic icon in chat.
     // For transcribed voice: prepend ASR context for the LLM.
-    final String text;
-    final String displayContent;
-    if (audioContent != null) {
-      // Audio sent directly — display mic icon, no prefix for LLM history
-      // (audio IS the content).
-      displayContent = '🎤 Voice message';
-      text = displayContent; // stored in history for display only
-    } else if (mirrorToOverlay) {
-      text =
-          '[Voice message — transcribed via speech recognition, '
-          'may contain recognition errors]\n$rawText';
-      displayContent = text;
-    } else {
-      text = rawText;
-      displayContent = text;
-    }
+    final outgoing = resolveOutgoingMessageContent(
+      rawText: rawText,
+      hasAudioContent: audioContent != null,
+      mirrorToOverlay: mirrorToOverlay,
+    );
+    final text = outgoing.text;
+    final displayContent = outgoing.displayContent;
 
     final msgs = _messages;
     final userMessageId = 'msg-${DateTime.now().millisecondsSinceEpoch}';
@@ -187,15 +178,8 @@ extension _AssistantSendPhases on _YoloAssistantWidgetState {
     final short = _compactToolResult(toolCommand, result, success);
     // Replace the matching ⏳ running entry instead of appending, so the
     // overlay shows ✅/❌ in-place rather than showing both states at once.
-    final runningIdx = ctx.overlayToolLogs.lastIndexWhere(
-      (e) => e.startsWith('⏳ running:'),
-    );
     final doneEntry = success ? '✅ $short' : '❌ $short';
-    if (runningIdx >= 0) {
-      ctx.overlayToolLogs[runningIdx] = doneEntry;
-    } else {
-      ctx.overlayToolLogs.add(doneEntry);
-    }
+    upsertOverlayToolLogEntry(ctx.overlayToolLogs, doneEntry);
     final statePatch = _toolTargetPatchIfNeeded(
       toolCommand: toolCommand,
       arguments: arguments,
@@ -304,9 +288,13 @@ extension _AssistantSendPhases on _YoloAssistantWidgetState {
     if (providerType.startsWith('cloud:')) {
       final cfg = (_chatProvider as CloudLlmProvider).config;
       if (cfg != null) {
-        ctx.dbg['modelId'] = cfg.model;
-        ctx.dbg['modelProvider'] = cfg.name;
-        ctx.dbg['modelBaseUrl'] = cfg.baseUrl;
+        ctx.dbg.addAll(
+          cloudModelDebugInfo(
+            model: cfg.model,
+            providerName: cfg.name,
+            baseUrl: cfg.baseUrl,
+          ),
+        );
       }
     } else {
       ctx.dbg['modelId'] = 'local (MLX)';
@@ -361,11 +349,12 @@ extension _AssistantSendPhases on _YoloAssistantWidgetState {
     // Record start time so onToolCompleted can compute accurate duration.
     // Store under function name, toolCallId, AND CLI command so the
     // lookup in onToolCompleted (keyed by CLI command) succeeds.
-    final now = DateTime.now().toIso8601String();
-    ctx.pendingToolStarts[toolName] = now;
-    ctx.pendingToolStarts[toolCallId] = now;
-    final cliCmd = YoloitCliToolCatalog.byFunctionName(toolName)?.command;
-    if (cliCmd != null) ctx.pendingToolStarts[cliCmd] = now;
+    recordPendingToolStarts(
+      ctx.pendingToolStarts,
+      toolName: toolName,
+      toolCallId: toolCallId,
+      cliCommand: YoloitCliToolCatalog.byFunctionName(toolName)?.command,
+    );
     ctx.overlayToolLogs.add('⏳ running: $toolName');
     if (ctx.mirrorToOverlay && mounted) {
       _syncOverlayState(

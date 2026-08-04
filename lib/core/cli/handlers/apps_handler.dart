@@ -240,68 +240,90 @@ Future<shelf.Response> _installZip(_AppsRequestContext ctx) async {
     return ctx.error('ZIP file not found: $zipPath');
   }
   try {
-    final zipName = zipFile.path.split(Platform.pathSeparator).last;
-    final appNameFromZip =
-        zipName.endsWith('.zip')
-            ? zipName.substring(0, zipName.length - 4)
-            : zipName;
-    final appsDir = Directory(
-      '${Platform.environment['HOME']}/.config/yoloit/apps',
-    );
-    await appsDir.create(recursive: true);
-    final extractDir = Directory(
-      '${appsDir.path}${Platform.pathSeparator}__zip_extract_${DateTime.now().millisecondsSinceEpoch}',
-    );
-    await extractDir.create();
-    final unzipResult = await Process.run('unzip', [
-      '-q',
-      zipFile.path,
-      '-d',
-      extractDir.path,
-    ]);
-    if (unzipResult.exitCode != 0) {
-      await extractDir.delete(recursive: true);
-      return ctx.error('Failed to extract ZIP: ${unzipResult.stderr}');
-    }
-    // Find the directory containing widget.js or manifest.json
-    Directory? appSource;
-    await for (final entity in extractDir.list(recursive: true)) {
-      if (entity is File) {
-        final name = entity.path.split(Platform.pathSeparator).last;
-        if (name == 'widget.js' || name == 'manifest.json') {
-          appSource = entity.parent;
-          break;
-        }
-      }
-    }
-    appSource ??= extractDir;
-    // Determine app name from manifest or zip filename
-    String appName = appNameFromZip;
-    final manifestFile = File(
-      '${appSource.path}${Platform.pathSeparator}manifest.json',
-    );
-    if (await manifestFile.exists()) {
-      try {
-        final raw =
-            jsonDecode(await manifestFile.readAsString())
-                as Map<String, dynamic>;
-        appName = (raw['id'] as String?)?.trim() ?? appNameFromZip;
-      } catch (_) {}
-    }
-    final destDir = Directory(
-      '${appsDir.path}${Platform.pathSeparator}$appName',
-    );
-    if (await destDir.exists()) await destDir.delete(recursive: true);
-    await Process.run('cp', ['-r', appSource.path, destDir.path]);
-    await extractDir.delete(recursive: true);
-    final manifest = await ctx.registry.find(appName);
-    await ctx.registry.loadAll(); // refresh registry cache
-    return ctx.json(
-      okJson({'appName': appName, 'widget': manifest?.toJson()}),
-    );
+    return await _installExtractedZip(ctx, zipFile);
   } catch (e) {
     return ctx.error('ZIP install failed: $e');
   }
+}
+
+/// Extract phase of [_installZip]: unzip into a temp directory, locate the
+/// app source, resolve the app name, and copy it into the apps directory.
+Future<shelf.Response> _installExtractedZip(
+  _AppsRequestContext ctx,
+  File zipFile,
+) async {
+  final zipName = zipFile.path.split(Platform.pathSeparator).last;
+  final appNameFromZip =
+      zipName.endsWith('.zip')
+          ? zipName.substring(0, zipName.length - 4)
+          : zipName;
+  final appsDir = Directory(
+    '${Platform.environment['HOME']}/.config/yoloit/apps',
+  );
+  await appsDir.create(recursive: true);
+  final extractDir = Directory(
+    '${appsDir.path}${Platform.pathSeparator}__zip_extract_${DateTime.now().millisecondsSinceEpoch}',
+  );
+  await extractDir.create();
+  final unzipResult = await Process.run('unzip', [
+    '-q',
+    zipFile.path,
+    '-d',
+    extractDir.path,
+  ]);
+  if (unzipResult.exitCode != 0) {
+    await extractDir.delete(recursive: true);
+    return ctx.error('Failed to extract ZIP: ${unzipResult.stderr}');
+  }
+  final appSource = await _findZipAppSource(extractDir);
+  final appName = await _resolveZipAppName(appSource, appNameFromZip);
+  final destDir = Directory(
+    '${appsDir.path}${Platform.pathSeparator}$appName',
+  );
+  if (await destDir.exists()) await destDir.delete(recursive: true);
+  await Process.run('cp', ['-r', appSource.path, destDir.path]);
+  await extractDir.delete(recursive: true);
+  final manifest = await ctx.registry.find(appName);
+  await ctx.registry.loadAll(); // refresh registry cache
+  return ctx.json(
+    okJson({'appName': appName, 'widget': manifest?.toJson()}),
+  );
+}
+
+/// Find the directory containing widget.js or manifest.json.
+Future<Directory> _findZipAppSource(Directory extractDir) async {
+  Directory? appSource;
+  await for (final entity in extractDir.list(recursive: true)) {
+    if (entity is File) {
+      final name = entity.path.split(Platform.pathSeparator).last;
+      if (name == 'widget.js' || name == 'manifest.json') {
+        appSource = entity.parent;
+        break;
+      }
+    }
+  }
+  appSource ??= extractDir;
+  return appSource;
+}
+
+/// Determine app name from manifest or zip filename.
+Future<String> _resolveZipAppName(
+  Directory appSource,
+  String appNameFromZip,
+) async {
+  String appName = appNameFromZip;
+  final manifestFile = File(
+    '${appSource.path}${Platform.pathSeparator}manifest.json',
+  );
+  if (await manifestFile.exists()) {
+    try {
+      final raw =
+          jsonDecode(await manifestFile.readAsString())
+              as Map<String, dynamic>;
+      appName = (raw['id'] as String?)?.trim() ?? appNameFromZip;
+    } catch (_) {}
+  }
+  return appName;
 }
 
 // /api/apps/:id/:action — resolves the widget, then dispatches on

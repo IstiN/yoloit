@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/services.dart' show AssetManifest, rootBundle;
 import 'package:local_models_flutter/local_models_flutter.dart' as flm;
 import 'package:local_models_sdk/local_models_sdk.dart' as sdk;
@@ -58,6 +59,46 @@ class LocalAiModelsService implements LocalTranscriber {
   LocalAiModelsService._();
 
   static final instance = LocalAiModelsService._();
+
+  /// Creates an isolated instance with injectable state for unit tests.
+  @visibleForTesting
+  LocalAiModelsService.forTesting({
+    sdk.ModelRegistry? registry,
+    sdk.LocalModelStore? store,
+    sdk.LocalModelDownloadManager? downloadManager,
+    Map<String, sdk.InstalledModel>? installedById,
+    Map<String, sdk.DownloadTaskRecord>? taskByModelId,
+    sdk.LocalModelsPrerequisitesStatus? prerequisites,
+    bool initialized = false,
+    String? initError,
+    String selectedChatModelId = _defaultChatModelId,
+    String selectedAsrModelId = _defaultAsrModelId,
+    this.prerequisitesChecker,
+  }) {
+    _registry = registry;
+    _store = store;
+    _downloadManager = downloadManager;
+    _initialized = initialized;
+    _initError = initError;
+    _selectedChatModelId = selectedChatModelId;
+    _selectedAsrModelId = selectedAsrModelId;
+    if (prerequisites != null) {
+      _prerequisites = prerequisites;
+    }
+    if (installedById != null) {
+      _installedById.addAll(installedById);
+    }
+    if (taskByModelId != null) {
+      _taskByModelId.addAll(taskByModelId);
+    }
+  }
+
+  /// Overrides the prerequisites probe (spawns real processes by default).
+  @visibleForTesting
+  Future<sdk.LocalModelsPrerequisitesStatus> Function({
+    Map<String, String>? environment,
+  })?
+  prerequisitesChecker;
 
   static const String _defaultChatModelId = 'gemma4-e2b-it-4bit';
   static const String _defaultAsrModelId = 'qwen3-asr-0.6b-4bit';
@@ -207,9 +248,11 @@ class LocalAiModelsService implements LocalTranscriber {
     _isCheckingPrerequisites = true;
     _notify();
     try {
-      _prerequisites = await sdk.LocalModelsPrerequisitesChecker.check(
-        environment: Platform.environment,
-      );
+      _prerequisites =
+          await (prerequisitesChecker ??
+              sdk.LocalModelsPrerequisitesChecker.check)(
+            environment: Platform.environment,
+          );
     } finally {
       _isCheckingPrerequisites = false;
       _notify();
@@ -220,10 +263,10 @@ class LocalAiModelsService implements LocalTranscriber {
     _isCheckingPrerequisites = true;
     _notify();
     try {
-      _prerequisites = await sdk
-          .LocalModelsPrerequisitesChecker.installMissingPrerequisites(
-        environment: Platform.environment,
-      );
+      _prerequisites =
+          await sdk.LocalModelsPrerequisitesChecker.installMissingPrerequisites(
+            environment: Platform.environment,
+          );
     } finally {
       _isCheckingPrerequisites = false;
       _notify();
@@ -594,6 +637,10 @@ class LocalAiModelsService implements LocalTranscriber {
     return null;
   }
 
+  @visibleForTesting
+  void handleTaskChangedForTesting(sdk.DownloadTaskRecord record) =>
+      _onTaskChanged(record);
+
   void _onTaskChanged(sdk.DownloadTaskRecord record) {
     if (record.status == sdk.DownloadTaskStatus.canceled) {
       _taskByModelId.remove(record.modelId);
@@ -651,6 +698,9 @@ class LocalAiModelsService implements LocalTranscriber {
 
   String get _preferencesPath =>
       p.join(PlatformDirs.instance.configDir, 'local_ai_models.json');
+
+  @visibleForTesting
+  Future<void> loadPreferencesForTesting() => _loadPreferences();
 
   Future<void> _loadPreferences() async {
     final file = File(_preferencesPath);

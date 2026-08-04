@@ -177,17 +177,14 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
     bool? hiddenOverride,
   }) {
     final draft = draftOverride ?? _inputController.text.trim();
-    final status =
-        forcedStatus ??
-        (_isRecordingMic
-            ? 'listening'
-            : _isTranscribingMic
-            ? 'processing'
-            : _isGeneratingReply
-            ? (_receivedAssistantToken ? 'responding' : 'thinking')
-            : draft.isNotEmpty
-            ? 'ready'
-            : 'idle');
+    final status = computeAssistantOverlayStatus(
+      forcedStatus: forcedStatus,
+      isRecordingMic: _isRecordingMic,
+      isTranscribingMic: _isTranscribingMic,
+      isGeneratingReply: _isGeneratingReply,
+      receivedAssistantToken: _receivedAssistantToken,
+      draft: draft,
+    );
     // ignore: avoid_print
     print(
       '[YoloAssistant] _syncOverlayState: forced=$forcedStatus → status=$status (isGenerating=$_isGeneratingReply, hasToken=$_receivedAssistantToken)',
@@ -436,22 +433,11 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
   String _availableBoardsSummary() {
     final cubit = context.read<BoardCubit>();
     final current = cubit.state.activeBoard;
-    return cubit.state.boards
-        .map((board) {
-          final marker = board.id == current?.id ? ' (current)' : '';
-          return '- ${board.name} [${board.id}]$marker';
-        })
-        .join('\n');
+    return availableBoardsSummary(cubit.state.boards, current?.id);
   }
 
-  String _currentBoardPanelsSummary(BoardDocument? board) {
-    if (board == null) return '';
-    final panels = [...board.panels]
-      ..sort((a, b) => b.zIndex.compareTo(a.zIndex));
-    return panels
-        .map((panel) => '- ${panel.title} [${panel.type}] (${panel.id})')
-        .join('\n');
-  }
+  String _currentBoardPanelsSummary(BoardDocument? board) =>
+      boardPanelsSummary(board);
 
   Future<ChatRuntimeContext> _runtimeContext() async {
     final board = _currentBoard();
@@ -665,11 +651,7 @@ $messagesJson
 ''';
   }
 
-  int _estimateTokens(String text) {
-    final normalized = text.trim();
-    if (normalized.isEmpty) return 0;
-    return (normalized.length / 4).ceil();
-  }
+  int _estimateTokens(String text) => estimateTokenCount(text);
 
   Future<void> _showChatSessionDialog() async {
     final colors = context.appColors;
@@ -1177,15 +1159,7 @@ $messagesJson
     final createdAt = _assistantSessionCreatedAt ?? DateTime.now();
 
     // Derive a short name from the first user message.
-    final firstUserMsg = msgs.firstWhere(
-      (m) => m['role'] == 'user',
-      orElse: () => <String, dynamic>{},
-    );
-    final firstText = (firstUserMsg['content'] as String? ?? '').trim();
-    final rawName =
-        firstText.length > 60 ? firstText.substring(0, 60) : firstText;
-    final sessionName =
-        rawName.isEmpty ? 'Yolo session' : rawName.replaceAll('\n', ' ');
+    final sessionName = deriveAssistantSessionName(msgs);
 
     final providerType = _chatProviderType ?? 'local';
     final modelLabel =
@@ -1306,10 +1280,10 @@ $messagesJson
     final isTool = msg['role'] == 'tool';
     final content = (msg['content'] as String? ?? '').trim();
     // Strip voice prefix from display (prefix is kept in LLM context but hidden in UI)
-    final displayContent =
-        isUser && content.startsWith('[Voice message')
-            ? content.substring(content.indexOf('\n') + 1).trim()
-            : content;
+    final displayContent = assistantDisplayContent(
+      isUser: isUser,
+      content: content,
+    );
     final showThinking = !isUser && content.isEmpty && _isGeneratingReply;
     final containsMermaid = content.contains('```mermaid');
     final textColor =
@@ -1914,52 +1888,6 @@ $messagesJson
     _resetVoiceOverlay();
   }
 
-  /// Builds a standard WAV file from raw PCM-16bit mono 16kHz bytes.
-  static Uint8List _buildWavFromPcm(Uint8List pcm) {
-    const sampleRate = 16000;
-    const numChannels = 1;
-    const bitsPerSample = 16;
-    const byteRate = sampleRate * numChannels * bitsPerSample ~/ 8;
-    const blockAlign = numChannels * bitsPerSample ~/ 8;
-    final dataSize = pcm.length;
-    final fileSize = 36 + dataSize; // RIFF chunk size
-
-    final header = ByteData(44);
-    // RIFF chunk
-    header.setUint8(0, 0x52); // R
-    header.setUint8(1, 0x49); // I
-    header.setUint8(2, 0x46); // F
-    header.setUint8(3, 0x46); // F
-    header.setUint32(4, fileSize, Endian.little);
-    header.setUint8(8, 0x57); // W
-    header.setUint8(9, 0x41); // A
-    header.setUint8(10, 0x56); // V
-    header.setUint8(11, 0x45); // E
-    // fmt chunk
-    header.setUint8(12, 0x66); // f
-    header.setUint8(13, 0x6D); // m
-    header.setUint8(14, 0x74); // t
-    header.setUint8(15, 0x20); // (space)
-    header.setUint32(16, 16, Endian.little); // chunk size = 16 for PCM
-    header.setUint16(20, 1, Endian.little); // PCM = 1
-    header.setUint16(22, numChannels, Endian.little);
-    header.setUint32(24, sampleRate, Endian.little);
-    header.setUint32(28, byteRate, Endian.little);
-    header.setUint16(32, blockAlign, Endian.little);
-    header.setUint16(34, bitsPerSample, Endian.little);
-    // data chunk
-    header.setUint8(36, 0x64); // d
-    header.setUint8(37, 0x61); // a
-    header.setUint8(38, 0x74); // t
-    header.setUint8(39, 0x61); // a
-    header.setUint32(40, dataSize, Endian.little);
-
-    final wav = Uint8List(44 + dataSize);
-    wav.setRange(0, 44, header.buffer.asUint8List());
-    wav.setRange(44, 44 + dataSize, pcm);
-    return wav;
-  }
-
   Future<void> _copyMessageToClipboard(String text) async {
     if (text.isEmpty) return;
     await copyToClipboard(text);
@@ -2077,14 +2005,7 @@ $messagesJson
     );
   }
 
-  String _formatAssistantError(Object error) {
-    final raw = error.toString();
-    if (raw.contains('flm_dispatch_json')) {
-      return 'Local model runtime mismatch: missing symbol "flm_dispatch_json". '
-          'Please update/reinstall the selected local model runtime in Settings → AI Models, then restart YoLoIT.';
-    }
-    return 'Error: $raw';
-  }
+  String _formatAssistantError(Object error) => formatAssistantError(error);
 }
 
 

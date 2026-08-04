@@ -10,6 +10,38 @@ import 'package:yoloit/core/cli/handlers/server_helpers.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 
+/// Shared request context passed to every extracted drawings route handler.
+class _DrawingsRequestContext {
+  const _DrawingsRequestContext({
+    required this.request,
+    required this.cubit,
+    required this.body,
+    required this.json,
+    required this.error,
+    required this.scheduleRebuild,
+    required this.parseColor,
+  });
+
+  final shelf.Request request;
+  final BoardCubit cubit;
+  final Future<Map<String, dynamic>> Function(shelf.Request) body;
+  final shelf.Response Function(Object) json;
+  final shelf.Response Function(String) error;
+  final void Function() scheduleRebuild;
+  final Color? Function(String?) parseColor;
+}
+
+typedef _DrawingsRouteHandler =
+    Future<shelf.Response> Function(_DrawingsRequestContext ctx, List<String> sub);
+
+/// Handlers keyed by HTTP method. Keys are unique, so map lookup is
+/// equivalent to the original if-chain.
+const _drawingsRoutes = <String, _DrawingsRouteHandler>{
+  'GET': _drawingsGet,
+  'POST': _drawingsPost,
+  'DELETE': _drawingsDelete,
+};
+
 Future<shelf.Response> handleDrawings(
   String method,
   List<String> sub,
@@ -22,74 +54,94 @@ Future<shelf.Response> handleDrawings(
   required void Function() scheduleRebuild,
   required Color? Function(String?) parseColor,
 }) async {
-  if (method == 'GET') {
-    // GET /api/drawings/svg?board=<id>  → SVG of drawings only
-    final isSvgExport = sub.firstOrNull == 'svg';
-    final boardId =
-        request.url.queryParameters['board'] ??
-        (isSvgExport ? sub.elementAtOrNull(1) : sub.firstOrNull);
-    final board = (boardId != null && boardId.isNotEmpty)
-        ? findBoard(cubit, boardId)
-        : cubit.state.activeBoard;
-    if (board == null) return error('Board not found');
+  final handler = _drawingsRoutes[method];
+  if (handler == null) return notFound('Unknown drawings route');
+  final ctx = _DrawingsRequestContext(
+    request: request,
+    cubit: cubit,
+    body: body,
+    json: json,
+    error: error,
+    scheduleRebuild: scheduleRebuild,
+    parseColor: parseColor,
+  );
+  return handler(ctx, sub);
+}
 
-    if (isSvgExport) {
-      final svg = BoardSvgExporter.exportDrawings(board);
-      return shelf.Response.ok(
-        svg,
-        headers: {'content-type': 'image/svg+xml; charset=utf-8'},
-      );
-    }
-    return json({
-      'ok': true,
-      'boardId': board.id,
-      'boardName': board.name,
-      'count': board.drawings.length,
-      'drawings': board.drawings.map(drawingToJson).toList(),
-    });
+Future<shelf.Response> _drawingsGet(
+  _DrawingsRequestContext ctx,
+  List<String> sub,
+) async {
+  // GET /api/drawings/svg?board=<id>  → SVG of drawings only
+  final isSvgExport = sub.firstOrNull == 'svg';
+  final boardId =
+      ctx.request.url.queryParameters['board'] ??
+      (isSvgExport ? sub.elementAtOrNull(1) : sub.firstOrNull);
+  final board = (boardId != null && boardId.isNotEmpty)
+      ? findBoard(ctx.cubit, boardId)
+      : ctx.cubit.state.activeBoard;
+  if (board == null) return ctx.error('Board not found');
+
+  if (isSvgExport) {
+    final svg = BoardSvgExporter.exportDrawings(board);
+    return shelf.Response.ok(
+      svg,
+      headers: {'content-type': 'image/svg+xml; charset=utf-8'},
+    );
   }
+  return ctx.json({
+    'ok': true,
+    'boardId': board.id,
+    'boardName': board.name,
+    'count': board.drawings.length,
+    'drawings': board.drawings.map(drawingToJson).toList(),
+  });
+}
 
-  if (method == 'POST') {
-    try {
-      return await handleDrawingsPost(
-        request,
-        cubit,
-        sub,
-        body: body,
-        json: json,
-        error: error,
-        scheduleRebuild: scheduleRebuild,
-        parseColor: parseColor,
-      );
-    } catch (e, st) {
-      developer.log('[Drawings] POST error: $e\n$st');
-      return json({'ok': false, 'error': e.toString()});
-    }
+Future<shelf.Response> _drawingsPost(
+  _DrawingsRequestContext ctx,
+  List<String> sub,
+) async {
+  try {
+    return await handleDrawingsPost(
+      ctx.request,
+      ctx.cubit,
+      sub,
+      body: ctx.body,
+      json: ctx.json,
+      error: ctx.error,
+      scheduleRebuild: ctx.scheduleRebuild,
+      parseColor: ctx.parseColor,
+    );
+  } catch (e, st) {
+    developer.log('[Drawings] POST error: $e\n$st');
+    return ctx.json({'ok': false, 'error': e.toString()});
   }
+}
 
-  if (method == 'DELETE') {
-    // DELETE /api/drawings/<board>/<id>  or  /api/drawings/<board>
-    final boardId = sub.firstOrNull;
-    if (boardId == null) return error('Missing board ID in path');
-    final board = findBoard(cubit, boardId);
-    if (board == null) return error('Board not found: $boardId');
+Future<shelf.Response> _drawingsDelete(
+  _DrawingsRequestContext ctx,
+  List<String> sub,
+) async {
+  // DELETE /api/drawings/<board>/<id>  or  /api/drawings/<board>
+  final boardId = sub.firstOrNull;
+  if (boardId == null) return ctx.error('Missing board ID in path');
+  final board = findBoard(ctx.cubit, boardId);
+  if (board == null) return ctx.error('Board not found: $boardId');
 
-    final drawingId = sub.length >= 2 ? sub[1] : null;
-    if (drawingId != null) {
-      await cubit.removeDrawing(drawingId, boardId: board.id);
-      scheduleRebuild();
-      return json({'ok': true, 'removed': drawingId});
-    } else {
-      // Clear all drawings
-      for (final d in board.drawings) {
-        await cubit.removeDrawing(d.id, boardId: board.id);
-      }
-      scheduleRebuild();
-      return json({'ok': true, 'cleared': board.drawings.length});
+  final drawingId = sub.length >= 2 ? sub[1] : null;
+  if (drawingId != null) {
+    await ctx.cubit.removeDrawing(drawingId, boardId: board.id);
+    ctx.scheduleRebuild();
+    return ctx.json({'ok': true, 'removed': drawingId});
+  } else {
+    // Clear all drawings
+    for (final d in board.drawings) {
+      await ctx.cubit.removeDrawing(d.id, boardId: board.id);
     }
+    ctx.scheduleRebuild();
+    return ctx.json({'ok': true, 'cleared': board.drawings.length});
   }
-
-  return notFound('Unknown drawings route');
 }
 
 /// Outcome of a stroke builder in [handleDrawingsPost]: either an immediate

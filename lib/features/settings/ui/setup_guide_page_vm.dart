@@ -12,6 +12,11 @@ import 'package:yoloit/ui/components/typography/label.dart';
 
 // ── Embedded (Settings panel) ─────────────────────────────────────────────────
 
+/// Test seam for substituting the dependency check with a fake result.
+@visibleForTesting
+Future<SetupCheckResult> Function() debugSetupCheckRunner =
+    SetupCheckService.check;
+
 /// Embedded version used inside the Settings panel (no dialog chrome).
 class SetupGuideEmbedded extends StatefulWidget {
   const SetupGuideEmbedded({super.key});
@@ -76,7 +81,7 @@ mixin _SetupGuideBase<T extends StatefulWidget> on State<T> {
 
   Future<void> _runChecks({bool silent = false}) async {
     if (!silent) setState(() => _loading = true);
-    final result = await SetupCheckService.check();
+    final result = await debugSetupCheckRunner();
     if (mounted) setState(() { _result = result; _loading = false; });
   }
 }
@@ -530,32 +535,42 @@ class _DependencyCardState extends State<_DependencyCard> {
     });
 
     _sub = SetupCheckService.install(action).listen(
-      (line) {
-        if (mounted) {
-          setState(() => _output.add(line));
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (_scrollController.hasClients) {
-              _scrollController.animateTo(
-                _scrollController.position.maxScrollExtent,
-                duration: const Duration(milliseconds: 150),
-                curve: Curves.easeOut,
-              );
-            }
-          });
-        }
-      },
-      onDone: () {
-        if (!mounted) return;
-        final success = _output.any((l) => l.contains('✅'));
-        setState(() => _phase = success ? _Phase.done : _Phase.failed);
-        if (success) {
-          Future.delayed(const Duration(milliseconds: 800), widget.onInstalled);
-        }
-      },
-      onError: (Object e) {
-        if (mounted) setState(() { _output.add('❌ $e'); _phase = _Phase.failed; });
-      },
+      _handleInstallLine,
+      onDone: _handleInstallDone,
+      onError: _handleInstallError,
     );
+  }
+
+  void _handleInstallLine(String line) {
+    if (mounted) {
+      setState(() => _output.add(line));
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 150),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+    }
+  }
+
+  void _handleInstallDone() {
+    if (!mounted) return;
+    final success = _output.any((l) => l.contains('✅'));
+    _finishInstall(success);
+  }
+
+  void _finishInstall(bool success) {
+    setState(() => _phase = success ? _Phase.done : _Phase.failed);
+    if (success) {
+      Future.delayed(const Duration(milliseconds: 800), widget.onInstalled);
+    }
+  }
+
+  void _handleInstallError(Object e) {
+    if (mounted) setState(() { _output.add('❌ $e'); _phase = _Phase.failed; });
   }
 
   ({Color color, IconData icon}) _statusStyle(AppColorScheme colors) {
@@ -795,26 +810,29 @@ class _OutputLog extends StatelessWidget {
             child: ListView.builder(
               controller: scrollController,
               itemCount: output.length,
-              itemBuilder: (_, i) {
-                final line = output[i];
-                final isSuccess = line.contains('✅');
-                final isError = line.contains('❌');
-                return Text(
-                  line,
-                  style: TextStyle(
-                    fontFamily: 'monospace',
-                    fontSize: 9,
-                    color: isSuccess
-                        ? colors.accentGreen
-                        : isError
-                            ? Colors.red.shade300
-                            : Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface,
-                  ),
-                );
-              },
+              itemBuilder: _buildOutputLine,
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildOutputLine(BuildContext context, int i) {
+    final colors = context.appColors;
+    final line = output[i];
+    final isSuccess = line.contains('✅');
+    final isError = line.contains('❌');
+    return Text(
+      line,
+      style: TextStyle(
+        fontFamily: 'monospace',
+        fontSize: 9,
+        color: isSuccess
+            ? colors.accentGreen
+            : isError
+                ? Colors.red.shade300
+                : Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface,
       ),
     );
   }

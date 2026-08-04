@@ -44,7 +44,7 @@ extension _AssistantVoicePhases on _YoloAssistantWidgetState {
 
     // Build WAV from raw PCM (16-bit mono 16 kHz).
     return pcmBytes != null && pcmBytes.isNotEmpty
-        ? _YoloAssistantWidgetState._buildWavFromPcm(pcmBytes)
+        ? buildWavFromPcm(pcmBytes)
         : null;
   }
 
@@ -53,12 +53,10 @@ extension _AssistantVoicePhases on _YoloAssistantWidgetState {
   Future<_AsrTranscriptionRun> _beginAsrRun(
     VoiceSettings voiceSettings,
   ) async {
-    final asrMode =
-        !voiceSettings.useCloudAsr
-            ? 'local'
-            : voiceSettings.useChatModelForCloudAsr
-            ? 'direct_audio'
-            : 'cloud';
+    final asrMode = resolveAsrMode(
+      useCloudAsr: voiceSettings.useCloudAsr,
+      useChatModelForCloudAsr: voiceSettings.useChatModelForCloudAsr,
+    );
     // Resolve the effective ASR model for debug display (mirrors CloudAsrService logic).
     String? asrResolvedModel;
     String? asrProviderName;
@@ -241,9 +239,10 @@ extension _AssistantVoicePhases on _YoloAssistantWidgetState {
     final text = transcript.trim();
     run.transcriptChars = text.length;
     if (text.isNotEmpty) {
-      final current = _inputController.text.trim();
-      _inputController.text =
-          current.isEmpty ? text : '$current ${text.trim()}';
+      _inputController.text = mergeTranscriptIntoInput(
+        _inputController.text,
+        text,
+      );
       _inputController.selection = TextSelection.collapsed(
         offset: _inputController.text.length,
       );
@@ -260,17 +259,17 @@ extension _AssistantVoicePhases on _YoloAssistantWidgetState {
   ) async {
     run.stopwatch.stop();
     final completedAt = DateTime.now().toIso8601String();
-    _pendingAsrDebug = {
-      'mode': run.mode,
-      'status': run.status,
-      'startedAt': run.startedAt,
-      'completedAt': completedAt,
-      'durationMs': run.stopwatch.elapsedMilliseconds,
-      'transcriptChars': run.transcriptChars,
-      if (run.resolvedModel != null) 'model': run.resolvedModel,
-      if (run.providerName != null) 'provider': run.providerName,
-      if (run.error != null) 'error': run.error,
-    };
+    _pendingAsrDebug = buildAsrDebugInfo(
+      mode: run.mode,
+      status: run.status,
+      startedAt: run.startedAt,
+      completedAt: completedAt,
+      durationMs: run.stopwatch.elapsedMilliseconds,
+      transcriptChars: run.transcriptChars,
+      resolvedModel: run.resolvedModel,
+      providerName: run.providerName,
+      error: run.error,
+    );
     // Save a persistent copy for ASR benchmarking.
     if (wavBytes != null && wavBytes.isNotEmpty) {
       try {
@@ -325,18 +324,18 @@ extension _AssistantVoicePhases on _YoloAssistantWidgetState {
     // Companion metadata JSON — useful for replay benchmarks.
     final transcript =
         run.transcriptChars > 0 ? (_inputController.text.trim()) : '';
-    final meta = {
-      'recordedAt': run.startedAt,
-      'completedAt': completedAt,
-      'durationMs': run.stopwatch.elapsedMilliseconds,
-      'asrMode': run.mode,
-      'asrStatus': run.status,
-      if (run.resolvedModel != null) 'asrModel': run.resolvedModel,
-      if (run.providerName != null) 'asrProvider': run.providerName,
-      'transcript': transcript,
-      'transcriptChars': run.transcriptChars,
-      if (run.error != null) 'error': run.error,
-    };
+    final meta = buildAsrSampleMetadata(
+      recordedAt: run.startedAt,
+      completedAt: completedAt,
+      durationMs: run.stopwatch.elapsedMilliseconds,
+      asrMode: run.mode,
+      asrStatus: run.status,
+      resolvedModel: run.resolvedModel,
+      providerName: run.providerName,
+      transcript: transcript,
+      transcriptChars: run.transcriptChars,
+      error: run.error,
+    );
     await File(
       '${samplesDir.path}/$ts.json',
     ).writeAsString(const JsonEncoder.withIndent('  ').convert(meta));

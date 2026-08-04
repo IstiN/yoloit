@@ -48,80 +48,128 @@ Widget buildCardFromContent(
   final type = (content['type'] as String?) ?? _typeFromId(nodeId);
 
   return switch (type) {
-    'agent' => AgentCard(
-        props: AgentCardProps.fromJson(content),
-        // Live xterm view backed by the guest registry — raw PTY bytes arrive
-        // over WebSocket and are piped straight into xterm.dart so rendering
-        // (colors, box-drawing, scrollback, cursor) matches the native client.
-        body: AgentCardProps.fromJson(content).isIdle
-            ? null
-            : GuestTerminalView(
-                nodeId: nodeId,
-                onInput: callbacks.onTerminalInput != null
-                    ? (data) => callbacks.onTerminalInput!(nodeId, data)
-                    : null,
-              ),
-        onTerminalInput: callbacks.onTerminalInput != null
-            ? (data) => callbacks.onTerminalInput!(nodeId, data)
-            : null,
-        onSessionStart: callbacks.onSessionStart != null
-            ? () => callbacks.onSessionStart!(nodeId)
-            : null,
-      ),
-    'workspace' => WorkspaceCard(
-        props: WorkspaceCardProps.fromJson(content),
-        onAddFolder: callbacks.onAddFolder != null
-            ? () => callbacks.onAddFolder!(nodeId)
-            : null,
-        onCreateSession: callbacks.onCreateSession != null
-            ? () => callbacks.onCreateSession!(nodeId)
-            : null,
-      ),
+    'agent' => _buildAgentCard(nodeId, content, callbacks),
+    'workspace' => _buildWorkspaceCard(nodeId, content, callbacks),
     'repo' => RepoCard(props: RepoCardProps.fromJson(content)),
     'branch' => BranchCard(props: BranchCardProps.fromJson(content)),
-    'run' => RunCard(
-        props: RunCardProps.fromJson(content),
-        onStart: callbacks.onRunStart != null
-            ? () => callbacks.onRunStart!(nodeId)
-            : null,
-        onStop: callbacks.onRunStop != null
-            ? () => callbacks.onRunStop!(nodeId)
-            : null,
-        onRestart: callbacks.onRunRestart != null
-            ? () => callbacks.onRunRestart!(nodeId)
-            : null,
-      ),
-    'editor' => EditorCard(
-        props: EditorCardProps.fromJson(content),
-        onSwitchTab: callbacks.onEditorSwitchTab != null
-            ? (idx) => callbacks.onEditorSwitchTab!(nodeId, idx)
-            : null,
-        onSave: callbacks.onEditorSave != null
-            ? () => callbacks.onEditorSave!(nodeId)
-            : null,
-        onContentUpdate: callbacks.onEditorContentUpdate != null
-            ? (text) => callbacks.onEditorContentUpdate!(nodeId, text)
-            : null,
-      ),
-    'files' => FilesCard(
-        props: FilesCardProps.fromJson(content),
-        onFileSelect: callbacks.onFileSelect != null
-            ? (path) => callbacks.onFileSelect!(nodeId, path)
-            : null,
-      ),
-    'tree' => FileTreeCard(
-        props: FileTreeCardProps.fromJson(content),
-        onToggle: callbacks.onTreeToggle != null
-            ? (path) => callbacks.onTreeToggle!(nodeId, path)
-            : null,
-        onSelect: callbacks.onTreeSelect != null
-            ? (path) => callbacks.onTreeSelect!(nodeId, path)
-            : null,
-      ),
+    'run' => _buildRunCard(nodeId, content, callbacks),
+    'editor' => _buildEditorCard(nodeId, content, callbacks),
+    'files' => _buildFilesCard(nodeId, content, callbacks),
+    'tree' => _buildFileTreeCard(nodeId, content, callbacks),
     'diff' => DiffCard(props: DiffCardProps.fromJson(content)),
     'session' => SessionCard(props: SessionCardProps.fromJson(content)),
     _ => _FallbackCard(nodeId: nodeId, content: content),
   };
+}
+
+Widget _buildAgentCard(
+  String nodeId,
+  Map<String, dynamic> content,
+  CardEventCallbacks callbacks,
+) {
+  return AgentCard(
+    props: AgentCardProps.fromJson(content),
+    // Live xterm view backed by the guest registry — raw PTY bytes arrive
+    // over WebSocket and are piped straight into xterm.dart so rendering
+    // (colors, box-drawing, scrollback, cursor) matches the native client.
+    body: AgentCardProps.fromJson(content).isIdle
+        ? null
+        : GuestTerminalView(
+            nodeId: nodeId,
+            onInput: callbacks.onTerminalInput != null
+                ? (data) => callbacks.onTerminalInput!(nodeId, data)
+                : null,
+          ),
+    onTerminalInput: callbacks.onTerminalInput != null
+        ? (data) => callbacks.onTerminalInput!(nodeId, data)
+        : null,
+    onSessionStart: callbacks.onSessionStart != null
+        ? () => callbacks.onSessionStart!(nodeId)
+        : null,
+  );
+}
+
+Widget _buildWorkspaceCard(
+  String nodeId,
+  Map<String, dynamic> content,
+  CardEventCallbacks callbacks,
+) {
+  return WorkspaceCard(
+    props: WorkspaceCardProps.fromJson(content),
+    onAddFolder: callbacks.onAddFolder != null
+        ? () => callbacks.onAddFolder!(nodeId)
+        : null,
+    onCreateSession: callbacks.onCreateSession != null
+        ? () => callbacks.onCreateSession!(nodeId)
+        : null,
+  );
+}
+
+Widget _buildRunCard(
+  String nodeId,
+  Map<String, dynamic> content,
+  CardEventCallbacks callbacks,
+) {
+  return RunCard(
+    props: RunCardProps.fromJson(content),
+    onStart: callbacks.onRunStart != null
+        ? () => callbacks.onRunStart!(nodeId)
+        : null,
+    onStop: callbacks.onRunStop != null
+        ? () => callbacks.onRunStop!(nodeId)
+        : null,
+    onRestart: callbacks.onRunRestart != null
+        ? () => callbacks.onRunRestart!(nodeId)
+        : null,
+  );
+}
+
+Widget _buildEditorCard(
+  String nodeId,
+  Map<String, dynamic> content,
+  CardEventCallbacks callbacks,
+) {
+  return EditorCard(
+    props: EditorCardProps.fromJson(content),
+    onSwitchTab: callbacks.onEditorSwitchTab != null
+        ? (idx) => callbacks.onEditorSwitchTab!(nodeId, idx)
+        : null,
+    onSave: callbacks.onEditorSave != null
+        ? () => callbacks.onEditorSave!(nodeId)
+        : null,
+    onContentUpdate: callbacks.onEditorContentUpdate != null
+        ? (text) => callbacks.onEditorContentUpdate!(nodeId, text)
+        : null,
+  );
+}
+
+Widget _buildFilesCard(
+  String nodeId,
+  Map<String, dynamic> content,
+  CardEventCallbacks callbacks,
+) {
+  return FilesCard(
+    props: FilesCardProps.fromJson(content),
+    onFileSelect: callbacks.onFileSelect != null
+        ? (path) => callbacks.onFileSelect!(nodeId, path)
+        : null,
+  );
+}
+
+Widget _buildFileTreeCard(
+  String nodeId,
+  Map<String, dynamic> content,
+  CardEventCallbacks callbacks,
+) {
+  return FileTreeCard(
+    props: FileTreeCardProps.fromJson(content),
+    onToggle: callbacks.onTreeToggle != null
+        ? (path) => callbacks.onTreeToggle!(nodeId, path)
+        : null,
+    onSelect: callbacks.onTreeSelect != null
+        ? (path) => callbacks.onTreeSelect!(nodeId, path)
+        : null,
+  );
 }
 
 String _typeFromId(String id) {

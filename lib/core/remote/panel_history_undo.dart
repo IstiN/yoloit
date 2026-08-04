@@ -164,31 +164,83 @@ PanelUndoPlan<P> planPanelHistoryUndo<P>({
     final before = event.before == null ? null : panelFromJson(event.before!);
     final after = event.after == null ? null : panelFromJson(event.after!);
 
-    if (after != null &&
-        before == null &&
-        current != null &&
-        panelMatchesCreateUndo(current, after, panelToJson)) {
-      return PanelUndoPlan.removeCreated(after, event.opId);
-    }
-    if (before != null &&
-        current != null &&
-        !panelSnapshotsEqual(current, before, panelToJson)) {
-      final coalescedEvent = coalescedPanelUpdateStart(
-        events,
-        index,
-        previousInRun: previousInRun,
-      );
-      final coalescedBefore = coalescedEvent.before;
-      final snapshot =
-          coalescedBefore == null ? before : panelFromJson(coalescedBefore);
-      final latestAfter =
-          event.after == null ? null : panelFromJson(event.after!);
-      return PanelUndoPlan.restoreSnapshot(snapshot, latestAfter, event.opId);
-    }
-    if (before != null && current == null && event.type == 'panel.deleted') {
-      return PanelUndoPlan.restoreDeleted(before, event.entityId, event.opId);
-    }
+    final plan =
+        _planRemoveCreated(event, current, before, after, panelToJson) ??
+        _planRestoreSnapshot(
+          events: events,
+          index: index,
+          event: event,
+          current: current,
+          before: before,
+          after: after,
+          panelFromJson: panelFromJson,
+          panelToJson: panelToJson,
+          previousInRun: previousInRun,
+        ) ??
+        _planRestoreDeleted(event, current, before);
+    if (plan != null) return plan;
   }
 
   return const PanelUndoPlan.none();
+}
+
+/// Creation undo: the event created a panel that still matches the recorded
+/// after-snapshot (ignoring z-index), so undo removes it.
+PanelUndoPlan<P>? _planRemoveCreated<P>(
+  RemoteHistoryEvent event,
+  P? current,
+  P? before,
+  P? after,
+  Map<String, dynamic> Function(P panel) panelToJson,
+) {
+  if (after != null &&
+      before == null &&
+      current != null &&
+      panelMatchesCreateUndo(current, after, panelToJson)) {
+    return PanelUndoPlan.removeCreated(after, event.opId);
+  }
+  return null;
+}
+
+/// Mutation undo: the panel drifted from the recorded before-snapshot, so
+/// undo restores the (possibly coalesced) before-snapshot.
+PanelUndoPlan<P>? _planRestoreSnapshot<P>({
+  required List<RemoteHistoryEvent> events,
+  required int index,
+  required RemoteHistoryEvent event,
+  required P? current,
+  required P? before,
+  required P? after,
+  required P Function(Map<String, dynamic> json) panelFromJson,
+  required Map<String, dynamic> Function(P panel) panelToJson,
+  required bool Function(RemoteHistoryEvent previous, RemoteHistoryEvent latest)?
+  previousInRun,
+}) {
+  if (before != null &&
+      current != null &&
+      !panelSnapshotsEqual(current, before, panelToJson)) {
+    final coalescedEvent = coalescedPanelUpdateStart(
+      events,
+      index,
+      previousInRun: previousInRun,
+    );
+    final coalescedBefore = coalescedEvent.before;
+    final snapshot =
+        coalescedBefore == null ? before : panelFromJson(coalescedBefore);
+    return PanelUndoPlan.restoreSnapshot(snapshot, after, event.opId);
+  }
+  return null;
+}
+
+/// Deletion undo: the event deleted a panel that no longer exists, so undo
+/// restores the deleted snapshot.
+PanelUndoPlan<P>? _planRestoreDeleted<P>(
+  RemoteHistoryEvent event,
+  P? current,
+  P? before,
+) {
+  if (before != null && current == null && event.type == 'panel.deleted') {
+    return PanelUndoPlan.restoreDeleted(before, event.entityId, event.opId);
+  }
+  return null;
 }

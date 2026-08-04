@@ -75,6 +75,33 @@ TerminalShortcut? terminalShortcutSequence(
   required bool isAlt,
   required bool hasSelection,
 }) {
+  return _exactModifierShortcuts(
+        key,
+        isCmd: isCmd,
+        isCtrl: isCtrl,
+        isAlt: isAlt,
+      ) ??
+      _backspaceShortcuts(key, isCmd: isCmd, isCtrl: isCtrl, isAlt: isAlt) ??
+      _arrowShortcuts(key, isCmd: isCmd, isAlt: isAlt) ??
+      _cmdScreenSearchShortcuts(key, isCmd: isCmd) ??
+      _cmdFontFileShortcuts(key, isCmd: isCmd, isCtrl: isCtrl, isAlt: isAlt) ??
+      _cmdSelectCopyShortcuts(
+        key,
+        isCmd: isCmd,
+        isCtrl: isCtrl,
+        isAlt: isAlt,
+        hasSelection: hasSelection,
+      );
+}
+
+/// Rules that require an exact modifier combination (no other modifiers):
+/// Ctrl+C → SIGINT and Cmd+V → smart paste.
+TerminalShortcut? _exactModifierShortcuts(
+  LogicalKeyboardKey key, {
+  required bool isCmd,
+  required bool isCtrl,
+  required bool isAlt,
+}) {
   // Ctrl+C → SIGINT. Handle explicitly so Flutter focus/copy shortcuts cannot
   // swallow it before the terminal backend sees ETX.
   if (isCtrl && !isCmd && !isAlt && key == LogicalKeyboardKey.keyC) {
@@ -86,6 +113,17 @@ TerminalShortcut? terminalShortcutSequence(
     return const TerminalActionShortcut(TerminalShortcutAction.paste);
   }
 
+  return null;
+}
+
+/// Backspace rules: Cmd+Backspace erases to start of line, Option/Ctrl+Backspace
+/// erases word backward.
+TerminalShortcut? _backspaceShortcuts(
+  LogicalKeyboardKey key, {
+  required bool isCmd,
+  required bool isCtrl,
+  required bool isAlt,
+}) {
   // Cmd+Backspace → erase to start of line (Ctrl+U)
   if (isCmd && key == LogicalKeyboardKey.backspace) {
     return const TerminalPtyShortcut('\x15');
@@ -96,6 +134,15 @@ TerminalShortcut? terminalShortcutSequence(
     return const TerminalPtyShortcut('\x17');
   }
 
+  return null;
+}
+
+/// Arrow-key rules: Cmd+←/→ jump to line start/end, Option+←/→ move by word.
+TerminalShortcut? _arrowShortcuts(
+  LogicalKeyboardKey key, {
+  required bool isCmd,
+  required bool isAlt,
+}) {
   // Cmd+Left → beginning of line (Ctrl+A)
   if (isCmd && key == LogicalKeyboardKey.arrowLeft) {
     return const TerminalPtyShortcut('\x01');
@@ -116,6 +163,14 @@ TerminalShortcut? terminalShortcutSequence(
     return const TerminalPtyShortcut('\x1bf');
   }
 
+  return null;
+}
+
+/// Cmd+K → clear screen, Cmd+F → open search.
+TerminalShortcut? _cmdScreenSearchShortcuts(
+  LogicalKeyboardKey key, {
+  required bool isCmd,
+}) {
   // Cmd+K → clear screen (Ctrl+L)
   if (isCmd && key == LogicalKeyboardKey.keyK) {
     return const TerminalPtyShortcut('\x0c');
@@ -126,6 +181,16 @@ TerminalShortcut? terminalShortcutSequence(
     return const TerminalActionShortcut(TerminalShortcutAction.openSearch);
   }
 
+  return null;
+}
+
+/// Cmd-only rules: Cmd+O → quick file search, Cmd+= / Cmd+- → font size.
+TerminalShortcut? _cmdFontFileShortcuts(
+  LogicalKeyboardKey key, {
+  required bool isCmd,
+  required bool isCtrl,
+  required bool isAlt,
+}) {
   // Cmd+O → global quick file search (prevent terminal from swallowing it)
   if (isCmd && !isCtrl && !isAlt && key == LogicalKeyboardKey.keyO) {
     return const TerminalActionShortcut(TerminalShortcutAction.openFileSearch);
@@ -145,6 +210,17 @@ TerminalShortcut? terminalShortcutSequence(
     );
   }
 
+  return null;
+}
+
+/// Cmd-only rules: Cmd+A → select all, Cmd+C → copy selection.
+TerminalShortcut? _cmdSelectCopyShortcuts(
+  LogicalKeyboardKey key, {
+  required bool isCmd,
+  required bool isCtrl,
+  required bool isAlt,
+  required bool hasSelection,
+}) {
   // Cmd+A → select all terminal buffer content
   if (isCmd && !isCtrl && !isAlt && key == LogicalKeyboardKey.keyA) {
     return const TerminalActionShortcut(TerminalShortcutAction.selectAll);
@@ -175,10 +251,46 @@ TerminalShortcut? terminalKeyEventShortcut(
   required bool isAlt,
   required bool awaitingApproval,
 }) {
+  return _ctrlCRule(key, isCmd: isCmd, isCtrl: isCtrl, isAlt: isAlt) ??
+      _shiftEnterRule(
+        key,
+        isShift: isShift,
+        isCmd: isCmd,
+        isCtrl: isCtrl,
+        isAlt: isAlt,
+      ) ??
+      _approvalEnterRule(
+        key,
+        isShift: isShift,
+        isCmd: isCmd,
+        isCtrl: isCtrl,
+        isAlt: isAlt,
+        awaitingApproval: awaitingApproval,
+      ) ??
+      _cmdVRule(key, isCmd: isCmd, isCtrl: isCtrl, isAlt: isAlt);
+}
+
+/// Ctrl+C → SIGINT.
+TerminalShortcut? _ctrlCRule(
+  LogicalKeyboardKey key, {
+  required bool isCmd,
+  required bool isCtrl,
+  required bool isAlt,
+}) {
   if (key == LogicalKeyboardKey.keyC && isCtrl && !isCmd && !isAlt) {
     return const TerminalPtyShortcut('\x03');
   }
-  // Shift+Enter → ESC+CR (newline-in-input for Copilot/Claude Code)
+  return null;
+}
+
+/// Shift+Enter → ESC+CR (newline-in-input for Copilot/Claude Code)
+TerminalShortcut? _shiftEnterRule(
+  LogicalKeyboardKey key, {
+  required bool isShift,
+  required bool isCmd,
+  required bool isCtrl,
+  required bool isAlt,
+}) {
   if (key == LogicalKeyboardKey.enter &&
       isShift &&
       !isCmd &&
@@ -186,7 +298,18 @@ TerminalShortcut? terminalKeyEventShortcut(
       !isAlt) {
     return const TerminalPtyShortcut('\x1b\r');
   }
-  // Plain Enter while awaiting approval → immediately signal ThinkingPhase.
+  return null;
+}
+
+/// Plain Enter while awaiting approval → immediately signal ThinkingPhase.
+TerminalShortcut? _approvalEnterRule(
+  LogicalKeyboardKey key, {
+  required bool isShift,
+  required bool isCmd,
+  required bool isCtrl,
+  required bool isAlt,
+  required bool awaitingApproval,
+}) {
   if (key == LogicalKeyboardKey.enter &&
       !isShift &&
       !isCmd &&
@@ -197,8 +320,17 @@ TerminalShortcut? terminalKeyEventShortcut(
       TerminalShortcutAction.notifyEnterPressed,
     );
   }
-  // Cmd+V — already handled by terminalShortcutSequence; block xterm's native
-  // paste so text isn't inserted twice.
+  return null;
+}
+
+/// Cmd+V — already handled by terminalShortcutSequence; block xterm's native
+/// paste so text isn't inserted twice.
+TerminalShortcut? _cmdVRule(
+  LogicalKeyboardKey key, {
+  required bool isCmd,
+  required bool isCtrl,
+  required bool isAlt,
+}) {
   if (key == LogicalKeyboardKey.keyV && isCmd && !isCtrl && !isAlt) {
     return const TerminalActionShortcut(
       TerminalShortcutAction.blockNativePaste,

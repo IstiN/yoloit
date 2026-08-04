@@ -1,9 +1,11 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:local_models_flutter/runtime/embedded_gemma_tool_calls.dart';
 import 'package:yoloit/core/utils/json_utils.dart';
 import 'package:yoloit/core/utils/string_utils.dart';
 import 'package:yoloit/features/board/assistant/yolo_assistant_tool_errors.dart';
+import 'package:yoloit/features/board/model/board_models.dart';
 
 /// Pure message/log helpers extracted from `_YoloAssistantWidgetState` so the
 /// text-processing logic can be unit-tested without pumping the widget.
@@ -277,4 +279,261 @@ String buildMicrophonePermissionHintText({
       'If the system prompt does not appear, macOS has already saved a decision for this exact debug bundle. '
       'Open Privacy & Security → Microphone and enable $appName. If it is missing from the list, reset the saved decision and press Request again:\n\n'
       '$resetCommand';
+}
+
+// ── Send/voice phase helpers (extracted verbatim from the widget state) ──────
+
+/// Picks the text stored in the LLM history and the text shown in the chat
+/// bubble for an outgoing message.
+({String text, String displayContent}) resolveOutgoingMessageContent({
+  required String rawText,
+  required bool hasAudioContent,
+  required bool mirrorToOverlay,
+}) {
+  // When sending audio directly to LLM: no voice-prefix, show mic icon in chat.
+  // For transcribed voice: prepend ASR context for the LLM.
+  final String text;
+  final String displayContent;
+  if (hasAudioContent) {
+    // Audio sent directly — display mic icon, no prefix for LLM history
+    // (audio IS the content).
+    displayContent = '🎤 Voice message';
+    text = displayContent; // stored in history for display only
+  } else if (mirrorToOverlay) {
+    text =
+        '[Voice message — transcribed via speech recognition, '
+        'may contain recognition errors]\n$rawText';
+    displayContent = text;
+  } else {
+    text = rawText;
+    displayContent = text;
+  }
+  return (text: text, displayContent: displayContent);
+}
+
+/// Replaces the last matching `⏳ running:` overlay tool log entry in place
+/// with [doneEntry] (so the overlay shows ✅/❌ in-place rather than showing
+/// both states at once), or appends it when no running entry exists.
+void upsertOverlayToolLogEntry(List<String> overlayToolLogs, String doneEntry) {
+  final runningIdx = overlayToolLogs.lastIndexWhere(
+    (e) => e.startsWith('⏳ running:'),
+  );
+  if (runningIdx >= 0) {
+    overlayToolLogs[runningIdx] = doneEntry;
+  } else {
+    overlayToolLogs.add(doneEntry);
+  }
+}
+
+/// Records the tool start timestamp under the function name, the toolCallId,
+/// AND the CLI command so the lookup in onToolCompleted (keyed by CLI
+/// command) succeeds.
+void recordPendingToolStarts(
+  Map<String, String> pendingToolStarts, {
+  required String toolName,
+  required String toolCallId,
+  required String? cliCommand,
+}) {
+  final now = DateTime.now().toIso8601String();
+  pendingToolStarts[toolName] = now;
+  pendingToolStarts[toolCallId] = now;
+  if (cliCommand != null) pendingToolStarts[cliCommand] = now;
+}
+
+/// Debug-session model info entries for a cloud provider config.
+Map<String, String> cloudModelDebugInfo({
+  required String model,
+  required String providerName,
+  required String baseUrl,
+}) => {'modelId': model, 'modelProvider': providerName, 'modelBaseUrl': baseUrl};
+
+/// Computes the overlay assistant status from the recording/transcribing/
+/// generating flags when no status was forced.
+String computeAssistantOverlayStatus({
+  String? forcedStatus,
+  required bool isRecordingMic,
+  required bool isTranscribingMic,
+  required bool isGeneratingReply,
+  required bool receivedAssistantToken,
+  required String draft,
+}) =>
+    forcedStatus ??
+    (isRecordingMic
+        ? 'listening'
+        : isTranscribingMic
+        ? 'processing'
+        : isGeneratingReply
+        ? (receivedAssistantToken ? 'responding' : 'thinking')
+        : draft.isNotEmpty
+        ? 'ready'
+        : 'idle');
+
+/// Strips the voice prefix from a user message for display (the prefix is
+/// kept in the LLM context but hidden in the UI).
+String assistantDisplayContent({required bool isUser, required String content}) =>
+    isUser && content.startsWith('[Voice message')
+        ? content.substring(content.indexOf('\n') + 1).trim()
+        : content;
+
+/// Derives a short session name from the first user message.
+String deriveAssistantSessionName(List<Map<String, dynamic>> messages) {
+  final firstUserMsg = messages.firstWhere(
+    (m) => m['role'] == 'user',
+    orElse: () => <String, dynamic>{},
+  );
+  final firstText = (firstUserMsg['content'] as String? ?? '').trim();
+  final rawName =
+      firstText.length > 60 ? firstText.substring(0, 60) : firstText;
+  return rawName.isEmpty ? 'Yolo session' : rawName.replaceAll('\n', ' ');
+}
+
+/// One line per board, marking the current one — for the LLM context.
+String availableBoardsSummary(
+  List<BoardDocument> boards,
+  String? currentBoardId,
+) => boards
+    .map((board) {
+      final marker = board.id == currentBoardId ? ' (current)' : '';
+      return '- ${board.name} [${board.id}]$marker';
+    })
+    .join('\n');
+
+/// One line per panel of [board], sorted by descending z-index — for the
+/// LLM context. Empty string when there is no active board.
+String boardPanelsSummary(BoardDocument? board) {
+  if (board == null) return '';
+  final panels = [...board.panels]
+    ..sort((a, b) => b.zIndex.compareTo(a.zIndex));
+  return panels
+      .map((panel) => '- ${panel.title} [${panel.type}] (${panel.id})')
+      .join('\n');
+}
+
+/// Rough token estimate: ~4 characters per token.
+int estimateTokenCount(String text) {
+  final normalized = text.trim();
+  if (normalized.isEmpty) return 0;
+  return (normalized.length / 4).ceil();
+}
+
+/// Formats an exception thrown during send for display in the chat bubble.
+String formatAssistantError(Object error) {
+  final raw = error.toString();
+  if (raw.contains('flm_dispatch_json')) {
+    return 'Local model runtime mismatch: missing symbol "flm_dispatch_json". '
+        'Please update/reinstall the selected local model runtime in Settings → AI Models, then restart YoLoIT.';
+  }
+  return 'Error: $raw';
+}
+
+/// Computes the ASR mode from the voice settings flags.
+String resolveAsrMode({
+  required bool useCloudAsr,
+  required bool useChatModelForCloudAsr,
+}) =>
+    !useCloudAsr
+        ? 'local'
+        : useChatModelForCloudAsr
+        ? 'direct_audio'
+        : 'cloud';
+
+/// Merges a fresh transcript into the current input field text.
+String mergeTranscriptIntoInput(String currentText, String transcript) {
+  final current = currentText.trim();
+  return current.isEmpty ? transcript : '$current ${transcript.trim()}';
+}
+
+/// Builds the `_pendingAsrDebug` map recorded after a transcription run.
+Map<String, dynamic> buildAsrDebugInfo({
+  required String mode,
+  required String status,
+  required String startedAt,
+  required String completedAt,
+  required int durationMs,
+  required int transcriptChars,
+  String? resolvedModel,
+  String? providerName,
+  String? error,
+}) => {
+  'mode': mode,
+  'status': status,
+  'startedAt': startedAt,
+  'completedAt': completedAt,
+  'durationMs': durationMs,
+  'transcriptChars': transcriptChars,
+  if (resolvedModel != null) 'model': resolvedModel,
+  if (providerName != null) 'provider': providerName,
+  if (error != null) 'error': error,
+};
+
+/// Builds the companion metadata JSON persisted next to a saved ASR sample —
+/// useful for replay benchmarks.
+Map<String, dynamic> buildAsrSampleMetadata({
+  required String recordedAt,
+  required String completedAt,
+  required int durationMs,
+  required String asrMode,
+  required String asrStatus,
+  required String transcript,
+  required int transcriptChars,
+  String? resolvedModel,
+  String? providerName,
+  String? error,
+}) => {
+  'recordedAt': recordedAt,
+  'completedAt': completedAt,
+  'durationMs': durationMs,
+  'asrMode': asrMode,
+  'asrStatus': asrStatus,
+  if (resolvedModel != null) 'asrModel': resolvedModel,
+  if (providerName != null) 'asrProvider': providerName,
+  'transcript': transcript,
+  'transcriptChars': transcriptChars,
+  if (error != null) 'error': error,
+};
+
+/// Builds a standard WAV file from raw PCM-16bit mono 16kHz bytes.
+Uint8List buildWavFromPcm(Uint8List pcm) {
+  const sampleRate = 16000;
+  const numChannels = 1;
+  const bitsPerSample = 16;
+  const byteRate = sampleRate * numChannels * bitsPerSample ~/ 8;
+  const blockAlign = numChannels * bitsPerSample ~/ 8;
+  final dataSize = pcm.length;
+  final fileSize = 36 + dataSize; // RIFF chunk size
+
+  final header = ByteData(44);
+  // RIFF chunk
+  header.setUint8(0, 0x52); // R
+  header.setUint8(1, 0x49); // I
+  header.setUint8(2, 0x46); // F
+  header.setUint8(3, 0x46); // F
+  header.setUint32(4, fileSize, Endian.little);
+  header.setUint8(8, 0x57); // W
+  header.setUint8(9, 0x41); // A
+  header.setUint8(10, 0x56); // V
+  header.setUint8(11, 0x45); // E
+  // fmt chunk
+  header.setUint8(12, 0x66); // f
+  header.setUint8(13, 0x6D); // m
+  header.setUint8(14, 0x74); // t
+  header.setUint8(15, 0x20); // (space)
+  header.setUint32(16, 16, Endian.little); // chunk size = 16 for PCM
+  header.setUint16(20, 1, Endian.little); // PCM = 1
+  header.setUint16(22, numChannels, Endian.little);
+  header.setUint32(24, sampleRate, Endian.little);
+  header.setUint32(28, byteRate, Endian.little);
+  header.setUint16(32, blockAlign, Endian.little);
+  header.setUint16(34, bitsPerSample, Endian.little);
+  // data chunk
+  header.setUint8(36, 0x64); // d
+  header.setUint8(37, 0x61); // a
+  header.setUint8(38, 0x74); // t
+  header.setUint8(39, 0x61); // a
+  header.setUint32(40, dataSize, Endian.little);
+
+  final wav = Uint8List(44 + dataSize);
+  wav.setRange(0, 44, header.buffer.asUint8List());
+  wav.setRange(44, 44 + dataSize, pcm);
+  return wav;
 }

@@ -552,29 +552,36 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   /// Restore provider session IDs from persisted panel state (or config).
   void _restoreSavedProviderSessionIds(Object? raw) {
     // Restore opencode session ID
-    if (_config.provider == 'opencode') {
-      final savedSessionId =
-          widget.panel.state['opencodeSessionId'] ??
-          (raw is Map ? raw['opencodeSessionId'] : null);
-      if (savedSessionId is String && savedSessionId.isNotEmpty) {
-        _opencodeSessionId = savedSessionId;
-      }
-    }
-    if (_config.provider == 'copilot') {
-      final savedSessionId =
-          widget.panel.state['copilotSessionId'] ??
-          (raw is Map ? raw['copilotSessionId'] : null);
-      if (savedSessionId is String && savedSessionId.isNotEmpty) {
-        _copilotSessionId = savedSessionId;
-      }
-    }
-    if (_config.provider == 'cursor') {
-      final savedSessionId =
-          widget.panel.state['cursorSessionId'] ??
-          (raw is Map ? raw['cursorSessionId'] : null);
-      if (savedSessionId is String && savedSessionId.isNotEmpty) {
-        _cursorSessionId = savedSessionId;
-      }
+    _restoreProviderSessionId(
+      'opencode',
+      raw,
+      (sid) => _opencodeSessionId = sid,
+    );
+    _restoreProviderSessionId(
+      'copilot',
+      raw,
+      (sid) => _copilotSessionId = sid,
+    );
+    _restoreProviderSessionId(
+      'cursor',
+      raw,
+      (sid) => _cursorSessionId = sid,
+    );
+  }
+
+  /// Restore a single provider's session ID from persisted panel state
+  /// (or config) when the active provider matches.
+  void _restoreProviderSessionId(
+    String provider,
+    Object? raw,
+    void Function(String) onRestored,
+  ) {
+    if (_config.provider != provider) return;
+    final key = '${provider}SessionId';
+    final savedSessionId =
+        widget.panel.state[key] ?? (raw is Map ? raw[key] : null);
+    if (savedSessionId is String && savedSessionId.isNotEmpty) {
+      onRestored(savedSessionId);
     }
   }
 

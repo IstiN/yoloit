@@ -60,14 +60,31 @@ void main() {
       await File('${tmp.path}/secret.txt').writeAsString('SECRET');
       CollaborationServer.debugWebClientDirOverride = webDir;
 
-      wsPort = await _freePort();
-      httpPort = await _freePort();
-      server = CollaborationServer(
-        onClientMessage: (_, _) {},
-        port: wsPort,
-        httpPort: httpPort,
-      );
-      await server!.start();
+      // Retry with fresh ports: under the full suite many isolates probe and
+      // bind ephemeral ports concurrently, so a port found free by
+      // _freePort() can be grabbed before start() binds it.
+      Object? lastError;
+      for (var attempt = 0; attempt < 5; attempt++) {
+        wsPort = await _freePort();
+        httpPort = await _freePort();
+        server = CollaborationServer(
+          onClientMessage: (_, _) {},
+          port: wsPort,
+          httpPort: httpPort,
+        );
+        try {
+          await server!.start();
+          lastError = null;
+          break;
+        } catch (e) {
+          lastError = e;
+          await server?.stop();
+          server = null;
+        }
+      }
+      if (lastError != null) {
+        throw StateError('no free port after 5 attempts: $lastError');
+      }
     });
 
     tearDown(() async {

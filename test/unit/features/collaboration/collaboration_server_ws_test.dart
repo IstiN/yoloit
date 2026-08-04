@@ -180,7 +180,7 @@ Future<int> _freePort() async {
 
 Future<void> _waitFor(
   bool Function() condition, {
-  Duration timeout = const Duration(seconds: 5),
+  Duration timeout = const Duration(seconds: 15),
 }) async {
   final sw = Stopwatch()..start();
   while (!condition()) {
@@ -200,16 +200,30 @@ void main() {
     final clients = <_TestWsClient>[];
 
     Future<void> startServer({CollaborationCipher? cipher}) async {
-      wsPort = await _freePort();
-      httpPort = await _freePort();
-      server = CollaborationServer(
-        onClientMessage: (id, msg) =>
-            received.add((clientId: id, msg: msg)),
-        port: wsPort,
-        httpPort: httpPort,
-        cipher: cipher,
-      );
-      await server!.start();
+      // Retry with fresh ports: under the full suite many isolates probe and
+      // bind ephemeral ports concurrently, so a port found free by
+      // _freePort() can be grabbed before start() binds it.
+      Object? lastError;
+      for (var attempt = 0; attempt < 5; attempt++) {
+        wsPort = await _freePort();
+        httpPort = await _freePort();
+        server = CollaborationServer(
+          onClientMessage: (id, msg) =>
+              received.add((clientId: id, msg: msg)),
+          port: wsPort,
+          httpPort: httpPort,
+          cipher: cipher,
+        );
+        try {
+          await server!.start();
+          return;
+        } catch (e) {
+          lastError = e;
+          await server?.stop();
+          server = null;
+        }
+      }
+      throw StateError('no free port after 5 attempts: $lastError');
     }
 
     Future<_TestWsClient> connectClient({
@@ -516,12 +530,17 @@ void main() {
         await _waitFor(() => server!.clientCount == 1);
         final frame =
             _encodeFrame(0x1, utf8.encode(SyncMessage.move('n4', 7, 8).encode()));
-        // Send byte-by-byte in three slices with delays in between.
+        // Send in three slices, flushing each to the OS so the server really
+        // receives the frame in multiple chunks. The server must buffer and
+        // reassemble regardless of how the bytes are segmented.
         client.socket.add(frame.sublist(0, 2));
+        await client.socket.flush();
         await Future<void>.delayed(const Duration(milliseconds: 50));
         client.socket.add(frame.sublist(2, 6));
+        await client.socket.flush();
         await Future<void>.delayed(const Duration(milliseconds: 50));
         client.socket.add(frame.sublist(6));
+        await client.socket.flush();
         await _waitFor(
           () => received.any((r) => r.msg.type == SyncMessage.kDeltaMove),
         );

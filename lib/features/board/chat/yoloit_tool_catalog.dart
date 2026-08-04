@@ -385,6 +385,12 @@ class YoloitCliToolArgumentNormalizer {
   }
 
   static String? _redirectPanelFunctions(String functionName, String text) {
+    return _redirectPanelHelp(functionName, text) ??
+        _redirectPanelFocus(functionName, text) ??
+        _redirectPanelShow(functionName, text);
+  }
+
+  static String? _redirectPanelHelp(String functionName, String text) {
     if (functionName == 'yoloit_panel_help' &&
         text.isNotEmpty &&
         (text.contains('details') || text.contains('content')) &&
@@ -392,6 +398,10 @@ class YoloitCliToolArgumentNormalizer {
         !text.contains('available')) {
       return 'yoloit_panel';
     }
+    return null;
+  }
+
+  static String? _redirectPanelFocus(String functionName, String text) {
     if (functionName == 'yoloit_board_focus' && text.contains('panel')) {
       return 'yoloit_panel_focus';
     }
@@ -399,6 +409,10 @@ class YoloitCliToolArgumentNormalizer {
         (text.contains('focus') || text.contains('фокус'))) {
       return 'yoloit_panel_focus';
     }
+    return null;
+  }
+
+  static String? _redirectPanelShow(String functionName, String text) {
     if (functionName == 'yoloit_panel_focus' &&
         text.contains('show') &&
         text.contains('panel') &&

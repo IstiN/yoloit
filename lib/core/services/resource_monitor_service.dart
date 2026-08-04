@@ -256,6 +256,62 @@ class _RuntimeSessionRegistration {
   final ResourceSessionMetadata metadata;
 }
 
+/// Parses `wmic ... /value` output (`Key=Value` lines) into a map.
+@visibleForTesting
+Map<String, String> parseWmicKeyValues(String stdout) {
+  final result = <String, String>{};
+  for (final line in stdout.split('\n')) {
+    final kv = line.trim().split('=');
+    if (kv.length != 2) continue;
+    result[kv[0].trim()] = kv[1].trim();
+  }
+  return result;
+}
+
+/// Parses `wmic process get ProcessId,ParentProcessId,Name,WorkingSetSize
+/// /format:csv` output into process records.
+///
+/// The first non-empty line is the header:
+/// `Node,Name,ParentProcessId,ProcessId,WorkingSetSize`.
+@visibleForTesting
+List<({int pid, int ppid, String name, int memoryBytes})> parseWmicProcessCsv(
+  String stdout,
+) {
+  final lines = stdout.split('\n');
+  int? pidIdx, ppidIdx, nameIdx, memIdx;
+  final processes = <({int pid, int ppid, String name, int memoryBytes})>[];
+  for (final raw in lines) {
+    final line = raw.trim();
+    if (line.isEmpty) continue;
+    final cols = line.split(',');
+    if (pidIdx == null) {
+      // Parse header
+      pidIdx = cols.indexOf('ProcessId');
+      ppidIdx = cols.indexOf('ParentProcessId');
+      nameIdx = cols.indexOf('Name');
+      memIdx = cols.indexOf('WorkingSetSize');
+      continue;
+    }
+    if (cols.length <=
+        math.max(
+          pidIdx,
+          math.max(ppidIdx ?? 0, math.max(nameIdx ?? 0, memIdx ?? 0)),
+        )) {
+      continue;
+    }
+    final p = int.tryParse(cols[pidIdx].trim());
+    final pp = int.tryParse(cols[ppidIdx ?? 0].trim());
+    final name = nameIdx != null ? cols[nameIdx].trim() : '';
+    final memBytes = math.max(
+      0,
+      int.tryParse(cols[memIdx ?? 0].trim()) ?? 0,
+    );
+    if (p == null || pp == null) continue;
+    processes.add((pid: p, ppid: pp, name: name, memoryBytes: memBytes));
+  }
+  return processes;
+}
+
 @visibleForTesting
 bool isProcessOwnedByYoloit({
   required int processPid,
@@ -761,46 +817,23 @@ class ResourceMonitorService {
         '/format:csv',
       ], runInShell: true);
       if (result.exitCode != 0) return;
-      final lines = (result.stdout as String).split('\n');
-      // First non-empty line is the header: Node,Name,ParentProcessId,ProcessId,WorkingSetSize
-      int? pidIdx, ppidIdx, nameIdx, memIdx;
-      for (final raw in lines) {
-        final line = raw.trim();
-        if (line.isEmpty) continue;
-        final cols = line.split(',');
-        if (pidIdx == null) {
-          // Parse header
-          pidIdx = cols.indexOf('ProcessId');
-          ppidIdx = cols.indexOf('ParentProcessId');
-          nameIdx = cols.indexOf('Name');
-          memIdx = cols.indexOf('WorkingSetSize');
-          continue;
-        }
-        if (cols.length <=
-            math.max(
-              pidIdx,
-              math.max(ppidIdx ?? 0, math.max(nameIdx ?? 0, memIdx ?? 0)),
-            )) {
-          continue;
-        }
-        final p = int.tryParse(cols[pidIdx].trim());
-        final pp = int.tryParse(cols[ppidIdx ?? 0].trim());
-        final name = nameIdx != null ? cols[nameIdx].trim() : '';
-        final memBytes = math.max(
-          0,
-          int.tryParse(cols[memIdx ?? 0].trim()) ?? 0,
-        );
-        if (p == null || pp == null) continue;
-        _byPid[p] = ProcessInfo(
-          pid: p,
-          ppid: pp,
-          cpu: 0.0,
-          memoryBytes: memBytes,
-        );
-        _childrenOf.putIfAbsent(pp, () => []).add(p);
-        _processNames[p] = name;
-      }
+      _applyWmicProcesses(parseWmicProcessCsv(result.stdout as String));
     } catch (_) {}
+  }
+
+  void _applyWmicProcesses(
+    List<({int pid, int ppid, String name, int memoryBytes})> processes,
+  ) {
+    for (final process in processes) {
+      _byPid[process.pid] = ProcessInfo(
+        pid: process.pid,
+        ppid: process.ppid,
+        cpu: 0.0,
+        memoryBytes: process.memoryBytes,
+      );
+      _childrenOf.putIfAbsent(process.ppid, () => []).add(process.pid);
+      _processNames[process.pid] = process.name;
+    }
   }
 
   Future<HostMetrics> _collectHost() async {
@@ -903,14 +936,9 @@ class ResourceMonitorService {
     ], runInShell: true);
     int freeKb = 0, totalKb = 0;
     if (memResult.exitCode == 0) {
-      for (final line in (memResult.stdout as String).split('\n')) {
-        final kv = line.trim().split('=');
-        if (kv.length != 2) continue;
-        final key = kv[0].trim();
-        final val = int.tryParse(kv[1].trim()) ?? 0;
-        if (key == 'FreePhysicalMemory') freeKb = val;
-        if (key == 'TotalVisibleMemorySize') totalKb = val;
-      }
+      final values = parseWmicKeyValues(memResult.stdout as String);
+      freeKb = int.tryParse(values['FreePhysicalMemory'] ?? '') ?? 0;
+      totalKb = int.tryParse(values['TotalVisibleMemorySize'] ?? '') ?? 0;
     }
     return (freeKb: freeKb, totalKb: totalKb);
   }
@@ -925,12 +953,11 @@ class ResourceMonitorService {
     ], runInShell: true);
     double cpuLoad = 0.0;
     if (cpuResult.exitCode == 0) {
-      for (final line in (cpuResult.stdout as String).split('\n')) {
-        final kv = line.trim().split('=');
-        if (kv.length == 2 && kv[0].trim() == 'LoadPercentage') {
-          cpuLoad = math.max(0.0, double.tryParse(kv[1].trim()) ?? 0.0);
-        }
-      }
+      final values = parseWmicKeyValues(cpuResult.stdout as String);
+      cpuLoad = math.max(
+        0.0,
+        double.tryParse(values['LoadPercentage'] ?? '') ?? 0.0,
+      );
     }
     return cpuLoad;
   }
@@ -945,12 +972,11 @@ class ResourceMonitorService {
     ], runInShell: true);
     int coreCount = 0;
     if (coreResult.exitCode == 0) {
-      for (final line in (coreResult.stdout as String).split('\n')) {
-        final kv = line.trim().split('=');
-        if (kv.length == 2 && kv[0].trim() == 'NumberOfLogicalProcessors') {
-          coreCount = math.max(0, int.tryParse(kv[1].trim()) ?? 0);
-        }
-      }
+      final values = parseWmicKeyValues(coreResult.stdout as String);
+      coreCount = math.max(
+        0,
+        int.tryParse(values['NumberOfLogicalProcessors'] ?? '') ?? 0,
+      );
     }
     return coreCount;
   }

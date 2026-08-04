@@ -191,55 +191,21 @@ class _AgentsRouteHandler {
         (requestBody['workspacePath'] as String?) ??
         Directory.current.path;
     final task = requestBody['task'] as String?;
-    final rawName = (requestBody['name'] as String?)?.trim();
-    final requestedSessionName =
-        (rawName != null && rawName.isNotEmpty ? rawName : null) ??
-        (task != null && task.trim().isNotEmpty
-            ? task.trim().length > 40
-                ? '${task.trim().substring(0, 37)}…'
-                : task.trim()
-            : 'agent-${DateTime.now().millisecondsSinceEpoch}');
+    final requestedSessionName = _requestedAgentSessionName(task, requestBody);
 
     // Map agent id to board.chat provider string.
     // copilot → 'copilot', opencode → 'opencode', claude → 'claude', etc.
     final provider = agentId; // agent id matches chat provider naming
 
-    // Look up default model from agent config
-    final configs = await service.load();
-    final agentConfig = configs.firstWhere(
-      (c) => c.id == agentId,
-      orElse:
-          () => AgentConfig(
-            id: agentId,
-            displayName: agentId,
-            iconLabel: agentId[0].toUpperCase(),
-            launchCommand: agentId,
-            visible: true,
-            isBuiltIn: false,
-          ),
-    );
-    final model = agentConfig.defaultModel ?? 'gpt-5-mini';
+    final model = await _agentDefaultModel(agentId);
 
     // Create board.chat panel on active board
     final boardCubit = cubit;
     if (boardCubit == null) return error('Board cubit not available');
-    final board = boardCubit.state.activeBoard ?? boardCubit.state.boards.firstOrNull;
+    final board =
+        boardCubit.state.activeBoard ?? boardCubit.state.boards.firstOrNull;
     if (board == null) return error('No active board');
-    final sessionName = makeUniqueChatSessionName(
-      requestedSessionName,
-      board.panels
-          .where((p) => p.type == ChatPanelPlugin.kTypeId)
-          .map(
-            (p) =>
-                (p.state['config'] is Map
-                    ? (Map<String, dynamic>.from(
-                          p.state['config'] as Map,
-                        ))['sessionName']
-                        as String?
-                    : null) ??
-                p.title,
-          ),
-    );
+    final sessionName = _uniqueAgentSessionName(requestedSessionName, board);
 
     // Build ChatSessionConfig state for the board.chat panel
     final config = ChatSessionConfig(
@@ -250,26 +216,12 @@ class _AgentsRouteHandler {
       autopilot: false,
     );
 
-    const plugin = ChatPanelPlugin();
     final panelId = 'chat-${DateTime.now().millisecondsSinceEpoch}';
-    final bounds = nextAvailableBoundsFor(
-      board,
-      preferredWidth: plugin.defaultSize.width,
-      preferredHeight: plugin.defaultSize.height,
-    );
-    final trimmedTask = task?.trim();
-    final panel = BoardPanelInstance(
-      id: panelId,
-      type: ChatPanelPlugin.kTypeId,
-      title: sessionName,
-      bounds: bounds,
-      state: {'config': config.toJson(), 'configured': true},
-      zIndex:
-          board.panels.fold<int>(
-            0,
-            (value, p) => p.zIndex > value ? p.zIndex : value,
-          ) +
-          1,
+    final panel = _buildAgentChatPanel(
+      panelId: panelId,
+      sessionName: sessionName,
+      board: board,
+      config: config,
     );
     await boardCubit.addPanel(panel, boardId: board.id);
     if (boardCubit.state.activeBoardId != board.id) {
@@ -280,14 +232,8 @@ class _AgentsRouteHandler {
 
     // Send initial task directly via ChatSessionManager — no UI dependency.
     // When the panel widget mounts it picks up this existing session.
-    var taskSent = false;
-    if (trimmedTask != null && trimmedTask.isNotEmpty) {
-      final session = sessionManager.getOrCreate(
-        panelId,
-        config,
-      );
-      taskSent = await session.sendMessage(text: trimmedTask);
-    }
+    final trimmedTask = task?.trim();
+    final taskSent = await _sendInitialAgentTask(panelId, config, trimmedTask);
 
     return json({
       'ok': true,
@@ -307,6 +253,102 @@ class _AgentsRouteHandler {
         'workingDir': workspacePath,
       },
     });
+  }
+
+  String _requestedAgentSessionName(
+    String? task,
+    Map<String, dynamic> requestBody,
+  ) {
+    final rawName = (requestBody['name'] as String?)?.trim();
+    return (rawName != null && rawName.isNotEmpty ? rawName : null) ??
+        (task != null && task.trim().isNotEmpty
+            ? task.trim().length > 40
+                ? '${task.trim().substring(0, 37)}…'
+                : task.trim()
+            : 'agent-${DateTime.now().millisecondsSinceEpoch}');
+  }
+
+  /// Look up default model from agent config.
+  Future<String> _agentDefaultModel(String agentId) async {
+    final configs = await service.load();
+    final agentConfig = configs.firstWhere(
+      (c) => c.id == agentId,
+      orElse:
+          () => AgentConfig(
+            id: agentId,
+            displayName: agentId,
+            iconLabel: agentId[0].toUpperCase(),
+            launchCommand: agentId,
+            visible: true,
+            isBuiltIn: false,
+          ),
+    );
+    return agentConfig.defaultModel ?? 'gpt-5-mini';
+  }
+
+  String _existingChatSessionName(BoardPanelInstance p) {
+    return (p.state['config'] is Map
+            ? (Map<String, dynamic>.from(
+                  p.state['config'] as Map,
+                ))['sessionName']
+                as String?
+            : null) ??
+        p.title;
+  }
+
+  String _uniqueAgentSessionName(
+    String requestedSessionName,
+    BoardDocument board,
+  ) {
+    return makeUniqueChatSessionName(
+      requestedSessionName,
+      board.panels
+          .where((p) => p.type == ChatPanelPlugin.kTypeId)
+          .map(_existingChatSessionName),
+    );
+  }
+
+  BoardPanelInstance _buildAgentChatPanel({
+    required String panelId,
+    required String sessionName,
+    required BoardDocument board,
+    required ChatSessionConfig config,
+  }) {
+    const plugin = ChatPanelPlugin();
+    final bounds = nextAvailableBoundsFor(
+      board,
+      preferredWidth: plugin.defaultSize.width,
+      preferredHeight: plugin.defaultSize.height,
+    );
+    return BoardPanelInstance(
+      id: panelId,
+      type: ChatPanelPlugin.kTypeId,
+      title: sessionName,
+      bounds: bounds,
+      state: {'config': config.toJson(), 'configured': true},
+      zIndex:
+          board.panels.fold<int>(
+            0,
+            (value, p) => p.zIndex > value ? p.zIndex : value,
+          ) +
+          1,
+    );
+  }
+
+  Future<bool> _sendInitialAgentTask(
+    String panelId,
+    ChatSessionConfig config,
+    String? trimmedTask,
+  ) async {
+    var taskSent = false;
+    if (trimmedTask != null && trimmedTask.isNotEmpty) {
+      final session = sessionManager.getOrCreate(
+        panelId,
+        config,
+      );
+      taskSent = await session.sendMessage(text: trimmedTask);
+    }
+    return taskSent;
   }
 
   // POST /agents/config — update agent config fields (defaultModel, asrMode, asrCloudConfigId, asrCloudModel)

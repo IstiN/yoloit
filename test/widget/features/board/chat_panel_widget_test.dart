@@ -16,6 +16,8 @@ import 'package:yoloit/features/board/chat/chat_provider.dart';
 import 'package:yoloit/features/board/chat/chat_session_manager.dart';
 import 'package:yoloit/features/board/chat/helpers/chat_sound_helper.dart';
 import 'package:yoloit/features/board/chat/widgets/chat_changed_files_strip.dart';
+import 'package:yoloit/features/board/chat/widgets/chat_message_list.dart';
+import 'package:yoloit/features/board/chat/widgets/model_search_dialog.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 
@@ -438,6 +440,107 @@ void main() {
       await h.finishTurn(tester);
       await tester.pump();
     });
+
+    testWidgets('cursor provider captures and persists its session id', (
+      tester,
+    ) async {
+      final h = _ChatHarness(
+        provider: 'cursor',
+        autoSessionId: 'cur-1',
+        panelId: 'chat-cursor',
+      );
+      await h.pump(tester);
+      addTearDown(h.dispose);
+
+      await h.typeAndSend(tester, 'hi cursor');
+      h.fake.emit(_delta('yo'));
+      await tester.pump();
+
+      // _captureProviderSessionIds persisted the cursor session id early.
+      expect(h.updates.any((u) => u['cursorSessionId'] == 'cur-1'), isTrue);
+
+      await h.finishTurn(tester);
+      await tester.pump();
+      // _persistMessages kept it in the persisted config snapshot too.
+      expect(
+        h.updates.any(
+          (u) => (u['config'] as Map?)?['cursorSessionId'] == 'cur-1',
+        ),
+        isTrue,
+      );
+    });
+
+    testWidgets('restores messages and cursor session id from the session', (
+      tester,
+    ) async {
+      final h = _ChatHarness(
+        provider: 'cursor',
+        panelId: 'chat-restore',
+        seedSession: (session) {
+          session.restoreMessages([
+            {'id': 'r1', 'role': 'user', 'content': 'restored hello'},
+          ]);
+          session.restoreCursorSessionId('cur-saved');
+        },
+      );
+      await h.pump(tester);
+      addTearDown(h.dispose);
+
+      // _restoreSessionMessages picked up the seeded session messages.
+      expect(find.byType(ChatMessageList), findsOneWidget);
+      // _restoreProviderSessionIds pushed the cursor id back to the provider.
+      expect(h.fake.getSessionId('test-session'), 'cur-saved');
+    });
+
+    testWidgets('slash menus navigate, autocomplete and dismiss via keyboard', (
+      tester,
+    ) async {
+      final h = _ChatHarness(provider: 'copilot', panelId: 'chat-slash');
+      await h.pump(tester);
+      addTearDown(h.dispose);
+      final field = find.byType(TextField);
+
+      // /model menu: arrows move the highlight, Tab selects the model.
+      await tester.enterText(field, '/model');
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      expect(
+        h.updates.any((u) => (u['config'] as Map?)?['model'] == 'fake-model'),
+        isTrue,
+      );
+
+      // Escape closes the menu; Enter then runs the /model command, opening
+      // the model picker dialog instead of sending a message.
+      await tester.enterText(field, '/model');
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+      await tester.pump();
+      expect(find.byType(ModelSearchDialog), findsOneWidget);
+      await tester.tapAt(const Offset(2, 2));
+      await tester.pump();
+      expect(h.fake.sentMessages, isEmpty);
+
+      // Plain slash Tab autocompletes the first command; /yolo is consumed
+      // locally once its menu is dismissed with Escape.
+      await tester.enterText(field, '/');
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      await tester.enterText(field, '/yolo');
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 350));
+      expect(h.fake.sentMessages, isEmpty);
+    });
   });
 }
 
@@ -577,6 +680,7 @@ class _ChatHarness {
     this.autoSessionId,
     this.extraPanels = const [],
     this.extraState = const {},
+    this.seedSession,
   });
 
   final String provider;
@@ -584,6 +688,7 @@ class _ChatHarness {
   final String? autoSessionId;
   final List<BoardPanelInstance> extraPanels;
   final Map<String, dynamic> extraState;
+  final void Function(ChatSession)? seedSession;
 
   final List<Map<String, dynamic>> updates = [];
   final List<(String, Map<String, dynamic>, String)> createdPanels = [];
@@ -598,11 +703,13 @@ class _ChatHarness {
       provider: provider,
     );
     fake = _FakeChatProvider(id: provider, autoSessionId: autoSessionId);
-    ChatSessionManager.instance.sessions[panelId] = ChatSession(
+    final session = ChatSession(
       panelId: panelId,
       config: config,
       providerFactory: (_) => fake,
     );
+    seedSession?.call(session);
+    ChatSessionManager.instance.sessions[panelId] = session;
 
     final panel = BoardPanelInstance(
       id: panelId,

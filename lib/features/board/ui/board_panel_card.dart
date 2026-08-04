@@ -638,9 +638,10 @@ class BoardPanelCardState extends State<BoardPanelCard>
   ) {
     final cubit = context.read<BoardCubit>();
     final activeBoard = cubit.state.activeBoard;
-    final remoteLockActor = activeBoard == null
-        ? null
-        : cubit.panelLockActor(activeBoard, panel.id);
+    final remoteLockActor =
+        activeBoard == null
+            ? null
+            : cubit.panelLockActor(activeBoard, panel.id);
     return BoardPanelRenderContext(
       isSelected:
           panel.id ==
@@ -654,50 +655,11 @@ class BoardPanelCardState extends State<BoardPanelCard>
       remoteInfo: activeBoard == null ? null : remoteInfoForBoard(activeBoard),
       readOnly: remoteLockActor != null,
       onCreateLinkedPanel: onCreateLinkedPanel,
-      onFindPanelByGroup: (typeId, group) {
-        final board = context.read<BoardCubit>().state.activeBoard;
-        if (board == null) return null;
-        for (final p in board.panels) {
-          if (p.type != typeId) continue;
-          final panelGroup = p.state['group'];
-          if (panelGroup is String && panelGroup.trim() == group.trim()) {
-            return p.id;
-          }
-        }
-        return null;
-      },
-      onRevealSessionInPanel: (panelId, sessionId) async {
-        final cubit = context.read<BoardCubit>();
-        await cubit.updatePanel(panelId, (p) {
-          final hiddenRaw = p.state['hiddenSessionIds'];
-          final hidden =
-              hiddenRaw is List
-                  ? hiddenRaw.whereType<String>().toSet()
-                  : <String>{};
-          hidden.remove(sessionId);
-          return p.copyWith(
-            state: {
-              ...p.state,
-              'activeSessionId': sessionId,
-              'hiddenSessionIds': hidden.toList(),
-            },
-          );
-        });
-      },
+      onFindPanelByGroup: _findPanelIdByGroup,
+      onRevealSessionInPanel: _revealSessionInPanel,
       onFocusPanelById:
           (panelId) => context.read<BoardCubit>().focusPanel(panelId),
-      onFindPanelById: (panelId) {
-        final board = context.read<BoardCubit>().state.activeBoard;
-        if (board == null) return null;
-        for (final panel in board.panels) {
-          if (panel.id == panelId) return panel;
-          if (panel.type == 'board.table') {
-            final customId = (panel.state['tableId'] as String?)?.trim() ?? '';
-            if (customId.isNotEmpty && customId == panelId) return panel;
-          }
-        }
-        return null;
-      },
+      onFindPanelById: _findPanelById,
       onResize:
           (w, h) => context.read<BoardCubit>().resizePanel(
             panel.id,
@@ -705,6 +667,51 @@ class BoardPanelCardState extends State<BoardPanelCard>
             height: h,
           ),
     );
+  }
+
+  String? _findPanelIdByGroup(String typeId, String group) {
+    final board = context.read<BoardCubit>().state.activeBoard;
+    if (board == null) return null;
+    for (final p in board.panels) {
+      if (p.type != typeId) continue;
+      final panelGroup = p.state['group'];
+      if (panelGroup is String && panelGroup.trim() == group.trim()) {
+        return p.id;
+      }
+    }
+    return null;
+  }
+
+  Future<void> _revealSessionInPanel(String panelId, String sessionId) async {
+    final cubit = context.read<BoardCubit>();
+    await cubit.updatePanel(panelId, (p) {
+      final hiddenRaw = p.state['hiddenSessionIds'];
+      final hidden =
+          hiddenRaw is List
+              ? hiddenRaw.whereType<String>().toSet()
+              : <String>{};
+      hidden.remove(sessionId);
+      return p.copyWith(
+        state: {
+          ...p.state,
+          'activeSessionId': sessionId,
+          'hiddenSessionIds': hidden.toList(),
+        },
+      );
+    });
+  }
+
+  BoardPanelInstance? _findPanelById(String panelId) {
+    final board = context.read<BoardCubit>().state.activeBoard;
+    if (board == null) return null;
+    for (final panel in board.panels) {
+      if (panel.id == panelId) return panel;
+      if (panel.type == 'board.table') {
+        final customId = (panel.state['tableId'] as String?)?.trim() ?? '';
+        if (customId.isNotEmpty && customId == panelId) return panel;
+      }
+    }
+    return null;
   }
 
   Widget _buildPanelContent(BuildContext context, BoardPanelInstance panel) {

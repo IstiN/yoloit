@@ -1,7 +1,14 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yoloit/core/services/resource_monitor_service.dart';
+import 'package:yoloit/features/terminal/data/runtime_paths.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('formatBytes', () {
     test('returns 0 MB for zero or negative', () {
       expect(formatBytes(0), '0 MB');
@@ -218,6 +225,257 @@ void main() {
         ResourceMonitorScopeX.fromId('all_agents'),
         ResourceMonitorScope.allAgents,
       );
+    });
+  });
+
+  group('parseWmicKeyValues', () {
+    test('parses key=value lines', () {
+      final values = parseWmicKeyValues(
+        '\r\nFreePhysicalMemory=1024\r\nTotalVisibleMemorySize=2048\r\n',
+      );
+      expect(values['FreePhysicalMemory'], '1024');
+      expect(values['TotalVisibleMemorySize'], '2048');
+    });
+
+    test('skips malformed lines', () {
+      final values = parseWmicKeyValues('noequals\na=b=c\nKey=1');
+      expect(values, hasLength(1));
+      expect(values['Key'], '1');
+    });
+  });
+
+  group('parseWmicProcessCsv', () {
+    test('parses header and data rows', () {
+      const csv =
+          'Node,Name,ParentProcessId,ProcessId,WorkingSetSize\n'
+          'HOST,explorer.exe,100,200,4096\n'
+          'HOST,cmd.exe,200,300,8192\n';
+      final rows = parseWmicProcessCsv(csv);
+      expect(rows, hasLength(2));
+      expect(rows[0].pid, 200);
+      expect(rows[0].ppid, 100);
+      expect(rows[0].name, 'explorer.exe');
+      expect(rows[0].memoryBytes, 4096);
+      expect(rows[1].pid, 300);
+      expect(rows[1].ppid, 200);
+      expect(rows[1].name, 'cmd.exe');
+    });
+
+    test('skips empty lines, short rows, and non-numeric ids', () {
+      const csv =
+          'Node,Name,ParentProcessId,ProcessId,WorkingSetSize\n'
+          '\n'
+          'short,row\n'
+          'HOST,notepad.exe,notapid,abc,1024\n';
+      expect(parseWmicProcessCsv(csv), isEmpty);
+    });
+
+    test('returns empty list for empty output', () {
+      expect(parseWmicProcessCsv(''), isEmpty);
+    });
+  });
+
+  group('ResourceMonitorService.stopProcess', () {
+    test('rejects invalid pids and the app own pid', () {
+      final service = ResourceMonitorService.instance;
+      expect(service.stopProcess(0), isFalse);
+      expect(service.stopProcess(-5), isFalse);
+      expect(service.stopProcess(pid), isFalse);
+    });
+  });
+
+  group('ResourceMonitorService persisted runtime sessions', () {
+    tearDown(() async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
+    });
+
+    test('returns null metadata when nothing persisted', () async {
+      SharedPreferences.setMockInitialValues({});
+      await ResourceMonitorService.instance.loadScopePreference();
+      expect(
+        ResourceMonitorService.instance.metadataForRuntimeSession('missing'),
+        isNull,
+      );
+    });
+
+    test('loads valid entries and skips malformed ones', () async {
+      SharedPreferences.setMockInitialValues({
+        'resource_runtime_sessions_v1': jsonEncode({
+          'sess-ok': {
+            'label': 'Copilot',
+            'metadata': {'kind': 'terminal', 'boardName': 'Board A'},
+          },
+          'sess-no-meta': {'label': 'NoMeta'},
+          'sess-bad': 'not-a-map',
+        }),
+      });
+      await ResourceMonitorService.instance.loadScopePreference();
+
+      final meta = ResourceMonitorService.instance.metadataForRuntimeSession(
+        'sess-ok',
+      );
+      expect(meta, isNotNull);
+      expect(meta!.kind, 'terminal');
+      expect(meta.boardName, 'Board A');
+      expect(
+        ResourceMonitorService.instance.metadataForRuntimeSession(
+          'sess-no-meta',
+        ),
+        isNull,
+      );
+      expect(
+        ResourceMonitorService.instance.metadataForRuntimeSession('sess-bad'),
+        isNull,
+      );
+      ResourceMonitorService.instance.unregisterRuntimeSession('sess-ok');
+    });
+
+    test('ignores empty, non-map, and corrupt payloads', () async {
+      SharedPreferences.setMockInitialValues({
+        'resource_runtime_sessions_v1': '',
+      });
+      await ResourceMonitorService.instance.loadScopePreference();
+
+      SharedPreferences.setMockInitialValues({
+        'resource_runtime_sessions_v1': jsonEncode(['a', 'b']),
+      });
+      await ResourceMonitorService.instance.loadScopePreference();
+
+      SharedPreferences.setMockInitialValues({
+        'resource_runtime_sessions_v1': '{corrupt',
+      });
+      await ResourceMonitorService.instance.loadScopePreference();
+
+      expect(
+        ResourceMonitorService.instance.metadataForRuntimeSession('a'),
+        isNull,
+      );
+    });
+  });
+
+  group('ResourceMonitorService polling', () {
+    setUp(() {
+      // TestWidgetsFlutterBinding stubs every HttpClient request with a 400;
+      // these tests need real loopback HTTP against a local server.
+      HttpOverrides.global = null;
+    });
+
+    test('syncs runtime sessions over http and collects host metrics', () async {
+      SharedPreferences.setMockInitialValues({});
+      final service = ResourceMonitorService.instance;
+      final portFile = File(RuntimePaths.portFile);
+      final hadPortFile = await portFile.exists();
+      final backup = hadPortFile ? await portFile.readAsString() : null;
+
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      var statusCode = 200;
+      Object sessionsPayload = <dynamic>[
+        {'id': 'rt-1', 'pid': pid},
+        {'id': '', 'pid': 5},
+        {'id': 'rt-bad-pid', 'pid': 'nope'},
+        'junk',
+      ];
+      server.listen((request) {
+        request.response
+          ..statusCode = statusCode
+          ..write(jsonEncode({'sessions': sessionsPayload}));
+        request.response.close();
+      });
+
+      Future<ResourceSnapshot> nextSnapshot() {
+        final future = service.stream.first;
+        service.pollNow();
+        return future.timeout(const Duration(seconds: 30));
+      }
+
+      try {
+        await portFile.create(recursive: true);
+        await portFile.writeAsString('${server.port}');
+
+        service.registerRuntimeSession(
+          'rt-1',
+          'Runtime One',
+          metadata: const ResourceSessionMetadata(kind: 'terminal'),
+        );
+        service.registerRuntimeShellSession(
+          sessionId: 'rt-stale',
+          shellPid: 999999,
+          label: 'Stale',
+          metadata: const ResourceSessionMetadata(kind: 'terminal'),
+        );
+
+        // Full sync: registers the live session, drops the stale one, and
+        // skips malformed payload entries.
+        var snapshot = await nextSnapshot();
+        final rt1 = snapshot.sessions.where((s) => s.sessionKey == 'rt-1');
+        expect(rt1, hasLength(1));
+        expect(rt1.single.label, 'Runtime One');
+        expect(rt1.single.metadata, isNotNull);
+        expect(snapshot.sessions.any((s) => s.pid == 999999), isFalse);
+        expect(snapshot.host.cpuCoreCount, greaterThan(0));
+        expect(snapshot.host.totalBytes, greaterThan(0));
+        expect(
+          snapshot.totalMemoryBytes,
+          greaterThanOrEqualTo(snapshot.appMemoryBytes),
+        );
+
+        // Non-200 response: fetch fails, registered session stays untouched.
+        statusCode = 500;
+        snapshot = await nextSnapshot();
+        expect(service.registeredPids.contains(pid), isTrue);
+
+        // Payload without a session list: treated as empty, so the previously
+        // synced runtime session is unregistered as stale.
+        statusCode = 200;
+        sessionsPayload = <String, dynamic>{'unexpected': true};
+        snapshot = await nextSnapshot();
+        expect(service.registeredPids.contains(pid), isFalse);
+
+        // Unparseable port file: treated as empty session list.
+        await portFile.writeAsString('not-a-port');
+        snapshot = await nextSnapshot();
+        expect(snapshot.sessions.any((s) => s.sessionKey == 'rt-1'), isFalse);
+
+        // Missing port file: treated as empty session list.
+        await portFile.delete();
+        snapshot = await nextSnapshot();
+        expect(snapshot.appMemoryBytes, greaterThanOrEqualTo(0));
+
+        // Unreachable daemon: fetch returns null, sync is skipped.
+        final closed = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        final closedPort = closed.port;
+        await closed.close();
+        await portFile.writeAsString('$closedPort');
+        snapshot = await nextSnapshot();
+        expect(snapshot.sessions.any((s) => s.sessionKey == 'rt-1'), isFalse);
+      } finally {
+        await server.close(force: true);
+        if (backup != null) {
+          await portFile.writeAsString(backup);
+        } else if (await portFile.exists()) {
+          await portFile.delete();
+        }
+        service.unregisterRuntimeSession('rt-1');
+        service.unregisterRuntimeSession('rt-stale');
+        service.unregisterSession(pid);
+      }
+    });
+
+    test('collects a snapshot in all-agents scope', () async {
+      SharedPreferences.setMockInitialValues({});
+      final service = ResourceMonitorService.instance;
+
+      final future = service.stream.first;
+      await service.setScope(ResourceMonitorScope.allAgents);
+      final snapshot = await future.timeout(const Duration(seconds: 30));
+      expect(snapshot.totalMemoryBytes, greaterThan(0));
+      expect(snapshot.host.totalBytes, greaterThan(0));
+
+      final back = service.stream.first;
+      await service.setScope(ResourceMonitorScope.yoloitOnly);
+      await back.timeout(const Duration(seconds: 30));
+      expect(service.scope, ResourceMonitorScope.yoloitOnly);
     });
   });
 }

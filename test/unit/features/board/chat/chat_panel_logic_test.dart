@@ -358,4 +358,20 @@ void main() {
       expect(md, contains('03:04:05  » \n'));
     });
   });
+
+  group('ChatSlashCommand.matches', () {
+    const cmd = ChatSlashCommand(
+      id: 'model',
+      displayName: 'model',
+      description: 'Switch AI model',
+      triggers: ['/model', '.model'],
+    );
+
+    test('matches any trigger as a prefix, nothing else', () {
+      expect(cmd.matches('/model'), isTrue);
+      expect(cmd.matches('.model gpt-5'), isTrue);
+      expect(cmd.matches('/mod'), isFalse);
+      expect(cmd.matches('model'), isFalse);
+    });
+  });
 }
