@@ -56,5 +56,21 @@ gates:
     enabled: false
   method_size:
     enabled: false
+  # Duplicated code blocks (crap4dart 0.2.0). Ratchet baseline: the gate is
+  # PER FILE (a file fails when >threshold% of its lines are duplicated).
+  # Current max is 57.14% — dominated by intentional VM/Web platform mirror
+  # pairs (chat_file_opener_helper, custom_widget_plugin, ...). Threshold
+  # pinned just above the current max so nothing gets WORSE; lower it
+  # gradually towards the default 1.0 as mirrors get unified.
+  duplication:
+    enabled: true
+    threshold: 58.0
+    min_tokens: 50
+    min_lines: 5
+    exclude:
+      - '**.g.dart'
+      - '**.freezed.dart'
+      - '**.mocks.dart'
+      - 'test/**'
   public_docs:
     enabled: false
