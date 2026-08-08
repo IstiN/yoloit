@@ -9,6 +9,24 @@ import 'package:yoloit/features/settings/data/local_ai_models_service.dart';
 
 import 'local_ai_models_service_harness.dart';
 
+/// Polls [condition] until it holds or [timeout] elapses.
+///
+/// Used instead of fixed `Future.delayed` waits so assertions do not race
+/// real async file I/O when the suite runs under load.
+Future<void> waitForCondition(
+  bool Function() condition, {
+  Duration timeout = const Duration(seconds: 15),
+  Duration interval = const Duration(milliseconds: 20),
+}) async {
+  final stopwatch = Stopwatch()..start();
+  while (!condition()) {
+    if (stopwatch.elapsed > timeout) {
+      fail('Timed out after $timeout waiting for condition.');
+    }
+    await Future<void>.delayed(interval);
+  }
+}
+
 void main() {
   late Directory tmpDir;
 
@@ -302,7 +320,7 @@ void main() {
   });
 
   group('handleTaskChangedForTesting', () {
-    test('canceled task is removed and stage directory deleted', () {
+    test('canceled task is removed and stage directory deleted', () async {
       final stageDir = Directory(p.join(tmpDir.path, 'stage'))
         ..createSync(recursive: true);
       final task = buildTask(
@@ -318,6 +336,11 @@ void main() {
         service.stateForModel('m1').status,
         LocalAiModelStatus.notDownloaded,
       );
+      // The service deletes the stage directory via an unawaited async
+      // delete, so poll until it finishes instead of asserting
+      // synchronously. This also drains the in-flight delete before
+      // tearDown removes the temp tree.
+      await waitForCondition(() => !stageDir.existsSync());
       expect(stageDir.existsSync(), isFalse);
     });
 

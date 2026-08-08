@@ -19,6 +19,27 @@ import 'package:yoloit/features/board/plugins/builtin/audio_recorder_plugin.dart
 
 import '../../../widget/features/board/yolo_assistant_test_env.dart';
 
+/// Polls [condition] with real-async pauses until it holds or [timeout]
+/// elapses.
+///
+/// The full suite runs many isolates in parallel, so a fixed
+/// `Future.delayed` after a tap is routinely outrun by real channel
+/// round-trips and file I/O on a busy machine; every post-tap assertion in
+/// this file waits on the actual outcome instead of a wall-clock guess.
+Future<void> _waitFor(
+  bool Function() condition, {
+  required String reason,
+  Duration timeout = const Duration(seconds: 15),
+}) async {
+  final sw = Stopwatch()..start();
+  while (!condition()) {
+    if (sw.elapsed > timeout) {
+      throw TimeoutException('timed out waiting for $reason');
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+  }
+}
+
 /// Scriptable system-audio bridge: never touches the native channels.
 class _FakeSystemAudioBridge implements SystemAudioBridge {
   bool supported = true;
@@ -64,9 +85,16 @@ void main() {
   late RecordPlatform originalRecordPlatform;
   late List<Map<String, dynamic>> writes;
 
-  BoardPanelInstance panel({Map<String, dynamic>? state}) =>
+  // The manager is a process-wide singleton keyed by panel id, so tests that
+  // touch it use distinct ids: a recording started by one test can then never
+  // be mistaken for (or silently replace) another test's panel when async
+  // work outlives its test under full-suite load.
+  BoardPanelInstance panel({
+    String id = 'panel-audio-1',
+    Map<String, dynamic>? state,
+  }) =>
       BoardPanelInstance(
-        id: 'panel-audio-1',
+        id: id,
         type: AudioRecorderPlugin.kTypeId,
         title: 'Audio Recorder',
         bounds: const BoardPanelBounds(x: 0, y: 0, width: 380, height: 460),
@@ -100,7 +128,7 @@ void main() {
         });
   }
 
-  BoardCubit cubitWithPanel(Map<String, dynamic> panelState) {
+  BoardCubit cubitWithPanel(Map<String, dynamic> panelState, {String? panelId}) {
     final cubit = BoardCubit();
     addTearDown(cubit.close);
     cubit.emit(
@@ -109,7 +137,7 @@ void main() {
           BoardDocument(
             id: 'board-1',
             name: 'Test',
-            panels: [panel(state: panelState)],
+            panels: [panel(id: panelId ?? 'panel-audio-1', state: panelState)],
           ),
         ],
         activeBoardId: 'board-1',
@@ -177,7 +205,12 @@ void main() {
 
     await tester.runAsync(() async {
       await tester.tap(find.text('Start recording'));
-      await Future<void>.delayed(const Duration(milliseconds: 200));
+      await _waitFor(
+        () => errors().contains(
+          'Microphone permission is required to record.',
+        ),
+        reason: 'mic permission error',
+      );
     });
     await tester.pump();
 
@@ -194,7 +227,12 @@ void main() {
 
     await tester.runAsync(() async {
       await tester.tap(find.text('Start recording'));
-      await Future<void>.delayed(const Duration(milliseconds: 200));
+      await _waitFor(
+        () => errors().contains(
+          'Could not determine the board for this panel.',
+        ),
+        reason: 'board lookup error',
+      );
     });
     await tester.pump();
 
@@ -214,7 +252,14 @@ void main() {
 
     await tester.runAsync(() async {
       await tester.tap(find.text('Start recording'));
-      await Future<void>.delayed(const Duration(milliseconds: 200));
+      // The flow continues after the hint and fails the board lookup (no
+      // cubit here), so wait until the final error has landed.
+      await _waitFor(
+        () =>
+            errors().isNotEmpty &&
+            errors().last == 'Could not determine the board for this panel.',
+        reason: 'board lookup error after system-audio hint',
+      );
     });
     await tester.pump();
 
@@ -240,7 +285,12 @@ void main() {
 
     await tester.runAsync(() async {
       await tester.tap(find.text('Start recording'));
-      await Future<void>.delayed(const Duration(milliseconds: 200));
+      await _waitFor(
+        () => errors().contains(
+          'Could not determine the board for this panel.',
+        ),
+        reason: 'board lookup error',
+      );
     });
     await tester.pump();
 
@@ -251,11 +301,13 @@ void main() {
   testWidgets('starts a recording through the manager and stops it', (
     tester,
   ) async {
+    const panelId = 'panel-audio-start-stop';
     final cubit = cubitWithPanel(
       stateWithConfig(
         captureSystemAudio: false,
         saveFolder: recordingsDir.path,
       ),
+      panelId: panelId,
     );
     AudioRecordingManager.instance.setCubit(cubit);
 
@@ -263,6 +315,7 @@ void main() {
       wrap(
         AudioRecorderPanelContent(
           panel: panel(
+            id: panelId,
             state: stateWithConfig(
               captureSystemAudio: false,
               saveFolder: recordingsDir.path,
@@ -276,16 +329,19 @@ void main() {
 
     await tester.runAsync(() async {
       await tester.tap(find.text('Start recording'));
-      await Future<void>.delayed(const Duration(milliseconds: 300));
+      await _waitFor(
+        () => AudioRecordingManager.instance.isRecording(panelId),
+        reason: 'recording to start',
+      );
     });
     await tester.pump();
 
     final manager = AudioRecordingManager.instance;
-    expect(manager.isRecording('panel-audio-1'), isTrue);
+    expect(manager.isRecording(panelId), isTrue);
     expect(errors(), isNot(contains(startsWith('Recording failed'))));
 
-    await tester.runAsync(() => manager.stop('panel-audio-1'));
-    expect(manager.isRecording('panel-audio-1'), isFalse);
+    await tester.runAsync(() => manager.stop(panelId));
+    expect(manager.isRecording(panelId), isFalse);
     final wavs = recordingsDir
         .listSync()
         .whereType<File>()
@@ -296,10 +352,12 @@ void main() {
   });
 
   testWidgets('tapping stop delegates to the manager', (tester) async {
+    const panelId = 'panel-audio-stop-noop';
     await tester.pumpWidget(
       wrap(
         AudioRecorderPanelContent(
           panel: panel(
+            id: panelId,
             state: <String, dynamic>{
               ...const AudioRecorderPlugin().initialState,
               'isRecording': true,
@@ -312,23 +370,28 @@ void main() {
 
     await tester.runAsync(() async {
       await tester.tap(find.text('Stop recording'));
+      // Stop with no active engine entry is a no-op, so there is no outcome
+      // to poll; give the (empty) async stop path a moment to surface any
+      // unexpected error before the negative assertions below.
       await Future<void>.delayed(const Duration(milliseconds: 200));
     });
     await tester.pump();
 
     // No active engine entry: stop is a no-op and no error is surfaced.
-    expect(AudioRecordingManager.instance.isRecording('panel-audio-1'), isFalse);
+    expect(AudioRecordingManager.instance.isRecording(panelId), isFalse);
     expect(errors(), isNot(contains(startsWith('Recording failed'))));
     expect(bridge.requestCount, 0);
   });
 
   testWidgets('a start failure surfaces a recording error', (tester) async {
+    const panelId = 'panel-audio-start-failure';
     recordPlatform.startStreamException = Exception('no mic hardware');
     final cubit = cubitWithPanel(
       stateWithConfig(
         captureSystemAudio: false,
         saveFolder: recordingsDir.path,
       ),
+      panelId: panelId,
     );
     AudioRecordingManager.instance.setCubit(cubit);
 
@@ -336,6 +399,7 @@ void main() {
       wrap(
         AudioRecorderPanelContent(
           panel: panel(
+            id: panelId,
             state: stateWithConfig(
               captureSystemAudio: false,
               saveFolder: recordingsDir.path,
@@ -349,11 +413,14 @@ void main() {
 
     await tester.runAsync(() async {
       await tester.tap(find.text('Start recording'));
-      await Future<void>.delayed(const Duration(milliseconds: 300));
+      await _waitFor(
+        () => errors().any((e) => e.startsWith('Recording failed:')),
+        reason: 'recording error to surface',
+      );
     });
     await tester.pump();
 
     expect(errors().last, startsWith('Recording failed:'));
-    expect(AudioRecordingManager.instance.isRecording('panel-audio-1'), isFalse);
+    expect(AudioRecordingManager.instance.isRecording(panelId), isFalse);
   });
 }

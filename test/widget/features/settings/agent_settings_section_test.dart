@@ -31,9 +31,28 @@ void main() {
   tearDown(() {
     ProviderModelCatalogService.skipCliDiscoveryForTests = false;
     CloudLlmSettingsService.secureReadTimeout = const Duration(seconds: 8);
-    PlatformDirs.reset();
+    // Delete the temp home before resetting PlatformDirs so that any stray
+    // in-flight write fails loudly here instead of landing in the real
+    // user config directory.
     if (home.existsSync()) home.deleteSync(recursive: true);
+    PlatformDirs.reset();
   });
+
+  /// Polls (real async, inside runAsync) until [condition] holds or the
+  /// timeout elapses. Robust replacement for fixed delays, which are flaky
+  /// when the full suite runs many isolates concurrently.
+  Future<void> pumpUntil(
+    WidgetTester tester,
+    bool Function() condition, {
+    Duration timeout = const Duration(seconds: 10),
+  }) async {
+    final sw = Stopwatch()..start();
+    while (!condition() && sw.elapsed < timeout) {
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      await tester.pump();
+    }
+    await tester.pump();
+  }
 
   Future<void> pumpSection(WidgetTester tester) async {
     tester.view.physicalSize = const Size(1600, 2400);
@@ -55,9 +74,10 @@ void main() {
     await pumpSection(tester);
     // First frame: loading indicator while the configs load.
     expect(find.byType(CircularProgressIndicator), findsWidgets);
-    await Future<void>.delayed(const Duration(milliseconds: 200));
-    await tester.pump();
-    await tester.pump();
+    await pumpUntil(
+      tester,
+      () => find.text('Default ASR:').evaluate().isNotEmpty,
+    );
     expect(find.text('Default ASR:'), findsOneWidget);
   }
 
@@ -123,19 +143,40 @@ void main() {
         expect(AgentConfigService.instance.defaultAgentId, isNull);
 
         await tester.tap(find.byIcon(Icons.star_border).first);
-        await Future<void>.delayed(const Duration(milliseconds: 50));
-        await tester.pump();
+        await pumpUntil(
+          tester,
+          () => AgentConfigService.instance.defaultAgentId != null,
+        );
 
         final chosen = AgentConfigService.instance.defaultAgentId;
         expect(chosen, isNotNull);
+        await pumpUntil(
+          tester,
+          () => find.byIcon(Icons.star).evaluate().isNotEmpty,
+        );
         expect(find.byIcon(Icons.star), findsOneWidget);
 
         // Tapping the same star again unsets the favorite.
         await tester.tap(find.byIcon(Icons.star));
-        await Future<void>.delayed(const Duration(milliseconds: 50));
-        await tester.pump();
+        await pumpUntil(
+          tester,
+          () => AgentConfigService.instance.defaultAgentId == null,
+        );
 
         expect(AgentConfigService.instance.defaultAgentId, isNull);
+
+        // Drain the unawaited _savePrefs() write before tearDown deletes
+        // the temp dir — otherwise the in-flight write can throw
+        // asynchronously and fail the test under load.
+        final prefsFile = File(
+          p.join(PlatformDirs.instance.configDir, 'agent_prefs.json'),
+        );
+        await pumpUntil(
+          tester,
+          () =>
+              prefsFile.existsSync() &&
+              prefsFile.readAsStringSync().contains('"defaultAgentId":null'),
+        );
       });
     });
 
@@ -144,26 +185,43 @@ void main() {
         await pumpLoaded(tester);
 
         await tester.tap(find.text('Add Custom Agent'));
-        await Future<void>.delayed(const Duration(milliseconds: 50));
-        await tester.pump();
-        await tester.pump();
+        await pumpUntil(
+          tester,
+          () => find.text('Custom Agent').evaluate().isNotEmpty,
+        );
 
         expect(find.text('Custom Agent'), findsOneWidget);
         // Custom agents get a delete button; built-ins do not.
         expect(find.byIcon(Icons.delete_outline), findsOneWidget);
 
-        // The new config was persisted to disk.
+        // The new config was persisted to disk (async save — poll for it).
         final configFile = File(
           p.join(PlatformDirs.instance.configDir, 'agent_configs.json'),
+        );
+        await pumpUntil(
+          tester,
+          () =>
+              configFile.existsSync() &&
+              configFile.readAsStringSync().contains('Custom Agent'),
         );
         expect(configFile.existsSync(), isTrue);
         expect(configFile.readAsStringSync(), contains('Custom Agent'));
 
         await tester.tap(find.byIcon(Icons.delete_outline));
-        await Future<void>.delayed(const Duration(milliseconds: 50));
-        await tester.pump();
+        await pumpUntil(
+          tester,
+          () => find.text('Custom Agent').evaluate().isEmpty,
+        );
 
         expect(find.text('Custom Agent'), findsNothing);
+
+        // Drain the unawaited save after the delete before tearDown
+        // deletes the temp dir (in-flight writes can fail the test
+        // asynchronously under load).
+        await pumpUntil(
+          tester,
+          () => !configFile.readAsStringSync().contains('Custom Agent'),
+        );
       });
     });
 
@@ -178,12 +236,19 @@ void main() {
 
         // First switch is the visibility toggle of the first row.
         await tester.tap(switches.first);
-        await Future<void>.delayed(const Duration(milliseconds: 50));
-        await tester.pump();
 
+        // The save is unawaited real async I/O — poll for the persisted
+        // content instead of relying on a fixed delay.
         final configFile = File(
           p.join(PlatformDirs.instance.configDir, 'agent_configs.json'),
         );
+        await pumpUntil(
+          tester,
+          () =>
+              configFile.existsSync() &&
+              configFile.readAsStringSync().contains('"visible":false'),
+        );
+
         expect(configFile.existsSync(), isTrue);
         expect(configFile.readAsStringSync(), contains('"visible":false'));
       });

@@ -194,7 +194,10 @@ void main() {
         tester,
         find.byKey(const Key('board-file-picker-create-folder-confirm')),
       );
-      expect(find.textContaining('Could not create folder'), findsOneWidget);
+      await _pumpUntilFound(
+        tester,
+        find.textContaining('Could not create folder'),
+      );
 
       // A valid name creates the folder and reloads the listing.
       await _tapIo(tester, find.byKey(const Key('board-file-picker-new-folder')));
@@ -206,6 +209,9 @@ void main() {
         tester,
         find.byKey(const Key('board-file-picker-create-folder-confirm')),
       );
+      // The reloaded tile only appears after the directory was created on
+      // disk, so waiting for it also covers the existsSync check.
+      await _pumpUntilFound(tester, _tile(p.join(fixture.path, 'created')));
       expect(Directory(p.join(fixture.path, 'created')).existsSync(), isTrue);
       expect(_tile(p.join(fixture.path, 'created')), findsOneWidget);
     });
@@ -366,10 +372,11 @@ void main() {
         find.byKey(const Key('board-file-picker-create-folder-confirm')),
       );
 
+      await _pumpUntil(tester, () => remote.createdDirs.isNotEmpty, 'mkdir');
       expect(remote.createdDirs, hasLength(1));
       expect(remote.createdDirs.single['parentPath'], '/remote');
       expect(remote.createdDirs.single['name'], 'newdir');
-      expect(_tile('/remote/newdir'), findsOneWidget);
+      await _pumpUntilFound(tester, _tile('/remote/newdir'));
 
       await tester.tap(find.byKey(const Key('board-file-picker-confirm')));
       await _pumpOut(tester);
@@ -437,9 +444,44 @@ Future<void> _pumpOut(WidgetTester tester, [int times = 6]) async {
   }
 }
 
+/// Gives the real event loop turns until [condition] holds. Used around
+/// actions that trigger real filesystem or socket I/O, whose latency under
+/// full-suite load can exceed any fixed delay. Budget: ~15 seconds.
+Future<void> _pumpUntil(
+  WidgetTester tester,
+  bool Function() condition,
+  String description,
+) async {
+  for (var i = 0; i < 300; i++) {
+    if (condition()) return;
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 50)),
+    );
+    await tester.pump();
+  }
+  fail('timed out waiting for: $description');
+}
+
+/// Polls until [finder] matches at least one widget.
+Future<void> _pumpUntilFound(WidgetTester tester, Finder finder) =>
+    _pumpUntil(tester, () => finder.evaluate().isNotEmpty, '$finder');
+
+/// Whether the picker's initial directory load has settled: either a listing
+/// arrived (the new-folder button becomes enabled) or the load failed.
+bool _initialLoadSettled(WidgetTester tester) {
+  final button = find.byKey(const Key('board-file-picker-new-folder'));
+  if (button.evaluate().isNotEmpty &&
+      tester.widget<IconButton>(button).onPressed != null) {
+    return true;
+  }
+  return find.textContaining('Could not load folder').evaluate().isNotEmpty;
+}
+
 /// Opens the picker dialog. The dialog's initial directory load uses real
 /// dart:io futures, so the tap and the first frames run on the real event
-/// loop via [WidgetTester.runAsync].
+/// loop via [WidgetTester.runAsync]. Waits until the initial load settles
+/// (listing shown or load error) so later steps never race a disabled
+/// button or an empty listing.
 Future<void> _openPicker(
   WidgetTester tester,
   void Function(BuildContext context) onOpen,
@@ -451,6 +493,8 @@ Future<void> _openPicker(
     await Future<void>.delayed(const Duration(milliseconds: 400));
     await tester.pump();
   });
+  await _pumpOut(tester);
+  await _pumpUntil(tester, () => _initialLoadSettled(tester), 'initial load');
   await _pumpOut(tester);
 }
 
