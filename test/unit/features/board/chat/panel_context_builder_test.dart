@@ -162,4 +162,266 @@ void main() {
       expect(summary, isNot(contains('is not a subtype')));
     });
   });
+
+  group('buildFocusPanelSummary type guidance', () {
+    setUpAll(() {
+      CliServer.instance
+        ..registerPanelHandler(const _KanbanTestHandler())
+        ..registerPanelHandler(const _RunConfigsTestHandler())
+        ..registerPanelHandler(const _QuietTerminalTestHandler())
+        ..registerPanelHandler(const _CustomTestHandler());
+    });
+
+    test('sticky panel gets sticky guidance without a handler', () async {
+      const panel = BoardPanelInstance(
+        id: 'p-sticky',
+        type: 'board.sticky',
+        title: 'Sticky',
+        bounds: BoardPanelBounds(x: 0, y: 0, width: 100, height: 100),
+      );
+
+      final summary = await buildFocusPanelSummary(panel);
+
+      expect(summary, contains('(no content available)'));
+      expect(summary, contains('yoloit_sticky_set'));
+      expect(summary, contains('yoloit_sticky_append'));
+      expect(summary, contains('yoloit_sticky_color'));
+    });
+
+    test('shape panel gets shape guidance without a handler', () async {
+      const panel = BoardPanelInstance(
+        id: 'p-shape',
+        type: 'board.shape',
+        title: 'Shape',
+        bounds: BoardPanelBounds(x: 0, y: 0, width: 100, height: 100),
+      );
+
+      final summary = await buildFocusPanelSummary(panel);
+
+      expect(summary, contains('(no content available)'));
+      expect(summary, contains('yoloit_shape_get'));
+      expect(summary, contains('yoloit_shape_set'));
+    });
+
+    test('kanban content lists columns and cards with kanban guidance', () async {
+      const panel = BoardPanelInstance(
+        id: 'p-kanban',
+        type: 'board.kanban',
+        title: 'Kanban',
+        bounds: BoardPanelBounds(x: 0, y: 0, width: 100, height: 100),
+      );
+
+      final summary = await buildFocusPanelSummary(panel);
+
+      expect(summary, contains('- **Todo** (2)'));
+      expect(summary, contains('- **Done** (0)'));
+      expect(summary, contains('  - Card one'));
+      expect(summary, contains('add-card'));
+      expect(summary, contains('move-card'));
+    });
+
+    test('run configs content lists configurations and sessions', () async {
+      const panel = BoardPanelInstance(
+        id: 'p-run',
+        type: 'board.run_configs',
+        title: 'Run',
+        bounds: BoardPanelBounds(x: 0, y: 0, width: 100, height: 100),
+      );
+
+      final summary = await buildFocusPanelSummary(panel);
+
+      expect(summary, contains('**Group:** dev'));
+      expect(summary, contains('**Workspace:** /repo'));
+      expect(summary, contains('- `web`: dart run'));
+      expect(summary, contains('**Sessions:**'));
+      expect(summary, contains('- `web` (running)'));
+      expect(summary, contains('Run a config'));
+    });
+
+    test('terminal without output action renders config only', () async {
+      const panel = BoardPanelInstance(
+        id: 'p-term-quiet',
+        type: 'board.terminal',
+        title: 'Shell',
+        bounds: BoardPanelBounds(x: 0, y: 0, width: 100, height: 100),
+      );
+
+      final summary = await buildFocusPanelSummary(panel);
+
+      expect(summary, contains('**Configuration:**'));
+      expect(summary, isNot(contains('Recent output')));
+    });
+
+    test('unknown type falls back to json content and generic guidance', () async {
+      const panel = BoardPanelInstance(
+        id: 'p-custom',
+        type: 'board.widget.custom',
+        title: 'Custom',
+        bounds: BoardPanelBounds(x: 0, y: 0, width: 100, height: 100),
+      );
+
+      final summary = await buildFocusPanelSummary(panel);
+
+      expect(summary, contains('"foo": "bar"'));
+      expect(summary, contains('yoloit_panel_help'));
+      expect(summary, contains('yoloit_do'));
+    });
+
+    test('table with many rows truncates and reports the omitted count', () async {
+      CliServer.instance.registerPanelHandler(const _BigTableTestHandler());
+      const panel = BoardPanelInstance(
+        id: 'p-big',
+        type: 'board.table',
+        title: 'Big',
+        bounds: BoardPanelBounds(x: 0, y: 0, width: 100, height: 100),
+      );
+
+      final summary = await buildFocusPanelSummary(panel);
+
+      expect(summary, contains('| r9 | 9 |'));
+      expect(summary, isNot(contains('| r11 | 11 |')));
+      expect(summary, contains('*(+2 rows omitted)*'));
+
+      // Restore the original table handler for other tests.
+      CliServer.instance.registerPanelHandler(const _TableTestHandler());
+    });
+  });
+}
+
+class _KanbanTestHandler extends PanelCliHandler {
+  const _KanbanTestHandler();
+
+  @override
+  String get typeId => 'board.kanban';
+
+  @override
+  List<String> get supportedActions => ['add-card', 'move-card'];
+
+  @override
+  Map<String, dynamic> getContent(BoardPanelInstance panel) => {
+    'columns': [
+      {
+        'title': 'Todo',
+        'cards': [
+          {'id': 'c1', 'text': 'Card one'},
+          {'id': 'c2', 'title': 'Card two'},
+        ],
+      },
+      {'title': 'Done', 'cards': <Map<String, dynamic>>[]},
+    ],
+  };
+
+  @override
+  Future<CliActionResult> handleAction(
+    String action,
+    Map<String, dynamic> args,
+    BoardPanelInstance panel,
+  ) async =>
+      const CliActionResult();
+}
+
+class _RunConfigsTestHandler extends PanelCliHandler {
+  const _RunConfigsTestHandler();
+
+  @override
+  String get typeId => 'board.run_configs';
+
+  @override
+  List<String> get supportedActions => ['run', 'output', 'stop'];
+
+  @override
+  Map<String, dynamic> getContent(BoardPanelInstance panel) => {
+    'group': 'dev',
+    'workspacePath': '/repo',
+    'configurations': [
+      {'name': 'web', 'command': 'dart run'},
+    ],
+    'sessions': [
+      {
+        'config': {'name': 'web'},
+        'status': 'running',
+      },
+    ],
+  };
+
+  @override
+  Future<CliActionResult> handleAction(
+    String action,
+    Map<String, dynamic> args,
+    BoardPanelInstance panel,
+  ) async =>
+      const CliActionResult();
+}
+
+class _QuietTerminalTestHandler extends PanelCliHandler {
+  const _QuietTerminalTestHandler();
+
+  @override
+  String get typeId => 'board.terminal';
+
+  @override
+  List<String> get supportedActions => ['config'];
+
+  @override
+  Map<String, dynamic> getContent(BoardPanelInstance panel) => {
+    'config': {'sessionId': 's2'},
+  };
+
+  @override
+  Future<CliActionResult> handleAction(
+    String action,
+    Map<String, dynamic> args,
+    BoardPanelInstance panel,
+  ) async =>
+      const CliActionResult();
+}
+
+class _CustomTestHandler extends PanelCliHandler {
+  const _CustomTestHandler();
+
+  @override
+  String get typeId => 'board.widget.custom';
+
+  @override
+  List<String> get supportedActions => [];
+
+  @override
+  Map<String, dynamic> getContent(BoardPanelInstance panel) => {'foo': 'bar'};
+
+  @override
+  Future<CliActionResult> handleAction(
+    String action,
+    Map<String, dynamic> args,
+    BoardPanelInstance panel,
+  ) async =>
+      const CliActionResult();
+}
+
+class _BigTableTestHandler extends PanelCliHandler {
+  const _BigTableTestHandler();
+
+  @override
+  String get typeId => 'board.table';
+
+  @override
+  List<String> get supportedActions => ['get'];
+
+  @override
+  Map<String, dynamic> getContent(BoardPanelInstance panel) => {
+    'columns': [
+      {'id': 'name', 'title': 'Name'},
+      {'id': 'n'},
+    ],
+    'rows': [
+      for (var i = 0; i < 12; i++) {'name': 'r$i', 'n': i},
+    ],
+  };
+
+  @override
+  Future<CliActionResult> handleAction(
+    String action,
+    Map<String, dynamic> args,
+    BoardPanelInstance panel,
+  ) async =>
+      const CliActionResult();
 }

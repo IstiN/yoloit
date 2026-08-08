@@ -27,6 +27,23 @@ class _MapSecureStorage implements SecureStorageLike {
   }
 }
 
+class _ThrowingSecureStorage implements SecureStorageLike {
+  @override
+  Future<void> delete({required String key}) async {
+    throw Exception('secure storage unavailable');
+  }
+
+  @override
+  Future<String?> read({required String key}) async {
+    throw Exception('secure storage unavailable');
+  }
+
+  @override
+  Future<void> write({required String key, required String? value}) async {
+    throw Exception('secure storage unavailable');
+  }
+}
+
 void main() {
   late Directory tempHome;
 
@@ -99,5 +116,60 @@ void main() {
       '${tempHome.path}/.config/yoloit/credentials/ws_secrets_a',
     );
     expect(file.existsSync(), isFalse);
+  });
+
+  test('ignores an empty config-dir file and falls back to secure storage',
+      () async {
+    final secure = _MapSecureStorage({'cloud_llm_configs_v1': 'from-secure'});
+    final store = YoloitCredentialStore(secureStorage: secure);
+
+    final credDir = Directory(
+      '${tempHome.path}/.config/yoloit/credentials',
+    );
+    await credDir.create(recursive: true);
+    await File('${credDir.path}/cloud_llm_configs_v1').writeAsString('');
+
+    final raw = await store.read(key: 'cloud_llm_configs_v1');
+    expect(raw, 'from-secure');
+
+    // The secure value is re-mirrored into the (previously empty) file.
+    expect(
+      await File('${credDir.path}/cloud_llm_configs_v1').readAsString(),
+      'from-secure',
+    );
+  });
+
+  test('treats secure read failures as a miss and returns null', () async {
+    final store = YoloitCredentialStore(
+      secureStorage: _ThrowingSecureStorage(),
+    );
+
+    final raw = await store.read(
+      key: 'yoloit_test_no_such_key_${DateTime.now().microsecondsSinceEpoch}',
+    );
+    expect(raw, isNull);
+  });
+
+  test('returns null when nothing is stored anywhere', () async {
+    final secure = _MapSecureStorage({});
+    final store = YoloitCredentialStore(secureStorage: secure);
+
+    final raw = await store.read(
+      key: 'yoloit_test_absent_${DateTime.now().microsecondsSinceEpoch}',
+    );
+    expect(raw, isNull);
+  });
+
+  test('sanitizes key characters for the mirror file name', () async {
+    final secure = _MapSecureStorage({});
+    final store = YoloitCredentialStore(secureStorage: secure);
+
+    await store.write(key: 'ws/secrets:odd', value: 'v');
+
+    final file = File(
+      '${tempHome.path}/.config/yoloit/credentials/ws_secrets_odd',
+    );
+    expect(file.existsSync(), isTrue);
+    expect(await store.read(key: 'ws/secrets:odd'), 'v');
   });
 }

@@ -76,6 +76,17 @@ class ProviderModelCatalogService {
   String? _loadError;
   bool _loadedFromRemote = false;
 
+  /// When true, [load] does not kick off background CLI model discovery
+  /// (which spawns real `codex` / `cursor-agent` processes). Tests set this
+  /// to avoid spawning processes from the test environment.
+  @visibleForTesting
+  static bool skipCliDiscoveryForTests = false;
+
+  void _maybeDiscoverCliModels() {
+    if (skipCliDiscoveryForTests) return;
+    unawaited(_discoverCliModels());
+  }
+
   bool get isLoaded => _loaded;
   String? get loadError => _loadError;
   bool get loadedFromRemote => _loadedFromRemote;
@@ -108,7 +119,7 @@ class ProviderModelCatalogService {
         _loaded = true;
         _loadedFromRemote = false;
         // Kick off CLI model discovery in background (non-blocking).
-        unawaited(_discoverCliModels());
+        _maybeDiscoverCliModels();
         return;
       }
       // Try bundled asset
@@ -117,7 +128,7 @@ class ProviderModelCatalogService {
         _parseCatalogs(asset);
         _loaded = true;
         _loadedFromRemote = false;
-        unawaited(_discoverCliModels());
+        _maybeDiscoverCliModels();
         return;
       }
       _loadError =
@@ -131,7 +142,7 @@ class ProviderModelCatalogService {
     _loadedFromRemote = true;
     await _saveCache(json);
     // Kick off CLI model discovery in background (non-blocking).
-    unawaited(_discoverCliModels());
+    _maybeDiscoverCliModels();
   }
 
   /// Returns available models for [providerId] = CLI-discovered models

@@ -83,7 +83,13 @@ class AgentHookService {
 
   Timer? _timer;
 
+  /// Test seam: overrides the home directory so tests can point hook
+  /// installation at a temp directory.
+  @visibleForTesting
+  static String? debugHomeDir;
+
   static String get _homeDir =>
+      debugHomeDir ??
       Platform.environment['HOME'] ??
       Platform.environment['USERPROFILE'] ??
       '';

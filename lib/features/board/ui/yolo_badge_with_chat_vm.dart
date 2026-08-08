@@ -96,6 +96,15 @@ class YoloBadgeWithChatState extends State<YoloBadgeWithChat>
     _voiceOverlayFocusNode.unfocus();
   }
 
+  /// Test-only hook that replaces the in-memory badge panel state so voice
+  /// overlay statuses can be exercised without driving the full mic pipeline.
+  @visibleForTesting
+  void debugSetBadgePanelState(Map<String, dynamic> state) {
+    setState(() {
+      _badgePanel = _badgePanel.copyWith(state: state);
+    });
+  }
+
   Future<void> handleVoiceOverlayPrimaryAction() async {
     switch (_assistantStatus) {
       case 'listening':

@@ -199,7 +199,7 @@ class OpencodeProvider extends CliProviderBase {
 
     // Watch the opencode log file in real-time and surface retries immediately.
     // Log is at ~/.local/share/opencode/log/*.log — a new file per run.
-    _logWatcher = _OpenCodeLogWatcher(
+    _logWatcher = OpenCodeLogWatcher(
       onRetry: (msg, {bool isFatal = false}) {
         _emitErrorMessage(controller, msg);
         if (isFatal) {
@@ -234,7 +234,7 @@ class OpencodeProvider extends CliProviderBase {
 
   bool _receivedFirstEvent = false;
   Timer? _startupTimer;
-  _OpenCodeLogWatcher? _logWatcher;
+  OpenCodeLogWatcher? _logWatcher;
 
   @override
   List<ChatEvent> parseLine(String line, String sessionName) {
@@ -476,8 +476,9 @@ class OpencodeProvider extends CliProviderBase {
 // errors immediately so the user sees them instead of an infinite spinner.
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _OpenCodeLogWatcher {
-  _OpenCodeLogWatcher({required this.onRetry});
+@visibleForTesting
+class OpenCodeLogWatcher {
+  OpenCodeLogWatcher({required this.onRetry});
 
   final void Function(String message, {bool isFatal}) onRetry;
 
@@ -554,14 +555,15 @@ class _OpenCodeLogWatcher {
       final newContent = utf8.decode(bytes, allowMalformed: true);
       // 429 log lines can be 37KB+ (full request body included).
       // Don't split by '\n' — scan the raw chunk directly for error patterns.
-      _parseChunk(newContent);
+      parseChunk(newContent);
     } catch (e) {
       debugPrint('[OpenCodeLog] read error: $e');
     }
     return newOffset;
   }
 
-  void _parseChunk(String content) {
+  @visibleForTesting
+  void parseChunk(String content) {
     // Search raw content directly — log lines can be 37KB+ and may arrive
     // across multiple polls, so don't rely on complete line boundaries.
     final statusMatch = RegExp(r'"statusCode":(\d+)').firstMatch(content);

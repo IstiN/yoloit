@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:yoloit/core/platform/file_storage_adapter.dart';
 import 'package:yoloit/core/remote/history_store_helpers.dart';
@@ -61,9 +62,16 @@ class MemoryBoardHistoryStore extends BoardHistoryStore {
 /// On desktop this delegates to real files under the configured [rootPrefix].
 /// On web it stores events in browser storage using scoped keys.
 class AdapterBoardHistoryStore extends BoardHistoryStore {
-  const AdapterBoardHistoryStore({this.rootPrefix = 'boards_history'});
+  const AdapterBoardHistoryStore({
+    this.rootPrefix = 'boards_history',
+    @visibleForTesting FileStorageAdapter? storage,
+  }) : _storage = storage;
 
   final String rootPrefix;
+
+  final FileStorageAdapter? _storage;
+
+  FileStorageAdapter get _adapter => _storage ?? FileStorageAdapter.instance;
 
   String _eventsDir(String boardId) => p.join(
     rootPrefix,
@@ -79,7 +87,7 @@ class AdapterBoardHistoryStore extends BoardHistoryStore {
 
   @override
   Future<void> append(BoardHistoryEvent event) async {
-    await FileStorageAdapter.instance.writeString(
+    await _adapter.writeString(
       _eventPath(event),
       const JsonEncoder.withIndent('  ').convert(event.toJson()),
     );
@@ -88,7 +96,7 @@ class AdapterBoardHistoryStore extends BoardHistoryStore {
   @override
   Future<List<BoardHistoryEvent>> eventsForBoard(String boardId) async {
     final dir = _eventsDir(boardId);
-    final storage = FileStorageAdapter.instance;
+    final storage = _adapter;
     if (!await storage.exists(dir)) return const [];
 
     final paths = await storage.list(dir);

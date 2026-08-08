@@ -379,11 +379,10 @@ void main() {
   });
 
   // NOTE: there is intentionally no test for the local install flow.
-  // `_installLocal` builds its script via `SetupCatalog.installScript`, which
-  // always returns at least the `set +e` preamble (see
-  // `SetupCatalog.installBatchScript`), so the 'No install command' StateError
-  // is unreachable and every other selection spawns a real install process —
-  // not safe or deterministic in a widget test.
+  // `_installLocal` spawns a real install process for any non-empty selection
+  // via `runSetupInstallScript` — not safe or deterministic in a widget test.
+  // (An empty selection short-circuits with the 'No install command'
+  // StateError before any process is spawned.)
 
   testWidgets('copy command flips to Copied and resets after two seconds', (
     tester,

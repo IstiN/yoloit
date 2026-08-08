@@ -62,7 +62,13 @@ class MindMapCubit extends Cubit<MindMapState> {
     if (savedViewsJson != null) {
       final map = jsonDecode(savedViewsJson) as Map<String, dynamic>;
       map.forEach((k, v) {
-        savedViews[k] = MindMapViewSnapshot.fromJson(v as Map<String, dynamic>);
+        try {
+          savedViews[k] = MindMapViewSnapshot.fromJson(
+            _deepCastViewJson(v as Map<String, dynamic>),
+          );
+        } catch (_) {
+          // Skip views persisted by older/broken serializers.
+        }
       });
     }
 
@@ -86,6 +92,27 @@ class MindMapCubit extends Cubit<MindMapState> {
   }
 
   // ── Named views ───────────────────────────────────────────────────────────
+
+  /// `jsonDecode` produces `Map<String, dynamic>` / `List<dynamic>`, but the
+  /// generated [MindMapViewSnapshot.fromJson] casts to
+  /// `Map<String, List<double>>` / `List<String>` directly. Deep-cast the
+  /// decoded payload so persisted views can actually be restored.
+  static Map<String, dynamic> _deepCastViewJson(Map<String, dynamic> json) {
+    Map<String, List<double>> castNumMap(Object? value) =>
+        (value! as Map<String, dynamic>).map(
+          (k, v) => MapEntry(k, (v as List<dynamic>).cast<double>()),
+        );
+    List<String> castStrList(Object? value) =>
+        (value! as List<dynamic>).cast<String>();
+    return {
+      'name': json['name'],
+      'positions': castNumMap(json['positions']),
+      'sizes': castNumMap(json['sizes']),
+      'locked': castStrList(json['locked']),
+      'hidden': castStrList(json['hidden']),
+      'hiddenTypes': castStrList(json['hiddenTypes']),
+    };
+  }
 
   Future<void> saveView(String name) async {
     final snapshot = MindMapViewSnapshot(

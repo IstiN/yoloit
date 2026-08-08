@@ -517,4 +517,161 @@ void main() {
       expect((body['roots'] as List).length, 1);
     });
   });
+
+  group('handleSetupInstall', () {
+    Future<shelf.Response> call({
+      required String method,
+      required List<String> sub,
+      shelf.Request? request,
+      String Function()? nextId,
+      void Function(String id, String displayScript)? onStarted,
+      Future<void> Function(String id, List<String> specialIds, String script)?
+      startTasks,
+    }) {
+      return handleSetupInstall(
+        request: request ?? _request(method, 'http://x/api/setup'),
+        method: method,
+        sub: sub,
+        nextId: nextId ?? () => 'generated-id',
+        onStarted: onStarted ?? (_, _) {},
+        startTasks: startTasks ?? (_, _, _) async {},
+      );
+    }
+
+    test('GET returns the setup snapshot', () async {
+      final response = await call(method: 'GET', sub: const <String>[]);
+      expect(response.statusCode, 200);
+      final body = await _decode(response);
+      expect(body['runtime'], isA<Map<String, dynamic>>());
+      expect(body['packages'], isA<List<dynamic>>());
+    }, timeout: const Timeout(Duration(seconds: 60)));
+
+    test('POST install rejects missing packageIds', () async {
+      final response = await call(
+        method: 'POST',
+        sub: const <String>['install'],
+        request: _request(
+          'POST',
+          'http://x/api/setup/install',
+          body: <String, Object?>{'packageIds': <String>[]},
+        ),
+      );
+      expect(response.statusCode, 400);
+      expect((await _decode(response))['error'], 'packageIds required');
+    });
+
+    test('POST install rejects packages without an install command', () async {
+      final response = await call(
+        method: 'POST',
+        sub: const <String>['install'],
+        request: _request(
+          'POST',
+          'http://x/api/setup/install',
+          body: <String, Object?>{'packageIds': <String>['no-such-package-xyz']},
+        ),
+      );
+      expect(response.statusCode, 400);
+      expect(
+        (await _decode(response))['error'],
+        'no install command for selected packages on this OS',
+      );
+    });
+
+    test('POST install dryRun returns the script without starting tasks',
+        () async {
+      var started = 0;
+      final response = await call(
+        method: 'POST',
+        sub: const <String>['install'],
+        request: _request(
+          'POST',
+          'http://x/api/setup/install',
+          body: <String, Object?>{
+            'packageIds': <String>['git'],
+            'dryRun': true,
+          },
+        ),
+        onStarted: (_, _) => started++,
+      );
+      expect(response.statusCode, 200);
+      final body = await _decode(response);
+      expect(body['ok'], isTrue);
+      expect(body['script'] as String, contains('install'));
+      expect(body.containsKey('id'), isFalse);
+      expect(started, 0);
+    }, timeout: const Timeout(Duration(seconds: 60)));
+
+    test('POST install with a special task labels the display script',
+        () async {
+      final response = await call(
+        method: 'POST',
+        sub: const <String>['install'],
+        request: _request(
+          'POST',
+          'http://x/api/setup/install',
+          body: <String, Object?>{
+            'packageIds': <String>['yoloit-skills'],
+            'dryRun': true,
+          },
+        ),
+      );
+      expect(response.statusCode, 200);
+      final body = await _decode(response);
+      expect(body['ok'], isTrue);
+      expect(body['script'] as String, contains('YoLoIT built-in task'));
+    }, timeout: const Timeout(Duration(seconds: 60)));
+
+    test('POST install starts tasks and reports the generated id', () async {
+      final started = <String>[];
+      final tasks = <List<Object?>>[];
+      final response = await call(
+        method: 'POST',
+        sub: const <String>['install'],
+        request: _request(
+          'POST',
+          'http://x/api/setup/install',
+          body: <String, Object?>{'packageIds': <String>['git']},
+        ),
+        onStarted: (id, displayScript) => started.add('$id|$displayScript'),
+        startTasks: (id, specialIds, script) async {
+          tasks.add(<Object?>[id, specialIds, script]);
+        },
+      );
+      expect(response.statusCode, 200);
+      final body = await _decode(response);
+      expect(body['ok'], isTrue);
+      expect(body['id'], 'generated-id');
+      expect(started, hasLength(1));
+      expect(started.single, startsWith('generated-id|'));
+      // The async kick-off happens via unawaited — let it run.
+      await Future<void>.delayed(Duration.zero);
+      expect(tasks, hasLength(1));
+      expect(tasks.single[0], 'generated-id');
+      expect(tasks.single[1], isEmpty);
+      expect(tasks.single[2] as String, contains('install'));
+    }, timeout: const Timeout(Duration(seconds: 60)));
+
+    test('POST install honors a caller-provided run id', () async {
+      final response = await call(
+        method: 'POST',
+        sub: const <String>['install'],
+        request: _request(
+          'POST',
+          'http://x/api/setup/install',
+          body: <String, Object?>{
+            'packageIds': <String>['git'],
+            'id': 'custom-run',
+          },
+        ),
+      );
+      expect((await _decode(response))['id'], 'custom-run');
+    }, timeout: const Timeout(Duration(seconds: 60)));
+
+    test('returns 404 for unknown routes', () async {
+      final wrongMethod = await call(method: 'GET', sub: const <String>['install']);
+      expect(wrongMethod.statusCode, 404);
+      final wrongSub = await call(method: 'POST', sub: const <String>['bogus']);
+      expect(wrongSub.statusCode, 404);
+    });
+  });
 }

@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart' show ValueNotifier;
+import 'package:flutter/foundation.dart' show ValueNotifier, visibleForTesting;
 import 'package:yoloit/core/services/resource_monitor_service.dart';
 import 'package:yoloit/core/services/support_log_service.dart';
 import 'package:yoloit/features/settings/data/agent_config_service.dart';
@@ -15,6 +15,11 @@ class TerminalBackendService {
   final _runtime = RuntimeTerminalBackend();
   final _tmux = TmuxTerminalBackend();
   final _bySession = <String, TerminalBackend>{};
+
+  /// Test-only backend override: when set, [launch] always uses it instead of
+  /// selecting a real local/runtime/tmux backend (which would spawn processes).
+  @visibleForTesting
+  TerminalBackend? debugBackendOverride;
 
   Future<TerminalProcess> launch({
     required String sessionId,
@@ -88,6 +93,8 @@ class TerminalBackendService {
   Future<void> restartRuntime() => _runtime.client.restartRuntime();
 
   TerminalBackend _selectBackend() {
+    final override = debugBackendOverride;
+    if (override != null) return override;
     return switch (AgentConfigService.instance.terminalBackendMode) {
       TerminalBackendMode.runtime => _runtime,
       TerminalBackendMode.tmux =>

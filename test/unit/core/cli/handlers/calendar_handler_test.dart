@@ -223,6 +223,79 @@ void main() {
       );
       expect(r.ok, isFalse);
     });
+
+    group('allDay coercion', () {
+      Future<Map<String, dynamic>> updateAllDay(
+        BoardPanelInstance panel,
+        Object? allDay, {
+        bool includeKey = true,
+      }) async {
+        final r = await handler.handleAction(
+          'update-event',
+          <String, dynamic>{
+            'eventId': 'ev-1',
+            if (includeKey) 'allDay': allDay,
+          },
+          panel,
+        );
+        expect(r.ok, isTrue);
+        return r.data!['event'] as Map<String, dynamic>;
+      }
+
+      test('truthy values set allDay to true', () async {
+        for (final value in <Object>[true, 'true', '1', 'yes', 1]) {
+          final panel = newPanel();
+          const storage = CalendarEventStorage();
+          await storage.upsertEvent(
+            panel.id,
+            CalendarEvent(
+              id: 'ev-1',
+              title: 'Standup',
+              start: DateTime(2026, 6, 19, 10),
+            ),
+          );
+          final event = await updateAllDay(panel, value);
+          expect(event['allDay'], isTrue, reason: 'allDay=$value');
+        }
+      });
+
+      test('falsy values set allDay to false', () async {
+        for (final value in <Object>[false, 'false', '0', 'no', 0]) {
+          final panel = newPanel();
+          const storage = CalendarEventStorage();
+          await storage.upsertEvent(
+            panel.id,
+            CalendarEvent(
+              id: 'ev-1',
+              title: 'Standup',
+              start: DateTime(2026, 6, 19, 10),
+              allDay: true,
+            ),
+          );
+          final event = await updateAllDay(panel, value);
+          expect(event['allDay'], isFalse, reason: 'allDay=$value');
+        }
+      });
+
+      test('unrecognized or missing allDay keeps the previous value', () async {
+        final panel = newPanel();
+        const storage = CalendarEventStorage();
+        await storage.upsertEvent(
+          panel.id,
+          CalendarEvent(
+            id: 'ev-1',
+            title: 'Standup',
+            start: DateTime(2026, 6, 19, 10),
+            allDay: true,
+          ),
+        );
+        final unrecognized = await updateAllDay(panel, 'maybe');
+        expect(unrecognized['allDay'], isTrue);
+
+        final missing = await updateAllDay(panel, null, includeKey: false);
+        expect(missing['allDay'], isTrue);
+      });
+    });
   });
 
   group('CalendarCliHandler — delete-event action', () {

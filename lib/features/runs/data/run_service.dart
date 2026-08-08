@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:yoloit/core/platform/platform_dirs.dart';
 import 'package:yoloit/core/platform/platform_shell.dart';
 
@@ -51,6 +52,11 @@ class RunService {
 
   /// Returns the cached tmux executable path, resolving it on first call.
   Future<String> _tmux() async => _tmuxPath ??= await _findExecutable('tmux');
+
+  /// Drops the cached tmux executable path so the next [_tmux] call
+  /// re-resolves it. Tests swap PATH shims between cases.
+  @visibleForTesting
+  void resetTmuxPathForTesting() => _tmuxPath = null;
 
   Future<void> start({
     required String sessionId,
@@ -215,6 +221,24 @@ class RunService {
       },
     );
   }
+
+  /// Exposes [_tailLog] so unit tests can drive the log-tailing logic
+  /// directly (missing file, partial lines, from-end reconnects).
+  @visibleForTesting
+  Future<void> tailLogForTesting({
+    required String sessionId,
+    required String log,
+    required bool fromStart,
+    required OutputCallback onOutput,
+    required ExitCallback onExit,
+  }) =>
+      _tailLog(
+        sessionId: sessionId,
+        log: log,
+        fromStart: fromStart,
+        onOutput: onOutput,
+        onExit: onExit,
+      );
 
   void stop(String sessionId) {
     final name = _sessionTmux[sessionId];

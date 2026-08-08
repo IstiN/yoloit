@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -284,7 +286,87 @@ void main() {
             .having((s) => s.nodeContent['n1'], 'content', {'text': 'hello'}),
       ],
     );
+  });
 
+  group('MindMapCubit.loadPersistedPositions', () {
+    test('emits empty collections when nothing is persisted', () async {
+      final cubit = MindMapCubit();
+      await cubit.loadPersistedPositions();
 
+      expect(cubit.state.positions, isEmpty);
+      expect(cubit.state.sizes, isEmpty);
+      expect(cubit.state.locked, isEmpty);
+      expect(cubit.state.hidden, isEmpty);
+      expect(cubit.state.hiddenTypes, isEmpty);
+      expect(cubit.state.savedViews, isEmpty);
+    });
+
+    test('restores persisted positions, sizes, locked, hidden and views', () async {
+      const view = MindMapViewSnapshot(
+        name: 'Focus',
+        positions: {'n1': Offset(3, 4)},
+        sizes: {'n1': Size(50, 60)},
+        locked: {'n1'},
+        hidden: {'n2'},
+        hiddenTypes: {'terminal'},
+      );
+      SharedPreferences.setMockInitialValues({
+        'mindmap.positions': jsonEncode({'n1': [10.0, 20.0]}),
+        'mindmap.sizes': jsonEncode({'n1': [200.0, 120.0]}),
+        'mindmap.locked': ['n1'],
+        'mindmap.hidden': ['n2', 'agent:s1'],
+        'mindmap.hiddenTypes': ['terminal'],
+        'mindmap.saved_views': jsonEncode({'Focus': view.toJson()}),
+      });
+
+      final cubit = MindMapCubit();
+      await cubit.loadPersistedPositions();
+
+      expect(cubit.state.positions, {'n1': const Offset(10, 20)});
+      expect(cubit.state.sizes, {'n1': const Size(200, 120)});
+      expect(cubit.state.locked, {'n1'});
+      // Stale agent-node hides are filtered out — agent cards always reappear.
+      expect(cubit.state.hidden, {'n2'});
+      expect(cubit.state.hiddenTypes, {'terminal'});
+      expect(cubit.state.savedViews.keys, ['Focus']);
+      expect(
+        cubit.state.savedViews['Focus']!.positions,
+        {'n1': const Offset(3, 4)},
+      );
+    });
+
+    test('clears corrupted positions when every node sits near the origin', () async {
+      SharedPreferences.setMockInitialValues({
+        'mindmap.positions': jsonEncode({'a': [0.0, 0.0], 'b': [5.0, 5.0]}),
+        'mindmap.locked': ['a'],
+        'mindmap.sizes': jsonEncode({'a': [100.0, 100.0]}),
+      });
+
+      final cubit = MindMapCubit();
+      await cubit.loadPersistedPositions();
+
+      expect(cubit.state.positions, isEmpty);
+      expect(cubit.state.locked, isEmpty);
+      expect(cubit.state.sizes, isEmpty);
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('mindmap.positions'), isNull);
+      expect(prefs.getStringList('mindmap.locked'), isNull);
+      expect(prefs.getString('mindmap.sizes'), isNull);
+    });
+
+    test('keeps positions when at least one node is away from the origin', () async {
+      SharedPreferences.setMockInitialValues({
+        'mindmap.positions': jsonEncode({'a': [0.0, 0.0], 'b': [500.0, 600.0]}),
+      });
+
+      final cubit = MindMapCubit();
+      await cubit.loadPersistedPositions();
+
+      expect(cubit.state.positions, {
+        'a': Offset.zero,
+        'b': const Offset(500, 600),
+      });
+    });
   });
 }

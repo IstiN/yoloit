@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
+import 'package:yoloit/core/platform/platform_dirs.dart';
 import 'package:yoloit/features/workspaces/data/agent_workspace_dir_service.dart';
 
 void main() {
@@ -156,6 +157,136 @@ void main() {
         AgentWorkspaceDirService.instance.deleteAgentDir(workspaceId, agentId),
         completes,
       );
+    });
+  });
+
+  group('AgentWorkspaceDirService.readWorktreeContexts', () {
+    late Directory tempHome;
+    late Directory worktree;
+    late Directory otherWorktree;
+
+    setUp(() {
+      // Point the config dir at a temp home so the service builds agent dirs
+      // inside the fixture instead of the real user config.
+      tempHome = Directory.systemTemp.createTempSync('aws_dirs_test');
+      PlatformDirs.setInstance(MacosPlatformDirs(homeOverride: tempHome.path));
+      worktree = Directory(p.join(tempHome.path, 'worktree'))
+        ..createSync();
+      otherWorktree = Directory(p.join(tempHome.path, 'other-worktree'))
+        ..createSync();
+    });
+
+    tearDown(() {
+      PlatformDirs.setInstance(const MacosPlatformDirs());
+      if (tempHome.existsSync()) tempHome.deleteSync(recursive: true);
+    });
+
+    test('returns null when the agent directory does not exist', () async {
+      final result = await AgentWorkspaceDirService.instance
+          .readWorktreeContexts('no-ws', 'no-agent', const ['/repos/myrepo']);
+      expect(result, isNull);
+    });
+
+    test('returns null when the agent directory has no links', () async {
+      await AgentWorkspaceDirService.instance.createAgentDir(
+        workspaceId,
+        agentId,
+        const {},
+      );
+      final result = await AgentWorkspaceDirService.instance
+          .readWorktreeContexts(workspaceId, agentId, const ['/repos/myrepo']);
+      expect(result, isNull);
+    });
+
+    test('maps the original repo path to an existing worktree target',
+        () async {
+      final resolvedWorktree = worktree.resolveSymbolicLinksSync();
+      await AgentWorkspaceDirService.instance.createAgentDir(
+        workspaceId,
+        agentId,
+        {'/repos/myrepo': resolvedWorktree},
+      );
+
+      final result = await AgentWorkspaceDirService.instance
+          .readWorktreeContexts(workspaceId, agentId, const ['/repos/myrepo']);
+
+      expect(result, isNotNull);
+      expect(result!['/repos/myrepo'], resolvedWorktree);
+    });
+
+    test('skips links whose basename matches no workspace path', () async {
+      final resolvedWorktree = worktree.resolveSymbolicLinksSync();
+      await AgentWorkspaceDirService.instance.createAgentDir(
+        workspaceId,
+        agentId,
+        {'/repos/myrepo': resolvedWorktree},
+      );
+
+      final result = await AgentWorkspaceDirService.instance
+          .readWorktreeContexts(workspaceId, agentId, const ['/repos/other']);
+
+      expect(result, isNull);
+    });
+
+    test('skips links pointing back at the original workspace path', () async {
+      // Recreate the "repo" as a real directory so the link target resolves.
+      final repo = Directory(p.join(tempHome.path, 'myrepo'))..createSync();
+      final resolvedRepo = repo.resolveSymbolicLinksSync();
+      await AgentWorkspaceDirService.instance.createAgentDir(
+        workspaceId,
+        agentId,
+        {resolvedRepo: resolvedRepo},
+      );
+
+      final result = await AgentWorkspaceDirService.instance
+          .readWorktreeContexts(workspaceId, agentId, [resolvedRepo]);
+
+      expect(result, isNull);
+    });
+
+    test('skips links whose worktree target no longer exists', () async {
+      final resolvedWorktree = worktree.resolveSymbolicLinksSync();
+      await AgentWorkspaceDirService.instance.createAgentDir(
+        workspaceId,
+        agentId,
+        {'/repos/myrepo': resolvedWorktree},
+      );
+      worktree.deleteSync(recursive: true);
+
+      final result = await AgentWorkspaceDirService.instance
+          .readWorktreeContexts(workspaceId, agentId, const ['/repos/myrepo']);
+
+      expect(result, isNull);
+    });
+
+    test('collects multiple worktree links and ignores non-link entries',
+        () async {
+      final resolvedWorktree = worktree.resolveSymbolicLinksSync();
+      final resolvedOther = otherWorktree.resolveSymbolicLinksSync();
+      await AgentWorkspaceDirService.instance.createAgentDir(
+        workspaceId,
+        agentId,
+        {
+          '/repos/myrepo': resolvedWorktree,
+          '/repos/otherrepo': resolvedOther,
+        },
+      );
+      // A plain file inside the agent dir must be ignored by the scan.
+      final agentDir =
+          AgentWorkspaceDirService.instance.dirForAgent(workspaceId, agentId);
+      File(p.join(agentDir, 'notes.txt')).writeAsStringSync('x');
+
+      final result = await AgentWorkspaceDirService.instance
+          .readWorktreeContexts(
+        workspaceId,
+        agentId,
+        const ['/repos/myrepo', '/repos/otherrepo'],
+      );
+
+      expect(result, isNotNull);
+      expect(result!.length, 2);
+      expect(result['/repos/myrepo'], resolvedWorktree);
+      expect(result['/repos/otherrepo'], resolvedOther);
     });
   });
 }

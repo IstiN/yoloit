@@ -350,6 +350,47 @@ void main() {
       expect(harness.linkedPanels.single.state['filePath'], 'added.dart');
       expect(harness.linkedPanels.single.state['rootPath'], repo.path);
     });
+
+    testWidgets('diff tab groups nested changes into expandable dir rows', (
+      tester,
+    ) async {
+      final repo = Directory.systemTemp.createTempSync('yoloit_filetree_git_');
+      addTearDown(() {
+        try {
+          repo.deleteSync(recursive: true);
+        } on FileSystemException {
+          // Ignore cleanup races.
+        }
+      });
+      _initNestedGitRepo(repo);
+      final harness = _PanelHarness(_stateFor(repo));
+      await tester.pumpWidget(_fileTreeApp(harness));
+      await _pumpOut(tester);
+
+      await _openDiffTab(tester);
+
+      expect(find.text('3 changed files'), findsOneWidget);
+      // Directory rows (auto-expanded after load) show their file counts.
+      expect(find.text('src'), findsOneWidget);
+      expect(find.text('sub'), findsOneWidget);
+      // Files inside expanded directories are listed with their names.
+      expect(find.text('added.dart'), findsOneWidget);
+      expect(find.text('deep.dart'), findsOneWidget);
+      expect(find.text('inner.txt'), findsOneWidget);
+
+      // Collapsing a directory hides its own files (sibling directory rows
+      // are rendered flat and stay visible).
+      await tester.tap(find.text('src'));
+      await _pumpOut(tester);
+      expect(find.text('added.dart'), findsNothing);
+      expect(find.text('deep.dart'), findsOneWidget);
+      expect(find.text('inner.txt'), findsOneWidget);
+
+      // Expanding again brings them back.
+      await tester.tap(find.text('src'));
+      await _pumpOut(tester);
+      expect(find.text('added.dart'), findsOneWidget);
+    });
   });
 }
 
@@ -502,4 +543,35 @@ void _initGitRepo(Directory dir) {
   ]);
   File(p.join(dir.path, 'tracked.md')).writeAsStringSync('v2');
   File(p.join(dir.path, 'added.dart')).writeAsStringSync('void main() {}');
+}
+
+/// Like [_initGitRepo] but leaves changes in nested paths so the diff tree
+/// groups them under directory rows: ` M sub/inner.txt`, `A  src/added.dart`
+/// and `A  src/deep/deep.dart`.
+void _initNestedGitRepo(Directory dir) {
+  void git(List<String> args) {
+    final result = Process.runSync('git', args, workingDirectory: dir.path);
+    if (result.exitCode != 0) {
+      throw StateError('git ${args.join(' ')} failed: ${result.stderr}');
+    }
+  }
+
+  git(['init']);
+  Directory(p.join(dir.path, 'sub')).createSync();
+  File(p.join(dir.path, 'sub', 'inner.txt')).writeAsStringSync('v1');
+  git(['add', '.']);
+  git([
+    '-c', 'user.email=test@example.com', //
+    '-c', 'user.name=Test',
+    'commit', '-m', 'init',
+  ]);
+  File(p.join(dir.path, 'sub', 'inner.txt')).writeAsStringSync('v2');
+  Directory(p.join(dir.path, 'src', 'deep')).createSync(recursive: true);
+  File(p.join(dir.path, 'src', 'added.dart')).writeAsStringSync('void a() {}');
+  File(
+    p.join(dir.path, 'src', 'deep', 'deep.dart'),
+  ).writeAsStringSync('void d() {}');
+  // Stage the new files so porcelain reports them individually ('A') instead
+  // of collapsing the untracked `src/` directory into a single '??' entry.
+  git(['add', 'src']);
 }

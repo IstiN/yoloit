@@ -19,9 +19,13 @@ import 'package:yoloit/features/board/model/chat_models.dart';
 /// the same way [CopilotCliProvider] does — the [ChatPanelWidget] remains
 /// provider-agnostic since it only reacts to [ChatEventType].
 class SubAgentEventWatcher {
-  SubAgentEventWatcher({required this.pid});
+  SubAgentEventWatcher({required this.pid, @visibleForTesting this.homeDir});
 
   final int pid;
+
+  /// Overrides `$HOME` for session discovery (tests only).
+  @visibleForTesting
+  final String? homeDir;
 
   StreamController<ChatEvent>? _controller;
   Timer? _pollTimer;
@@ -45,7 +49,7 @@ class SubAgentEventWatcher {
   // ── Session discovery ──────────────────────────────────────────────────────
 
   void _startPollingForSession() {
-    final home = Platform.environment['HOME'] ?? '';
+    final home = homeDir ?? Platform.environment['HOME'] ?? '';
     if (home.isEmpty) return;
 
     final stateDir = Directory('$home/$_sessionStateSubPath');

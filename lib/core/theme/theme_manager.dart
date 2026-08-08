@@ -499,7 +499,9 @@ class ThemeManager extends ChangeNotifier {
     _customThemes = [];
     final dir = _themesDir;
     final storage = FileStorageAdapter.instance;
-    if (!await storage.exists(dir)) return;
+    // Do not gate on storage.exists(dir): the VM adapter checks File
+    // existence, which is false for directories. list() already returns an
+    // empty result when the directory is missing.
     final paths = await storage.list(dir);
     for (final filePath in paths) {
       if (!filePath.endsWith('.json')) continue;

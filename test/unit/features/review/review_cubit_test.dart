@@ -2,7 +2,9 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yoloit/features/review/bloc/review_cubit.dart';
+import 'package:yoloit/features/review/bloc/review_state.dart';
 import 'package:yoloit/features/review/models/review_models.dart';
 
 void main() {
@@ -240,6 +242,104 @@ void main() {
       expect(result[0].isExpanded, isFalse);
 
       cubit.close();
+    });
+  });
+
+  group('ReviewCubit.refresh', () {
+    late Directory tempDir;
+    late ReviewCubit cubit;
+
+    setUp(() {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      SharedPreferences.setMockInitialValues({});
+      tempDir = Directory.systemTemp.createTempSync('review_refresh_test_');
+      cubit = ReviewCubit();
+    });
+
+    tearDown(() async {
+      await cubit.close();
+      if (tempDir.existsSync()) {
+        tempDir.deleteSync(recursive: true);
+      }
+    });
+
+    test('does nothing when no workspace paths are set', () async {
+      await cubit.refresh();
+
+      expect(cubit.state, isA<ReviewInitial>());
+    });
+
+    test('builds an expanded root node from the workspace path', () async {
+      File('${tempDir.path}/a.txt').createSync();
+      Directory('${tempDir.path}/sub').createSync();
+
+      await cubit.loadWorkspace([tempDir.path]);
+
+      final state = cubit.state as ReviewLoaded;
+      expect(state.fileTree, hasLength(1));
+      final root = state.fileTree.single;
+      expect(root.name, p.basename(tempDir.path));
+      expect(root.path, tempDir.path);
+      expect(root.isDirectory, isTrue);
+      expect(root.isExpanded, isTrue);
+      expect(
+        root.children.map((c) => c.name),
+        containsAll(<String>['a.txt', 'sub']),
+      );
+    });
+
+    test('builds one root per path for multi-path workspaces', () async {
+      final second = Directory.systemTemp.createTempSync('review_refresh_b_');
+      addTearDown(() {
+        if (second.existsSync()) second.deleteSync(recursive: true);
+      });
+
+      await cubit.loadWorkspace([tempDir.path, second.path]);
+
+      final state = cubit.state as ReviewLoaded;
+      expect(
+        state.fileTree.map((n) => n.path),
+        [tempDir.path, second.path],
+      );
+    });
+
+    test('restores persisted expanded directories for the workspace id', () async {
+      final sub = Directory('${tempDir.path}/sub')..createSync();
+      File('${sub.path}/inner.txt').createSync();
+      // The root path itself must be skipped (already expanded by refresh).
+      SharedPreferences.setMockInitialValues({
+        'filetree.expanded.ws1': [tempDir.path, sub.path],
+      });
+
+      await cubit.loadWorkspace([tempDir.path], workspaceId: 'ws1');
+
+      final state = cubit.state as ReviewLoaded;
+      final subNode = state.fileTree.single.children.single;
+      expect(subNode.path, sub.path);
+      expect(subNode.isExpanded, isTrue);
+      expect(subNode.children.map((c) => c.name), ['inner.txt']);
+    });
+
+    test('preserves selection, content and view mode across refreshes', () async {
+      File('${tempDir.path}/a.txt').createSync();
+      await cubit.loadWorkspace([tempDir.path]);
+
+      final loaded = cubit.state as ReviewLoaded;
+      cubit.emit(loaded.copyWith(
+        selectedFilePath: '${tempDir.path}/a.txt',
+        viewMode: ReviewViewMode.file,
+        fileContent: 'content',
+        fileLanguage: 'dart',
+      ));
+
+      await cubit.refresh();
+
+      final state = cubit.state as ReviewLoaded;
+      expect(state.selectedFilePath, '${tempDir.path}/a.txt');
+      expect(state.viewMode, ReviewViewMode.file);
+      expect(state.fileContent, 'content');
+      expect(state.fileLanguage, 'dart');
+      expect(state.fileTree, hasLength(1));
     });
   });
 }

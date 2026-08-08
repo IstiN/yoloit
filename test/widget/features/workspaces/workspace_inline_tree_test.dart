@@ -11,8 +11,43 @@ import 'package:yoloit/features/terminal/models/agent_session.dart';
 import 'package:yoloit/features/terminal/models/agent_type.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_cubit.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_state.dart';
+import 'package:yoloit/features/workspaces/data/worktree_service.dart';
 import 'package:yoloit/features/workspaces/models/workspace.dart';
+import 'package:yoloit/features/workspaces/models/worktree_model.dart';
 import 'package:yoloit/features/workspaces/ui/workspace_inline_tree.dart';
+
+class _FakeWorktreeService implements WorktreeService {
+  _FakeWorktreeService(this.worktreesByRepo);
+
+  final Map<String, List<WorktreeEntry>> worktreesByRepo;
+
+  @override
+  Future<List<WorktreeEntry>> listWorktrees(String repoPath) async =>
+      worktreesByRepo[repoPath] ?? const [];
+
+  @override
+  Future<String?> addWorktree(
+    String repoPath,
+    String worktreePath,
+    String branchOrCommit, {
+    bool createNewBranch = false,
+  }) async =>
+      null;
+
+  @override
+  Future<String?> removeWorktree(
+    String repoPath,
+    String worktreePath, {
+    bool force = false,
+  }) async =>
+      null;
+
+  @override
+  Future<void> pruneWorktrees(String repoPath) async {}
+
+  @override
+  Future<List<String>> listBranches(String repoPath) async => const [];
+}
 
 const _testWorkspace = Workspace(
   id: 'ws_test',
@@ -252,6 +287,109 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('New Agent Session'), findsNothing);
+    });
+  });
+
+  group('WorkspaceInlineTree session labels', () {
+    late WorktreeService originalService;
+
+    setUp(() {
+      originalService = WorktreeService.instance;
+    });
+
+    tearDown(() {
+      WorktreeService.instance = originalService;
+    });
+
+    AgentSession worktreeSession({
+      required Map<String, String> contexts,
+      String? customName,
+    }) {
+      return AgentSession(
+        id: 'sess_wt',
+        type: AgentType.claude,
+        workspacePath: contexts.values.first,
+        workspaceId: 'ws_test',
+        customName: customName,
+        worktreeContexts: contexts,
+      );
+    }
+
+    TerminalLoaded stateWith(AgentSession session) => TerminalLoaded(
+          sessions: [session],
+          activeIndex: 0,
+          allSessions: [session],
+        );
+
+    testWidgets('resolves the branch name from the loaded worktrees', (tester) async {
+      WorktreeService.instance = _FakeWorktreeService({
+        '/fake/repo-a': [
+          const WorktreeEntry(
+            path: '/fake/repo-a__feat-x',
+            branch: 'feat/x',
+            isMain: false,
+            isLocked: false,
+            isBare: false,
+          ),
+        ],
+      });
+      final session = worktreeSession(
+        contexts: {'/fake/repo-a': '/fake/repo-a__feat-x'},
+      );
+
+      await tester.pumpWidget(_buildTest(termState: stateWith(session)));
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(find.text('Claude · feat/x'), findsOneWidget);
+    });
+
+    testWidgets('falls back to stripping the repo prefix when the worktree '
+        'is not in the loaded list', (tester) async {
+      WorktreeService.instance = _FakeWorktreeService(const {});
+      final session = worktreeSession(
+        contexts: {'/fake/repo-a': '/fake/repo-a__feat-x'},
+      );
+
+      await tester.pumpWidget(_buildTest(termState: stateWith(session)));
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(find.text('Claude · feat-x'), findsOneWidget);
+    });
+
+    testWidgets('falls back to the full directory name without repo prefix', (tester) async {
+      WorktreeService.instance = _FakeWorktreeService(const {});
+      final session = worktreeSession(
+        contexts: {'/fake/repo-a': '/elsewhere/plain_dir'},
+      );
+
+      await tester.pumpWidget(_buildTest(termState: stateWith(session)));
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(find.text('Claude · plain_dir'), findsOneWidget);
+    });
+
+    testWidgets('custom name wins over the worktree branch label', (tester) async {
+      WorktreeService.instance = _FakeWorktreeService({
+        '/fake/repo-a': [
+          const WorktreeEntry(
+            path: '/fake/repo-a__feat-x',
+            branch: 'feat/x',
+            isMain: false,
+            isLocked: false,
+            isBare: false,
+          ),
+        ],
+      });
+      final session = worktreeSession(
+        contexts: {'/fake/repo-a': '/fake/repo-a__feat-x'},
+        customName: 'My Bot',
+      );
+
+      await tester.pumpWidget(_buildTest(termState: stateWith(session)));
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(find.text('My Bot'), findsOneWidget);
+      expect(find.text('Claude · feat/x'), findsNothing);
     });
   });
 }

@@ -360,4 +360,84 @@ void main() {
       expect(OpencodeProvider.looksLikeError('ok'), isFalse);
     });
   });
+
+  group('OpenCodeLogWatcher.parseChunk', () {
+    late List<(String, bool)> emitted;
+    late OpenCodeLogWatcher watcher;
+
+    setUp(() {
+      emitted = <(String, bool)>[];
+      watcher = OpenCodeLogWatcher(
+        onRetry: (msg, {isFatal = false}) => emitted.add((msg, isFatal)),
+      );
+    });
+
+    tearDown(() => watcher.stop());
+
+    test('emits fatal rate-limit message for 429 with message', () {
+      watcher.parseChunk(
+        'opencode log line {"statusCode":429,"message":"Quota exceeded"} tail',
+      );
+
+      expect(emitted, hasLength(1));
+      expect(emitted.single.$1, '⏳ Rate limit (429): Quota exceeded');
+      expect(emitted.single.$2, isTrue);
+    });
+
+    test('uses fallback text for 429 without a message', () {
+      watcher.parseChunk('{"statusCode":429} retrying in 30s');
+
+      expect(emitted, hasLength(1));
+      expect(
+        emitted.single.$1,
+        '⏳ Rate limit (429): Please try again later',
+      );
+      expect(emitted.single.$2, isTrue);
+    });
+
+    test('emits non-fatal warning for ERROR line with a message', () {
+      watcher.parseChunk(
+        '2024-01-01 ERROR {"statusCode":500,"message":"boom"}',
+      );
+
+      expect(emitted, hasLength(1));
+      expect(emitted.single.$1, '⚠️ OpenCode: boom');
+      expect(emitted.single.$2, isFalse);
+    });
+
+    test('emits warning for ERROR line with message but no status', () {
+      watcher.parseChunk('ERROR {"message":"provider unavailable"}');
+
+      expect(emitted, hasLength(1));
+      expect(emitted.single.$1, '⚠️ OpenCode: provider unavailable');
+      expect(emitted.single.$2, isFalse);
+    });
+
+    test('ignores non-429 status without ERROR marker', () {
+      watcher.parseChunk('{"statusCode":200,"message":"all good"}');
+
+      expect(emitted, isEmpty);
+    });
+
+    test('ignores message without status code and without ERROR', () {
+      watcher.parseChunk('{"message":"just info"}');
+
+      expect(emitted, isEmpty);
+    });
+
+    test('ignores chunks with neither status nor message', () {
+      watcher.parseChunk('some plain log line without markers');
+
+      expect(emitted, isEmpty);
+    });
+
+    test('does not re-emit duplicate messages', () {
+      const chunk = '{"statusCode":429,"message":"slow down"}';
+
+      watcher.parseChunk(chunk);
+      watcher.parseChunk(chunk);
+
+      expect(emitted, hasLength(1));
+    });
+  });
 }

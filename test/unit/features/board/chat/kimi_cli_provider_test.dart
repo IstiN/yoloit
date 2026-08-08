@@ -357,4 +357,94 @@ void main() {
       expect(events[5].rawType, 'kimi.wire.step_end');
     }, timeout: const Timeout(Duration(seconds: 10)));
   });
+
+  group('KimiCliProvider._findWireJsonl', () {
+    late Directory sessionsDir;
+
+    setUp(() {
+      sessionsDir = Directory.systemTemp.createTempSync('kimi_wire_test');
+    });
+
+    tearDown(() {
+      if (sessionsDir.existsSync()) {
+        sessionsDir.deleteSync(recursive: true);
+      }
+    });
+
+    KimiCliProvider provider() => KimiCliProvider(
+      wireJsonlPath: '',
+      sessionsDirOverride: sessionsDir.path,
+    );
+
+    File createWireFile(String relativePath, DateTime modified) {
+      final file = File('${sessionsDir.path}/$relativePath')
+        ..createSync(recursive: true);
+      file.writeAsStringSync('{}\n');
+      file.setLastModifiedSync(modified);
+      return file;
+    }
+
+    test('returns the newest wire.jsonl modified after the cutoff', () async {
+      final cutoff = DateTime.now();
+      final older = createWireFile(
+        'a/wire.jsonl',
+        cutoff.add(const Duration(seconds: 2)),
+      );
+      final newest = createWireFile(
+        'nested/deep/wire.jsonl',
+        cutoff.add(const Duration(seconds: 10)),
+      );
+      // A file older than the cutoff is never eligible.
+      createWireFile(
+        'stale/wire.jsonl',
+        cutoff.subtract(const Duration(hours: 1)),
+      );
+
+      final found = await provider().findWireJsonlForTest(cutoff);
+
+      expect(found, newest.path);
+      expect(found, isNot(older.path));
+    }, timeout: const Timeout(Duration(seconds: 15)));
+
+    test('finds wire.jsonl recursively in nested session dirs', () async {
+      final cutoff = DateTime.now();
+      final wire = createWireFile(
+        'session-xyz/logs/wire.jsonl',
+        cutoff.add(const Duration(seconds: 5)),
+      );
+
+      final found = await provider().findWireJsonlForTest(cutoff);
+
+      expect(found, wire.path);
+    }, timeout: const Timeout(Duration(seconds: 15)));
+
+    test(
+      'returns null when only stale wire.jsonl files exist',
+      () async {
+        final cutoff = DateTime.now();
+        createWireFile(
+          'old/wire.jsonl',
+          cutoff.subtract(const Duration(hours: 2)),
+        );
+
+        final found = await provider().findWireJsonlForTest(cutoff);
+
+        expect(found, isNull);
+      },
+      // 15 attempts with a 200 ms delay between them.
+      timeout: const Timeout(Duration(seconds: 15)),
+    );
+
+    test(
+      'returns null when the sessions root does not exist',
+      () async {
+        sessionsDir.deleteSync(recursive: true);
+
+        final found = await provider().findWireJsonlForTest(DateTime.now());
+
+        expect(found, isNull);
+      },
+      timeout: const Timeout(Duration(seconds: 15)),
+    );
+  });
 }

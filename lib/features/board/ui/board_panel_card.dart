@@ -304,6 +304,14 @@ class BoardPanelCardState extends State<BoardPanelCard>
     );
   }
 
+  @visibleForTesting
+  void debugHandlePanelPointerDown({
+    required bool isWebpage,
+    required bool isFocused,
+  }) {
+    _handlePanelPointerDown(isWebpage: isWebpage, isFocused: isFocused);
+  }
+
   void _handlePanelPointerDown({
     required bool isWebpage,
     required bool isFocused,

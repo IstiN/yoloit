@@ -29,11 +29,16 @@ class KimiCliProvider extends CliProviderBase {
     super.agentId = 'kimi',
     super.processStarter,
     this.wireJsonlPath,
+    @visibleForTesting this.sessionsDirOverride,
   });
 
   /// When non-null, overrides the auto-discovered wire.jsonl path.
   /// An empty string disables the watcher entirely (stream-json fallback).
   final String? wireJsonlPath;
+
+  /// Overrides the `~/.kimi-code/sessions` root used by auto-discovery
+  /// (tests only).
+  final String? sessionsDirOverride;
 
   final Map<String, _KimiSessionState> _sessionStates = {};
   final Map<String, Process> _currentProcesses = {};
@@ -319,15 +324,21 @@ class KimiCliProvider extends CliProviderBase {
     }
   }
 
+  /// Test hook for [_findWireJsonl].
+  @visibleForTesting
+  Future<String?> findWireJsonlForTest(DateTime after) => _findWireJsonl(after);
+
   Future<String?> _findWireJsonl(DateTime after) async {
+    final overrideRoot = sessionsDirOverride;
     final home = Platform.environment['HOME'] ?? '';
-    if (home.isEmpty) return null;
+    if (overrideRoot == null && home.isEmpty) return null;
+    final sessionsRoot = overrideRoot ?? '$home/.kimi-code/sessions';
 
     // Retry up to 15 times (3s total) – wire.jsonl may not exist immediately.
     for (var attempt = 0; attempt < 15; attempt++) {
       final result = await Process.run(
         'find',
-        ['$home/.kimi-code/sessions', '-name', 'wire.jsonl'],
+        [sessionsRoot, '-name', 'wire.jsonl'],
       );
 
       final paths =

@@ -44,6 +44,10 @@ class YoloitWebToolExecutor implements YoloitToolExecutor {
   /// In-memory clipboard for panel copy/paste/duplicate inside the browser.
   static String? _clipboardPayload;
 
+  /// Test hook that sets the in-memory clipboard payload directly.
+  @visibleForTesting
+  static set debugClipboardPayload(String? value) => _clipboardPayload = value;
+
   /// Dispatch table mapping each supported CLI command to its handler.
   ///
   /// Multi-command aliases (e.g. `note:add` / `note:append`) point at the

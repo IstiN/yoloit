@@ -67,4 +67,43 @@ void main() {
     expect(restored.packages.single.id, 'codex');
     expect(restored.packages.single.installAction?.command, 'install codex');
   });
+
+  group('package manager detection', () {
+    test('detectRuntime reports the host platform details', () async {
+      final runtime = await SetupCatalog.detectRuntime();
+
+      expect(runtime.os, SetupTargetOs.macos);
+      expect(runtime.osLabel, 'macOS');
+      expect(runtime.packageManager, anyOf('brew', 'shell'));
+      expect(runtime.homeDirectory, isNotEmpty);
+    });
+
+    test('macOS resolves to brew or shell', () async {
+      expect(
+        await SetupCatalog.packageManagerForOs(SetupTargetOs.macos),
+        anyOf('brew', 'shell'),
+      );
+    });
+
+    test('windows resolves to winget or shell', () async {
+      expect(
+        await SetupCatalog.packageManagerForOs(SetupTargetOs.windows),
+        anyOf('winget', 'shell'),
+      );
+    });
+
+    test('linux probes apt, dnf and pacman before shell', () async {
+      expect(
+        await SetupCatalog.packageManagerForOs(SetupTargetOs.linux),
+        anyOf('apt', 'dnf', 'pacman', 'shell'),
+      );
+    });
+
+    test('unknown OS always falls back to shell', () async {
+      expect(
+        await SetupCatalog.packageManagerForOs(SetupTargetOs.unknown),
+        'shell',
+      );
+    });
+  });
 }

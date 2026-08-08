@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -605,6 +606,111 @@ void main() {
       );
       expect(response.statusCode, 400);
       verifyNever(() => cubit.addDrawing(any(), boardId: any(named: 'boardId')));
+    });
+  });
+
+  group('handleDrawings POST file', () {
+    late MockBoardCubit cubit;
+    late Directory tempDir;
+
+    setUp(() {
+      cubit = MockBoardCubit();
+      final board = BoardDocument(
+        id: 'board-1',
+        name: 'Test Board',
+        panels: [],
+        drawings: [],
+      );
+      when(() => cubit.state).thenReturn(BoardState(boards: [board], activeBoardId: 'board-1'));
+      when(() => cubit.addDrawing(any(), boardId: any(named: 'boardId')))
+          .thenAnswer((_) async {});
+      tempDir = Directory.systemTemp.createTempSync('drawings_file_test');
+    });
+
+    tearDown(() {
+      if (tempDir.existsSync()) tempDir.deleteSync(recursive: true);
+    });
+
+    File writeSvg(String name, String contents) {
+      final file = File('${tempDir.path}${Platform.pathSeparator}$name');
+      file.writeAsStringSync(contents);
+      return file;
+    }
+
+    Future<Map<String, dynamic>> postFile(Map<String, dynamic> requestBody) async {
+      final request = shelf.Request('POST', Uri.parse('http://localhost/api/drawings'));
+      final response = await handleDrawings(
+        'POST',
+        [],
+        request,
+        cubit,
+        body: (_) async => {'board': 'board-1', 'type': 'file', ...requestBody},
+        json: (o) => shelf.Response.ok(jsonEncode(o)),
+        error: (s) => shelf.Response(400, body: s),
+        notFound: (s) => shelf.Response(404, body: s),
+        scheduleRebuild: () {},
+        parseColor: (_) => Colors.black,
+      );
+      expect(response.statusCode, 200);
+      return jsonDecode(await response.readAsString()) as Map<String, dynamic>;
+    }
+
+    test('returns error when no file or path is provided', () async {
+      final body = await postFile({});
+      expect(body['ok'], false);
+      expect(body['error'] as String, contains('Missing "file"'));
+      verifyNever(() => cubit.addDrawing(any(), boardId: any(named: 'boardId')));
+    });
+
+    test('returns error when the SVG file does not exist', () async {
+      final body = await postFile({'file': '${tempDir.path}/nope.svg'});
+      expect(body['ok'], false);
+      expect(body['error'] as String, contains('SVG file not found'));
+      verifyNever(() => cubit.addDrawing(any(), boardId: any(named: 'boardId')));
+    });
+
+    test('renders every path of the SVG file as one drawing', () async {
+      final svg = writeSvg(
+        'two.svg',
+        '<svg><path d="M0 0 L10 0"/><path d="M0 0 L100 0"/></svg>',
+      );
+      final body = await postFile({'file': svg.path, 'width': 2.0});
+      expect(body['ok'], true);
+      expect(body['type'], 'file');
+      expect(body['strokeCount'], 2);
+
+      final drawing =
+          verify(() => cubit.addDrawing(captureAny(), boardId: 'board-1'))
+              .captured
+              .single as BoardDrawingElement;
+      // Width tracks the widest path: 100 + 2 * strokeWidth.
+      expect(drawing.size.width, 104);
+      expect(drawing.strokes.length, 2);
+    });
+
+    test('accepts the "path" key as an alias for "file"', () async {
+      final svg = writeSvg('alias.svg', '<svg><path d="M0 0 L5 5"/></svg>');
+      final body = await postFile({'path': svg.path});
+      expect(body['ok'], true);
+      expect(body['strokeCount'], 1);
+    });
+
+    test('returns error when the SVG has no d attributes', () async {
+      final svg = writeSvg('plain.svg', '<svg><rect x="0" y="0"/></svg>');
+      final body = await postFile({'file': svg.path});
+      expect(body['ok'], false);
+      expect(body['error'] as String, contains('No drawable paths'));
+      verifyNever(() => cubit.addDrawing(any(), boardId: any(named: 'boardId')));
+    });
+
+    test('skips empty and unparseable d attributes', () async {
+      final svg = writeSvg(
+        'bad.svg',
+        '<svg><path d=""/><path d="garbage"/></svg>',
+      );
+      final body = await postFile({'file': svg.path});
+      expect(body['ok'], false);
+      expect(body['error'] as String, contains('No drawable paths'));
     });
   });
 }

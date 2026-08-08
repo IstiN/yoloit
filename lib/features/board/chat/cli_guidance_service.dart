@@ -134,6 +134,13 @@ class CliGuidanceService {
       Platform.environment['PROJECT_DIR'],
       p.dirname(Platform.resolvedExecutable),
     ];
+    return findSourceTreeCliInRoots(roots);
+  }
+
+  /// Walks up from each root (max 10 levels) looking for a source-tree
+  /// `tools/yoloit` wrapper. Extracted for tests.
+  @visibleForTesting
+  String? findSourceTreeCliInRoots(List<String?> roots) {
     final seen = <String>{};
     for (final raw in roots) {
       if (raw == null || raw.trim().isEmpty) continue;

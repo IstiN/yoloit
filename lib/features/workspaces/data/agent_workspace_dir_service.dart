@@ -53,9 +53,16 @@ class AgentWorkspaceDirService {
     if (!await dir.exists()) return null;
 
     final result = <String, String>{};
-    for (final entity in await dir.list().toList()) {
+    // followLinks: false — worktree entries are symlinks; following them
+    // would list valid ones as Directory and hide them from the scan.
+    for (final entity in await dir.list(followLinks: false).toList()) {
       if (entity is Link) {
-        final target = await entity.resolveSymbolicLinks();
+        final String target;
+        try {
+          target = await entity.resolveSymbolicLinks();
+        } on FileSystemException {
+          continue; // Dangling symlink — nothing to recover.
+        }
         // Find the original workspace path whose basename matches the link name.
         final linkName = p.basename(entity.path);
         final originalPath = workspacePaths

@@ -1,10 +1,13 @@
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yoloit/core/platform/platform_dirs.dart';
 import 'package:yoloit/features/terminal/data/clipboard_file_service.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   setUpAll(() {
     PlatformDirs.setInstance(const MacosPlatformDirs(homeOverride: '/tmp'));
   });
@@ -188,6 +191,80 @@ void main() {
         ClipboardFileService.instance.isSafeInlineText('abc', maxLength: 3),
         isTrue,
       );
+    });
+  });
+
+  group('ClipboardFileService.saveClipboardToFile', () {
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+
+    void mockClipboardText(String? text) {
+      messenger.setMockMethodCallHandler(SystemChannels.platform, (
+        call,
+      ) async {
+        if (call.method == 'Clipboard.getData') {
+          if (text == null) return null;
+          return <String, dynamic>{'text': text};
+        }
+        return null;
+      });
+    }
+
+    tearDown(() {
+      messenger.setMockMethodCallHandler(SystemChannels.platform, null);
+    });
+
+    test('saves clipboard text to a temp .txt file', () async {
+      mockClipboardText('hello from clipboard');
+
+      final path = await ClipboardFileService.instance.saveClipboardToFile();
+      expect(path, isNotNull);
+      expect(path, endsWith('.txt'));
+
+      final file = File(path!);
+      addTearDown(() async {
+        if (await file.exists()) await file.delete();
+      });
+
+      expect(await file.exists(), isTrue);
+      expect(await file.readAsString(), 'hello from clipboard');
+    });
+
+    test('normalizes clipboard text before saving', () async {
+      mockClipboardText('\x1B[31merror\x1B[0m\n\n\nbold   \n\n');
+
+      final path = await ClipboardFileService.instance.saveClipboardToFile();
+      expect(path, isNotNull);
+
+      final file = File(path!);
+      addTearDown(() async {
+        if (await file.exists()) await file.delete();
+      });
+
+      expect(await file.readAsString(), 'error\n\nbold');
+    });
+
+    test('returns null when the clipboard is empty', () async {
+      mockClipboardText(null);
+      final path = await ClipboardFileService.instance.saveClipboardToFile();
+      expect(path, isNull);
+    });
+
+    test('returns null when the clipboard text is empty', () async {
+      mockClipboardText('');
+      final path = await ClipboardFileService.instance.saveClipboardToFile();
+      expect(path, isNull);
+    });
+
+    test('returns null when the clipboard channel throws', () async {
+      messenger.setMockMethodCallHandler(SystemChannels.platform, (
+        call,
+      ) async {
+        throw PlatformException(code: 'unavailable');
+      });
+
+      final path = await ClipboardFileService.instance.saveClipboardToFile();
+      expect(path, isNull);
     });
   });
 }

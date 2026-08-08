@@ -271,7 +271,9 @@ class _BoardPanelLayerState extends State<BoardPanelLayer> {
               : null,
     );
     if (isInCollapsedGroup) {
-      return IgnorePointer(child: card);
+      // Keep the AnimatedPositioned card inside a Stack: a Positioned widget
+      // cannot be a direct child of IgnorePointer (invalid parent data).
+      return IgnorePointer(child: Stack(children: [card]));
     }
     return card;
   }

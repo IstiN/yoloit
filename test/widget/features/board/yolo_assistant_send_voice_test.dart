@@ -323,10 +323,70 @@ void main() {
       expect(env.panelState['voiceResponse'], 'Voice answer');
     });
 
-    testWidgets('stop without recorded audio skips transcription and send', (
+    testWidgets('direct audio converts WAV to MP3 when enabled', (
       tester,
     ) async {
+      SharedPreferences.setMockInitialValues({
+        'cloud_llm_active_config_v1': 'cfg-1',
+        'voice_settings_v1':
+            '{"useCloudAsr":true,"convertWavToMp3":true,'
+            '"useChatModelForCloudAsr":true}',
+      });
+      await env.seedCloudConfigs([env.cloudConfigJson('cfg-1')]);
       final controller = YoloAssistantController();
+      addTearDown(controller.dispose);
+      env.fakeProvider.events = const [
+        ChatEvent(
+          type: ChatEventType.assistantDelta,
+          rawType: 'assistant.message_delta',
+          data: {'deltaContent': 'Voice answer'},
+        ),
+      ];
+      await env.pumpAssistant(tester, controller: controller);
+
+      await controller.startMic();
+      // One second of 16 kHz mono PCM so ffmpeg has enough frames to encode.
+      env.recordPlatform.byteStreamCtrl!.add(
+        Uint8List.fromList(List<int>.generate(32000, (i) => i % 256)),
+      );
+      await tester.pump(const Duration(milliseconds: 100));
+      // stopMic runs real-async: the WAV→MP3 conversion spawns a real
+      // ffmpeg process (or falls back to WAV when ffmpeg is absent).
+      await tester.runAsync(
+        () => controller.stopMic(sendAfterTranscription: true),
+      );
+      await env.settleVoice(tester);
+
+      expect(env.fakeProvider.sendCount, 1);
+      final audio = env.fakeProvider.lastAudioContent;
+      expect(audio, isNotNull);
+      expect(audio!.single['type'], 'input_audio');
+      final payload = audio.single['input_audio'] as Map<String, Object?>;
+      final ffmpegAvailable =
+          Process.runSync('sh', const ['-lc', 'command -v ffmpeg'])
+              .exitCode ==
+          0;
+      expect(payload['format'], ffmpegAvailable ? 'mp3' : 'wav');
+      final data = base64Decode(payload['data'] as String);
+      expect(data.length, greaterThan(0));
+
+      // The ASR sample metadata still records the direct-audio run.
+      final samplesDir = Directory(
+        '${env.tempHome.path}/Library/Application Support/yoloit/asr_samples',
+      );
+      final metaFile = samplesDir
+          .listSync()
+          .whereType<File>()
+          .singleWhere((f) => f.path.endsWith('.json'));
+      final meta =
+          jsonDecode(metaFile.readAsStringSync()) as Map<String, dynamic>;
+      expect(meta['asrMode'], 'direct_audio');
+      expect(meta['asrStatus'], 'ok');
+    });
+
+    testWidgets('stop without recorded audio skips transcription and send', (
+      tester,
+    ) async {      final controller = YoloAssistantController();
       addTearDown(controller.dispose);
       await env.pumpAssistant(tester, controller: controller);
 

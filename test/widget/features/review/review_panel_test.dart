@@ -1,6 +1,9 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/core/theme/app_theme.dart';
 import 'package:yoloit/features/editor/bloc/file_editor_cubit.dart';
 import 'package:yoloit/features/review/bloc/review_cubit.dart';
@@ -21,6 +24,21 @@ Widget _buildReviewTest(ReviewState state) {
       home: const Scaffold(body: ReviewPanel()),
     ),
   );
+}
+
+class _FakePlatformLauncher extends PlatformLauncher {
+  final List<String> revealed = <String>[];
+
+  @override
+  Future<void> openUrl(String url) async {}
+
+  @override
+  Future<void> revealInFinder(String path) async {
+    revealed.add(path);
+  }
+
+  @override
+  Future<void> openTerminal(String workdir) async {}
 }
 
 void main() {
@@ -172,6 +190,160 @@ void main() {
       expect(find.text('Create PR'), findsOneWidget);
       expect(find.text('Merge'), findsOneWidget);
       expect(find.text('Close'), findsOneWidget);
+    });
+  });
+
+  group('file tree context menu', () {
+    const fileTree = [
+      FileTreeNode(name: 'lib', path: '/project/lib', isDirectory: true),
+      FileTreeNode(
+        name: 'main.dart',
+        path: '/project/main.dart',
+        isDirectory: false,
+      ),
+    ];
+
+    late _FakePlatformLauncher launcher;
+    String? clipboardText;
+
+    setUp(() {
+      launcher = _FakePlatformLauncher();
+      PlatformLauncher.setInstance(launcher);
+      clipboardText = null;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+        if (call.method == 'Clipboard.setData') {
+          clipboardText =
+              (call.arguments as Map<dynamic, dynamic>)['text'] as String?;
+        }
+        return null;
+      });
+    });
+
+    tearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, null);
+    });
+
+    Future<void> pumpPanel(WidgetTester tester) async {
+      await tester.pumpWidget(_buildReviewTest(const ReviewLoaded(
+        fileTree: fileTree,
+        changedFiles: [],
+      )));
+      await tester.pump();
+    }
+
+    testWidgets('shows file actions for a file node', (tester) async {
+      await pumpPanel(tester);
+
+      await tester.tap(find.text('main.dart'), buttons: kSecondaryButton);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Copy path'), findsOneWidget);
+      expect(find.text('Copy filename'), findsOneWidget);
+      expect(find.text('Rename'), findsOneWidget);
+      expect(find.text('Show in Finder'), findsOneWidget);
+      // Directories-only action is absent for files.
+      expect(find.text('New Folder'), findsNothing);
+    });
+
+    testWidgets('shows New Folder and no Rename for a directory node', (tester) async {
+      await pumpPanel(tester);
+
+      await tester.tap(find.text('lib'), buttons: kSecondaryButton);
+      await tester.pumpAndSettle();
+
+      expect(find.text('New Folder'), findsOneWidget);
+      expect(find.text('Copy path'), findsOneWidget);
+      expect(find.text('Show in Finder'), findsOneWidget);
+      // Rename is only offered for files.
+      expect(find.text('Rename'), findsNothing);
+    });
+
+    testWidgets('Copy path copies the node path and shows a snackbar', (tester) async {
+      await pumpPanel(tester);
+
+      await tester.tap(find.text('main.dart'), buttons: kSecondaryButton);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Copy path'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(clipboardText, '/project/main.dart');
+      expect(find.text('Path copied'), findsOneWidget);
+
+      // Drain the snackbar timer.
+      await tester.pump(const Duration(seconds: 2));
+    });
+
+    testWidgets('Copy filename copies the node name and shows a snackbar', (tester) async {
+      await pumpPanel(tester);
+
+      await tester.tap(find.text('main.dart'), buttons: kSecondaryButton);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Copy filename'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(clipboardText, 'main.dart');
+      expect(find.text('Filename copied'), findsOneWidget);
+
+      await tester.pump(const Duration(seconds: 2));
+    });
+
+    testWidgets('Rename turns the node label into a text field', (tester) async {
+      await pumpPanel(tester);
+
+      await tester.tap(find.text('main.dart'), buttons: kSecondaryButton);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Rename'));
+      await tester.pumpAndSettle();
+
+      expect(find.widgetWithText(TextField, 'main.dart'), findsOneWidget);
+    });
+
+    testWidgets('Show in Finder reveals the node path', (tester) async {
+      await pumpPanel(tester);
+
+      await tester.tap(find.text('main.dart'), buttons: kSecondaryButton);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Show in Finder'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(launcher.revealed, ['/project/main.dart']);
+    });
+
+    testWidgets('New Folder opens the folder creation dialog', (tester) async {
+      await pumpPanel(tester);
+
+      await tester.tap(find.text('lib'), buttons: kSecondaryButton);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('New Folder'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Create'), findsOneWidget);
+      expect(find.text('Cancel'), findsOneWidget);
+
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Create'), findsNothing);
+    });
+
+    testWidgets('dismissing the menu triggers no action', (tester) async {
+      await pumpPanel(tester);
+
+      await tester.tap(find.text('main.dart'), buttons: kSecondaryButton);
+      await tester.pumpAndSettle();
+      expect(find.text('Copy path'), findsOneWidget);
+
+      await tester.tapAt(const Offset(10, 10));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Copy path'), findsNothing);
+      expect(clipboardText, isNull);
+      expect(launcher.revealed, isEmpty);
     });
   });
 }

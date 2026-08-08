@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:js_widget_runtime/js_widget_runtime.dart';
 import 'package:yoloit/features/board/widgets/widget_file_reader_vm.dart';
@@ -17,9 +18,15 @@ class WidgetRegistryService {
 
   final WidgetFileReader _reader = VmWidgetFileReader.instance;
 
+  /// Test seam: overrides the home directory used by [appsDir] and `~`
+  /// expansion so unit tests can point the registry at a temp directory.
+  @visibleForTesting
+  static String? debugHomeDir;
+
+  static String get _home => debugHomeDir ?? Platform.environment['HOME'] ?? '';
+
   String get appsDir {
-    final home = Platform.environment['HOME'] ?? '';
-    return '$home/.config/yoloit/apps';
+    return '$_home/.config/yoloit/apps';
   }
 
   /// Backward-compat alias.
@@ -41,7 +48,7 @@ class WidgetRegistryService {
     // Treat absolute paths as direct local-dev mounts (no install needed).
     if (id.startsWith('/') || id.startsWith('~')) {
       final resolved = id.startsWith('~')
-          ? id.replaceFirst('~', Platform.environment['HOME'] ?? '')
+          ? id.replaceFirst('~', _home)
           : id;
       final dir = Directory(resolved);
       if (await dir.exists()) {

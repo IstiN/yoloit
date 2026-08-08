@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:json_annotation/json_annotation.dart';
+import 'package:meta/meta.dart';
 import 'package:yoloit/core/setup/agent_cli_discovery.dart';
 import 'package:yoloit/core/setup/setup_skills_service_vm.dart'
     if (dart.library.ui) 'package:yoloit/core/setup/setup_skills_service_flutter.dart' as skills_service;
@@ -460,7 +461,8 @@ class SetupCatalog {
         'code=\$?; if [ \$code -eq 0 ]; then echo "==> [$index] ok"; else echo "==> [$index] failed: \$code"; fi',
       );
     }
-    return buffer.toString().trim();
+    // No usable commands → empty script, so callers can detect the no-op.
+    return index == 0 ? '' : buffer.toString().trim();
   }
 
   static String _normalizeInstallCommand(String command, SetupTargetOs os) {
@@ -600,6 +602,12 @@ class SetupCatalog {
     }
     return 'shell';
   }
+
+  /// Test hook for [_packageManager]: lets unit tests probe non-host OS
+  /// branches (the host OS only ever exercises one of them).
+  @visibleForTesting
+  static Future<String> packageManagerForOs(SetupTargetOs os) =>
+      _packageManager(os);
 
   static Future<Map<String, String>> _linuxOsRelease() async {
     try {

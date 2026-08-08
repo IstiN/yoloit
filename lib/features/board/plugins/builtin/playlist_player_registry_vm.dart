@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:media_kit/media_kit.dart';
 
 /// Keeps [Player] instances alive across board switches so playback is
@@ -10,13 +11,22 @@ class PlaylistPlayerRegistry {
   PlaylistPlayerRegistry._();
   static final PlaylistPlayerRegistry instance = PlaylistPlayerRegistry._();
 
+  /// Test seam: when set, [acquire] builds players through this factory
+  /// instead of constructing a real media_kit [Player] (which requires
+  /// native libmpv and is unavailable in unit tests).
+  @visibleForTesting
+  static Player Function()? debugPlayerFactory;
+
   final Map<String, Player> _players = {};
   // Track which path each player currently has open so we can resume vs. re-open.
   final Map<String, String> _openedPath = {};
 
   /// Returns the existing player for [panelId] or creates a new one.
   Player acquire(String panelId) {
-    return _players.putIfAbsent(panelId, Player.new);
+    return _players.putIfAbsent(
+      panelId,
+      () => debugPlayerFactory?.call() ?? Player(),
+    );
   }
 
   /// Releases and disposes the player for [panelId].

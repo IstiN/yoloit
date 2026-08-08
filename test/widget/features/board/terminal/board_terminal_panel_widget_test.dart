@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:yoloit/core/services/resource_monitor_service.dart';
 import 'package:yoloit/core/theme/app_theme.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/bloc/board_state.dart';
@@ -14,8 +15,10 @@ import 'package:yoloit/features/board/terminal/board_terminal_panel_widget.dart'
 import 'package:yoloit/features/board/terminal/board_terminal_session_manager.dart';
 import 'package:yoloit/features/mindmap/widgets/canvas_interaction_lock.dart';
 import 'package:yoloit/features/terminal/data/terminal_backend.dart';
+import 'package:yoloit/features/terminal/data/terminal_backend_service.dart';
 import 'package:yoloit/features/terminal/models/agent_session.dart';
 import 'package:yoloit/features/terminal/models/agent_type.dart';
+import 'package:yoloit/features/terminal/models/terminal_backend_mode.dart';
 import 'package:yoloit/features/terminal/ui/terminal_panel.dart';
 
 BoardPanelInstance _terminalPanel({
@@ -52,6 +55,41 @@ AgentSession _liveSession(
     status: AgentStatus.live,
     customName: name,
   );
+}
+
+/// Backend that never spawns a real process: sessions get an in-memory
+/// output stream and an exit-code future that never completes.
+class _FakeTerminalBackend implements TerminalBackend {
+  // Closed via addTearDown in the tests that install this backend.
+  // ignore: close_sinks
+  final output = StreamController<String>();
+
+  @override
+  TerminalBackendMode get mode => TerminalBackendMode.local;
+
+  @override
+  Future<TerminalProcess> launch({
+    required String sessionId,
+    required String workspacePath,
+    String? label,
+    ResourceSessionMetadata? metadata,
+    Map<String, String>? extraEnv,
+    bool forceNewShell = false,
+  }) async {
+    return TerminalProcess(
+      output: output.stream,
+      exitCode: Completer<int>().future,
+    );
+  }
+
+  @override
+  void write(String sessionId, String data) {}
+
+  @override
+  void resize(String sessionId, int columns, int rows) {}
+
+  @override
+  Future<void> kill(String sessionId) async {}
 }
 
 void main() {
@@ -518,6 +556,107 @@ void main() {
       expect(find.text('Terminal history'), findsNothing);
       // The restore path created a new terminal panel on the active board.
       expect(cubit.state.activeBoard!.panels.length, 2);
+    });
+  });
+
+  group('ensure configured session', () {
+    _FakeTerminalBackend useFakeBackend() {
+      final backend = _FakeTerminalBackend();
+      addTearDown(backend.output.close);
+      TerminalBackendService.instance.debugBackendOverride = backend;
+      addTearDown(
+        () => TerminalBackendService.instance.debugBackendOverride = null,
+      );
+      return backend;
+    }
+
+    testWidgets('configured panel without a session id creates a session', (
+      tester,
+    ) async {
+      useFakeBackend();
+      final cubit = BoardCubit();
+      addTearDown(cubit.close);
+      final updates = <Map<String, dynamic>>[];
+      final panel = _terminalPanel(sessionName: 'demo', workingDir: '/tmp/demo');
+      await pumpPanel(
+        tester,
+        panel: panel,
+        cubit: cubit,
+        withBoard: true,
+        onUpdateState: updates.add,
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+
+      // The manager spawned (via the fake backend) and the panel switched to
+      // the connected view.
+      expect(find.byType(TerminalWidget), findsOneWidget);
+
+      // The new config (with the generated session id) was pushed upstream.
+      expect(updates, isNotEmpty);
+      final config = updates.last['config'] as Map<String, dynamic>;
+      expect(config['sessionId'] as String, isNotEmpty);
+      expect(config['sessionName'], 'demo');
+
+      // The panel title follows the session display name.
+      final updated = cubit.state.activeBoard!.panels.singleWhere(
+        (p) => p.id == 'term-panel-1',
+      );
+      expect(updated.title, 'demo');
+      await tester.pump(const Duration(milliseconds: 500));
+    });
+
+    testWidgets('restores a configured session that is not live yet', (
+      tester,
+    ) async {
+      useFakeBackend();
+      final manager = BoardTerminalSessionManager.instance;
+      final cubit = BoardCubit();
+      addTearDown(cubit.close);
+      await pumpPanel(
+        tester,
+        panel: _terminalPanel(
+          sessionId: 'sess-restore',
+          sessionName: 'demo',
+          workingDir: '/tmp/demo',
+        ),
+        cubit: cubit,
+        withBoard: true,
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+
+      // ensureSession re-spawned the missing session through the backend.
+      expect(manager.sessionFor('sess-restore'), isNotNull);
+      expect(find.byType(TerminalWidget), findsOneWidget);
+      await tester.pump(const Duration(milliseconds: 500));
+    });
+
+    testWidgets('unconfigured panel skips session resolution on config churn', (
+      tester,
+    ) async {
+      final manager = BoardTerminalSessionManager.instance;
+      final cubit = BoardCubit();
+      addTearDown(cubit.close);
+      await pumpPanel(
+        tester,
+        panel: _terminalPanel(sessionName: 'named'),
+        cubit: cubit,
+      );
+      expect(find.text('Create terminal'), findsOneWidget);
+
+      // A config change that keeps the panel unconfigured must early-return
+      // from session resolution without touching the manager.
+      await tester.pumpWidget(
+        buildApp(
+          panel: _terminalPanel(sessionName: 'renamed'),
+          cubit: cubit,
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('Create terminal'), findsOneWidget);
+      expect(manager.sessionFor(''), isNull);
     });
   });
 
