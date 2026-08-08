@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/features/board/audio_recorder/transcription_service.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
@@ -37,6 +38,49 @@ class _FakeSettings implements VoiceSettingsProvider {
   Future<VoiceSettings> loadVoiceSettings() async =>
       const VoiceSettings(useCloudAsr: true);
 }
+
+/// Cloud ASR fake that always fails, to exercise the transcribe error path.
+class _ThrowingCloud implements CloudTranscriber {
+  @override
+  Future<String> transcribeFromFile({
+    required String audioPath,
+    required VoiceSettings voiceSettings,
+  }) async => throw StateError('cloud down');
+}
+
+/// Records `revealInFinder` calls instead of spawning a real `open` process.
+class _RecordingLauncher extends PlatformLauncher {
+  final List<String> revealed = <String>[];
+
+  @override
+  Future<void> openUrl(String url) async {}
+
+  @override
+  Future<void> revealInFinder(String path) async {
+    revealed.add(path);
+  }
+
+  @override
+  Future<void> openTerminal(String workdir) async {}
+}
+
+Map<String, dynamic> _rec(
+  String name, {
+  String? path,
+  int durationMs = 1234,
+  String id = 'rec-1',
+}) => <String, dynamic>{
+  'id': id,
+  'path': path ?? '/nonexistent/$name',
+  'name': name,
+  'durationMs': durationMs,
+  'sizeBytes': 0,
+  'createdAt': 0,
+  'format': 'wav',
+};
+
+Map<String, dynamic> _stateWith(Map<String, dynamic> patch) =>
+    <String, dynamic>{...const AudioRecorderPlugin().initialState, ...patch};
 
 void main() {
   group('AudioRecorderConfig', () {
@@ -276,6 +320,414 @@ void main() {
       expect(capturedState!['title'], 'rec-test.wav.md');
       expect(capturedTitle, 'rec-test.wav.md');
       expect(writtenMd, contains('hello transcript'));
+    });
+
+    testWidgets('renders the last error from panel state', (tester) async {
+      final renderContext = BoardPanelRenderContext(
+        isSelected: false,
+        onFocus: () {},
+        onDelete: () {},
+        onUpdateState: (_) {},
+        onShowEditor: () {},
+      );
+
+      await tester.pumpWidget(
+        _wrap(
+          AudioRecorderPanelContent(
+            panel: _panel(state: _stateWith(<String, dynamic>{'lastError': 'boom'})),
+            renderContext: renderContext,
+          ),
+        ),
+      );
+
+      expect(find.text('boom'), findsOneWidget);
+    });
+
+    testWidgets('recording state shows stop button, elapsed, disabled toggles',
+        (tester) async {
+      Map<String, dynamic>? written;
+      final renderContext = BoardPanelRenderContext(
+        isSelected: false,
+        onFocus: () {},
+        onDelete: () {},
+        onUpdateState: (state) => written = state,
+        onShowEditor: () {},
+      );
+
+      await tester.pumpWidget(
+        _wrap(
+          AudioRecorderPanelContent(
+            panel: _panel(
+              state: _stateWith(<String, dynamic>{
+                'isRecording': true,
+                'elapsedMs': 65000,
+              }),
+            ),
+            renderContext: renderContext,
+          ),
+        ),
+      );
+
+      expect(find.text('Stop recording'), findsOneWidget);
+      expect(find.text('01:05'), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('toggle-system-audio')));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('toggle-microphone')));
+      await tester.pump();
+      expect(written, isNull);
+    });
+
+    testWidgets('elapsed label formats zero and clamps large values',
+        (tester) async {
+      final renderContext = BoardPanelRenderContext(
+        isSelected: false,
+        onFocus: () {},
+        onDelete: () {},
+        onUpdateState: (_) {},
+        onShowEditor: () {},
+      );
+
+      Widget content(int elapsedMs) => _wrap(
+        AudioRecorderPanelContent(
+          panel: _panel(
+            state: _stateWith(<String, dynamic>{
+              'isRecording': true,
+              'elapsedMs': elapsedMs,
+            }),
+          ),
+          renderContext: renderContext,
+        ),
+      );
+
+      await tester.pumpWidget(content(0));
+      expect(find.text('00:00'), findsOneWidget);
+
+      // 400000 s is clamped to 359999 s => 5999 minutes, 59 seconds.
+      await tester.pumpWidget(content(400000000));
+      expect(find.text('5999:59'), findsOneWidget);
+    });
+
+    testWidgets('recording count label pluralizes', (tester) async {
+      final renderContext = BoardPanelRenderContext(
+        isSelected: false,
+        onFocus: () {},
+        onDelete: () {},
+        onUpdateState: (_) {},
+        onShowEditor: () {},
+      );
+
+      Widget content(List<Map<String, dynamic>> recordings) => _wrap(
+        AudioRecorderPanelContent(
+          panel: _panel(
+            state: _stateWith(<String, dynamic>{'recordings': recordings}),
+          ),
+          renderContext: renderContext,
+        ),
+      );
+
+      await tester.pumpWidget(content(<Map<String, dynamic>>[]));
+      expect(find.text('0 recordings'), findsOneWidget);
+
+      await tester.pumpWidget(content(<Map<String, dynamic>>[_rec('a.wav')]));
+      expect(find.text('1 recording'), findsOneWidget);
+
+      await tester.pumpWidget(
+        content(<Map<String, dynamic>>[
+          _rec('a.wav'),
+          _rec('b.wav', id: 'rec-2'),
+        ]),
+      );
+      expect(find.text('2 recordings'), findsOneWidget);
+    });
+
+    testWidgets('recording row shows the name and formatted duration',
+        (tester) async {
+      final renderContext = BoardPanelRenderContext(
+        isSelected: false,
+        onFocus: () {},
+        onDelete: () {},
+        onUpdateState: (_) {},
+        onShowEditor: () {},
+      );
+
+      await tester.pumpWidget(
+        _wrap(
+          AudioRecorderPanelContent(
+            panel: _panel(
+              state: _stateWith(<String, dynamic>{
+                'recordings': <Map<String, dynamic>>[_rec('rec-test.wav')],
+              }),
+            ),
+            renderContext: renderContext,
+          ),
+        ),
+      );
+
+      expect(find.text('rec-test.wav'), findsOneWidget);
+      expect(find.text('00:01'), findsOneWidget);
+    });
+
+    testWidgets('reveal delegates to PlatformLauncher.revealInFinder',
+        (tester) async {
+      final original = PlatformLauncher.instance;
+      final fake = _RecordingLauncher();
+      PlatformLauncher.setInstance(fake);
+      addTearDown(() => PlatformLauncher.setInstance(original));
+
+      final renderContext = BoardPanelRenderContext(
+        isSelected: false,
+        onFocus: () {},
+        onDelete: () {},
+        onUpdateState: (_) {},
+        onShowEditor: () {},
+      );
+
+      await tester.pumpWidget(
+        _wrap(
+          AudioRecorderPanelContent(
+            panel: _panel(
+              state: _stateWith(<String, dynamic>{
+                'recordings': <Map<String, dynamic>>[_rec('rec-test.wav')],
+              }),
+            ),
+            renderContext: renderContext,
+          ),
+        ),
+      );
+
+      await tester.tap(find.byKey(const ValueKey('reveal-rec-test.wav')));
+      await tester.pump();
+
+      expect(fake.revealed, <String>['/nonexistent/rec-test.wav']);
+    });
+
+    testWidgets('playback failure surfaces an error instead of throwing',
+        (tester) async {
+      Map<String, dynamic>? written;
+      final renderContext = BoardPanelRenderContext(
+        isSelected: false,
+        onFocus: () {},
+        onDelete: () {},
+        onUpdateState: (state) => written = state,
+        onShowEditor: () {},
+      );
+
+      await tester.pumpWidget(
+        _wrap(
+          AudioRecorderPanelContent(
+            panel: _panel(
+              state: _stateWith(<String, dynamic>{
+                'recordings': <Map<String, dynamic>>[_rec('rec-test.wav')],
+              }),
+            ),
+            renderContext: renderContext,
+          ),
+        ),
+      );
+
+      // media_kit's native player is unavailable in the unit-test
+      // environment, so the play attempt lands in the catch path.
+      await tester.tap(find.byKey(const ValueKey('play-rec-test.wav')));
+      for (var i = 0; i < 20 && written == null; i++) {
+        await tester.pump();
+      }
+
+      expect(written, isNotNull);
+      expect(written!['lastError'] as String, contains('Playback failed'));
+    });
+
+    testWidgets('transcribe failure surfaces an error via panel state',
+        (tester) async {
+      addTearDown(() => TranscriptionService.debugSetInstance(null));
+      TranscriptionService.debugSetInstance(
+        TranscriptionService.testInstance(
+          cloud: _ThrowingCloud(),
+          settings: _FakeSettings(),
+        ),
+      );
+
+      Map<String, dynamic>? written;
+      final renderContext = BoardPanelRenderContext(
+        isSelected: false,
+        onFocus: () {},
+        onDelete: () {},
+        onUpdateState: (state) => written = state,
+        onShowEditor: () {},
+      );
+
+      await tester.pumpWidget(
+        _wrap(
+          AudioRecorderPanelContent(
+            panel: _panel(
+              state: _stateWith(<String, dynamic>{
+                'recordings': <Map<String, dynamic>>[_rec('rec-test.wav')],
+              }),
+            ),
+            renderContext: renderContext,
+          ),
+        ),
+      );
+
+      final button = find.byKey(const ValueKey('transcribe-rec-test.wav'));
+      await tester.ensureVisible(button);
+      await tester.pump();
+      await tester.tap(button);
+      for (var i = 0; i < 20; i++) {
+        await tester.pump();
+        final error = written?['lastError'];
+        if (error is String && error.contains('Transcription failed')) break;
+      }
+
+      expect(written, isNotNull);
+      expect(written!['lastError'] as String, contains('Transcription failed'));
+    });
+
+    testWidgets('transcribe maps an uppercase .WAV path to .md',
+        (tester) async {
+      const audioPath = '/tmp/yoloit_tx/REC-2.WAV';
+
+      final savedWriter = AudioRecorderPanelContent.writeTranscriptFile;
+      addTearDown(() {
+        TranscriptionService.debugSetInstance(null);
+        AudioRecorderPanelContent.writeTranscriptFile = savedWriter;
+      });
+      AudioRecorderPanelContent.writeTranscriptFile = (path, contents) async {};
+      TranscriptionService.debugSetInstance(
+        TranscriptionService.testInstance(
+          cloud: _FakeCloud(),
+          settings: _FakeSettings(),
+        ),
+      );
+
+      Map<String, dynamic>? capturedState;
+      final renderContext = BoardPanelRenderContext(
+        isSelected: false,
+        onFocus: () {},
+        onDelete: () {},
+        onUpdateState: (_) {},
+        onShowEditor: () {},
+        onCreateLinkedPanel: (typeId, state, title) async {
+          capturedState = state;
+          return 'panel-preview-1';
+        },
+      );
+
+      await tester.pumpWidget(
+        _wrap(
+          AudioRecorderPanelContent(
+            panel: _panel(
+              state: _stateWith(<String, dynamic>{
+                'recordings': <Map<String, dynamic>>[
+                  _rec('REC-2.WAV', path: audioPath),
+                ],
+              }),
+            ),
+            renderContext: renderContext,
+          ),
+        ),
+      );
+
+      final button = find.byKey(const ValueKey('transcribe-REC-2.WAV'));
+      await tester.ensureVisible(button);
+      await tester.pump();
+      await tester.tap(button);
+      for (var i = 0; i < 20 && capturedState == null; i++) {
+        await tester.pump();
+      }
+
+      expect(capturedState, isNotNull);
+      expect(capturedState!['path'] as String, endsWith('REC-2.md'));
+      expect(capturedState!['title'], 'REC-2.WAV.md');
+    });
+
+    testWidgets('transcribe appends .md for non-wav recordings',
+        (tester) async {
+      const audioPath = '/tmp/yoloit_tx/voice.m4a';
+
+      final savedWriter = AudioRecorderPanelContent.writeTranscriptFile;
+      addTearDown(() {
+        TranscriptionService.debugSetInstance(null);
+        AudioRecorderPanelContent.writeTranscriptFile = savedWriter;
+      });
+      AudioRecorderPanelContent.writeTranscriptFile = (path, contents) async {};
+      TranscriptionService.debugSetInstance(
+        TranscriptionService.testInstance(
+          cloud: _FakeCloud(),
+          settings: _FakeSettings(),
+        ),
+      );
+
+      Map<String, dynamic>? capturedState;
+      final renderContext = BoardPanelRenderContext(
+        isSelected: false,
+        onFocus: () {},
+        onDelete: () {},
+        onUpdateState: (_) {},
+        onShowEditor: () {},
+        onCreateLinkedPanel: (typeId, state, title) async {
+          capturedState = state;
+          return 'panel-preview-1';
+        },
+      );
+
+      await tester.pumpWidget(
+        _wrap(
+          AudioRecorderPanelContent(
+            panel: _panel(
+              state: _stateWith(<String, dynamic>{
+                'recordings': <Map<String, dynamic>>[
+                  _rec('voice.m4a', path: audioPath),
+                ],
+              }),
+            ),
+            renderContext: renderContext,
+          ),
+        ),
+      );
+
+      final button = find.byKey(const ValueKey('transcribe-voice.m4a'));
+      await tester.ensureVisible(button);
+      await tester.pump();
+      await tester.tap(button);
+      for (var i = 0; i < 20 && capturedState == null; i++) {
+        await tester.pump();
+      }
+
+      expect(capturedState, isNotNull);
+      expect(capturedState!['path'] as String, endsWith('voice.m4a.md'));
+      expect(capturedState!['title'], 'voice.m4a.md');
+    });
+
+    testWidgets('folder row shows the board default or the configured folder',
+        (tester) async {
+      final renderContext = BoardPanelRenderContext(
+        isSelected: false,
+        onFocus: () {},
+        onDelete: () {},
+        onUpdateState: (_) {},
+        onShowEditor: () {},
+      );
+
+      await tester.pumpWidget(
+        _wrap(AudioRecorderPanelContent(panel: _panel(), renderContext: renderContext)),
+      );
+      expect(find.text('Board default folder'), findsOneWidget);
+
+      await tester.pumpWidget(
+        _wrap(
+          AudioRecorderPanelContent(
+            panel: _panel(
+              state: _stateWith(<String, dynamic>{
+                AudioRecorderConfig.configKey:
+                    const AudioRecorderConfig(saveFolder: '/tmp/recs').toJson(),
+              }),
+            ),
+            renderContext: renderContext,
+          ),
+        ),
+      );
+      expect(find.text('/tmp/recs'), findsOneWidget);
     });
   });
 

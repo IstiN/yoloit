@@ -177,7 +177,6 @@ void main() {
         panel: _panel('p1'),
         onRenderUI: firstRenders.add,
       );
-      final engine = createdEngines.single;
       final backend = createdBackends.single;
       backend.emitRender({'type': 'text', 'value': 'cached'});
 

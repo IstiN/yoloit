@@ -1,9 +1,14 @@
+import 'package:flutter/foundation.dart';
 import 'package:process_run/process_run.dart';
 import 'package:yoloit/features/workspaces/models/worktree_model.dart';
 
 class WorktreeService {
   const WorktreeService._();
-  static const WorktreeService instance = WorktreeService._();
+
+  /// Singleton. Mutable so widget tests can substitute a mock without
+  /// spawning real `git` processes.
+  @visibleForTesting
+  static WorktreeService instance = const WorktreeService._();
 
   Future<List<WorktreeEntry>> listWorktrees(String repoPath) async {
     try {

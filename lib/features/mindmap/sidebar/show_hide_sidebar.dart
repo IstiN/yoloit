@@ -1384,78 +1384,13 @@ class _SidebarTreeRow extends StatelessWidget {
     final sessions =
         state is TerminalLoaded ? state.allSessions : <AgentSession>[];
     final session = sessions.where((s) => s.id == sessionId).firstOrNull;
-    final controller = TextEditingController(
-      text: session?.customName ?? session?.displayName ?? '',
-    );
     final result = await showDialog<String>(
       context: context,
       builder:
-          (ctx) => AlertDialog(
-            backgroundColor: context.appColors.surfaceElevated,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-            title: Text(
-              'Rename Session',
-              style: TextStyle(
-                color: Theme.of(ctx).colorScheme.onSurface,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            content: TextField(
-              controller: controller,
-              autofocus: true,
-              style: TextStyle(
-                color: Theme.of(ctx).colorScheme.onSurface,
-                fontSize: 13,
-              ),
-              decoration: InputDecoration(
-                hintText: 'Session name...',
-                hintStyle: TextStyle(
-                  color: Theme.of(ctx).colorScheme.onSurface.withAlpha(128),
-                ),
-                filled: true,
-                fillColor: context.appColors.surface,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(6),
-                  borderSide: BorderSide(color: context.appColors.border),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(6),
-                  borderSide: BorderSide(color: context.appColors.primary),
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-              ),
-              onSubmitted: (v) => Navigator.pop(ctx, v),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: Text(
-                  'Cancel',
-                  style: TextStyle(
-                    color: Theme.of(ctx).colorScheme.onSurface.withAlpha(128),
-                  ),
-                ),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, controller.text),
-                child: Text(
-                  'Rename',
-                  style: TextStyle(
-                    color: context.appColors.primary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
+          (ctx) => _RenameSessionDialog(
+            initialText: session?.customName ?? session?.displayName ?? '',
           ),
     );
-    controller.dispose();
     if (result != null && result.trim().isNotEmpty) {
       terminalCubit.renameSession(sessionId, result.trim());
     }
@@ -1530,6 +1465,97 @@ class _SidebarTreeRow extends StatelessWidget {
     } else if (result == 'kill') {
       terminalCubit.closeSession(sessionId);
     }
+  }
+}
+
+class _RenameSessionDialog extends StatefulWidget {
+  const _RenameSessionDialog({required this.initialText});
+
+  final String initialText;
+
+  @override
+  State<_RenameSessionDialog> createState() => _RenameSessionDialogState();
+}
+
+class _RenameSessionDialogState extends State<_RenameSessionDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialText);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: context.appColors.surfaceElevated,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      title: Text(
+        'Rename Session',
+        style: TextStyle(
+          color: Theme.of(context).colorScheme.onSurface,
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        style: TextStyle(
+          color: Theme.of(context).colorScheme.onSurface,
+          fontSize: 13,
+        ),
+        decoration: InputDecoration(
+          hintText: 'Session name...',
+          hintStyle: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface.withAlpha(128),
+          ),
+          filled: true,
+          fillColor: context.appColors.surface,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(6),
+            borderSide: BorderSide(color: context.appColors.border),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(6),
+            borderSide: BorderSide(color: context.appColors.primary),
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 8,
+          ),
+        ),
+        onSubmitted: (v) => Navigator.pop(context, v),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(
+            'Cancel',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface.withAlpha(128),
+            ),
+          ),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context, _controller.text),
+          child: Text(
+            'Rename',
+            style: TextStyle(
+              color: context.appColors.primary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }
 

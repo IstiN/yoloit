@@ -233,7 +233,10 @@ extension _AssistantSendPhases on _YoloAssistantWidgetState {
   Future<ChatProvider> _ensureChatProvider(String providerType) async {
     if (_chatProvider == null || _chatProviderType != providerType) {
       _chatProvider?.dispose();
-      if (providerType.startsWith('cloud:')) {
+      final debugFactory = YoloAssistantWidget.debugChatProviderFactory;
+      if (debugFactory != null) {
+        _chatProvider = debugFactory(providerType, _wrappedExecutor!);
+      } else if (providerType.startsWith('cloud:')) {
         final configId = providerType.substring(6);
         final cloudConfig =
             await CloudLlmSettingsService.instance.loadConfigById(configId) ??

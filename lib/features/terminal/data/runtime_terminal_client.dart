@@ -2,7 +2,13 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart' show kDebugMode, ValueNotifier;
+import 'package:flutter/foundation.dart'
+    show
+        kDebugMode,
+        ValueNotifier,
+        protected,
+        visibleForOverriding,
+        visibleForTesting;
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:yoloit/features/terminal/data/runtime_paths.dart';
 
@@ -31,15 +37,22 @@ class RuntimeTerminalClient {
   /// running runtime process is still the old one.
   static final ValueNotifier<bool> updateRequired = ValueNotifier(false);
 
+  /// Test hook: overrides [kDebugMode] so release-only code paths
+  /// (binary extraction, update checks) can be exercised in tests.
+  @visibleForTesting
+  static bool? debugModeOverride;
+
+  bool get _isDebug => debugModeOverride ?? kDebugMode;
+
   Future<void> ensureStarted() async {
-    if (kDebugMode) {
+    if (_isDebug) {
       await _killStaleDebugRuntime();
     }
     if (await _loadPort() && await _isHealthy()) {
       await _checkBinaryUpdate();
       return;
     }
-    await _startRuntime();
+    await startRuntime();
     for (var i = 0; i < 50; i++) {
       if (await _loadPort() && await _isHealthy()) return;
       await Future<void>.delayed(const Duration(milliseconds: 100));
@@ -48,7 +61,7 @@ class RuntimeTerminalClient {
   }
 
   Future<void> _checkBinaryUpdate() async {
-    if (kDebugMode) return;
+    if (_isDebug) return;
     final binaryName = Platform.isWindows ? 'yoloitd.exe' : 'yoloitd';
     final installed = File('$runtimeHome/$binaryName');
     if (!await installed.exists()) return;
@@ -89,7 +102,7 @@ class RuntimeTerminalClient {
 
     // Re-extract binary and start fresh.
     await _runtimeBinaryPath();
-    await _startRuntime();
+    await startRuntime();
     for (var i = 0; i < 50; i++) {
       if (await _loadPort() && await _isHealthy()) {
         updateRequired.value = false;
@@ -246,7 +259,9 @@ class RuntimeTerminalClient {
     }
   }
 
-  Future<void> _startRuntime() async {
+  @protected
+  @visibleForOverriding
+  Future<void> startRuntime() async {
     final dir = Directory(runtimeHome);
     await dir.create(recursive: true);
     await _deleteIfExists(_portPath);
@@ -276,7 +291,7 @@ class RuntimeTerminalClient {
 
     // In debug mode prefer the live binary in the project tree so developers
     // can iterate without rebuilding Flutter assets.
-    if (kDebugMode) {
+    if (_isDebug) {
       final debugPath = 'tools/yoloitd/$binaryName';
       if (await File(debugPath).exists()) return debugPath;
     }

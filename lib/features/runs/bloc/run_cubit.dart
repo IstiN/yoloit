@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yoloit/features/runs/bloc/run_state.dart';
 import 'package:yoloit/features/runs/data/run_config_storage.dart';
@@ -296,6 +297,17 @@ class RunCubit extends Cubit<RunState> {
     await RunConfigStorage.instance.save(state.workspacePath ?? '', configs);
     emit(state.copyWith(configs: configs));
   }
+
+  /// Test seam for [_appendOutput] so output batching can be exercised
+  /// without spawning real runner processes.
+  @visibleForTesting
+  void debugAppendOutput(String sessionId, String line, bool isError) =>
+      _appendOutput(sessionId, line, isError);
+
+  /// Test seam for [_onExit] so exit handling can be exercised without
+  /// spawning real runner processes.
+  @visibleForTesting
+  void debugOnExit(String sessionId, int code) => _onExit(sessionId, code);
 
   void _appendOutput(String sessionId, String line, bool isError) {
     // Ignore output for sessions that no longer belong to the active workspace.

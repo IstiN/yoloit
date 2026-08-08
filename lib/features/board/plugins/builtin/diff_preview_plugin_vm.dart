@@ -6,6 +6,18 @@ import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/diff_preview_plugin_base.dart';
 
+/// Subset of [Process.run] used by the diff preview panel.
+typedef DiffPreviewProcessRun =
+    Future<ProcessResult> Function(
+      String executable,
+      List<String> arguments, {
+      String? workingDirectory,
+    });
+
+/// Process runner used to shell out to `git`; overridable in tests.
+@visibleForTesting
+DiffPreviewProcessRun diffPreviewProcessRun = Process.run;
+
 class DiffPreviewPlugin extends DiffPreviewPluginBase {
   const DiffPreviewPlugin();
 
@@ -35,7 +47,7 @@ class _DiffPreviewContent extends StatefulWidget {
 }
 
 class _DiffPreviewContentState extends State<_DiffPreviewContent> {
-  List<_DiffLine>? _lines;
+  List<DiffLine>? _lines;
   bool _loading = true;
   String? _error;
   bool _sideBySide = false;
@@ -103,7 +115,7 @@ class _DiffPreviewContentState extends State<_DiffPreviewContent> {
 
       if (!mounted) return;
       setState(() {
-        _lines = _parseDiff(diffOutput);
+        _lines = parseDiffPreviewLines(diffOutput);
         _loading = false;
       });
     } catch (e) {
@@ -117,7 +129,7 @@ class _DiffPreviewContentState extends State<_DiffPreviewContent> {
 
   /// Runs `git diff HEAD`, falling back to the unstaged diff when empty.
   Future<String> _resolveDiffOutput(String rootPath, String filePath) async {
-    final result = await Process.run(
+    final result = await diffPreviewProcessRun(
       'git',
       ['diff', 'HEAD', '--', filePath],
       workingDirectory: rootPath.isNotEmpty ? rootPath : null,
@@ -127,7 +139,7 @@ class _DiffPreviewContentState extends State<_DiffPreviewContent> {
 
     // If no diff against HEAD, try unstaged
     if (diffOutput.trim().isEmpty) {
-      final unstagedResult = await Process.run(
+      final unstagedResult = await diffPreviewProcessRun(
         'git',
         ['diff', '--', filePath],
         workingDirectory: rootPath.isNotEmpty ? rootPath : null,
@@ -143,7 +155,7 @@ class _DiffPreviewContentState extends State<_DiffPreviewContent> {
     String rootPath,
     String filePath,
   ) async {
-    final statusResult = await Process.run(
+    final statusResult = await diffPreviewProcessRun(
       'git',
       ['status', '--porcelain', '--', filePath],
       workingDirectory: rootPath.isNotEmpty ? rootPath : null,
@@ -163,8 +175,8 @@ class _DiffPreviewContentState extends State<_DiffPreviewContent> {
       _lines = lines
           .asMap()
           .entries
-          .map((e) => _DiffLine(
-                type: _DiffLineType.added,
+          .map((e) => DiffLine(
+                type: DiffLineType.added,
                 content: e.value,
                 newLineNo: e.key + 1,
               ))
@@ -172,55 +184,6 @@ class _DiffPreviewContentState extends State<_DiffPreviewContent> {
       _loading = false;
     });
     return true;
-  }
-
-  List<_DiffLine> _parseDiff(String diff) {
-    final lines = diff.split('\n');
-    final result = <_DiffLine>[];
-    int oldLine = 0;
-    int newLine = 0;
-
-    for (final line in lines) {
-      if (line.startsWith('@@')) {
-        // Parse hunk header: @@ -oldStart,oldCount +newStart,newCount @@
-        final match = RegExp(r'@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@(.*)').firstMatch(line);
-        if (match != null) {
-          oldLine = int.parse(match.group(1)!);
-          newLine = int.parse(match.group(2)!);
-        }
-        result.add(_DiffLine(
-          type: _DiffLineType.hunk,
-          content: line,
-        ));
-      } else if (line.startsWith('---') || line.startsWith('+++') || line.startsWith('diff ') || line.startsWith('index ')) {
-        // Skip diff header lines
-        continue;
-      } else if (line.startsWith('+')) {
-        result.add(_DiffLine(
-          type: _DiffLineType.added,
-          content: line.substring(1),
-          newLineNo: newLine,
-        ));
-        newLine++;
-      } else if (line.startsWith('-')) {
-        result.add(_DiffLine(
-          type: _DiffLineType.removed,
-          content: line.substring(1),
-          oldLineNo: oldLine,
-        ));
-        oldLine++;
-      } else if (line.startsWith(' ')) {
-        result.add(_DiffLine(
-          type: _DiffLineType.context,
-          content: line.substring(1),
-          oldLineNo: oldLine,
-          newLineNo: newLine,
-        ));
-        oldLine++;
-        newLine++;
-      }
-    }
-    return result;
   }
 
   @override
@@ -314,7 +277,7 @@ class _DiffPreviewContentState extends State<_DiffPreviewContent> {
     return _buildUnified(lines);
   }
 
-  Widget _buildUnified(List<_DiffLine> lines) {
+  Widget _buildUnified(List<DiffLine> lines) {
     final colors = context.appColors;
     return ListView.builder(
       padding: const EdgeInsets.symmetric(vertical: 2),
@@ -322,24 +285,24 @@ class _DiffPreviewContentState extends State<_DiffPreviewContent> {
       itemBuilder: (_, i) {
         final line = lines[i];
         final bgColor = switch (line.type) {
-          _DiffLineType.added => colors.diffAddBg,
-          _DiffLineType.removed => colors.diffRemoveBg,
-          _DiffLineType.hunk => colors.diffContextBg,
-          _DiffLineType.context => Colors.transparent,
+          DiffLineType.added => colors.diffAddBg,
+          DiffLineType.removed => colors.diffRemoveBg,
+          DiffLineType.hunk => colors.diffContextBg,
+          DiffLineType.context => Colors.transparent,
         };
         final textColor = switch (line.type) {
-          _DiffLineType.added => colors.diffAddText,
-          _DiffLineType.removed => colors.diffRemoveText,
-          _DiffLineType.hunk => colors.accentBlue,
-          _DiffLineType.context => colors.terminalText,
+          DiffLineType.added => colors.diffAddText,
+          DiffLineType.removed => colors.diffRemoveText,
+          DiffLineType.hunk => colors.accentBlue,
+          DiffLineType.context => colors.terminalText,
         };
         final prefix = switch (line.type) {
-          _DiffLineType.added => '+',
-          _DiffLineType.removed => '-',
-          _DiffLineType.hunk => '',
-          _DiffLineType.context => ' ',
+          DiffLineType.added => '+',
+          DiffLineType.removed => '-',
+          DiffLineType.hunk => '',
+          DiffLineType.context => ' ',
         };
-        final lineNo = line.type == _DiffLineType.hunk
+        final lineNo = line.type == DiffLineType.hunk
             ? ''
             : '${(line.oldLineNo ?? '').toString().padLeft(4)} ${(line.newLineNo ?? '').toString().padLeft(4)}';
 
@@ -396,24 +359,24 @@ class _DiffPreviewContentState extends State<_DiffPreviewContent> {
     );
   }
 
-  Widget _buildSideBySide(List<_DiffLine> lines) {
+  Widget _buildSideBySide(List<DiffLine> lines) {
     final colors = context.appColors;
     // Build left (old) and right (new) columns
-    final leftLines = <_DiffLine>[];
-    final rightLines = <_DiffLine>[];
+    final leftLines = <DiffLine>[];
+    final rightLines = <DiffLine>[];
 
     for (final line in lines) {
       switch (line.type) {
-        case _DiffLineType.context:
+        case DiffLineType.context:
           leftLines.add(line);
           rightLines.add(line);
-        case _DiffLineType.removed:
+        case DiffLineType.removed:
           leftLines.add(line);
-          rightLines.add(const _DiffLine(type: _DiffLineType.context, content: ''));
-        case _DiffLineType.added:
-          leftLines.add(const _DiffLine(type: _DiffLineType.context, content: ''));
+          rightLines.add(const DiffLine(type: DiffLineType.context, content: ''));
+        case DiffLineType.added:
+          leftLines.add(const DiffLine(type: DiffLineType.context, content: ''));
           rightLines.add(line);
-        case _DiffLineType.hunk:
+        case DiffLineType.hunk:
           leftLines.add(line);
           rightLines.add(line);
       }
@@ -430,7 +393,7 @@ class _DiffPreviewContentState extends State<_DiffPreviewContent> {
         final left = leftLines[i];
         final right = rightLines[i];
 
-        if (left.type == _DiffLineType.hunk) {
+        if (left.type == DiffLineType.hunk) {
           return Container(
             color: colors.diffContextBg,
             height: 20,
@@ -460,16 +423,16 @@ class _DiffPreviewContentState extends State<_DiffPreviewContent> {
     );
   }
 
-  Widget _sideCell(_DiffLine line, {required bool isLeft}) {
+  Widget _sideCell(DiffLine line, {required bool isLeft}) {
     final colors = context.appColors;
     final bgColor = switch (line.type) {
-      _DiffLineType.removed => colors.diffRemoveBg,
-      _DiffLineType.added => colors.diffAddBg,
+      DiffLineType.removed => colors.diffRemoveBg,
+      DiffLineType.added => colors.diffAddBg,
       _ => Colors.transparent,
     };
     final textColor = switch (line.type) {
-      _DiffLineType.removed => colors.diffRemoveText,
-      _DiffLineType.added => colors.diffAddText,
+      DiffLineType.removed => colors.diffRemoveText,
+      DiffLineType.added => colors.diffAddText,
       _ => colors.terminalText,
     };
     final lineNo = isLeft ? line.oldLineNo : line.newLineNo;
@@ -534,16 +497,73 @@ class _ToggleButton extends StatelessWidget {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-enum _DiffLineType { context, added, removed, hunk }
+/// Parses unified `git diff` output into typed lines with old/new line numbers.
+List<DiffLine> parseDiffPreviewLines(String diff) {
+  final lines = diff.split('\n');
+  final result = <DiffLine>[];
+  int oldLine = 0;
+  int newLine = 0;
 
-class _DiffLine {
-  const _DiffLine({
+  for (final line in lines) {
+    if (line.startsWith('@@')) {
+      // Parse hunk header: @@ -oldStart,oldCount +newStart,newCount @@
+      final match = RegExp(
+        r'@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@(.*)',
+      ).firstMatch(line);
+      if (match != null) {
+        oldLine = int.parse(match.group(1)!);
+        newLine = int.parse(match.group(2)!);
+      }
+      result.add(DiffLine(
+        type: DiffLineType.hunk,
+        content: line,
+      ));
+    } else if (line.startsWith('---') ||
+        line.startsWith('+++') ||
+        line.startsWith('diff ') ||
+        line.startsWith('index ')) {
+      // Skip diff header lines
+      continue;
+    } else if (line.startsWith('+')) {
+      result.add(DiffLine(
+        type: DiffLineType.added,
+        content: line.substring(1),
+        newLineNo: newLine,
+      ));
+      newLine++;
+    } else if (line.startsWith('-')) {
+      result.add(DiffLine(
+        type: DiffLineType.removed,
+        content: line.substring(1),
+        oldLineNo: oldLine,
+      ));
+      oldLine++;
+    } else if (line.startsWith(' ')) {
+      result.add(DiffLine(
+        type: DiffLineType.context,
+        content: line.substring(1),
+        oldLineNo: oldLine,
+        newLineNo: newLine,
+      ));
+      oldLine++;
+      newLine++;
+    }
+  }
+  return result;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum DiffLineType { context, added, removed, hunk }
+
+class DiffLine {
+  const DiffLine({
     required this.type,
     required this.content,
     this.oldLineNo,
     this.newLineNo,
   });
-  final _DiffLineType type;
+  final DiffLineType type;
   final String content;
   final int? oldLineNo;
   final int? newLineNo;

@@ -85,6 +85,7 @@ void main() {
       );
 
       expect(find.byType(SessionHistoryPickerDialog), findsOneWidget);
+      expect(restoredEntry, isNull);
     });
 
     testWidgets('renders history icon in title', (tester) async {

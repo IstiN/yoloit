@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:yoloit/core/remote/board_share_server.dart';
 import 'package:yoloit/core/theme/app_theme.dart';
 import 'package:yoloit/core/ui/adaptive_dialog.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
@@ -105,6 +107,29 @@ Future<void> _pumpBoard(
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  const recordChannel = MethodChannel('com.llfbandit.record/messages');
+
+  setUpAll(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(recordChannel, (call) async {
+          switch (call.method) {
+            case 'create':
+              return 1;
+            case 'dispose':
+            case 'hasPermission':
+            case 'isRecording':
+            case 'isPaused':
+              return false;
+            default:
+              return null;
+          }
+        });
+  });
+
+  tearDownAll(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(recordChannel, null);
+  });
 
   testWidgets('shape catalog entry creates a frame panel', (tester) async {
     SharedPreferences.setMockInitialValues({});
@@ -599,5 +624,93 @@ void main() {
 
     expect(cubit.connectedUrl, isNull);
     expect(find.text('Connect remote YoLoIT'), findsNothing);
+  });
+
+  testWidgets('delete board confirm replaces it with a fresh default board', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    _setSurface(tester);
+
+    final cubit = _TestBoardCubit(
+      BoardState(boards: [_board()], activeBoardId: 'board', isLoaded: true),
+    );
+    addTearDown(cubit.close);
+    await _pumpBoard(tester, cubit);
+
+    await tester.tap(find.text('Delete'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(find.text('Delete board?'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+
+    // Deleting the last board seeds a replacement default board.
+    expect(cubit.state.boards, hasLength(1));
+    expect(cubit.state.boards.single.id, isNot('board'));
+    expect(cubit.state.boards.single.name, 'Board 1');
+    expect(find.text('Delete board?'), findsNothing);
+  });
+
+  testWidgets('delete board cancel keeps the board', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    _setSurface(tester);
+
+    final cubit = _TestBoardCubit(
+      BoardState(boards: [_board()], activeBoardId: 'board', isLoaded: true),
+    );
+    addTearDown(cubit.close);
+    await _pumpBoard(tester, cubit);
+
+    await tester.tap(find.text('Delete'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(find.text('Delete board?'), findsOneWidget);
+
+    await tester.tap(find.text('Cancel'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+
+    expect(cubit.state.boards.single.id, 'board');
+    expect(find.text('Delete board?'), findsNothing);
+  });
+
+  testWidgets('share board starts the share server and shows the dialog', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    _setSurface(tester);
+
+    final cubit = _TestBoardCubit(
+      BoardState(boards: [_board()], activeBoardId: 'board', isLoaded: true),
+    );
+    addTearDown(cubit.close);
+    await _pumpBoard(tester, cubit);
+    expect(BoardShareServer.instance.isRunning, isFalse);
+
+    // The share server binds a real socket: drive the tap and the bind on
+    // the real async clock.
+    await tester.runAsync(() async {
+      await tester.tap(find.text('Share'));
+      await tester.pump();
+      // Allow the real HttpServer bind + LAN host lookup to complete.
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+      await tester.pump();
+    });
+
+    expect(BoardShareServer.instance.isRunning, isTrue);
+    expect(find.text('Share board'), findsOneWidget);
+    expect(find.text('Done'), findsOneWidget);
+
+    await tester.tap(find.text('Done'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(find.text('Share board'), findsNothing);
+
+    // Stop the server on the real clock so no socket leaks past the test.
+    await tester.runAsync(() => BoardShareServer.instance.stop());
+    expect(BoardShareServer.instance.isRunning, isFalse);
   });
 }

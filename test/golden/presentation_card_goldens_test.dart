@@ -5,13 +5,6 @@ import 'package:yoloit/features/mindmap/nodes/presentation/card_props.dart';
 import 'package:yoloit/features/mindmap/nodes/presentation/card_factory.dart';
 import 'package:yoloit/features/mindmap/nodes/presentation/agent_card.dart';
 import 'package:yoloit/features/mindmap/nodes/presentation/workspace_card.dart';
-import 'package:yoloit/features/mindmap/nodes/presentation/repo_branch_card.dart';
-import 'package:yoloit/features/mindmap/nodes/presentation/run_card.dart';
-import 'package:yoloit/features/mindmap/nodes/presentation/editor_card.dart';
-import 'package:yoloit/features/mindmap/nodes/presentation/files_card.dart';
-import 'package:yoloit/features/mindmap/nodes/presentation/file_tree_card.dart';
-import 'package:yoloit/features/mindmap/nodes/presentation/diff_card.dart';
-import 'package:yoloit/features/mindmap/nodes/presentation/session_card.dart';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 

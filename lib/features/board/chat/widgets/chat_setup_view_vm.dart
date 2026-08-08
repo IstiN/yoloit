@@ -24,6 +24,37 @@ import 'package:yoloit/features/settings/data/setup_check_service.dart';
 import 'package:yoloit/features/settings/ui/env_group_picker.dart';
 import 'package:yoloit/features/settings/ui/setup_guide_page.dart';
 
+/// Splits a CLI launch command into tokens, honoring single and double
+/// quotes. Quoted sections keep their inner spaces; quote characters are
+/// stripped. Consecutive unquoted spaces collapse and empty tokens are
+/// dropped.
+@visibleForTesting
+List<String> splitChatLaunchCommand(String command) {
+  final parts = <String>[];
+  final sb = StringBuffer();
+  bool inDoubleQuotes = false;
+  bool inSingleQuotes = false;
+  for (int i = 0; i < command.length; i++) {
+    final char = command[i];
+    if (char == '"' && !inSingleQuotes) {
+      inDoubleQuotes = !inDoubleQuotes;
+    } else if (char == "'" && !inDoubleQuotes) {
+      inSingleQuotes = !inSingleQuotes;
+    } else if (char == ' ' && !inDoubleQuotes && !inSingleQuotes) {
+      if (sb.isNotEmpty) {
+        parts.add(sb.toString());
+        sb.clear();
+      }
+    } else {
+      sb.write(char);
+    }
+  }
+  if (sb.isNotEmpty) {
+    parts.add(sb.toString());
+  }
+  return parts;
+}
+
 class ChatSetupView extends StatefulWidget {
   const ChatSetupView({
     required this.panelId,
@@ -101,31 +132,7 @@ class ChatSetupViewState extends State<ChatSetupView> {
     };
   }
 
-  List<String> _splitCommand(String command) {
-    final parts = <String>[];
-    final sb = StringBuffer();
-    bool inDoubleQuotes = false;
-    bool inSingleQuotes = false;
-    for (int i = 0; i < command.length; i++) {
-      final char = command[i];
-      if (char == '"' && !inSingleQuotes) {
-        inDoubleQuotes = !inDoubleQuotes;
-      } else if (char == "'" && !inDoubleQuotes) {
-        inSingleQuotes = !inSingleQuotes;
-      } else if (char == ' ' && !inDoubleQuotes && !inSingleQuotes) {
-        if (sb.isNotEmpty) {
-          parts.add(sb.toString());
-          sb.clear();
-        }
-      } else {
-        sb.write(char);
-      }
-    }
-    if (sb.isNotEmpty) {
-      parts.add(sb.toString());
-    }
-    return parts;
-  }
+  List<String> _splitCommand(String command) => splitChatLaunchCommand(command);
 
   @override
   void initState() {

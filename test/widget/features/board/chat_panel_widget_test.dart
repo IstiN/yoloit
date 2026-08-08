@@ -1,5 +1,3 @@
-import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -12,7 +10,6 @@ import 'package:yoloit/core/theme/app_theme.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/chat/chat_panel_plugin.dart';
 import 'package:yoloit/features/board/chat/chat_panel_widget.dart';
-import 'package:yoloit/features/board/chat/chat_provider.dart';
 import 'package:yoloit/features/board/chat/chat_session_manager.dart';
 import 'package:yoloit/features/board/chat/helpers/chat_sound_helper.dart';
 import 'package:yoloit/features/board/chat/widgets/chat_changed_files_strip.dart';
@@ -20,6 +17,8 @@ import 'package:yoloit/features/board/chat/widgets/chat_message_list.dart';
 import 'package:yoloit/features/board/chat/widgets/model_search_dialog.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
+
+import 'chat_panel_test_harness.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -78,7 +77,7 @@ void main() {
 
     setUp(() {
       tempDir = Directory.systemTemp.createTempSync('chat_panel_widget_test');
-      PlatformDirs.setInstance(_TestPlatformDirs(tempDir.path));
+      PlatformDirs.setInstance(ChatTestPlatformDirs(tempDir.path));
       // Spawning `afplay` inside the fake-async zone leaks a pending timer.
       playChatCompletionSound = () async {};
     });
@@ -92,7 +91,7 @@ void main() {
     testWidgets('full send flow streams events and persists session id', (
       tester,
     ) async {
-      final h = _ChatHarness(
+      final h = ChatPanelHarness(
         provider: 'opencode',
         autoSessionId: 'oc-1',
         panelId: 'chat-send-flow',
@@ -109,9 +108,9 @@ void main() {
       );
 
       // Ignored tool calls never reach the active tool map.
-      h.fake.emit(_toolStart('tc0', 'report_intent'));
+      h.fake.emit(chatToolStartEvent('tc0', 'report_intent'));
       await tester.pump();
-      h.fake.emit(_toolComplete('tc0', content: 'Intent logged'));
+      h.fake.emit(chatToolCompleteEvent('tc0', content: 'Intent logged'));
       await tester.pump();
 
       h.fake.emit(
@@ -122,8 +121,8 @@ void main() {
         ),
       );
       await tester.pump();
-      h.fake.emit(_delta('Hi '));
-      h.fake.emit(_delta('there'));
+      h.fake.emit(chatDeltaEvent('Hi '));
+      h.fake.emit(chatDeltaEvent('there'));
       await tester.pump();
       h.fake.emit(
         const ChatEvent(
@@ -136,11 +135,11 @@ void main() {
 
       // A mutating tool call surfaces changed files.
       h.fake.emit(
-        _toolStart('tc1', 'edit', arguments: {'path': '/tmp/a.dart'}),
+        chatToolStartEvent('tc1', 'edit', arguments: {'path': '/tmp/a.dart'}),
       );
       await tester.pump();
       h.fake.emit(
-        _toolComplete('tc1', content: 'updated file /tmp/a.dart'),
+        chatToolCompleteEvent('tc1', content: 'updated file /tmp/a.dart'),
       );
       await tester.pump();
 
@@ -193,7 +192,7 @@ void main() {
     testWidgets('queues follow-up while busy and auto-sends it on done', (
       tester,
     ) async {
-      final h = _ChatHarness(
+      final h = ChatPanelHarness(
         provider: 'copilot',
         autoSessionId: 'cop-9',
         panelId: 'chat-follow-up',
@@ -255,7 +254,7 @@ void main() {
     testWidgets('syncs UI when the session changes externally (CLI send)', (
       tester,
     ) async {
-      final h = _ChatHarness(provider: 'copilot', panelId: 'chat-cli-driven');
+      final h = ChatPanelHarness(provider: 'copilot', panelId: 'chat-cli-driven');
       await h.pump(tester);
       addTearDown(h.dispose);
 
@@ -291,7 +290,7 @@ void main() {
     testWidgets('sub-agent events build a linked markdown log panel', (
       tester,
     ) async {
-      final h = _ChatHarness(provider: 'copilot', panelId: 'chat-subagent');
+      final h = ChatPanelHarness(provider: 'copilot', panelId: 'chat-subagent');
       await h.pump(tester);
       addTearDown(h.dispose);
 
@@ -368,7 +367,7 @@ void main() {
     testWidgets('/yolo mention injects panel summaries into the prompt', (
       tester,
     ) async {
-      final h = _ChatHarness(
+      final h = ChatPanelHarness(
         provider: 'copilot',
         panelId: 'chat-yolo',
         extraPanels: const [
@@ -417,7 +416,7 @@ void main() {
     });
 
     testWidgets('consumes a CLI pending message on mount', (tester) async {
-      final h = _ChatHarness(
+      final h = ChatPanelHarness(
         provider: 'copilot',
         panelId: 'chat-cli-pending',
         extraState: const {'_cliPendingMessage': 'do the thing'},
@@ -444,7 +443,7 @@ void main() {
     testWidgets('cursor provider captures and persists its session id', (
       tester,
     ) async {
-      final h = _ChatHarness(
+      final h = ChatPanelHarness(
         provider: 'cursor',
         autoSessionId: 'cur-1',
         panelId: 'chat-cursor',
@@ -453,7 +452,7 @@ void main() {
       addTearDown(h.dispose);
 
       await h.typeAndSend(tester, 'hi cursor');
-      h.fake.emit(_delta('yo'));
+      h.fake.emit(chatDeltaEvent('yo'));
       await tester.pump();
 
       // _captureProviderSessionIds persisted the cursor session id early.
@@ -473,7 +472,7 @@ void main() {
     testWidgets('restores messages and cursor session id from the session', (
       tester,
     ) async {
-      final h = _ChatHarness(
+      final h = ChatPanelHarness(
         provider: 'cursor',
         panelId: 'chat-restore',
         seedSession: (session) {
@@ -495,7 +494,7 @@ void main() {
     testWidgets('slash menus navigate, autocomplete and dismiss via keyboard', (
       tester,
     ) async {
-      final h = _ChatHarness(provider: 'copilot', panelId: 'chat-slash');
+      final h = ChatPanelHarness(provider: 'copilot', panelId: 'chat-slash');
       await h.pump(tester);
       addTearDown(h.dispose);
       final field = find.byType(TextField);
@@ -542,247 +541,4 @@ void main() {
       expect(h.fake.sentMessages, isEmpty);
     });
   });
-}
-
-// ── Test doubles & harness ──────────────────────────────────────────────────
-
-class _TestPlatformDirs extends PlatformDirs {
-  const _TestPlatformDirs(this.root);
-
-  final String root;
-
-  @override
-  String get configDir => '$root/config';
-
-  @override
-  String get dataDir => '$root/data';
-
-  @override
-  String get logsDir => '$root/logs';
-
-  @override
-  String get tempDir => root;
-
-  @override
-  String get skillsDir => '$root/skills';
-
-  @override
-  String get yoloitTempDir => '$root/tmp';
-}
-
-class _FakeChatProvider extends ChatProvider {
-  _FakeChatProvider({required this.id, this.autoSessionId});
-
-  final String id;
-  final String? autoSessionId;
-  final List<String> sentMessages = [];
-  final List<ChatRuntimeContext?> sentRuntimeContexts = [];
-  final Map<String, String> _sessionIds = {};
-  StreamController<ChatEvent>? _controller;
-
-  @override
-  String get providerId => id;
-
-  @override
-  String get displayName => 'Fake';
-
-  @override
-  List<ChatModelInfo> get availableModels =>
-      const [ChatModelInfo(id: 'fake-model', displayName: 'Fake Model')];
-
-  @override
-  bool get supportsImages => false;
-
-  @override
-  ChatImageMode get imageMode => ChatImageMode.filePath;
-
-  @override
-  bool isRunning(String sessionName) => _controller != null;
-
-  @override
-  Stream<ChatEvent> sendMessage({
-    required String message,
-    required ChatSessionConfig config,
-    required bool isFirstMessage,
-    List<String> attachments = const [],
-    ChatRuntimeContext? runtimeContext,
-    List<Map<String, Object?>>? audioContentOverride,
-  }) {
-    sentMessages.add(message);
-    sentRuntimeContexts.add(runtimeContext);
-    final sid = autoSessionId;
-    if (sid != null) _sessionIds[config.sessionName] = sid;
-    _controller = StreamController<ChatEvent>();
-    return _controller!.stream;
-  }
-
-  void emit(ChatEvent event) => _controller?.add(event);
-
-  Future<void> complete() async {
-    final controller = _controller;
-    _controller = null;
-    await controller?.close();
-  }
-
-  @override
-  Future<void> stop(String sessionName) => complete();
-
-  @override
-  void dispose() {}
-
-  @override
-  void setSessionId(String sessionName, String sessionId) {
-    _sessionIds[sessionName] = sessionId;
-  }
-
-  @override
-  String? getSessionId(String sessionName) => _sessionIds[sessionName];
-}
-
-ChatEvent _delta(String text) => ChatEvent(
-  type: ChatEventType.assistantDelta,
-  rawType: 'assistant.message_delta',
-  data: {'deltaContent': text},
-);
-
-ChatEvent _toolStart(
-  String toolCallId,
-  String toolName, {
-  Map<String, dynamic>? arguments,
-}) => ChatEvent(
-  type: ChatEventType.toolStart,
-  rawType: 'tool.execution_start',
-  data: {
-    'toolCallId': toolCallId,
-    'toolName': toolName,
-    'arguments': ?arguments,
-  },
-);
-
-ChatEvent _toolComplete(
-  String toolCallId, {
-  required String content,
-  bool success = true,
-}) => ChatEvent(
-  type: ChatEventType.toolComplete,
-  rawType: 'tool.execution_complete',
-  data: {
-    'toolCallId': toolCallId,
-    'success': success,
-    'result': {'content': content},
-  },
-);
-
-class _ChatHarness {
-  _ChatHarness({
-    required this.provider,
-    required this.panelId,
-    this.autoSessionId,
-    this.extraPanels = const [],
-    this.extraState = const {},
-    this.seedSession,
-  });
-
-  final String provider;
-  final String panelId;
-  final String? autoSessionId;
-  final List<BoardPanelInstance> extraPanels;
-  final Map<String, dynamic> extraState;
-  final void Function(ChatSession)? seedSession;
-
-  final List<Map<String, dynamic>> updates = [];
-  final List<(String, Map<String, dynamic>, String)> createdPanels = [];
-  late final _FakeChatProvider fake;
-  late final BoardCubit cubit;
-  late final ChatSessionConfig config;
-
-  Future<void> pump(WidgetTester tester) async {
-    config = ChatSessionConfig(
-      sessionName: 'test-session',
-      workingDir: '/tmp',
-      provider: provider,
-    );
-    fake = _FakeChatProvider(id: provider, autoSessionId: autoSessionId);
-    final session = ChatSession(
-      panelId: panelId,
-      config: config,
-      providerFactory: (_) => fake,
-    );
-    seedSession?.call(session);
-    ChatSessionManager.instance.sessions[panelId] = session;
-
-    final panel = BoardPanelInstance(
-      id: panelId,
-      type: ChatPanelPlugin.kTypeId,
-      title: 'AI Chat',
-      bounds: const BoardPanelBounds(x: 0, y: 0, width: 420, height: 500),
-      state: {
-        'configured': true,
-        'config': config.toJson(),
-        ...extraState,
-      },
-    );
-    final board = BoardDocument(
-      id: 'b1',
-      name: 'Board 1',
-      panels: [panel, ...extraPanels],
-    );
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('board.documents.v1', jsonEncode([board.toJson()]));
-    await prefs.setString('board.active.id.v1', 'b1');
-    cubit = BoardCubit();
-    // BoardCubit.load() performs real file I/O (AgentConfigService), which
-    // never completes inside the widget-test fake-async zone — run it in a
-    // real async scope.
-    await tester.runAsync(() => cubit.load());
-
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: AppThemePreset.neonPurple.theme,
-        home: Scaffold(
-          body: BlocProvider.value(
-            value: cubit,
-            child: SizedBox(
-              width: 520,
-              height: 620,
-              child: ChatPanelWidget(
-                panel: panel,
-                onUpdateState: updates.add,
-                onCreateLinkedPanel: (typeId, state, title) async {
-                  createdPanels.add((typeId, state, title));
-                  return 'linked-${createdPanels.length}';
-                },
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-    await tester.pump();
-  }
-
-  /// Types [text] into the input field and presses Enter, then lets the
-  /// debounced draft-persist timer (300 ms) elapse so no timer leaks.
-  Future<void> typeAndSend(WidgetTester tester, String text) async {
-    await tester.enterText(find.byType(TextField), text);
-    await tester.pump();
-    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 350));
-  }
-
-  /// Closes the provider stream so `onDone` fires. The close future must not
-  /// be awaited directly inside the fake-async zone — it only resolves once
-  /// the done event is delivered, which requires a pump first.
-  Future<void> finishTurn(WidgetTester tester) async {
-    unawaited(fake.complete());
-    await tester.pump();
-    await tester.pump();
-  }
-
-  void dispose() {
-    ChatSessionManager.instance.sessions.remove(panelId);
-    ChatPanelWidget.processingNotifiers.remove(panelId);
-    unawaited(cubit.close());
-  }
 }

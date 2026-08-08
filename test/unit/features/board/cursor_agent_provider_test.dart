@@ -202,7 +202,6 @@ void main() {
       test('second delta is NOT first (currentStreamId set)', () {
         String? currentStreamId = 'cursor-12345';
 
-        final delta = cursorDelta('world');
         final isFirst = currentStreamId == null;
         expect(isFirst, isFalse);
         // currentStreamId unchanged

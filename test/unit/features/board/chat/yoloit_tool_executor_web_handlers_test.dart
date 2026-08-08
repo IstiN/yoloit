@@ -536,5 +536,257 @@ void main() {
         }
       });
     });
+
+    group('kanban columns', () {
+      test('kanban:rename-column renames an existing column', () async {
+        cubit.addFakePanel(
+          fakePanel('p-kr1', 'board.kanban', 'KanbanR', state: {
+            'columns': <String>['Todo', 'Doing'],
+          }),
+        );
+
+        final result = await invoke('yoloit_kanban_rename_column', {
+          'panel': 'KanbanR',
+          'column': 'Todo',
+          'name': 'Done',
+        });
+        expect(decode(result)['ok'], isTrue);
+        expect(
+          cubit.updatedPanels['p-kr1']?.state['columns'],
+          <String>['Done', 'Doing'],
+        );
+      });
+
+      test('kanban:rename-column validates its arguments', () async {
+        cubit.addFakePanel(fakePanel('p-kr2', 'board.kanban', 'KanbanV'));
+
+        final missing = await invoke('yoloit_kanban_rename_column', {
+          'panel': 'KanbanV',
+          'column': 'Todo',
+        });
+        expect(
+          decode(missing)['error'],
+          contains('Missing column name or new name'),
+        );
+
+        final unknown = await invoke('yoloit_kanban_rename_column', {
+          'panel': 'KanbanV',
+          'column': 'Nope',
+          'name': 'X',
+        });
+        expect(decode(unknown)['error'], contains('Column not found'));
+      });
+    });
+
+    group('timer', () {
+      test('timer:set updates duration and label', () async {
+        cubit.addFakePanel(
+          fakePanel('p-ts1', 'board.timer', 'TimerS', state: {
+            'duration': 300,
+            'remaining': 300,
+            'isRunning': true,
+          }),
+        );
+
+        final result = await invoke('yoloit_timer_set', {
+          'panel': 'TimerS',
+          'duration': '10m',
+          'label': 'Long',
+        });
+        expect(decode(result)['ok'], isTrue);
+        final state = cubit.updatedPanels['p-ts1']?.state;
+        expect(state?['duration'], 600);
+        expect(state?['remaining'], 600);
+        expect(state?['isRunning'], isFalse);
+        expect(state?['label'], 'Long');
+      });
+
+      test('timer:set returns error when no settings provided', () async {
+        cubit.addFakePanel(fakePanel('p-ts2', 'board.timer', 'TimerE'));
+
+        final result = await invoke('yoloit_timer_set', {'panel': 'TimerE'});
+        expect(
+          decode(result)['error'],
+          contains('No timer settings provided'),
+        );
+      });
+    });
+
+    group('webpage', () {
+      test('web:get, web:url and web:title read the panel state', () async {
+        cubit.addFakePanel(
+          fakePanel('p-wg1', 'board.webpage', 'WebG', state: {
+            'url': 'https://example.com',
+            'title': 'Example',
+          }),
+        );
+
+        final get = decode(await invoke('yoloit_web_get', {'panel': 'WebG'}));
+        expect(get['url'], 'https://example.com');
+        expect(get['title'], 'Example');
+
+        final url = decode(await invoke('yoloit_web_url', {'panel': 'WebG'}));
+        expect(url['url'], 'https://example.com');
+
+        final title = decode(
+          await invoke('yoloit_web_title', {'panel': 'WebG'}),
+        );
+        expect(title['title'], 'Example');
+      });
+    });
+
+    group('table', () {
+      Future<String> addRow(String panel, Map<String, dynamic> cells) {
+        return invoke('yoloit_table_add_row', {
+          'panel': panel,
+          'cells': cells,
+        });
+      }
+
+      test('table:update-row merges cells into the row', () async {
+        cubit.addFakePanel(fakePanel('p-tu1', 'board.table', 'TableU'));
+        final addResult = await addRow('TableU', {'month': 'Apr'});
+        final rowId = decode(addResult)['id'] as String;
+
+        final result = await invoke('yoloit_table_update_row', {
+          'panel': 'TableU',
+          'row_id': rowId,
+          'cells': {'month': 'May', 'sales': 200},
+        });
+        expect(decode(result)['ok'], isTrue);
+        final rows = cubit.updatedPanels['p-tu1']?.state['rows'] as List;
+        final row = rows.last as Map<String, dynamic>;
+        expect(row['id'], rowId);
+        expect(row['month'], 'May');
+        expect(row['sales'], 200);
+      });
+
+      test('table:update-row validates the row id', () async {
+        cubit.addFakePanel(fakePanel('p-tu2', 'board.table', 'TableV'));
+
+        final missing = await invoke('yoloit_table_update_row', {
+          'panel': 'TableV',
+          'cells': {'a': 1},
+        });
+        expect(decode(missing)['error'], contains('Missing row id'));
+
+        final unknown = await invoke('yoloit_table_update_row', {
+          'panel': 'TableV',
+          'row_id': 'no-such-row',
+          'cells': {'a': 1},
+        });
+        expect(decode(unknown)['error'], contains('Row not found'));
+      });
+
+      test('table:add-column and table:remove-column manage columns', () async {
+        cubit.addFakePanel(
+          fakePanel('p-tc1', 'board.table', 'TableC', state: {
+            'columns': <Map<String, dynamic>>[
+              {'id': 'month', 'title': 'Month', 'type': 'text'},
+            ],
+          }),
+        );
+
+        final addResult = await invoke('yoloit_table_add_column', {
+          'panel': 'TableC',
+          'id': 'c1',
+          'title': 'Custom',
+          'type': 'number',
+        });
+        expect(decode(addResult)['ok'], isTrue);
+        final columns = cubit.updatedPanels['p-tc1']?.state['columns'] as List;
+        expect(
+          columns.map((c) => (c as Map<String, dynamic>)['id']),
+          contains('c1'),
+        );
+
+        final duplicate = await invoke('yoloit_table_add_column', {
+          'panel': 'TableC',
+          'id': 'c1',
+        });
+        expect(decode(duplicate)['error'], contains('Column already exists'));
+
+        final removeResult = await invoke('yoloit_table_remove_column', {
+          'panel': 'TableC',
+          'column_id': 'c1',
+        });
+        expect(decode(removeResult)['ok'], isTrue);
+
+        final missing = await invoke('yoloit_table_remove_column', {
+          'panel': 'TableC',
+          'column_id': 'c1',
+        });
+        expect(decode(missing)['error'], contains('Column not found'));
+      });
+
+      test('table:add-column requires a column id', () async {
+        cubit.addFakePanel(fakePanel('p-tc2', 'board.table', 'TableI'));
+
+        final result = await invoke('yoloit_table_add_column', {
+          'panel': 'TableI',
+          'title': 'No id',
+        });
+        expect(decode(result)['error'], contains('Missing column id'));
+      });
+
+      test('table:clear empties the rows', () async {
+        cubit.addFakePanel(fakePanel('p-tc3', 'board.table', 'TableX'));
+        await addRow('TableX', {'month': 'Apr'});
+
+        final result = await invoke('yoloit_table_clear', {'panel': 'TableX'});
+        expect(decode(result)['ok'], isTrue);
+        expect(cubit.updatedPanels['p-tc3']?.state['rows'], isEmpty);
+      });
+    });
+
+    group('chart refresh', () {
+      test('chart:link-table and chart:refresh copy rows into data', () async {
+        cubit.addFakePanel(fakePanel('p-cr-t', 'board.table', 'DataT'));
+        cubit.addFakePanel(fakePanel('p-cr-c', 'board.chart', 'ChartC'));
+        await invoke('yoloit_table_add_row', {
+          'panel': 'DataT',
+          'cells': {'month': 'Apr', 'sales': 200},
+        });
+
+        final linkResult = await invoke('yoloit_chart_link_table', {
+          'panel': 'ChartC',
+          'table_panel': 'DataT',
+        });
+        expect(decode(linkResult)['ok'], isTrue);
+        expect(
+          cubit.updatedPanels['p-cr-c']?.state['tablePanelId'],
+          'p-cr-t',
+        );
+
+        final refreshResult = await invoke('yoloit_chart_refresh', {
+          'panel': 'ChartC',
+        });
+        expect(decode(refreshResult)['ok'], isTrue);
+        final data = cubit.updatedPanels['p-cr-c']?.state['data'] as List;
+        expect(data.length, 4);
+        expect((data.last as Map<String, dynamic>)['month'], 'Apr');
+      });
+
+      test('chart:refresh requires a linked table', () async {
+        cubit.addFakePanel(fakePanel('p-cr-n', 'board.chart', 'ChartN'));
+
+        final result = await invoke('yoloit_chart_refresh', {
+          'panel': 'ChartN',
+        });
+        expect(decode(result)['error'], contains('No linked table'));
+      });
+
+      test('chart:link-table returns error when table hint missing', () async {
+        cubit.addFakePanel(fakePanel('p-cr-u', 'board.chart', 'ChartU'));
+
+        final result = await invoke('yoloit_chart_link_table', {
+          'panel': 'ChartU',
+        });
+        expect(
+          decode(result)['error'],
+          contains('Linked table panel not found'),
+        );
+      });
+    });
   });
 }

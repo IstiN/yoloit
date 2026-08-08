@@ -233,13 +233,17 @@ class SkillsInstallService {
       }
     }
 
-    // Remove stale skill links
-    await for (final entity in dir.list()) {
+    // Remove stale skill links.
+    // Note: list() must not follow links — a symlink to an existing directory
+    // would be reported as a Directory and never cleaned up.
+    await for (final entity in dir.list(followLinks: false)) {
+      final name = p.basename(entity.path);
+      if (desired.contains(name)) continue;
       if (entity is Link) {
-        final name = p.basename(entity.path);
-        if (!desired.contains(name)) {
-          await entity.delete();
-        }
+        await entity.delete();
+      } else if (linkStyle == _LinkStyle.copilot && entity is Directory) {
+        // Copilot entries are real directories holding a linked SKILL.md.
+        await entity.delete(recursive: true);
       }
     }
 

@@ -26,7 +26,7 @@ Future<void> _initGitRepo(Directory dir) async {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  const service = WorktreeService.instance;
+  final service = WorktreeService.instance;
   const nonExistentPath = '/nonexistent/path/that/does/not/exist';
 
   group('WorktreeService — non-existent paths', () {

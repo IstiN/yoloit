@@ -970,6 +970,34 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   Future<void> debugRefreshBoardPreviewsInBackground(String activeBoardId) =>
       _refreshBoardPreviewsInBackground(activeBoardId);
 
+  @visibleForTesting
+  KeyEventResult debugHandleBoardKeyEvent(KeyEvent event) =>
+      _handleBoardKeyEvent(_boardFocus, event);
+
+  @visibleForTesting
+  void debugViewerInteractionStart(ScaleStartDetails details) =>
+      _onViewerInteractionStart(details, false);
+
+  @visibleForTesting
+  void debugViewerInteractionUpdate(ScaleUpdateDetails details) =>
+      _onViewerInteractionUpdate(details, false);
+
+  @visibleForTesting
+  Size get debugCanvasSize => _canvasSize;
+
+  @visibleForTesting
+  Offset get debugCanvasOrigin => _canvasOrigin;
+
+  @visibleForTesting
+  bool get debugIsViewportZooming => _isViewportZooming;
+
+  @visibleForTesting
+  Matrix4 get debugCanvasTransform => _transformController.value.clone();
+
+  @visibleForTesting
+  set debugCanvasTransform(Matrix4 transform) =>
+      _transformController.value = transform;
+
   Future<void> _restoreLatestPanelHistory(
     BuildContext context,
     BoardDocument board,

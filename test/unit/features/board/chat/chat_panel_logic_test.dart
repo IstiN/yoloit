@@ -373,5 +373,27 @@ void main() {
       expect(cmd.matches('/mod'), isFalse);
       expect(cmd.matches('model'), isFalse);
     });
+
+    test('context and yolo commands match slash and dot triggers only', () {
+      const contextCmd = ChatSlashCommand(
+        id: 'context',
+        displayName: 'context',
+        description: 'Toggle context injections',
+        triggers: ['/context', '.context'],
+      );
+      const yoloCmd = ChatSlashCommand(
+        id: 'yolo',
+        displayName: 'yolo',
+        description: 'Reference a board panel',
+        triggers: ['/yolo', '.yolo'],
+      );
+      expect(contextCmd.matches('/context'), isTrue);
+      expect(contextCmd.matches('.context boards'), isTrue);
+      expect(contextCmd.matches('/con'), isFalse);
+      expect(yoloCmd.matches('/yolo [panel:Notes|n1]'), isTrue);
+      expect(yoloCmd.matches('.yolo'), isTrue);
+      expect(yoloCmd.matches('/yo'), isFalse);
+      expect(yoloCmd.matches('yolo'), isFalse);
+    });
   });
 }

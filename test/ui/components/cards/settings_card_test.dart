@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/ui/components/cards/settings_card.dart';
 
 void main() {

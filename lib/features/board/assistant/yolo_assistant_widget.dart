@@ -112,6 +112,17 @@ class YoloAssistantWidget extends StatefulWidget {
   final ValueChanged<Map<String, dynamic>> onUpdateState;
   final YoloAssistantController? controller;
 
+  /// Test-only hook for building the chat provider used by the assistant.
+  ///
+  /// When non-null, the send pipeline builds the provider through this
+  /// factory instead of constructing real cloud/local providers (which
+  /// require model runtimes or network access).
+  @visibleForTesting
+  static ChatProvider Function(
+    String providerType,
+    AssistantToolExecutor toolExecutor,
+  )? debugChatProviderFactory;
+
   @override
   State<YoloAssistantWidget> createState() => _YoloAssistantWidgetState();
 }

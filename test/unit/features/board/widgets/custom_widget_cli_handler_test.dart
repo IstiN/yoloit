@@ -1,6 +1,5 @@
 // covers: board.widget.custom (CLI handler)
 import 'package:flutter_test/flutter_test.dart';
-import 'package:yoloit/core/cli/panel_cli_handler.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/builtin/custom_widget_plugin_base.dart';
 import 'package:yoloit/features/board/plugins/builtin/custom_widget_plugin_content.dart';
