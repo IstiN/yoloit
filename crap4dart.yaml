@@ -56,15 +56,15 @@ gates:
     enabled: false
   method_size:
     enabled: false
-  # Duplicated code blocks (crap4dart 0.2.0). Ratchet baseline: the gate is
-  # PER FILE (a file fails when >threshold% of its lines are duplicated).
-  # Current max is 57.14% — dominated by intentional VM/Web platform mirror
-  # pairs (chat_file_opener_helper, custom_widget_plugin, ...). Threshold
-  # pinned just above the current max so nothing gets WORSE; lower it
-  # gradually towards the default 1.0 as mirrors get unified.
+  # Duplicated code blocks (crap4dart >= 0.2.1, full-file tokenization).
+  # Ratchet: per-file threshold sits just above the worst NON-mirror file
+  # (action_icon_button 37.5%, ui_cli_inprocess 34.9% — dedupe them next,
+  # then lower towards the 1.0% default). The listed VM/Web/stub mirror
+  # pairs are the project's deliberate platform-split architecture
+  # (near-identical by design) — excluded until unified:
   duplication:
     enabled: true
-    threshold: 58.0
+    threshold: 38.0
     min_tokens: 50
     min_lines: 5
     exclude:
@@ -72,5 +72,24 @@ gates:
       - '**.freezed.dart'
       - '**.mocks.dart'
       - 'test/**'
+      # Platform mirror pairs (deliberate VM/Web splits):
+      - 'lib/features/board/plugins/builtin/custom_widget_plugin_vm.dart'
+      - 'lib/features/board/plugins/builtin/custom_widget_plugin_web.dart'
+      - 'lib/features/board/chat/helpers/chat_file_opener_helper_vm.dart'
+      - 'lib/features/board/chat/helpers/chat_file_opener_helper_web.dart'
+      - 'lib/features/board/chat/helpers/chat_subagent_note_helper_vm.dart'
+      - 'lib/features/board/chat/helpers/chat_subagent_note_helper_web.dart'
+      - 'lib/features/board/chat/helpers/chat_mic_helper_vm.dart'
+      - 'lib/features/board/chat/helpers/chat_mic_helper_web.dart'
+      - 'lib/features/board/widgets/js_widget_media_kit_audio.dart'
+      - 'lib/features/board/widgets/js_widget_media_kit_video.dart'
+      - 'lib/features/preview/widgets/markdown_document_preview_vm.dart'
+      - 'lib/features/preview/widgets/markdown_document_preview_web.dart'
+      - 'lib/features/board/ui/webview_overlays_vm.dart'
+      - 'lib/features/board/ui/webview_overlays_web.dart'
+      - 'lib/core/utils/http_client_vm.dart'
+      - 'lib/core/utils/http_client_web.dart'
+      - 'lib/features/board/plugins/builtin/audio_recorder_content_vm.dart'
+      - 'lib/features/board/plugins/builtin/audio_recorder_content_stub.dart'
   public_docs:
     enabled: false
