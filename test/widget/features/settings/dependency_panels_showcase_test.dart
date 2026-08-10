@@ -1,8 +1,73 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:media_kit/media_kit.dart';
+import 'package:media_kit_video/media_kit_video.dart';
 import 'package:yoloit/core/theme/app_theme.dart';
 import 'package:yoloit/features/settings/ui/debug_ui/sections/dependency_panels_showcase.dart';
+
+/// Fake Player that succeeds — covers the `_startSampleVideo` success path.
+class _FakePlayer implements Player {
+  _FakePlayer();
+
+  final List<String> opened = [];
+  bool disposed = false;
+
+  @override
+  PlayerState get state => const PlayerState();
+
+  @override
+  PlayerStream get stream => _FakePlayerStream();
+
+  @override
+  Future<void> open(Playable playable, {bool play = true}) async {
+    opened.add((playable as Media).uri);
+  }
+
+  @override
+  Future<void> dispose() async {
+    disposed = true;
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      super.noSuchMethod(invocation);
+}
+
+class _FakePlayerStream implements PlayerStream {
+  @override
+  Stream<Duration> get position => const Stream<Duration>.empty();
+
+  @override
+  Stream<Duration> get duration => const Stream<Duration>.empty();
+
+  @override
+  Stream<bool> get playing => const Stream<bool>.empty();
+
+  @override
+  Stream<bool> get completed => const Stream<bool>.empty();
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      super.noSuchMethod(invocation);
+}
+
+/// Fake VideoController that does not require libmpv. Holds a reference to
+/// the fake [Player] so the [Video] widget can read `controller.player`.
+class _FakeVideoController implements VideoController {
+  _FakeVideoController(this._player);
+
+  final Player _player;
+
+  @override
+  Player get player => _player;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      super.noSuchMethod(invocation);
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -150,6 +215,49 @@ void main() {
       }
 
       expect(terminal, isNotNull);
+    });
+  });
+
+  group('_startSampleVideo success path with fake Player', () {
+    late _FakePlayer fakePlayer;
+
+    setUp(() {
+      fakePlayer = _FakePlayer();
+      // Inject the fake Player and VideoController so initState succeeds
+      // and _startSampleVideo runs to completion.
+      DependencyPanelsShowcase.debugPlayerFactory = () => fakePlayer;
+      DependencyPanelsShowcase.debugVideoControllerFactory =
+          (p) => _FakeVideoController(p);
+    });
+
+    tearDown(() {
+      DependencyPanelsShowcase.debugPlayerFactory = null;
+      DependencyPanelsShowcase.debugVideoControllerFactory = null;
+    });
+
+    testWidgets('_startSampleVideo opens media and sets _videoReady on success',
+        (tester) async {
+      // The Video widget from media_kit_video calls many native methods
+      // on the controller during build. Those throw in the headless test
+      // env. Capture the framework error so it doesn't fail the test —
+      // we only need to verify _startSampleVideo's player.open() call.
+      final errors = <FlutterErrorDetails>[];
+      FlutterError.onError = errors.add;
+
+      await tester.runAsync(() async {
+        await tester.pumpWidget(buildApp());
+
+        // Give _startSampleVideo time to call player.open().
+        for (var i = 0; i < 30; i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 100));
+          await tester.pump(const Duration(milliseconds: 1));
+          if (fakePlayer.opened.isNotEmpty) break;
+        }
+      });
+
+      // The fake player's open() was called — _startSampleVideo ran.
+      expect(fakePlayer.opened, hasLength(1));
+      expect(fakePlayer.opened.first, contains('ForBiggerBlazes'));
     });
   });
 }

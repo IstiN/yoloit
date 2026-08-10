@@ -160,7 +160,7 @@ void main() async {
           p.join(home, '.local', 'share');
       final authFile = File(p.join(xdgHome, 'opencode', 'auth.json'));
       final existed = authFile.existsSync();
-      final oldContent = existed ? authFile.readAsStringSync() : null;
+      // ignore: unused_local_variable = existed ? authFile.readAsStringSync() : null;
 
       // Write corrupt JSON — but ONLY if the file didn't exist before.
       // Never overwrite the user's real auth.json.

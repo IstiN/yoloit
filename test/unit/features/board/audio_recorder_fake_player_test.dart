@@ -129,7 +129,7 @@ void main() {
     });
 
     testWidgets('_togglePlay opens media for a new recording id', (tester) async {
-      Map<String, dynamic>? written;
+      Map<String, dynamic>? written; // ignore: unused_local_variable
       final renderContext = BoardPanelRenderContext(
         isSelected: false,
         onFocus: () {},
@@ -163,7 +163,7 @@ void main() {
 
     testWidgets('_togglePlay pauses when same recording is already playing',
         (tester) async {
-      Map<String, dynamic>? written;
+      Map<String, dynamic>? written; // ignore: unused_local_variable
       final renderContext = BoardPanelRenderContext(
         isSelected: false,
         onFocus: () {},
@@ -209,7 +209,7 @@ void main() {
 
     testWidgets('_togglePlay resumes with play() when same id but not playing',
         (tester) async {
-      Map<String, dynamic>? written;
+      Map<String, dynamic>? written; // ignore: unused_local_variable
       final renderContext = BoardPanelRenderContext(
         isSelected: false,
         onFocus: () {},
@@ -253,7 +253,7 @@ void main() {
     });
 
     testWidgets('_ensurePlayer subscribes to player streams', (tester) async {
-      Map<String, dynamic>? written;
+      Map<String, dynamic>? written; // ignore: unused_local_variable
       final renderContext = BoardPanelRenderContext(
         isSelected: false,
         onFocus: () {},
@@ -295,7 +295,7 @@ void main() {
     });
 
     testWidgets('_togglePlay switches to a new recording id', (tester) async {
-      Map<String, dynamic>? written;
+      Map<String, dynamic>? written; // ignore: unused_local_variable
       final renderContext = BoardPanelRenderContext(
         isSelected: false,
         onFocus: () {},

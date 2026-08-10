@@ -1,6 +1,8 @@
 import 'dart:io';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yoloit/core/cli/board_screenshot_service.dart';
 import 'package:yoloit/core/platform/file_storage_adapter.dart';
@@ -158,4 +160,154 @@ void main() {
       expect(badName.existsSync(), isTrue);
     });
   });
+
+  // Tests the REAL cleanupOldSnapshots() method (line 137), which hardcodes
+  // 'board_snapshots' as the directory path. We create that dir relative to
+  // the temp CWD so the VmFileStorageAdapter.list() finds it.
+  group('BoardScreenshotService.cleanupOldSnapshots (real method)', () {
+    late Directory tempDir;
+    late FileStorageAdapter originalAdapter;
+
+    setUp(() async {
+      tempDir = await Directory.systemTemp.createTemp('snapshots_real_');
+      originalAdapter = FileStorageAdapter.instance;
+      FileStorageAdapter.setInstanceForTest(const VmFileStorageAdapter());
+      final origCwd = Directory.current;
+      Directory.current = tempDir;
+      addTearDown(() => Directory.current = origCwd);
+    });
+
+    tearDown(() async {
+      FileStorageAdapter.setInstanceForTest(originalAdapter);
+      if (tempDir.existsSync()) {
+        await tempDir.delete(recursive: true);
+      }
+    });
+
+    test('deletes old snapshots from the default board_snapshots directory',
+        () async {
+      // The real method hardcodes 'board_snapshots' as a relative path.
+      // With CWD at tempDir, this creates tempDir/board_snapshots/.
+      final snapDir = Directory('${tempDir.path}/board_snapshots')
+        ..createSync(recursive: true);
+
+      final oldTs = DateTime.now()
+          .subtract(const Duration(hours: 2))
+          .millisecondsSinceEpoch;
+      final newTs = DateTime.now().millisecondsSinceEpoch;
+
+      final oldFile = File('${snapDir.path}/board_snapshot_$oldTs.png')
+        ..writeAsStringSync('old');
+      final newFile = File('${snapDir.path}/board_snapshot_$newTs.png')
+        ..writeAsStringSync('new');
+
+      await BoardScreenshotService.instance.cleanupOldSnapshots();
+
+      expect(oldFile.existsSync(), isFalse,
+          reason: 'old snapshot should be deleted by real cleanupOldSnapshots');
+      expect(newFile.existsSync(), isTrue,
+          reason: 'recent snapshot should survive');
+    });
+
+    test('completes without error when board_snapshots does not exist',
+        () async {
+      // No board_snapshots dir → list returns empty → no-op.
+      await BoardScreenshotService.instance.cleanupOldSnapshots();
+    });
+
+    test('catch block swallows errors from adapter failures', () async {
+      // Create the dir with an old file, but swap the adapter to one that
+      // throws on list(). The try/catch in cleanupOldSnapshots must swallow.
+      final snapDir = Directory('${tempDir.path}/board_snapshots')
+        ..createSync(recursive: true);
+      final oldTs = DateTime.now()
+          .subtract(const Duration(hours: 3))
+          .millisecondsSinceEpoch;
+      File('${snapDir.path}/board_snapshot_$oldTs.png')
+        ..writeAsStringSync('old');
+
+      FileStorageAdapter.setInstanceForTest(_ThrowingAdapter());
+
+      // Must not throw.
+      await BoardScreenshotService.instance.cleanupOldSnapshots();
+    });
+  });
+
+  group('BoardScreenshotService.captureJpegFile / saveSnapshotBytes', () {
+    test('saveSnapshotBytes returns null for null input', () async {
+      expect(
+        await BoardScreenshotService.instance.saveSnapshotBytes(null),
+        isNull,
+      );
+    });
+
+    test('saveSnapshotBytes writes a file for valid PNG bytes', () async {
+      // Generate a real 1x1 PNG via dart:ui to ensure the codec can decode it.
+      final recorder = ui.PictureRecorder();
+      final canvas = ui.Canvas(recorder);
+      canvas.drawRect(
+        const ui.Rect.fromLTWH(0, 0, 1, 1),
+        ui.Paint()..color = const ui.Color(0xFFFF0000),
+      );
+      final picture = recorder.endRecording();
+      final image = await picture.toImage(1, 1);
+      final byteData =
+          await image.toByteData(format: ui.ImageByteFormat.png);
+      image.dispose();
+      picture.dispose();
+      final pngBytes = byteData!.buffer.asUint8List();
+
+      final result = await BoardScreenshotService.instance
+          .saveSnapshotBytes(pngBytes);
+      expect(result, isNotNull);
+      expect(result, startsWith('board_snapshots/'));
+      expect(result, endsWith('.png'));
+    });
+
+    test('saveSnapshotBytes catches errors for invalid bytes', () async {
+      // Invalid bytes that can't be decoded as an image.
+      final badBytes = Uint8List.fromList([0, 1, 2, 3]);
+      final result = await BoardScreenshotService.instance
+          .saveSnapshotBytes(badBytes);
+      expect(result, isNull);
+    });
+  });
+}
+
+/// FileStorageAdapter that throws on every operation — used to verify the
+/// try/catch in the real cleanupOldSnapshots() swallows errors.
+class _ThrowingAdapter implements FileStorageAdapter {
+  const _ThrowingAdapter();
+
+  @override
+  Future<bool> exists(String path) async => throw FileSystemException('boom');
+
+  @override
+  Future<String?> readString(String path) async => throw FileSystemException('boom');
+
+  @override
+  Future<Uint8List?> readBytes(String path) async =>
+      throw FileSystemException('boom');
+
+  @override
+  Future<void> writeString(String path, String contents) async =>
+      throw FileSystemException('boom');
+
+  @override
+  Future<void> appendString(String path, String contents) async =>
+      throw FileSystemException('boom');
+
+  @override
+  Future<int?> length(String path) async => throw FileSystemException('boom');
+
+  @override
+  Future<void> writeBytes(String path, Uint8List bytes) async =>
+      throw FileSystemException('boom');
+
+  @override
+  Future<void> delete(String path) async => throw FileSystemException('boom');
+
+  @override
+  Future<List<String>> list(String directoryPath) async =>
+      throw FileSystemException('boom');
 }

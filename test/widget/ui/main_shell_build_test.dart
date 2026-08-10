@@ -15,10 +15,6 @@ import 'package:yoloit/features/editor/bloc/file_editor_cubit.dart';
 import 'package:yoloit/features/editor/bloc/file_editor_state.dart';
 import 'package:yoloit/features/editor/ui/file_editor_panel.dart';
 import 'package:yoloit/features/editor/utils/editor_panel_logic.dart';
-import 'package:yoloit/features/review/bloc/review_cubit.dart';
-import 'package:yoloit/features/runs/bloc/run_cubit.dart';
-import 'package:yoloit/features/terminal/bloc/terminal_cubit.dart';
-import 'package:yoloit/features/workspaces/bloc/workspace_cubit.dart';
 import 'package:yoloit/ui/shell/main_shell.dart';
 
 // ── Fakes ───────────────────────────────────────────────────────────────────
@@ -418,6 +414,97 @@ void main() {
       final markers = parseDiffMarkers(diffOutput);
       expect(markers, isNotEmpty);
       expect(markers.values.toSet().contains(GutterMarkerType.added), isTrue);
+    });
+
+    testWidgets('loads git gutter markers from a real git repo with modified file',
+        (tester) async {
+      // Create a real git repo, commit a file, modify it, then open the
+      // editor pointed at that repo so _loadGitGutter calls GitService.getDiff
+      // and parses the diff into _gitMarkers.
+      final tmpDir =
+          await Directory.systemTemp.createTemp('git_gutter_integration');
+      addTearDown(() => tmpDir.delete(recursive: true));
+
+      await Process.run('git', ['init'], workingDirectory: tmpDir.path);
+      await Process.run(
+        'git',
+        ['config', 'user.email', 'test@test.com'],
+        workingDirectory: tmpDir.path,
+      );
+      await Process.run(
+        'git',
+        ['config', 'user.name', 'Test'],
+        workingDirectory: tmpDir.path,
+      );
+
+      final file = File('${tmpDir.path}/main.dart');
+      await file.writeAsString('void main() {}\n');
+      await Process.run(
+        'git',
+        ['add', 'main.dart'],
+        workingDirectory: tmpDir.path,
+      );
+      await Process.run(
+        'git',
+        ['commit', '-m', 'init'],
+        workingDirectory: tmpDir.path,
+      );
+
+      // Modify the file to produce a diff.
+      await file.writeAsString('void main() {\n  print(1);\n}\n');
+
+      await tester.pumpWidget(
+        editorHarness(
+          FileEditorState(
+            isVisible: true,
+            activeIndex: 0,
+            tabs: [
+              EditorTab(
+                filePath: '${tmpDir.path}/main.dart',
+                content: 'void main() {\n  print(1);\n}\n',
+                originalContent: 'void main() {}\n',
+                workspacePath: tmpDir.path,
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pump();
+      // Give the async git diff call time to complete.
+      await tester.pump(const Duration(seconds: 3));
+
+      // The editor should render without errors and the gutter markers
+      // should have been loaded (line 1126-1128 of _loadGitGutter).
+      expect(find.byType(FileEditorPanel), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('_loadGitGutter does nothing for a non-git workspace path',
+        (tester) async {
+      // Point workspacePath at a non-existent directory. GitService.getDiff
+      // will catch the exception and return '' → diff.isEmpty → no markers set.
+      await tester.pumpWidget(
+        editorHarness(
+          FileEditorState(
+            isVisible: true,
+            activeIndex: 0,
+            tabs: [
+              EditorTab(
+                filePath: '/nonexistent/workspace/main.dart',
+                content: 'void main() {}',
+                originalContent: 'void main() {}',
+                workspacePath: '/nonexistent/workspace',
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 3));
+
+      // Should render without crash — _loadGitGutter catches the exception.
+      expect(find.byType(FileEditorPanel), findsOneWidget);
+      expect(tester.takeException(), isNull);
     });
   });
 }

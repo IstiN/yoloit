@@ -21,6 +21,17 @@ import 'package:yoloit/ui/components/typography/section_title.dart';
 class DependencyPanelsShowcase extends StatefulWidget {
   const DependencyPanelsShowcase({super.key});
 
+  /// Test seam: override [Player] creation so the success path of
+  /// [_startSampleVideo] can be exercised without libmpv.
+  @visibleForTesting
+  static Player Function()? debugPlayerFactory;
+
+  /// Test seam: override [VideoController] creation. When null the real
+  /// constructor is used (throws in headless tests).
+  @visibleForTesting
+  static VideoController Function(Player player)?
+      debugVideoControllerFactory;
+
   @override
   State<DependencyPanelsShowcase> createState() =>
       _DependencyPanelsShowcaseState();
@@ -39,8 +50,11 @@ class _DependencyPanelsShowcaseState extends State<DependencyPanelsShowcase> {
   void initState() {
     super.initState();
     try {
-      _player = Player();
-      _videoController = VideoController(_player!);
+      _player = DependencyPanelsShowcase.debugPlayerFactory?.call() ??
+          Player();
+      _videoController =
+          DependencyPanelsShowcase.debugVideoControllerFactory?.call(_player!) ??
+              VideoController(_player!);
       _startSampleVideo();
     } catch (e) {
       _videoError = '$e';

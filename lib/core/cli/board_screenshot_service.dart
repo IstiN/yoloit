@@ -41,6 +41,14 @@ class BoardScreenshotService {
       pixelRatio: pixelRatio,
       format: ui.ImageByteFormat.png,
     );
+    return saveSnapshotBytes(bytes);
+  }
+
+  /// Writes captured [bytes] as a snapshot file. Extracted from
+  /// [captureJpegFile] for testability — the real capture path needs a
+  /// live render engine which is unavailable in headless tests.
+  @visibleForTesting
+  Future<String?> saveSnapshotBytes(Uint8List? bytes) async {
     if (bytes == null) return null;
 
     try {
