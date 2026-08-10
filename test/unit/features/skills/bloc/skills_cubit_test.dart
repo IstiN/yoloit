@@ -184,4 +184,45 @@ void main() {
       expect((cubit.state as SkillsLoaded).busySkillIds, isEmpty);
     });
   });
+
+  group('installSkillToRepo', () {
+    test('is a no-op before the store is loaded', () async {
+      await cubit.installSkillToRepo(skillIn('x'), p.join(home.path, 'repo'));
+
+      expect(cubit.state, isA<SkillsInitial>());
+    });
+
+    test('copies an installed skill into the repo and clears busy state',
+        () async {
+      await Directory(p.join(skillsDir, 'alpha')).create(recursive: true);
+      await File(
+        p.join(skillsDir, 'alpha', 'SKILL.md'),
+      ).writeAsString('# alpha\n');
+      await loadCubit();
+      final skill = skillIn('alpha', installed: true);
+      final repo = p.join(home.path, 'repo');
+
+      await cubit.installSkillToRepo(skill, repo);
+
+      final state = cubit.state as SkillsLoaded;
+      expect(state.busySkillIds, isEmpty);
+      expect(state.errorMessage, isNull);
+      expect(
+        File(p.join(repo, '.agents', 'skills', 'alpha', 'SKILL.md'))
+            .readAsStringSync(),
+        '# alpha\n',
+      );
+    });
+
+    test('surfaces an error when the skill is not installed globally',
+        () async {
+      await loadCubit();
+
+      await cubit.installSkillToRepo(skillIn('ghost'), p.join(home.path, 'repo'));
+
+      final state = cubit.state as SkillsLoaded;
+      expect(state.busySkillIds, isEmpty);
+      expect(state.errorMessage, contains('not installed globally'));
+    });
+  });
 }

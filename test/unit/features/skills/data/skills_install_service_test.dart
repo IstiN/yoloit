@@ -69,6 +69,40 @@ void main() {
       expect(result.status, SkillInstallStatus.error);
       expect(result.message, contains('gh'));
     });
+
+    test('returns error when the skills dir path is blocked by a file',
+        () async {
+      // Force the catch branch of the gh-download helper: creating the skills
+      // directory fails because a regular file occupies its path.
+      await Directory(p.dirname(skillsDir)).create(recursive: true);
+      await File(skillsDir).writeAsString('not a directory');
+
+      final result = await SkillsInstallService.instance.installGithubSkill(ghSkill);
+
+      expect(result.status, SkillInstallStatus.error);
+      expect(result.message, contains('Could not install skill'));
+    });
+
+    test('returns error when the git clone of the source repo fails', () async {
+      const missingRepoSkill = SkillEntry(
+        id: 'missing-repo-skill',
+        name: 'Missing Repo Skill',
+        description: 'desc',
+        source: 'yoloit-no-such-owner-xyz/repo-nope-xyz',
+        sourceType: SkillSourceType.github,
+      );
+
+      final result = await SkillsInstallService.instance
+          .installGithubSkill(missingRepoSkill);
+
+      expect(result.status, SkillInstallStatus.error);
+      expect(result.message, contains('Could not install skill'));
+      // No skill directory was left behind.
+      expect(
+        await Directory(p.join(skillsDir, missingRepoSkill.id)).exists(),
+        isFalse,
+      );
+    }, timeout: const Timeout(Duration(seconds: 120)));
   });
 
   group('runInstallScript', () {

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:yoloit/features/search/utils/fuzzy_matcher.dart';
 
@@ -241,6 +242,16 @@ class FileSearchService {
       return lineResult.exitCode == 0 ? lineResult.stdout as String : null;
     });
   }
+
+  /// Test seam for the grep-based fallback (ripgrep is present on most dev
+  /// machines, so the fallback is otherwise unreachable in tests).
+  @visibleForTesting
+  Future<List<SearchResult>> grepFallbackForTest(
+    String dirPath,
+    String wsName,
+    String query,
+  ) =>
+      _grepFallback(dirPath, wsName, query);
 
   Future<List<SearchResult>> _grepFallback(
     String dirPath,

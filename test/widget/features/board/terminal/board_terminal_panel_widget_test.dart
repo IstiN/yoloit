@@ -2,95 +2,17 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:yoloit/core/services/resource_monitor_service.dart';
-import 'package:yoloit/core/theme/app_theme.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
-import 'package:yoloit/features/board/bloc/board_state.dart';
-import 'package:yoloit/features/board/model/board_models.dart';
-import 'package:yoloit/features/board/plugins/builtin/plugin_type_ids.dart';
-import 'package:yoloit/features/board/terminal/board_terminal_panel_widget.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_session_manager.dart';
+import 'package:yoloit/features/board/ui/board_file_picker.dart';
 import 'package:yoloit/features/mindmap/widgets/canvas_interaction_lock.dart';
 import 'package:yoloit/features/terminal/data/terminal_backend.dart';
 import 'package:yoloit/features/terminal/data/terminal_backend_service.dart';
-import 'package:yoloit/features/terminal/models/agent_session.dart';
-import 'package:yoloit/features/terminal/models/agent_type.dart';
-import 'package:yoloit/features/terminal/models/terminal_backend_mode.dart';
 import 'package:yoloit/features/terminal/ui/terminal_panel.dart';
 
-BoardPanelInstance _terminalPanel({
-  String sessionId = '',
-  String sessionName = '',
-  String workingDir = '',
-  List<String> envGroupIds = const [],
-}) {
-  return BoardPanelInstance(
-    id: 'term-panel-1',
-    type: kTerminalPluginTypeId,
-    title: 'Terminal',
-    bounds: const BoardPanelBounds(x: 0, y: 0, width: 520, height: 400),
-    state: {
-      'config': {
-        'sessionId': sessionId,
-        'sessionName': sessionName,
-        'workingDir': workingDir,
-        'envGroupIds': envGroupIds,
-      },
-    },
-  );
-}
-
-AgentSession _liveSession(
-  String id, {
-  String name = 'demo',
-  String dir = '/tmp/demo',
-}) {
-  return AgentSession(
-    id: id,
-    type: AgentType.terminal,
-    workspacePath: dir,
-    status: AgentStatus.live,
-    customName: name,
-  );
-}
-
-/// Backend that never spawns a real process: sessions get an in-memory
-/// output stream and an exit-code future that never completes.
-class _FakeTerminalBackend implements TerminalBackend {
-  // Closed via addTearDown in the tests that install this backend.
-  // ignore: close_sinks
-  final output = StreamController<String>();
-
-  @override
-  TerminalBackendMode get mode => TerminalBackendMode.local;
-
-  @override
-  Future<TerminalProcess> launch({
-    required String sessionId,
-    required String workspacePath,
-    String? label,
-    ResourceSessionMetadata? metadata,
-    Map<String, String>? extraEnv,
-    bool forceNewShell = false,
-  }) async {
-    return TerminalProcess(
-      output: output.stream,
-      exitCode: Completer<int>().future,
-    );
-  }
-
-  @override
-  void write(String sessionId, String data) {}
-
-  @override
-  void resize(String sessionId, int columns, int rows) {}
-
-  @override
-  Future<void> kill(String sessionId) async {}
-}
+import 'board_terminal_panel_test_harness.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -105,63 +27,13 @@ void main() {
     CanvasInteractionLock.instance.resetForTesting();
   });
 
-  Widget buildApp({
-    required BoardPanelInstance panel,
-    required BoardCubit cubit,
-    ValueChanged<Map<String, dynamic>>? onUpdateState,
-  }) {
-    // BoardCubit sits above the MaterialApp so dialogs pushed onto the root
-    // navigator (e.g. the session history dialog) can also read it.
-    return BlocProvider<BoardCubit>.value(
-      value: cubit,
-      child: MaterialApp(
-        theme: AppThemePreset.neonPurple.theme,
-        home: Scaffold(
-          body: SizedBox(
-            width: 560,
-            height: 480,
-            child: BoardTerminalPanelWidget(
-              panel: panel,
-              onUpdateState: onUpdateState ?? (_) {},
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> pumpPanel(
-    WidgetTester tester, {
-    required BoardPanelInstance panel,
-    BoardCubit? cubit,
-    ValueChanged<Map<String, dynamic>>? onUpdateState,
-    bool withBoard = false,
-  }) async {
-    final boardCubit = cubit ?? BoardCubit();
-    if (withBoard) {
-      boardCubit.emit(
-        BoardState(
-          boards: [
-            BoardDocument(id: 'b1', name: 'Board 1', panels: [panel]),
-          ],
-          activeBoardId: 'b1',
-          isLoaded: true,
-        ),
-      );
-    }
-    await tester.pumpWidget(
-      buildApp(panel: panel, cubit: boardCubit, onUpdateState: onUpdateState),
-    );
-    await tester.pump();
-  }
-
   group('setup view', () {
     testWidgets('unconfigured panel shows create terminal form', (
       tester,
     ) async {
       final cubit = BoardCubit();
       addTearDown(cubit.close);
-      await pumpPanel(tester, panel: _terminalPanel(), cubit: cubit);
+      await pumpTerminalPanel(tester, panel: terminalPanel(), cubit: cubit);
 
       expect(find.text('Create terminal'), findsOneWidget);
       expect(find.text('Working Directory'), findsOneWidget);
@@ -188,9 +60,9 @@ void main() {
     ) async {
       final cubit = BoardCubit();
       addTearDown(cubit.close);
-      await pumpPanel(
+      await pumpTerminalPanel(
         tester,
-        panel: _terminalPanel(sessionName: 'named'),
+        panel: terminalPanel(sessionName: 'named'),
         cubit: cubit,
       );
 
@@ -203,12 +75,12 @@ void main() {
       tester,
     ) async {
       final manager = BoardTerminalSessionManager.instance;
-      manager.setSessionForTesting('sess-1', _liveSession('sess-1'));
+      manager.setSessionForTesting('sess-1', liveTerminalSession('sess-1'));
       final cubit = BoardCubit();
       addTearDown(cubit.close);
-      await pumpPanel(
+      await pumpTerminalPanel(
         tester,
-        panel: _terminalPanel(
+        panel: terminalPanel(
           sessionId: 'sess-1',
           sessionName: 'demo',
           workingDir: '/Users/test/projects/demo',
@@ -235,12 +107,12 @@ void main() {
 
     testWidgets('short working dir is shown unmodified', (tester) async {
       final manager = BoardTerminalSessionManager.instance;
-      manager.setSessionForTesting('sess-1', _liveSession('sess-1'));
+      manager.setSessionForTesting('sess-1', liveTerminalSession('sess-1'));
       final cubit = BoardCubit();
       addTearDown(cubit.close);
-      await pumpPanel(
+      await pumpTerminalPanel(
         tester,
-        panel: _terminalPanel(
+        panel: terminalPanel(
           sessionId: 'sess-1',
           sessionName: 'demo',
           workingDir: '/tmp/demo',
@@ -255,26 +127,26 @@ void main() {
       tester,
     ) async {
       final manager = BoardTerminalSessionManager.instance;
-      manager.setSessionForTesting('sess-1', _liveSession('sess-1'));
+      manager.setSessionForTesting('sess-1', liveTerminalSession('sess-1'));
       final cubit = BoardCubit();
       addTearDown(cubit.close);
 
-      final panelV1 = _terminalPanel(
+      final panelV1 = terminalPanel(
         sessionId: 'sess-1',
         sessionName: 'demo',
         workingDir: '/tmp/demo',
       );
-      await pumpPanel(tester, panel: panelV1, cubit: cubit);
+      await pumpTerminalPanel(tester, panel: panelV1, cubit: cubit);
       expect(find.text('/tmp/demo'), findsOneWidget);
 
       // Same session id, different name: didUpdateWidget re-reads the config
       // and resolves the already-live session again.
-      final panelV2 = _terminalPanel(
+      final panelV2 = terminalPanel(
         sessionId: 'sess-1',
         sessionName: 'renamed',
         workingDir: '/tmp/demo',
       );
-      await tester.pumpWidget(buildApp(panel: panelV2, cubit: cubit));
+      await tester.pumpWidget(buildTerminalPanelApp(panel: panelV2, cubit: cubit));
       await tester.pump();
       expect(find.byType(TerminalWidget), findsOneWidget);
 
@@ -282,7 +154,7 @@ void main() {
       // listener and re-attaches the info bar terminal listener.
       manager.setSessionForTesting(
         'sess-1',
-        _liveSession('sess-1', name: 'demo2'),
+        liveTerminalSession('sess-1', name: 'demo2'),
       );
       await tester.pump();
       expect(find.byType(TerminalWidget), findsOneWidget);
@@ -290,13 +162,13 @@ void main() {
 
     testWidgets('TUI badge reflects alt-buffer changes', (tester) async {
       final manager = BoardTerminalSessionManager.instance;
-      final session = _liveSession('sess-1');
+      final session = liveTerminalSession('sess-1');
       manager.setSessionForTesting('sess-1', session);
       final cubit = BoardCubit();
       addTearDown(cubit.close);
-      await pumpPanel(
+      await pumpTerminalPanel(
         tester,
-        panel: _terminalPanel(
+        panel: terminalPanel(
           sessionId: 'sess-1',
           sessionName: 'demo',
           workingDir: '/tmp/demo',
@@ -320,12 +192,12 @@ void main() {
       tester,
     ) async {
       final manager = BoardTerminalSessionManager.instance;
-      manager.setSessionForTesting('sess-1', _liveSession('sess-1'));
+      manager.setSessionForTesting('sess-1', liveTerminalSession('sess-1'));
       final cubit = BoardCubit();
       addTearDown(cubit.close);
-      await pumpPanel(
+      await pumpTerminalPanel(
         tester,
-        panel: _terminalPanel(
+        panel: terminalPanel(
           sessionId: 'sess-1',
           sessionName: 'demo',
           workingDir: '/tmp/demo',
@@ -350,16 +222,16 @@ void main() {
       tester,
     ) async {
       final manager = BoardTerminalSessionManager.instance;
-      final session = _liveSession('sess-1');
+      final session = liveTerminalSession('sess-1');
       manager.setSessionForTesting('sess-1', session);
       final cubit = BoardCubit();
       addTearDown(cubit.close);
-      final panel = _terminalPanel(
+      final panel = terminalPanel(
         sessionId: 'sess-1',
         sessionName: 'demo',
         workingDir: '/tmp/demo',
       );
-      await pumpPanel(tester, panel: panel, cubit: cubit, withBoard: true);
+      await pumpTerminalPanel(tester, panel: panel, cubit: cubit, withBoard: true);
       expect(find.byType(TerminalWidget), findsOneWidget);
 
       // Kill the session: the manager notifies and the panel switches to the
@@ -396,12 +268,12 @@ void main() {
       tester,
     ) async {
       final manager = BoardTerminalSessionManager.instance;
-      manager.setSessionForTesting('sess-1', _liveSession('sess-1'));
+      manager.setSessionForTesting('sess-1', liveTerminalSession('sess-1'));
       final cubit = BoardCubit();
       addTearDown(cubit.close);
-      await pumpPanel(
+      await pumpTerminalPanel(
         tester,
-        panel: _terminalPanel(
+        panel: terminalPanel(
           sessionId: 'sess-1',
           sessionName: 'demo',
           workingDir: '/tmp/demo',
@@ -433,12 +305,12 @@ void main() {
       tester,
     ) async {
       final manager = BoardTerminalSessionManager.instance;
-      manager.setSessionForTesting('sess-1', _liveSession('sess-1'));
+      manager.setSessionForTesting('sess-1', liveTerminalSession('sess-1'));
       final cubit = BoardCubit();
       addTearDown(cubit.close);
-      await pumpPanel(
+      await pumpTerminalPanel(
         tester,
-        panel: _terminalPanel(
+        panel: terminalPanel(
           sessionId: 'sess-1',
           sessionName: 'demo',
           workingDir: '/tmp/demo',
@@ -489,12 +361,12 @@ void main() {
     testWidgets('lists live and saved entries with actions', (tester) async {
       seedHistory();
       final manager = BoardTerminalSessionManager.instance;
-      manager.setSessionForTesting('sess-1', _liveSession('sess-1'));
+      manager.setSessionForTesting('sess-1', liveTerminalSession('sess-1'));
       final cubit = BoardCubit();
       addTearDown(cubit.close);
-      await pumpPanel(
+      await pumpTerminalPanel(
         tester,
-        panel: _terminalPanel(
+        panel: terminalPanel(
           sessionId: 'sess-1',
           sessionName: 'demo',
           workingDir: '/tmp/demo',
@@ -537,15 +409,15 @@ void main() {
     ) async {
       seedHistory();
       final manager = BoardTerminalSessionManager.instance;
-      manager.setSessionForTesting('sess-1', _liveSession('sess-1'));
+      manager.setSessionForTesting('sess-1', liveTerminalSession('sess-1'));
       final cubit = BoardCubit();
       addTearDown(cubit.close);
-      final panel = _terminalPanel(
+      final panel = terminalPanel(
         sessionId: 'sess-1',
         sessionName: 'demo',
         workingDir: '/tmp/demo',
       );
-      await pumpPanel(tester, panel: panel, cubit: cubit, withBoard: true);
+      await pumpTerminalPanel(tester, panel: panel, cubit: cubit, withBoard: true);
 
       await openHistoryDialog(tester);
       expect(find.byIcon(Icons.restore), findsOneWidget);
@@ -560,9 +432,9 @@ void main() {
   });
 
   group('ensure configured session', () {
-    _FakeTerminalBackend useFakeBackend() {
-      final backend = _FakeTerminalBackend();
-      addTearDown(backend.output.close);
+    FakeTerminalBackend useFakeBackend() {
+      final backend = FakeTerminalBackend();
+      addTearDown(backend.closeIfLaunched);
       TerminalBackendService.instance.debugBackendOverride = backend;
       addTearDown(
         () => TerminalBackendService.instance.debugBackendOverride = null,
@@ -577,8 +449,8 @@ void main() {
       final cubit = BoardCubit();
       addTearDown(cubit.close);
       final updates = <Map<String, dynamic>>[];
-      final panel = _terminalPanel(sessionName: 'demo', workingDir: '/tmp/demo');
-      await pumpPanel(
+      final panel = terminalPanel(sessionName: 'demo', workingDir: '/tmp/demo');
+      await pumpTerminalPanel(
         tester,
         panel: panel,
         cubit: cubit,
@@ -613,9 +485,9 @@ void main() {
       final manager = BoardTerminalSessionManager.instance;
       final cubit = BoardCubit();
       addTearDown(cubit.close);
-      await pumpPanel(
+      await pumpTerminalPanel(
         tester,
-        panel: _terminalPanel(
+        panel: terminalPanel(
           sessionId: 'sess-restore',
           sessionName: 'demo',
           workingDir: '/tmp/demo',
@@ -638,9 +510,9 @@ void main() {
       final manager = BoardTerminalSessionManager.instance;
       final cubit = BoardCubit();
       addTearDown(cubit.close);
-      await pumpPanel(
+      await pumpTerminalPanel(
         tester,
-        panel: _terminalPanel(sessionName: 'named'),
+        panel: terminalPanel(sessionName: 'named'),
         cubit: cubit,
       );
       expect(find.text('Create terminal'), findsOneWidget);
@@ -648,8 +520,8 @@ void main() {
       // A config change that keeps the panel unconfigured must early-return
       // from session resolution without touching the manager.
       await tester.pumpWidget(
-        buildApp(
-          panel: _terminalPanel(sessionName: 'renamed'),
+        buildTerminalPanelApp(
+          panel: terminalPanel(sessionName: 'renamed'),
           cubit: cubit,
         ),
       );
@@ -669,12 +541,12 @@ void main() {
       addTearDown(tester.view.reset);
 
       final manager = BoardTerminalSessionManager.instance;
-      manager.setSessionForTesting('sess-1', _liveSession('sess-1'));
+      manager.setSessionForTesting('sess-1', liveTerminalSession('sess-1'));
       final cubit = BoardCubit();
       addTearDown(cubit.close);
-      await pumpPanel(
+      await pumpTerminalPanel(
         tester,
-        panel: _terminalPanel(
+        panel: terminalPanel(
           sessionId: 'sess-1',
           sessionName: 'demo',
           workingDir: '/tmp/demo',
@@ -737,6 +609,154 @@ void main() {
       await tester.pump();
       await tester.pump();
       expect(find.text('PgUp'), findsNothing);
+      await tester.pump(const Duration(milliseconds: 500));
+    });
+  });
+
+  group('start session from setup view', () {
+    FakeTerminalBackend useBackend({Object? launchError}) {
+      final backend = FakeTerminalBackend()..launchError = launchError;
+      addTearDown(backend.closeIfLaunched);
+      TerminalBackendService.instance.debugBackendOverride = backend;
+      addTearDown(
+        () => TerminalBackendService.instance.debugBackendOverride = null,
+      );
+      return backend;
+    }
+
+    void stubFolderPicker(String path) {
+      BoardFilePicker.debugPickDirectoryOverride = () async => path;
+      addTearDown(() => BoardFilePicker.debugPickDirectoryOverride = null);
+    }
+
+    Future<void> pickFolderAndStart(WidgetTester tester) async {
+      await tester.tap(find.text('Select folder…'));
+      await tester.pump();
+      await tester.pump();
+      await tester.tap(find.widgetWithText(FilledButton, 'Start Terminal'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+    }
+
+    testWidgets('start creates a session and pushes the config upstream', (
+      tester,
+    ) async {
+      useBackend();
+      stubFolderPicker('/tmp/demo');
+      final cubit = BoardCubit();
+      addTearDown(cubit.close);
+      final updates = <Map<String, dynamic>>[];
+      await pumpTerminalPanel(
+        tester,
+        panel: terminalPanel(),
+        cubit: cubit,
+        withBoard: true,
+        onUpdateState: updates.add,
+      );
+      expect(find.text('Create terminal'), findsOneWidget);
+
+      await pickFolderAndStart(tester);
+
+      // The session spawned through the fake backend and the connected view
+      // replaced the setup form.
+      expect(find.byType(TerminalWidget), findsOneWidget);
+
+      // The folder name became the default session name.
+      expect(updates, isNotEmpty);
+      final config = updates.last['config'] as Map<String, dynamic>;
+      expect(config['sessionId'] as String, isNotEmpty);
+      expect(config['sessionName'], 'demo');
+      expect(config['workingDir'], '/tmp/demo');
+
+      // The panel title follows the session display name.
+      final updated = cubit.state.activeBoard!.panels.singleWhere(
+        (p) => p.id == 'term-panel-1',
+      );
+      expect(updated.title, 'demo');
+      await tester.pump(const Duration(milliseconds: 500));
+    });
+
+    testWidgets('start failure shows a snackbar and keeps the setup view', (
+      tester,
+    ) async {
+      useBackend(launchError: StateError('boom'));
+      stubFolderPicker('/tmp/demo');
+      final cubit = BoardCubit();
+      addTearDown(cubit.close);
+      await pumpTerminalPanel(
+        tester,
+        panel: terminalPanel(),
+        cubit: cubit,
+        withBoard: true,
+      );
+
+      await pickFolderAndStart(tester);
+
+      expect(
+        find.textContaining('Could not start terminal'),
+        findsOneWidget,
+      );
+      expect(find.text('Create terminal'), findsOneWidget);
+      // Drain the snackbar timer.
+      await tester.pump(const Duration(seconds: 5));
+    });
+  });
+
+  group('respawn on env group change', () {
+    testWidgets('kills the old session and spawns a new one with the groups', (
+      tester,
+    ) async {
+      final backend = FakeTerminalBackend();
+      addTearDown(backend.closeIfLaunched);
+      TerminalBackendService.instance.debugBackendOverride = backend;
+      addTearDown(
+        () => TerminalBackendService.instance.debugBackendOverride = null,
+      );
+      final manager = BoardTerminalSessionManager.instance;
+      manager.setSessionForTesting('sess-1', liveTerminalSession('sess-1'));
+      final cubit = BoardCubit();
+      addTearDown(cubit.close);
+      final updates = <Map<String, dynamic>>[];
+      await pumpTerminalPanel(
+        tester,
+        panel: terminalPanel(
+          sessionId: 'sess-1',
+          sessionName: 'demo',
+          workingDir: '/tmp/demo',
+          envGroupIds: ['g1'],
+        ),
+        cubit: cubit,
+        withBoard: true,
+        onUpdateState: updates.add,
+      );
+      expect(find.byType(TerminalWidget), findsOneWidget);
+
+      // Same session id, different env groups: didUpdateWidget respawns the
+      // session. Dropping the last group keeps env resolution offline (an
+      // empty id list short-circuits without touching the file system).
+      await tester.pumpWidget(
+        buildTerminalPanelApp(
+          panel: terminalPanel(
+            sessionId: 'sess-1',
+            sessionName: 'demo',
+            workingDir: '/tmp/demo',
+          ),
+          cubit: cubit,
+          onUpdateState: updates.add,
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+
+      // The old session is gone; a fresh one with a new id is live.
+      expect(manager.isLive('sess-1'), isFalse);
+      expect(updates, isNotEmpty);
+      final config = updates.last['config'] as Map<String, dynamic>;
+      expect(config['envGroupIds'], isEmpty);
+      final newSessionId = config['sessionId'] as String;
+      expect(newSessionId, isNot('sess-1'));
+      expect(manager.sessionFor(newSessionId), isNotNull);
+      expect(find.byType(TerminalWidget), findsOneWidget);
       await tester.pump(const Duration(milliseconds: 500));
     });
   });

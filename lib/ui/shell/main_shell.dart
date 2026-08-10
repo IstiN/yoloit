@@ -46,8 +46,32 @@ import 'package:yoloit/ui/widgets/panel_visibility.dart';
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
 
+  /// Forces the legacy four-pane canvas in tests — session restore always
+  /// maps to Board View, so the panes layout is otherwise unreachable.
+  @visibleForTesting
+  static bool debugForcePanesCanvas = false;
+
   @override
   State<MainShell> createState() => _MainShellState();
+}
+
+/// Test seams for the silent auto-update flow so widget tests can drive
+/// `_MainShellState._autoCheckForUpdate` without network or installer I/O.
+@visibleForTesting
+class AutoUpdateTestHooks {
+  const AutoUpdateTestHooks._();
+
+  /// Overrides [UpdateService.isDevBuild] (always true in debug test runs).
+  static bool? isDevBuildOverride;
+
+  /// Overrides [UpdateService.checkForUpdate].
+  static Future<UpdateCheckResult> Function()? checkForUpdateOverride;
+
+  /// Overrides [UpdateService.downloadAndPrepare].
+  static Future<String?> Function(
+    UpdateInfo info, {
+    required void Function(double? progress, String status) onProgress,
+  })? downloadAndPrepareOverride;
 }
 
 enum _CanvasMode { panes, board }
@@ -105,6 +129,7 @@ class _MainShellState extends State<MainShell> with WindowListener {
         'mindMap' => _CanvasMode.board,
         _ => _CanvasMode.board,
       };
+      if (MainShell.debugForcePanesCanvas) _canvasMode = _CanvasMode.panes;
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // Initialize terminal services (no sessions yet — workspace listener will load them)
@@ -127,14 +152,19 @@ class _MainShellState extends State<MainShell> with WindowListener {
 
   Future<void> _autoCheckForUpdate() async {
     if (!mounted) return;
-    if (UpdateService.isDevBuild) return;
+    if (AutoUpdateTestHooks.isDevBuildOverride ?? UpdateService.isDevBuild) {
+      return;
+    }
 
     final autoEnabled = await SessionPrefs.isAutoUpdateCheckEnabled();
     if (!autoEnabled) return;
 
     if (!await _isUpdateCheckDue()) return;
 
-    final result = await UpdateService.checkForUpdate();
+    final check =
+        AutoUpdateTestHooks.checkForUpdateOverride ??
+        UpdateService.checkForUpdate;
+    final result = await check();
     if (!mounted || result.status != UpdateCheckStatus.available) return;
 
     await _downloadUpdate(result.info!);
@@ -158,7 +188,10 @@ class _MainShellState extends State<MainShell> with WindowListener {
     });
 
     try {
-      final token = await UpdateService.downloadAndPrepare(
+      final download =
+          AutoUpdateTestHooks.downloadAndPrepareOverride ??
+          UpdateService.downloadAndPrepare;
+      final token = await download(
         info,
         onProgress: _onUpdateDownloadProgress,
       );

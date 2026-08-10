@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:js_widget_runtime/js_widget_runtime.dart' show WidgetManifest;
 import 'package:shelf/shelf.dart' as shelf;
@@ -15,6 +16,15 @@ typedef _AppsRouteHandler =
 
 typedef _AppActionHandler =
     Future<shelf.Response> Function(_AppActionContext ctx);
+
+/// Test seam: overrides the apps directory used by the demo and zip-install
+/// handlers (normally `$HOME/.config/yoloit/apps`).
+@visibleForTesting
+String? debugAppsDirOverride;
+
+String _appsDirPath() =>
+    debugAppsDirOverride ??
+    '${Platform.environment['HOME']}/.config/yoloit/apps';
 
 /// Shared request context passed to every extracted route handler.
 class _AppsRequestContext {
@@ -165,9 +175,7 @@ Future<shelf.Response> _devSkill(_AppsRequestContext ctx) async {
 
 // GET /api/apps/demo — list installed demo apps with their file paths
 Future<shelf.Response> _listDemos(_AppsRequestContext ctx) async {
-  final appsDir = Directory(
-    '${Platform.environment['HOME']}/.config/yoloit/apps',
-  );
+  final appsDir = Directory(_appsDirPath());
   if (!await appsDir.exists()) {
     return ctx.json({'demos': <Map<String, Object?>>[]});
   }
@@ -200,7 +208,7 @@ Future<shelf.Response> _listDemos(_AppsRequestContext ctx) async {
 // GET /api/apps/demo/:id — show manifest + widget.js content of a demo app
 Future<shelf.Response> _showDemo(_AppsRequestContext ctx) async {
   final id = ctx.sub[1];
-  final appsDir = '${Platform.environment['HOME']}/.config/yoloit/apps';
+  final appsDir = _appsDirPath();
   final appDir = Directory('$appsDir/$id');
   if (!await appDir.exists()) {
     return ctx.error(
@@ -257,9 +265,7 @@ Future<shelf.Response> _installExtractedZip(
       zipName.endsWith('.zip')
           ? zipName.substring(0, zipName.length - 4)
           : zipName;
-  final appsDir = Directory(
-    '${Platform.environment['HOME']}/.config/yoloit/apps',
-  );
+  final appsDir = Directory(_appsDirPath());
   await appsDir.create(recursive: true);
   final extractDir = Directory(
     '${appsDir.path}${Platform.pathSeparator}__zip_extract_${DateTime.now().millisecondsSinceEpoch}',

@@ -344,4 +344,57 @@ void main() {
       expect(res.json['error'], contains('Unsupported action'));
     });
   });
+
+  group('board history ops', () {
+    test('board.undo and board.redo round-trip a panel resize', () async {
+      final cubit = await startServer();
+      await cubit.addPanel(stickyPanel('p1', 'A'));
+      await cubit.updatePanel(
+        'p1',
+        (p) => p.copyWith(bounds: p.bounds.copyWith(width: 500)),
+      );
+
+      final undo = await applyYamlJson('- op: board.undo');
+
+      expect(undo.status, 200, reason: undo.json.toString());
+      final undoResult =
+          (undo.json['results'] as List<dynamic>).single
+              as Map<String, dynamic>;
+      expect(undoResult['ok'], true);
+      expect(undoResult['undone'], true);
+      expect(undoResult['redoDepth'], 1);
+      expect(cubit.state.boards.single.panels.single.bounds.width, 300);
+
+      final redo = await applyYamlJson('- op: board.redo');
+
+      expect(redo.status, 200, reason: redo.json.toString());
+      final redoResult =
+          (redo.json['results'] as List<dynamic>).single
+              as Map<String, dynamic>;
+      expect(redoResult['ok'], true);
+      expect(redoResult['redone'], true);
+      expect(redoResult['redoDepth'], 0);
+      expect(cubit.state.boards.single.panels.single.bounds.width, 500);
+    });
+
+    test('board.undo without history fails the apply', () async {
+      await startServer();
+
+      final res = await applyYamlJson('- op: board.undo');
+
+      expect(res.status, 400);
+      expect(res.json['error'], contains('No restorable panel history yet'));
+      expect(res.json['failedAt'], 1);
+    });
+
+    test('board.redo without history fails the apply', () async {
+      await startServer();
+
+      final res = await applyYamlJson('- op: board.redo');
+
+      expect(res.status, 400);
+      expect(res.json['error'], contains('No redoable panel history yet'));
+      expect(res.json['failedAt'], 1);
+    });
+  });
 }

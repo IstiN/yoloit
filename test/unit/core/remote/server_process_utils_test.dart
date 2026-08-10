@@ -5,38 +5,19 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:yoloit/core/remote/server_process_utils.dart';
 
-class _ProcessHost with ServerProcessMixin {}
-
-shelf.Request _request(
-  String method,
-  String url, {
-  Object? body,
-  Map<String, String>? headers,
-}) {
-  return shelf.Request(
-    method,
-    Uri.parse(url),
-    headers: headers ?? const <String, String>{},
-    body: body == null ? null : jsonEncode(body),
-  );
-}
-
-Future<Map<String, dynamic>> _decode(shelf.Response response) async {
-  final text = await response.readAsString();
-  return Map<String, dynamic>.from(jsonDecode(text) as Map);
-}
+import 'server_process_test_support.dart';
 
 void main() {
   group('response helpers', () {
     test('readJsonBody parses maps and tolerates empty or non-map bodies',
         () async {
-      expect(await readJsonBody(_request('POST', 'http://x/')), isEmpty);
+      expect(await readJsonBody(shelfRequest('POST', 'http://x/')), isEmpty);
       expect(
-        await readJsonBody(_request('POST', 'http://x/', body: '  ')),
+        await readJsonBody(shelfRequest('POST', 'http://x/', body: '  ')),
         isEmpty,
       );
       expect(
-        await readJsonBody(_request('POST', 'http://x/', body: <String, int>{'a': 1})),
+        await readJsonBody(shelfRequest('POST', 'http://x/', body: <String, int>{'a': 1})),
         <String, dynamic>{'a': 1},
       );
       // A JSON list is not a map and yields an empty body.
@@ -109,11 +90,11 @@ void main() {
 
   group('authorization', () {
     test('isAuthorized allows empty token and matches bearer or query', () {
-      expect(isAuthorized(_request('GET', 'http://x/'), null), isTrue);
-      expect(isAuthorized(_request('GET', 'http://x/'), '  '), isTrue);
+      expect(isAuthorized(shelfRequest('GET', 'http://x/'), null), isTrue);
+      expect(isAuthorized(shelfRequest('GET', 'http://x/'), '  '), isTrue);
       expect(
         isAuthorized(
-          _request(
+          shelfRequest(
             'GET',
             'http://x/',
             headers: const <String, String>{'authorization': 'Bearer tok'},
@@ -123,16 +104,16 @@ void main() {
         isTrue,
       );
       expect(
-        isAuthorized(_request('GET', 'http://x/?token=tok'), 'tok'),
+        isAuthorized(shelfRequest('GET', 'http://x/?token=tok'), 'tok'),
         isTrue,
       );
-      expect(isAuthorized(_request('GET', 'http://x/'), 'tok'), isFalse);
+      expect(isAuthorized(shelfRequest('GET', 'http://x/'), 'tok'), isFalse);
     });
   });
 
   group('ServerProcessMixin', () {
     test('collectRun captures output lines, exit code and cleanup', () async {
-      final host = _ProcessHost();
+      final host = ProcessHost();
       final process = await Process.start(
         'sh',
         <String>['-c', 'echo hello; echo oops 1>&2; exit 3'],
@@ -149,7 +130,7 @@ void main() {
 
     test('collectTerminal captures raw chunks, exit code and cleanup',
         () async {
-      final host = _ProcessHost();
+      final host = ProcessHost();
       final process = await Process.start(
         'sh',
         <String>['-c', 'printf out; printf err 1>&2; exit 5'],
@@ -166,7 +147,7 @@ void main() {
     });
 
     test('killAllRunsAndTerminals kills processes and clears state', () async {
-      final host = _ProcessHost();
+      final host = ProcessHost();
       final runProcess = await Process.start('sleep', <String>['30']);
       final termProcess = await Process.start('sleep', <String>['30']);
       host.runs['r'] = runProcess;
@@ -192,7 +173,7 @@ void main() {
         running: true,
         exitCode: null,
       );
-      final body = await _decode(response);
+      final body = await decodeShelfJson(response);
       expect(body['id'], 't1');
       expect(body['next'], 3);
       expect(body['chunks'], <String>['b', 'c']);
@@ -208,7 +189,7 @@ void main() {
         running: false,
         exitCode: 7,
       );
-      final body = await _decode(response);
+      final body = await decodeShelfJson(response);
       expect(body['chunks'], isEmpty);
       expect(body['exitCode'], 7);
     });
@@ -234,7 +215,7 @@ void main() {
       shelf.Request? request,
     }) {
       return handleTerminalsRequest(
-        request: request ?? _request(method, 'http://x/api/terminals'),
+        request: request ?? shelfRequest(method, 'http://x/api/terminals'),
         method: method,
         sub: sub,
         defaultCwd: Directory.systemTemp.path,
@@ -267,9 +248,9 @@ void main() {
       final response = await call(
         method: 'GET',
         sub: <String>['t1', 'log'],
-        request: _request('GET', 'http://x/api/terminals/t1/log?since=1'),
+        request: shelfRequest('GET', 'http://x/api/terminals/t1/log?since=1'),
       );
-      final body = await _decode(response);
+      final body = await decodeShelfJson(response);
       expect(response.statusCode, 200);
       expect(body['chunks'], <String>['b']);
       expect(body['running'], isFalse);
@@ -279,9 +260,9 @@ void main() {
       final invalid = await call(
         method: 'GET',
         sub: <String>['t1', 'log'],
-        request: _request('GET', 'http://x/api/terminals/t1/log?since=abc'),
+        request: shelfRequest('GET', 'http://x/api/terminals/t1/log?since=abc'),
       );
-      final invalidBody = await _decode(invalid);
+      final invalidBody = await decodeShelfJson(invalid);
       expect(invalidBody['chunks'], <String>['a', 'b']);
     });
 
@@ -289,14 +270,14 @@ void main() {
       final response = await call(
         method: 'POST',
         sub: <String>['nope', 'input'],
-        request: _request(
+        request: shelfRequest(
           'POST',
           'http://x/api/terminals/nope/input',
           body: <String, String>{'data': 'ls\n'},
         ),
       );
       expect(response.statusCode, 404);
-      expect((await _decode(response))['error'], 'terminal not found');
+      expect((await decodeShelfJson(response))['error'], 'terminal not found');
     });
 
     test('input writes data to the terminal stdin', () async {
@@ -305,13 +286,13 @@ void main() {
       final response = await call(
         method: 'POST',
         sub: <String>['t1', 'input'],
-        request: _request(
+        request: shelfRequest(
           'POST',
           'http://x/api/terminals/t1/input',
           body: <String, String>{'data': 'ping\n'},
         ),
       );
-      expect((await _decode(response))['ok'], isTrue);
+      expect((await decodeShelfJson(response))['ok'], isTrue);
       await process.stdin.close();
       final echoed = await utf8.decoder.bind(process.stdout).join();
       expect(echoed, contains('ping'));
@@ -322,7 +303,7 @@ void main() {
       final missing = await call(
         method: 'POST',
         sub: <String>['nope', 'resize'],
-        request: _request(
+        request: shelfRequest(
           'POST',
           'http://x/api/terminals/nope/resize',
           body: <String, int>{'rows': 40, 'cols': 120},
@@ -335,13 +316,13 @@ void main() {
       final response = await call(
         method: 'POST',
         sub: <String>['t1', 'resize'],
-        request: _request(
+        request: shelfRequest(
           'POST',
           'http://x/api/terminals/t1/resize',
           body: <String, int>{'rows': 40, 'cols': 120},
         ),
       );
-      expect((await _decode(response))['ok'], isTrue);
+      expect((await decodeShelfJson(response))['ok'], isTrue);
       await process.stdin.close();
       final echoed = await utf8.decoder.bind(process.stdout).join();
       expect(echoed, contains('stty rows 40 cols 120'));
@@ -350,12 +331,12 @@ void main() {
     test('stop kills the terminal and reports false for unknown id',
         () async {
       final missing = await call(method: 'POST', sub: <String>['nope', 'stop']);
-      expect((await _decode(missing))['ok'], isFalse);
+      expect((await decodeShelfJson(missing))['ok'], isFalse);
 
       final process = await Process.start('sleep', <String>['30']);
       terminals['t1'] = process;
       final response = await call(method: 'POST', sub: <String>['t1', 'stop']);
-      expect((await _decode(response))['ok'], isTrue);
+      expect((await decodeShelfJson(response))['ok'], isTrue);
       expect(terminals, isNot(contains('t1')));
       expect(await process.exitCode, isNot(0));
     });
@@ -378,7 +359,7 @@ void main() {
     }) {
       final killed = <String>[];
       return handleTerminalCreate(
-        request: _request('POST', 'http://x/api/terminals', body: body),
+        request: shelfRequest('POST', 'http://x/api/terminals', body: body),
         defaultCwd: defaultCwd.isEmpty ? Directory.systemTemp.path : defaultCwd,
         nextId: () => '',
         killExisting: killExisting ?? killed.add,
@@ -389,7 +370,7 @@ void main() {
     test('rejects an empty id', () async {
       final response = await create(body: <String, Object?>{'id': '  '});
       expect(response.statusCode, 400);
-      expect((await _decode(response))['error'], 'id required');
+      expect((await decodeShelfJson(response))['error'], 'id required');
     });
 
     test('rejects a missing working directory', () async {
@@ -400,7 +381,7 @@ void main() {
         },
       );
       expect(response.statusCode, 404);
-      expect((await _decode(response))['error'], 'working directory not found');
+      expect((await decodeShelfJson(response))['error'], 'working directory not found');
     });
 
     test('starts a terminal process with env and reports pid', () async {
@@ -415,7 +396,7 @@ void main() {
         },
         killExisting: killed.add,
       );
-      final body = await _decode(response);
+      final body = await decodeShelfJson(response);
       expect(body['ok'], isTrue);
       expect(body['id'], 't1');
       expect(body['pid'], isA<int>());
@@ -433,17 +414,17 @@ void main() {
       }
 
       final response = await handleFilesRequest(
-        request: _request('GET', 'http://x/api/files?path=%2Ftmp'),
+        request: shelfRequest('GET', 'http://x/api/files?path=%2Ftmp'),
         method: 'GET',
         sub: const <String>[],
         defaultRoot: () => Directory.systemTemp.path,
         listFiles: listFiles,
       );
       expect(listed, <String?>['/tmp']);
-      expect((await _decode(response))['listed'], '/tmp');
+      expect((await decodeShelfJson(response))['listed'], '/tmp');
 
       final rejected = await handleFilesRequest(
-        request: _request('DELETE', 'http://x/api/files/x'),
+        request: shelfRequest('DELETE', 'http://x/api/files/x'),
         method: 'DELETE',
         sub: const <String>['x'],
         defaultRoot: () => Directory.systemTemp.path,
@@ -459,7 +440,7 @@ void main() {
       Future<shelf.Response> create(Map<String, Object?> body) {
         return handleFilesRequest(
           request:
-              _request('POST', 'http://x/api/files/directories', body: body),
+              shelfRequest('POST', 'http://x/api/files/directories', body: body),
           method: 'POST',
           sub: const <String>['directories'],
           defaultRoot: () => Directory.systemTemp.path,
@@ -469,14 +450,14 @@ void main() {
 
       final badName = await create(<String, Object?>{'name': 'a/b'});
       expect(badName.statusCode, 400);
-      expect((await _decode(badName))['error'], 'invalid directory name');
+      expect((await decodeShelfJson(badName))['error'], 'invalid directory name');
 
       final badParent = await create(<String, Object?>{
         'parentPath': '/yoloit/no/such/dir-xyz',
         'name': 'child',
       });
       expect(badParent.statusCode, 404);
-      expect((await _decode(badParent))['error'], 'parent directory not found');
+      expect((await decodeShelfJson(badParent))['error'], 'parent directory not found');
 
       final tempDir = await Directory.systemTemp.createTemp('yoloit_mkdir_');
       addTearDown(() => tempDir.delete(recursive: true));
@@ -484,7 +465,7 @@ void main() {
         'parentPath': tempDir.path,
         'name': 'child',
       });
-      expect((await _decode(created))['listed'], tempDir.path);
+      expect((await decodeShelfJson(created))['listed'], tempDir.path);
       expect(
         Directory('${tempDir.path}${Platform.pathSeparator}child').existsSync(),
         isTrue,
@@ -499,7 +480,7 @@ void main() {
         roots: const <Map<String, Object?>>[],
       );
       expect(missing.statusCode, 404);
-      expect((await _decode(missing))['error'], 'directory not found');
+      expect((await decodeShelfJson(missing))['error'], 'directory not found');
 
       final root = await buildFileListingResponse(
         directory: Directory(Platform.isWindows ? 'C:\\' : '/'),
@@ -510,7 +491,7 @@ void main() {
           <String, Object?>{'name': 'root'},
         ],
       );
-      final body = await _decode(root);
+      final body = await decodeShelfJson(root);
       expect(body['ok'], isTrue);
       expect(body['parent'], isNull);
       expect((body['entries'] as List).length, 1);
@@ -529,7 +510,7 @@ void main() {
       startTasks,
     }) {
       return handleSetupInstall(
-        request: request ?? _request(method, 'http://x/api/setup'),
+        request: request ?? shelfRequest(method, 'http://x/api/setup'),
         method: method,
         sub: sub,
         nextId: nextId ?? () => 'generated-id',
@@ -541,7 +522,7 @@ void main() {
     test('GET returns the setup snapshot', () async {
       final response = await call(method: 'GET', sub: const <String>[]);
       expect(response.statusCode, 200);
-      final body = await _decode(response);
+      final body = await decodeShelfJson(response);
       expect(body['runtime'], isA<Map<String, dynamic>>());
       expect(body['packages'], isA<List<dynamic>>());
     }, timeout: const Timeout(Duration(seconds: 60)));
@@ -550,21 +531,21 @@ void main() {
       final response = await call(
         method: 'POST',
         sub: const <String>['install'],
-        request: _request(
+        request: shelfRequest(
           'POST',
           'http://x/api/setup/install',
           body: <String, Object?>{'packageIds': <String>[]},
         ),
       );
       expect(response.statusCode, 400);
-      expect((await _decode(response))['error'], 'packageIds required');
+      expect((await decodeShelfJson(response))['error'], 'packageIds required');
     });
 
     test('POST install rejects packages without an install command', () async {
       final response = await call(
         method: 'POST',
         sub: const <String>['install'],
-        request: _request(
+        request: shelfRequest(
           'POST',
           'http://x/api/setup/install',
           body: <String, Object?>{'packageIds': <String>['no-such-package-xyz']},
@@ -572,7 +553,7 @@ void main() {
       );
       expect(response.statusCode, 400);
       expect(
-        (await _decode(response))['error'],
+        (await decodeShelfJson(response))['error'],
         'no install command for selected packages on this OS',
       );
     });
@@ -583,7 +564,7 @@ void main() {
       final response = await call(
         method: 'POST',
         sub: const <String>['install'],
-        request: _request(
+        request: shelfRequest(
           'POST',
           'http://x/api/setup/install',
           body: <String, Object?>{
@@ -594,7 +575,7 @@ void main() {
         onStarted: (_, _) => started++,
       );
       expect(response.statusCode, 200);
-      final body = await _decode(response);
+      final body = await decodeShelfJson(response);
       expect(body['ok'], isTrue);
       expect(body['script'] as String, contains('install'));
       expect(body.containsKey('id'), isFalse);
@@ -606,7 +587,7 @@ void main() {
       final response = await call(
         method: 'POST',
         sub: const <String>['install'],
-        request: _request(
+        request: shelfRequest(
           'POST',
           'http://x/api/setup/install',
           body: <String, Object?>{
@@ -616,7 +597,7 @@ void main() {
         ),
       );
       expect(response.statusCode, 200);
-      final body = await _decode(response);
+      final body = await decodeShelfJson(response);
       expect(body['ok'], isTrue);
       expect(body['script'] as String, contains('YoLoIT built-in task'));
     }, timeout: const Timeout(Duration(seconds: 60)));
@@ -627,7 +608,7 @@ void main() {
       final response = await call(
         method: 'POST',
         sub: const <String>['install'],
-        request: _request(
+        request: shelfRequest(
           'POST',
           'http://x/api/setup/install',
           body: <String, Object?>{'packageIds': <String>['git']},
@@ -638,7 +619,7 @@ void main() {
         },
       );
       expect(response.statusCode, 200);
-      final body = await _decode(response);
+      final body = await decodeShelfJson(response);
       expect(body['ok'], isTrue);
       expect(body['id'], 'generated-id');
       expect(started, hasLength(1));
@@ -655,7 +636,7 @@ void main() {
       final response = await call(
         method: 'POST',
         sub: const <String>['install'],
-        request: _request(
+        request: shelfRequest(
           'POST',
           'http://x/api/setup/install',
           body: <String, Object?>{
@@ -664,7 +645,7 @@ void main() {
           },
         ),
       );
-      expect((await _decode(response))['id'], 'custom-run');
+      expect((await decodeShelfJson(response))['id'], 'custom-run');
     }, timeout: const Timeout(Duration(seconds: 60)));
 
     test('returns 404 for unknown routes', () async {

@@ -83,6 +83,13 @@ void main() {
       expect(p.passSessionArgs, isFalse);
     });
 
+    test('availableModels falls back to the hardcoded catalog', () {
+      // The catalog service is never loaded in this test process, so
+      // modelsForProvider returns null and the hardcoded list wins.
+      final p = OpencodeProvider();
+      expect(p.availableModels, same(kOpencodeModels));
+    });
+
     test('emits user message event first', () async {
       final p = OpencodeProvider(
         processStarter: _starterFor(stdout: [
@@ -439,5 +446,87 @@ void main() {
 
       expect(emitted, hasLength(1));
     });
+  });
+
+  group('OpenCodeLogWatcher.start', () {
+    late Directory logDir;
+
+    setUp(() {
+      logDir = Directory.systemTemp.createTempSync('opencode_log_watch');
+    });
+
+    tearDown(() {
+      if (logDir.existsSync()) {
+        logDir.deleteSync(recursive: true);
+      }
+    });
+
+    OpenCodeLogWatcher watcherFor(List<(String, bool)> emitted) {
+      return OpenCodeLogWatcher(
+        onRetry: (msg, {isFatal = false}) => emitted.add((msg, isFatal)),
+        logDir: logDir,
+      );
+    }
+
+    Future<void> waitFor(bool Function() condition) async {
+      final deadline = DateTime.now().add(const Duration(seconds: 10));
+      while (!condition() && DateTime.now().isBefore(deadline)) {
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      }
+    }
+
+    test('emits retry from an existing recent log file', () async {
+      File('${logDir.path}/session.log').writeAsStringSync(
+        '{"statusCode":429,"message":"slow down"}\n',
+      );
+      final emitted = <(String, bool)>[];
+      final watcher = watcherFor(emitted);
+
+      final done = watcher.start();
+      await waitFor(() => emitted.isNotEmpty);
+      watcher.stop();
+      await done;
+
+      expect(emitted, hasLength(1));
+      expect(emitted.single.$1, contains('429'));
+      expect(emitted.single.$2, isTrue);
+    }, timeout: const Timeout(Duration(seconds: 15)));
+
+    test('picks up content appended after the watch begins', () async {
+      final logFile = File('${logDir.path}/live.log')
+        ..writeAsStringSync('plain startup line\n');
+      final emitted = <(String, bool)>[];
+      final watcher = watcherFor(emitted);
+
+      final done = watcher.start();
+      // Let the watcher find the file and complete its first read.
+      await Future<void>.delayed(const Duration(milliseconds: 1600));
+      logFile.writeAsStringSync(
+        '{"statusCode":429,"message":"quota"}\n',
+        mode: FileMode.append,
+      );
+      await waitFor(() => emitted.isNotEmpty);
+      watcher.stop();
+      await done;
+
+      expect(emitted, hasLength(1));
+      expect(emitted.single.$1, contains('quota'));
+      expect(emitted.single.$2, isTrue);
+    }, timeout: const Timeout(Duration(seconds: 15)));
+
+    test('returns without emitting when only stale log files exist', () async {
+      final stale = File('${logDir.path}/stale.log')
+        ..writeAsStringSync('{"statusCode":429,"message":"old"}\n');
+      stale.setLastModifiedSync(
+        DateTime.now().subtract(const Duration(hours: 1)),
+      );
+      final emitted = <(String, bool)>[];
+      final watcher = watcherFor(emitted);
+
+      // 10 attempts with a 500 ms delay between them, then gives up.
+      await watcher.start();
+
+      expect(emitted, isEmpty);
+    }, timeout: const Timeout(Duration(seconds: 15)));
   });
 }

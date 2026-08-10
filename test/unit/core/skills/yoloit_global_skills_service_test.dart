@@ -66,6 +66,31 @@ void main() {
   );
 
   test(
+    'copyDirectoryForTest copies files and nested directories recursively',
+    () async {
+      final source = Directory(p.join(home.path, 'src'));
+      final nested = Directory(p.join(source.path, 'nested', 'deep'));
+      await nested.create(recursive: true);
+      await File(p.join(source.path, 'SKILL.md')).writeAsString('# skill\n');
+      await File(p.join(nested.path, 'notes.md')).writeAsString('notes\n');
+      final dest = Directory(p.join(home.path, 'out', 'dest'));
+
+      await YoloitGlobalSkillsService.instance
+          .copyDirectoryForTest(source, dest);
+
+      expect(
+        await File(p.join(dest.path, 'SKILL.md')).readAsString(),
+        '# skill\n',
+      );
+      expect(
+        await File(p.join(dest.path, 'nested', 'deep', 'notes.md'))
+            .readAsString(),
+        'notes\n',
+      );
+    },
+  );
+
+  test(
     'SetupCatalog exposes YoLoIT global skills as a special install task',
     () {
       final package = SetupCatalog.packages.singleWhere(

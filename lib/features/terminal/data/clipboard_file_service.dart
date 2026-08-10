@@ -1,10 +1,11 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:super_clipboard/super_clipboard.dart';
-import 'package:yoloit/core/utils/text_normalize.dart' as text_normalize;
 import 'package:yoloit/core/platform/platform_dirs.dart';
+import 'package:yoloit/core/utils/text_normalize.dart' as text_normalize;
 
 /// Saves the current clipboard content to a temp file under /tmp/yoloit_clip/
 /// and returns the absolute path, or null if the clipboard is empty.
@@ -57,6 +58,12 @@ class ClipboardFileService {
 
     return null;
   }
+
+  /// Test seam: super_clipboard has no mockable platform channel in unit
+  /// tests, so tests drive the image branch through this wrapper.
+  @visibleForTesting
+  Future<String?> tryReadImageForTesting(ClipboardReader reader) =>
+      _tryReadImage(reader);
 
   Future<String?> _tryReadImage(ClipboardReader reader) async {
     final formats = [

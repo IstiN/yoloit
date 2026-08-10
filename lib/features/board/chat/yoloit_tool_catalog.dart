@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:yaml/yaml.dart';
 import 'package:yoloit/core/cli/cli_text_argument_resolver.dart';
@@ -325,6 +326,14 @@ class YoloitCliToolCatalog {
     }
     return result;
   }
+
+  /// Test seam exposing [_mergeYamlCommands] so tests can exercise the YAML
+  /// merge logic directly without going through the asset bundle.
+  @visibleForTesting
+  static void debugMergeYamlCommands(
+    Map<String, Map<String, List<String>>> result,
+    YamlList? commands,
+  ) => _mergeYamlCommands(result, commands);
 
   /// Merges the `human` variants of each command in [commands] into
   /// [result], appending phrases per locale.

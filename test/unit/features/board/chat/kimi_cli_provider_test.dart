@@ -14,11 +14,12 @@ class _FakeProcess implements Process {
     required List<String> stdoutLines,
     List<String> stderrLines = const [],
     required int exitCode,
+    Duration lineDelay = const Duration(milliseconds: 5),
   })  : _stdout = StreamController<List<int>>(),
         _stderr = StreamController<List<int>>(),
         _exitCode = exitCode {
-    _emit(stdoutLines, _stdout);
-    _emit(stderrLines, _stderr);
+    _emit(stdoutLines, _stdout, lineDelay);
+    _emit(stderrLines, _stderr, lineDelay);
   }
 
   final StreamController<List<int>> _stdout;
@@ -26,11 +27,15 @@ class _FakeProcess implements Process {
   final int _exitCode;
   bool _stdinClosed = false;
 
-  static void _emit(List<String> lines, StreamController<List<int>> c) {
+  static void _emit(
+    List<String> lines,
+    StreamController<List<int>> c,
+    Duration lineDelay,
+  ) {
     Future.microtask(() async {
       for (final line in lines) {
         c.add(utf8.encode('$line\n'));
-        await Future.delayed(const Duration(milliseconds: 5));
+        await Future.delayed(lineDelay);
       }
       await c.close();
     });
@@ -75,6 +80,7 @@ ProcessStarter _starterFor({
   List<String> stdout = const [],
   List<String> stderr = const [],
   int exitCode = 0,
+  Duration lineDelay = const Duration(milliseconds: 5),
 }) {
   return (String exe, List<String> args,
           {String? workingDirectory,
@@ -83,6 +89,7 @@ ProcessStarter _starterFor({
         stdoutLines: stdout,
         stderrLines: stderr,
         exitCode: exitCode,
+        lineDelay: lineDelay,
       );
 }
 
@@ -356,6 +363,128 @@ void main() {
       expect(events[5].type, ChatEventType.assistantMessage);
       expect(events[5].rawType, 'kimi.wire.step_end');
     }, timeout: const Timeout(Duration(seconds: 10)));
+
+    test('wire.jsonl: skips blank, stale and malformed lines', () async {
+      final tmp = Directory.systemTemp.createTempSync('kimi_wire_lines');
+      addTearDown(() {
+        if (tmp.existsSync()) {
+          tmp.deleteSync(recursive: true);
+        }
+      });
+      final staleMs =
+          DateTime.now()
+              .subtract(const Duration(minutes: 1))
+              .millisecondsSinceEpoch;
+      final wire = File('${tmp.path}/wire.jsonl')
+        ..writeAsStringSync(
+          [
+            '',
+            '   ',
+            'not json at all',
+            '{"type":"unrelated"}',
+            jsonEncode({
+              'type': 'context.append_loop_event',
+              'time': staleMs,
+              'event': {
+                'type': 'content.part',
+                'uuid': 'old',
+                'part': {'type': 'text', 'text': 'STALE'},
+              },
+            }),
+            '{"type":"context.append_loop_event","event":',
+            jsonEncode({
+              'type': 'context.append_loop_event',
+              'event': {
+                'type': 'content.part',
+                'uuid': 'u1',
+                'part': {'type': 'text', 'text': 'fresh text'},
+              },
+            }),
+          ].join('\n'),
+        );
+
+      final p = KimiCliProvider(
+        wireJsonlPath: wire.path,
+        processStarter: _starterFor(stdout: const []),
+      );
+
+      final events = await p
+          .sendMessage(
+            message: 'hi',
+            config: const ChatSessionConfig(
+              sessionName: 's1',
+              workingDir: '/tmp',
+            ),
+            isFirstMessage: true,
+          )
+          .toList();
+
+      final deltas =
+          events
+              .where((e) => e.type == ChatEventType.assistantDelta)
+              .toList();
+      expect(deltas, hasLength(1));
+      expect(deltas.single.data['deltaContent'], 'fresh text');
+    }, timeout: const Timeout(Duration(seconds: 15)));
+
+    test('wire.jsonl: reads chunks appended while the process runs', () async {
+      final tmp = Directory.systemTemp.createTempSync('kimi_wire_grow');
+      addTearDown(() {
+        if (tmp.existsSync()) {
+          tmp.deleteSync(recursive: true);
+        }
+      });
+
+      Map<String, Object?> textEvent(String uuid, String text) => {
+        'type': 'context.append_loop_event',
+        'event': {
+          'type': 'content.part',
+          'uuid': uuid,
+          'part': {'type': 'text', 'text': text},
+        },
+      };
+
+      final wire = File('${tmp.path}/wire.jsonl')
+        ..writeAsStringSync('${jsonEncode(textEvent('u1', 'first chunk'))}\n');
+
+      // The fake process stays alive for ~2.5s so the watcher polls the
+      // wire file multiple times instead of only flushing at the end.
+      final p = KimiCliProvider(
+        wireJsonlPath: wire.path,
+        processStarter: _starterFor(
+          stdout: const ['{"role":"assistant","content":"done"}'],
+          lineDelay: const Duration(milliseconds: 2500),
+        ),
+      );
+
+      final streamFuture = p
+          .sendMessage(
+            message: 'hi',
+            config: const ChatSessionConfig(
+              sessionName: 's1',
+              workingDir: '/tmp',
+            ),
+            isFirstMessage: true,
+          )
+          .toList();
+
+      // Append more content (including a broken line) mid-run.
+      await Future<void>.delayed(const Duration(milliseconds: 1600));
+      wire.writeAsStringSync(
+        'broken json line\n'
+        '${jsonEncode(textEvent('u2', 'second chunk'))}\n',
+        mode: FileMode.append,
+      );
+
+      final events = await streamFuture;
+
+      final deltas = events
+          .where((e) => e.type == ChatEventType.assistantDelta)
+          .map((e) => e.data['deltaContent'])
+          .join();
+      expect(deltas, contains('first chunk'));
+      expect(deltas, contains('second chunk'));
+    }, timeout: const Timeout(Duration(seconds: 15)));
   });
 
   group('KimiCliProvider._findWireJsonl', () {

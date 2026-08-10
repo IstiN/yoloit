@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:local_models_flutter/local_models_flutter.dart' as flm;
 import 'package:local_models_flutter/runtime/embedded_gemma_tool_calls.dart';
 import 'package:yoloit/core/utils/json_utils.dart';
@@ -41,6 +42,11 @@ class LocalLlmProvider extends ChatProvider {
   final Future<flm.InstalledModel> Function()? _installedModelLoader;
   final Future<void> Function()? _runtimeReady;
   final YoloitToolExecutor _toolExecutor;
+
+  /// Overrides [LocalAiModelsService.instance] inside [_loadInstalledModel]
+  /// (tests only).
+  @visibleForTesting
+  static LocalAiModelsService? localAiModelsServiceOverride;
   final Map<String, bool> _running = {};
   final Map<String, bool> _cancelRequested = {};
   final Map<String, List<({String user, String assistant})>> _history = {};
@@ -598,25 +604,31 @@ class LocalLlmProvider extends ChatProvider {
     );
   }
 
+  /// Test hook for [_loadInstalledModel].
+  @visibleForTesting
+  Future<flm.InstalledModel> loadInstalledModelForTest() =>
+      _loadInstalledModel();
+
   Future<flm.InstalledModel> _loadInstalledModel() async {
     final loader = _installedModelLoader;
     if (loader != null) {
       return loader();
     }
 
-    await LocalAiModelsService.instance.initialize();
+    final service =
+        localAiModelsServiceOverride ?? LocalAiModelsService.instance;
+    await service.initialize();
     final runtimeReady = _runtimeReady;
     if (runtimeReady != null) {
       await runtimeReady();
     } else {
-      await LocalAiModelsService.instance.ensureRuntimeReady();
+      await service.ensureRuntimeReady();
     }
-    var modelId = LocalAiModelsService.instance.selectedChatModelId;
+    var modelId = service.selectedChatModelId;
 
     // If a router model is selected for chat, auto-switch to the orchestrator.
     // The orchestrator (Gemma 4) decides when to call tools vs respond with text.
     if (modelId.toLowerCase().contains('router')) {
-      final service = LocalAiModelsService.instance;
       final orchestratorId = service.chatModels
           .map((m) => m.id)
           .where(
@@ -636,7 +648,7 @@ class LocalLlmProvider extends ChatProvider {
       }
     }
 
-    final installed = LocalAiModelsService.instance.installedModelById(modelId);
+    final installed = service.installedModelById(modelId);
     if (installed == null) {
       throw StateError(
         'Model "$modelId" is not installed. Download it in Settings → AI Models.',
@@ -1183,6 +1195,13 @@ class LocalLlmProvider extends ChatProvider {
     }
     return false;
   }
+
+  /// Test hook for [_appendSummarySections].
+  @visibleForTesting
+  void appendSummarySectionsForTest(
+    StringBuffer systemBuf,
+    ChatRuntimeContext? runtimeContext,
+  ) => _appendSummarySections(systemBuf, runtimeContext);
 
   void _appendSummarySections(
     StringBuffer systemBuf,

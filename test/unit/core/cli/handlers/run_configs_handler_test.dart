@@ -248,6 +248,113 @@ void main() {
       expect(r.ok, isFalse);
       expect(r.message, contains('Unknown'));
     });
+
+    test('update without id returns error', () async {
+      final r = await handler.handleAction('update', {}, _panel());
+      expect(r.ok, isFalse);
+      expect(r.message, contains('Missing'));
+    });
+
+    test('update with unknown config returns not-found error', () async {
+      final r = await handler.handleAction('update', {'id': 'nope'}, _panel());
+      expect(r.ok, isFalse);
+      expect(r.message, contains('not found'));
+    });
+
+    test('update by name replaces fields and drops blank quick actions', () async {
+      await handler.handleAction('add', {
+        'name': 'Updatable',
+        'command': 'echo before',
+      }, _panel());
+
+      final r = await handler.handleAction('update', {
+        'name': 'Updatable',
+        'newName': 'Renamed',
+        'command': 'echo after',
+        'workingDir': '/tmp',
+        'env': {'YOLO_A': '1'},
+        'isFlutterRun': true,
+        'quickActions': [
+          {
+            'id': 'q1',
+            'label': 'Go',
+            'icon': 'bolt',
+            'command': 'g',
+            'appendNewline': true,
+          },
+          {'id': 'q2', 'label': 'Blank', 'icon': 'bolt', 'command': '  '},
+        ],
+      }, _panel());
+
+      expect(r.ok, isTrue);
+      expect(r.message, contains('updated'));
+      expect(r.data!['name'], 'Renamed');
+      expect(r.data!['command'], 'echo after');
+      expect(r.data!['workingDir'], '/tmp');
+      expect(r.data!['env'], {'YOLO_A': '1'});
+      expect(r.data!['isFlutterRun'], isTrue);
+      final actions = r.data!['quickActions'] as List<dynamic>;
+      expect(actions, hasLength(1));
+      final action = actions.single as Map<String, dynamic>;
+      expect(action['id'], 'q1');
+      expect(action['appendNewline'], isTrue);
+    });
+
+    test('update by id keeps untouched fields', () async {
+      final added = await handler.handleAction('add', {
+        'name': 'KeepMe',
+        'command': 'echo keep',
+      }, _panel());
+      final id = added.data!['id'] as String;
+
+      final r = await handler.handleAction('update', {
+        'id': id,
+        'command': 'echo changed',
+      }, _panel());
+
+      expect(r.ok, isTrue);
+      expect(r.data!['id'], id);
+      expect(r.data!['name'], 'KeepMe');
+      expect(r.data!['command'], 'echo changed');
+    });
+
+    test('input without text returns error', () async {
+      final r = await handler.handleAction('input', {}, _panel());
+      expect(r.ok, isFalse);
+      expect(r.message, contains('Missing'));
+    });
+
+    test('input without a running session returns error', () async {
+      final r = await handler.handleAction('input', {'text': 'r'}, _panel());
+      expect(r.ok, isFalse);
+      expect(r.message, contains('No running session'));
+    });
+
+    test('input sends text to a running session', () async {
+      const config = RunConfig(
+        id: 'cfg_1',
+        name: 'Test',
+        command: 'echo hi',
+        group: 'p1',
+      );
+      const session = RunSession(
+        id: 'sess_1',
+        config: config,
+        workspacePath: '/tmp',
+        status: RunStatus.running,
+      );
+      cubit.emit(cubit.state.copyWith(sessions: [session]));
+
+      final r = await handler.handleAction('input', {
+        'text': 'r',
+        'appendNewline': true,
+      }, _panel());
+
+      expect(r.ok, isTrue);
+      expect(r.message, contains('Input sent to "Test"'));
+      expect(r.data!['id'], 'sess_1');
+      expect(r.data!['status'], 'running');
+    });
   });
 
   group('RunConfigsCliHandler — board.run panel type', () {

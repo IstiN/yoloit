@@ -20,12 +20,18 @@ class BoardFileSelection {
 class BoardFilePicker {
   const BoardFilePicker._();
 
+  /// Test seam: bypasses the directory picker dialog in widget tests.
+  @visibleForTesting
+  static Future<String?> Function()? debugPickDirectoryOverride;
+
   static Future<String?> pickDirectory(
     BuildContext context, {
     RemoteBoardInfo? remoteInfo,
     String? initialPath,
     String title = 'Choose folder',
   }) {
+    final override = debugPickDirectoryOverride;
+    if (override != null) return override();
     // Always use the in-app dialog (local and remote): the native macOS
     // directory panel from file_picker offers no "New Folder" button,
     // while this dialog can create folders in both modes.

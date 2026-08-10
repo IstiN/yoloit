@@ -3,9 +3,54 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:yoloit/core/platform/platform_dirs.dart';
+import 'package:yoloit/core/platform/platform_shell.dart';
 import 'package:yoloit/features/runs/bloc/run_cubit.dart';
+import 'package:yoloit/features/runs/data/run_service.dart';
 import 'package:yoloit/features/runs/models/run_config.dart';
 import 'package:yoloit/features/runs/models/run_session.dart';
+
+/// Points run log files at a temp dir so tests never touch the real config.
+class _TempDirs extends PlatformDirs {
+  _TempDirs(this.root);
+
+  final String root;
+
+  @override
+  String get configDir => root;
+
+  @override
+  String get dataDir => root;
+
+  @override
+  String get logsDir => root;
+
+  @override
+  String get tempDir => root;
+
+  @override
+  String get skillsDir => '$root/skills';
+
+  @override
+  String get yoloitTempDir => '$root/tmp';
+}
+
+/// Prepends a temp bin dir (with a fake tmux shim) to the executable search
+/// path so [RunService] never talks to a real tmux server.
+class _ShimShell extends PlatformShell {
+  _ShimShell(this.binDir);
+
+  final String binDir;
+
+  @override
+  String get defaultShell => '/bin/bash';
+
+  @override
+  String get pathSeparator => ':';
+
+  @override
+  String enrichedPath(String existing) => '$binDir:$existing';
+}
 
 RunConfig _config(
   String id, {
@@ -369,6 +414,88 @@ void main() {
       cubit.removeSession('s1');
 
       expect(cubit.state.activeSessionId, 's2');
+    });
+  });
+
+  group('restartSession (real runner)', () {
+    late Directory binDir;
+
+    setUp(() async {
+      binDir = Directory('${tempDir.path}/bin')..createSync();
+      PlatformDirs.setInstance(_TempDirs(tempDir.path));
+      PlatformShell.setInstance(_ShimShell(binDir.path));
+
+      // Fake tmux: runs the new-session command detached in a plain bash so
+      // the log file (including the __YOLOIT_EXIT_ marker) is still written,
+      // and answers every other subcommand without a real tmux server.
+      final shim = File('${binDir.path}/tmux');
+      shim.writeAsStringSync(
+        '#!/bin/bash\n'
+        'if [ "\$1" = "new-session" ]; then\n'
+        '  for last in "\$@"; do :; done\n'
+        '  nohup /bin/bash -c "\$last" >/dev/null 2>&1 &\n'
+        '  exit 0\n'
+        'fi\n'
+        'if [ "\$1" = "has-session" ]; then exit 1; fi\n'
+        'exit 0\n',
+      );
+      final chmod = await Process.run('chmod', ['+x', shim.path]);
+      expect(chmod.exitCode, 0, reason: 'chmod +x ${shim.path} failed');
+      RunService.instance.resetTmuxPathForTesting();
+    });
+
+    tearDown(() {
+      RunService.instance.stop('s1');
+      PlatformShell.setInstance(const MacosPlatformShell());
+      PlatformDirs.setInstance(const MacosPlatformDirs());
+    });
+
+    test('clears output, marks running and re-runs the command', () async {
+      final session = RunSession(
+        id: 's1',
+        config: _config('cfg-s1', command: 'echo restarted-marker'),
+        workspacePath: tempDir.path,
+        status: RunStatus.stopped,
+        output: [
+          RunOutputLine(
+            text: 'stale line',
+            isError: false,
+            timestamp: DateTime.utc(2026),
+          ),
+        ],
+        startedAt: DateTime.utc(2026),
+      );
+      _seedPrefs(tempDir.path, sessions: [session]);
+      await cubit.loadForWorkspace(tempDir.path);
+
+      final restarted = await cubit.restartSession('s1');
+
+      expect(restarted, isNotNull);
+      expect(restarted!.id, 's1');
+      expect(restarted.status, RunStatus.running);
+      expect(restarted.output, isEmpty);
+      expect(restarted.exitCode, isNull);
+      expect(restarted.workspacePath, tempDir.path);
+      expect(cubit.state.activeSessionId, 's1');
+
+      // Wait for the detached command to finish and the log poller to
+      // deliver the exit marker before tearDown removes the temp dir.
+      final sw = Stopwatch()..start();
+      while (cubit.state.sessions.single.status == RunStatus.running) {
+        if (sw.elapsed > const Duration(seconds: 15)) {
+          fail('restarted run did not finish in time');
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      }
+
+      final done = cubit.state.sessions.single;
+      expect(done.status, RunStatus.stopped);
+      expect(done.exitCode, 0);
+      expect(done.output.map((line) => line.text), contains('restarted-marker'));
+      expect(
+        done.output.map((line) => line.text),
+        isNot(contains('stale line')),
+      );
     });
   });
 

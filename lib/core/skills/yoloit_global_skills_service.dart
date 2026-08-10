@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:yoloit/core/platform/platform_dirs.dart';
@@ -264,6 +265,12 @@ class YoloitGlobalSkillsService {
       await dir.delete(recursive: true);
     }
   }
+
+  /// Test hook for [_copyDirectory] (the production call site only runs when
+  /// symlinking fails, which is hard to force deterministically in tests).
+  @visibleForTesting
+  Future<void> copyDirectoryForTest(Directory source, Directory dest) =>
+      _copyDirectory(source, dest);
 
   Future<void> _copyDirectory(Directory source, Directory dest) async {
     await dest.create(recursive: true);

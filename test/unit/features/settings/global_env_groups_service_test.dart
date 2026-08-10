@@ -301,6 +301,84 @@ void main() {
     });
   });
 
+  group('GlobalEnvGroupsService.parseEnvContent', () {
+    test('parses plain key/value pairs and export-prefixed lines', () {
+      final result = GlobalEnvGroupsService.instance.parseEnvContent(
+        'FOO=bar\nexport BAZ=qux\n',
+      );
+      expect(result, {'FOO': 'bar', 'BAZ': 'qux'});
+    });
+
+    test('skips comments, blank lines, and lines without a key', () {
+      final result = GlobalEnvGroupsService.instance.parseEnvContent(
+        '# comment\n\n   \n=nokey\nKEY_WITHOUT_EQUALS\nVALID=1',
+      );
+      expect(result, {'VALID': '1'});
+    });
+
+    test('preserves empty values', () {
+      expect(
+        GlobalEnvGroupsService.instance.parseEnvContent('EMPTY='),
+        {'EMPTY': ''},
+      );
+    });
+
+    test('strips surrounding double and single quotes', () {
+      final result = GlobalEnvGroupsService.instance.parseEnvContent(
+        'A="double quoted"\nB=\'single quoted\'\nC=""',
+      );
+      expect(result, {'A': 'double quoted', 'B': 'single quoted', 'C': ''});
+    });
+
+    test('keeps # inside quoted values', () {
+      expect(
+        GlobalEnvGroupsService.instance.parseEnvContent('HASH="a # b"'),
+        {'HASH': 'a # b'},
+      );
+    });
+
+    test('strips trailing comment from unquoted values', () {
+      expect(
+        GlobalEnvGroupsService.instance.parseEnvContent(
+          'VAL=value # trailing comment',
+        ),
+        {'VAL': 'value'},
+      );
+    });
+
+    test(r'unescapes \n \r \t sequences in values', () {
+      expect(
+        GlobalEnvGroupsService.instance.parseEnvContent(
+          r'MULTI=line1\nline2\ttab\rcr',
+        ),
+        {'MULTI': 'line1\nline2\ttab\rcr'},
+      );
+    });
+
+    test('trims whitespace around key and value', () {
+      expect(
+        GlobalEnvGroupsService.instance.parseEnvContent(
+          '  SPACED  =  some value  ',
+        ),
+        {'SPACED': 'some value'},
+      );
+    });
+
+    test('last occurrence wins for duplicate keys', () {
+      expect(
+        GlobalEnvGroupsService.instance.parseEnvContent('K=first\nK=second'),
+        {'K': 'second'},
+      );
+    });
+
+    test('handles CRLF line endings', () {
+      expect(
+        GlobalEnvGroupsService.instance.parseEnvContent('A=1\r\nB=2\r\n'),
+        {'A': '1', 'B': '2'},
+      );
+    });
+  });
+
   group('GlobalEnvGroup.fromJson', () {
     test('parses valid JSON', () {
       final group = GlobalEnvGroup.fromJson({

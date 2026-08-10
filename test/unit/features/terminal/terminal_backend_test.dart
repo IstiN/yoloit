@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yoloit/core/platform/platform_shell.dart';
@@ -95,6 +96,60 @@ void main() {
 
     ResourceMonitorService.instance.unregisterSession(42);
     ResourceMonitorService.instance.unregisterRuntimeSession('board_terminal_1');
+  });
+
+  group('buffered utf8 decoder', () {
+    Future<List<String>> decode(List<List<int>> chunks) {
+      return Stream.fromIterable(chunks)
+          .transform(TerminalProcess.utf8DecoderForTesting())
+          .toList();
+    }
+
+    test('passes ascii through unchanged', () async {
+      expect(await decode([utf8.encode('hello')]), ['hello']);
+    });
+
+    test('buffers a 2-byte sequence split across chunks', () async {
+      // 'é' = 0xC3 0xA9
+      final chunks = [
+        [0x68, 0xC3], // 'h' + first byte of 'é'
+        [0xA9, 0x6C, 0x6C, 0x6F], // second byte + 'llo'
+      ];
+      expect(await decode(chunks), ['h', 'éllo']);
+    });
+
+    test('buffers a 3-byte sequence split across chunks', () async {
+      // '€' = 0xE2 0x82 0xAC
+      final chunks = [
+        [0xE2],
+        [0x82, 0xAC],
+      ];
+      expect(await decode(chunks), ['€']);
+    });
+
+    test('buffers a 4-byte sequence split across many chunks', () async {
+      // '🙂' = 0xF0 0x9F 0x99 0x82
+      final chunks = [
+        [0x61, 0xF0], // 'a' + first byte
+        [0x9F],
+        [0x99, 0x82],
+      ];
+      expect(await decode(chunks), ['a', '🙂']);
+    });
+
+    test('decodes immediately when a chunk ends on a boundary', () async {
+      final chunks = [utf8.encode('héllo'), utf8.encode('!')];
+      expect(await decode(chunks), ['héllo', '!']);
+    });
+
+    test('drops a lone continuation byte left in the carry', () async {
+      expect(await decode([[0x80]]), isEmpty);
+    });
+
+    test('replaces malformed lead bytes instead of crashing', () async {
+      final output = await decode([[0xFF, 0x61]]);
+      expect(output, ['\uFFFDa']);
+    });
   });
 }
 

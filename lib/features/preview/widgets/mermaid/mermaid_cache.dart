@@ -34,6 +34,24 @@ class MermaidRasterizedDiagramCache {
       LinkedHashMap<String, MermaidRasterizedDiagram>();
   static bool _renderMethodCallbackSet = false;
 
+  /// Test-only override for the SVG→PNG conversion (which normally shells
+  /// out to the bundled `resvg` binary), so cache behavior can be exercised
+  /// deterministically in tests.
+  @visibleForTesting
+  static Future<Uint8List> Function(
+    String svg, {
+    double? width,
+    double? height,
+    String? backgroundColor,
+  })? debugSvgToPngOverride;
+
+  /// Test-only hook that clears all cached entries between tests.
+  @visibleForTesting
+  static void debugReset() {
+    _entries.clear();
+    _resolved.clear();
+  }
+
   static String keyFor(String code, double width, {String variant = ''}) =>
       '${width.round()}:$variant:${code.length}:${code.hashCode}';
 
@@ -80,7 +98,8 @@ class MermaidRasterizedDiagramCache {
     final stopwatch = Stopwatch()..start();
     final future = () async {
       final svg = await renderer.renderToSvg(code, options: options);
-      final png = await MermaidRenderer.svgToPng(
+      final svgToPng = debugSvgToPngOverride ?? MermaidRenderer.svgToPng;
+      final png = await svgToPng(
         svg,
         width: width,
         backgroundColor: options.backgroundColor,

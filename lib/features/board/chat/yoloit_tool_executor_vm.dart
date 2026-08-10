@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:yoloit/core/cli/cli_server.dart';
 import 'package:yoloit/core/cli/cli_text_argument_resolver.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
@@ -24,6 +25,11 @@ class YoloitCliToolExecutor implements YoloitToolExecutor {
   final bool execute;
   final String? executablePath;
   final Duration timeout;
+
+  /// Test hook overriding the CLI server port used for the in-process `ui:`
+  /// invocation path, so tests can point it at a fake CLI HTTP server.
+  @visibleForTesting
+  static int? debugCliPortOverride;
 
   @override
   Future<String> invoke(
@@ -60,7 +66,7 @@ class YoloitCliToolExecutor implements YoloitToolExecutor {
     final guard = _preExecutionResult(tool, arguments, validation, rendered);
     if (guard != null) return guard;
 
-    final cliPort = CliServer.instance.port;
+    final cliPort = debugCliPortOverride ?? CliServer.instance.port;
     if (cliPort != null && tool.command.startsWith('ui:')) {
       final inProcess = await _tryInvokeInProcess(tool, normalized, cliPort);
       if (inProcess != null) return inProcess;

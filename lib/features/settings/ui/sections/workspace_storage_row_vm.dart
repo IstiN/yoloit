@@ -6,6 +6,23 @@ import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/ui/board_file_picker.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_cubit.dart';
 
+/// Test seams for [WorkspaceStorageRow] so widget tests never open the real
+/// directory picker or write to the real `~/.yoloit/config.json`.
+@visibleForTesting
+class WorkspaceStorageRowTestHooks {
+  const WorkspaceStorageRowTestHooks._();
+
+  /// Overrides [BoardFilePicker.pickDirectory].
+  static Future<String?> Function(
+    BuildContext context, {
+    String? initialPath,
+    String title,
+  })? pickDirectoryOverride;
+
+  /// Overrides [AppConfig.setWorkspacesFilePath].
+  static Future<void> Function(String newPath)? setWorkspacesFilePathOverride;
+}
+
 // ignore: must_be_immutable
 class WorkspaceStorageRow extends StatefulWidget {
   const WorkspaceStorageRow({super.key});
@@ -24,14 +41,20 @@ class WorkspaceStorageRowState extends State<WorkspaceStorageRow> {
   }
 
   Future<void> _pickDirectory(BuildContext context) async {
-    final result = await BoardFilePicker.pickDirectory(
+    final picker =
+        WorkspaceStorageRowTestHooks.pickDirectoryOverride ??
+        BoardFilePicker.pickDirectory;
+    final result = await picker(
       context,
       initialPath: p.dirname(_currentPath),
       title: 'Choose workspace storage folder',
     );
     if (result == null) return;
     final newPath = '$result/workspaces.json';
-    await AppConfig.instance.setWorkspacesFilePath(newPath);
+    final setPath =
+        WorkspaceStorageRowTestHooks.setWorkspacesFilePathOverride ??
+        AppConfig.instance.setWorkspacesFilePath;
+    await setPath(newPath);
     if (mounted) {
       setState(() => _currentPath = newPath);
       if (context.mounted) await context.read<WorkspaceCubit>().load();

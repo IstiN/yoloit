@@ -1,8 +1,11 @@
+import 'dart:io';
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/core/theme/app_theme.dart';
 import 'package:yoloit/features/editor/bloc/file_editor_cubit.dart';
@@ -344,6 +347,216 @@ void main() {
       expect(find.text('Copy path'), findsNothing);
       expect(clipboardText, isNull);
       expect(launcher.revealed, isEmpty);
+    });
+  });
+
+  group('file tree rename', () {
+    late Directory tempDir;
+
+    setUp(() {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      SharedPreferences.setMockInitialValues({});
+      tempDir = Directory.systemTemp.createTempSync('review_rename_test_');
+    });
+
+    tearDown(() {
+      if (tempDir.existsSync()) tempDir.deleteSync(recursive: true);
+    });
+
+    Future<void> pumpWithFile(WidgetTester tester, String fileName) async {
+      File('${tempDir.path}/$fileName').writeAsStringSync('content\n');
+      await tester.pumpWidget(_buildReviewTest(ReviewLoaded(
+        fileTree: [
+          FileTreeNode(
+            name: fileName,
+            path: '${tempDir.path}/$fileName',
+            isDirectory: false,
+          ),
+        ],
+        changedFiles: const [],
+      )));
+      await tester.pump();
+    }
+
+    Future<void> startRename(WidgetTester tester, String fileName) async {
+      await tester.tap(find.text(fileName), buttons: kSecondaryButton);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Rename'));
+      await tester.pumpAndSettle();
+      expect(find.widgetWithText(TextField, fileName), findsOneWidget);
+    }
+
+    testWidgets('committing a rename moves the file on disk', (tester) async {
+      await pumpWithFile(tester, 'old.txt');
+      await startRename(tester, 'old.txt');
+
+      await tester.enterText(find.byType(TextField), 'new.txt');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pump();
+
+      expect(File('${tempDir.path}/new.txt').existsSync(), isTrue);
+      expect(File('${tempDir.path}/old.txt').existsSync(), isFalse);
+      // The text field is closed after the commit.
+      expect(find.byType(TextField), findsNothing);
+    });
+
+    testWidgets('submitting the unchanged name closes without renaming',
+        (tester) async {
+      await pumpWithFile(tester, 'same.txt');
+      await startRename(tester, 'same.txt');
+
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pump();
+
+      expect(File('${tempDir.path}/same.txt').existsSync(), isTrue);
+      expect(find.byType(TextField), findsNothing);
+    });
+
+    testWidgets('submitting a blank name closes without renaming',
+        (tester) async {
+      await pumpWithFile(tester, 'keep.txt');
+      await startRename(tester, 'keep.txt');
+
+      await tester.enterText(find.byType(TextField), '   ');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pump();
+
+      expect(File('${tempDir.path}/keep.txt').existsSync(), isTrue);
+      expect(find.byType(TextField), findsNothing);
+    });
+
+    testWidgets('a failing rename surfaces a snackbar', (tester) async {
+      const bogusPath = '/nonexistent_dir_12345/ghost.txt';
+      await tester.pumpWidget(_buildReviewTest(const ReviewLoaded(
+        fileTree: [
+          FileTreeNode(name: 'ghost.txt', path: bogusPath, isDirectory: false),
+        ],
+        changedFiles: [],
+      )));
+      await tester.pump();
+
+      await tester.tap(find.text('ghost.txt'), buttons: kSecondaryButton);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Rename'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField), 'other.txt');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(find.textContaining('Rename failed'), findsOneWidget);
+
+      // Drain the snackbar timer.
+      await tester.pump(const Duration(seconds: 4));
+    });
+  });
+
+  group('review panel tab and node variants', () {
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+    });
+
+    testWidgets('switching to the DIFF tab groups staged and unstaged changes',
+        (tester) async {
+      await tester.pumpWidget(_buildReviewTest(const ReviewLoaded(
+        fileTree: [
+          FileTreeNode(name: 'repo_one', path: '/repos/one', isDirectory: true),
+          FileTreeNode(name: 'repo_two', path: '/repos/two', isDirectory: true),
+        ],
+        changedFiles: [
+          FileChange(
+            path: 'lib/staged.dart',
+            status: FileChangeStatus.added,
+            isStaged: true,
+            repoPath: '/repos/one',
+          ),
+          FileChange(
+            path: 'lib/dirty.dart',
+            status: FileChangeStatus.modified,
+            repoPath: '/repos/two',
+          ),
+        ],
+      )));
+      await tester.pump();
+
+      await tester.tap(find.text('DIFF'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('STAGED'), findsOneWidget);
+      expect(find.text('CHANGES'), findsOneWidget);
+      expect(find.text('one'), findsOneWidget);
+      expect(find.text('two'), findsOneWidget);
+      expect(find.text('lib/staged.dart'), findsOneWidget);
+      expect(find.text('lib/dirty.dart'), findsOneWidget);
+    });
+
+    testWidgets('DIFF tab shows placeholder when there are no changes',
+        (tester) async {
+      await tester.pumpWidget(_buildReviewTest(const ReviewLoaded(
+        fileTree: [],
+        changedFiles: [],
+      )));
+      await tester.pump();
+
+      await tester.tap(find.text('DIFF'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('No changes'), findsOneWidget);
+    });
+
+    testWidgets('tapping the run panel header collapses and expands it',
+        (tester) async {
+      await tester.pumpWidget(_buildReviewTest(const ReviewLoaded(
+        fileTree: [],
+        changedFiles: [],
+      )));
+      await tester.pump();
+
+      expect(find.byIcon(Icons.drag_handle), findsOneWidget);
+
+      await tester.tap(find.text('Run'));
+      await tester.pumpAndSettle();
+      expect(find.byIcon(Icons.drag_handle), findsNothing);
+
+      await tester.tap(find.text('Run'));
+      await tester.pumpAndSettle();
+      expect(find.byIcon(Icons.drag_handle), findsOneWidget);
+    });
+
+    testWidgets(
+        'expanded directories, modified markers and selection render',
+        (tester) async {
+      await tester.pumpWidget(_buildReviewTest(const ReviewLoaded(
+        fileTree: [
+          FileTreeNode(
+            name: 'lib',
+            path: '/project/lib',
+            isDirectory: true,
+            isExpanded: true,
+            children: [
+              FileTreeNode(
+                name: 'nested.dart',
+                path: '/project/lib/nested.dart',
+                isDirectory: false,
+              ),
+            ],
+          ),
+          FileTreeNode(
+            name: 'dirty.dart',
+            path: '/project/dirty.dart',
+            isDirectory: false,
+            isModified: true,
+          ),
+        ],
+        changedFiles: [],
+        selectedFilePath: '/project/lib/nested.dart',
+      )));
+      await tester.pump();
+
+      expect(find.text('nested.dart'), findsOneWidget);
+      expect(find.text('dirty.dart'), findsOneWidget);
+      expect(find.byIcon(Icons.expand_more), findsOneWidget);
     });
   });
 }

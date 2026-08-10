@@ -1,5 +1,3 @@
-import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -7,6 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yoloit/core/platform/platform_installer.dart';
 import 'package:yoloit/core/session/session_prefs.dart';
 import 'package:yoloit/features/updates/data/update_service.dart';
+
+import '../../../helpers/fake_http_overrides.dart';
 
 void main() {
   group('UpdateService.isVersionNewer', () {
@@ -107,6 +107,8 @@ void main() {
   });
 
   group('UpdateService.checkForUpdate', () {
+    late FakeHttpOverrides httpOverrides;
+
     setUpAll(() {
       TestWidgetsFlutterBinding.ensureInitialized();
       // Pin the "current" app version; the first check caches it statically.
@@ -115,10 +117,11 @@ void main() {
 
     setUp(() {
       SharedPreferences.setMockInitialValues(<String, Object>{});
-      _FakeHttpOverrides.requestCount = 0;
-      _FakeHttpOverrides.responder = (uri, headers) =>
-          _releaseResponse(200, tagName: 'v9.9.9');
-      HttpOverrides.global = _FakeHttpOverrides();
+      httpOverrides = FakeHttpOverrides(
+        responder: (uri, headers) =>
+            githubReleaseResponse(200, tagName: 'v9.9.9'),
+      );
+      HttpOverrides.global = httpOverrides;
     });
 
     tearDown(() {
@@ -128,7 +131,7 @@ void main() {
     test('dev builds never auto-check unless forced', () async {
       final result = await UpdateService.checkForUpdate();
       expect(result.status, UpdateCheckStatus.upToDate);
-      expect(_FakeHttpOverrides.requestCount, 0);
+      expect(httpOverrides.requestCount, 0);
     });
 
     test('reports an available update for a newer release', () async {
@@ -142,9 +145,9 @@ void main() {
 
     test('sends accept and user-agent headers', () async {
       Map<String, List<String>>? seen;
-      _FakeHttpOverrides.responder = (uri, headers) {
+      httpOverrides.responder = (uri, headers) {
         seen = headers.values;
-        return _releaseResponse(200, tagName: 'v9.9.9');
+        return githubReleaseResponse(200, tagName: 'v9.9.9');
       };
       await UpdateService.checkForUpdate(force: true);
       expect(seen, isNotNull);
@@ -159,8 +162,8 @@ void main() {
     });
 
     test('reports up-to-date for an older or equal release', () async {
-      _FakeHttpOverrides.responder =
-          (uri, headers) => _releaseResponse(200, tagName: 'v1.0.0');
+      httpOverrides.responder =
+          (uri, headers) => githubReleaseResponse(200, tagName: 'v1.0.0');
       final result = await UpdateService.checkForUpdate(force: true);
       expect(result.status, UpdateCheckStatus.upToDate);
     });
@@ -175,8 +178,8 @@ void main() {
     });
 
     test('fails gracefully on a non-200 response', () async {
-      _FakeHttpOverrides.responder =
-          (uri, headers) => _FakeHttpClientResponse(500, <int>[]);
+      httpOverrides.responder =
+          (uri, headers) => const FakeHttpResponse(500, <int>[]);
       final result = await UpdateService.checkForUpdate(force: true);
       expect(result.status, UpdateCheckStatus.failed);
       expect(
@@ -186,15 +189,15 @@ void main() {
     });
 
     test('fails with the rate-limit message on HTTP 403', () async {
-      _FakeHttpOverrides.responder =
-          (uri, headers) => _FakeHttpClientResponse(403, <int>[]);
+      httpOverrides.responder =
+          (uri, headers) => const FakeHttpResponse(403, <int>[]);
       final result = await UpdateService.checkForUpdate(force: true);
       expect(result.status, UpdateCheckStatus.failed);
       expect(result.errorMessage, contains('rate limit'));
     });
 
     test('fails with a network message on SocketException', () async {
-      _FakeHttpOverrides.responder =
+      httpOverrides.responder =
           (uri, headers) => throw const SocketException('offline');
       final result = await UpdateService.checkForUpdate(force: true);
       expect(result.status, UpdateCheckStatus.failed);
@@ -222,109 +225,4 @@ class _FakeInstaller extends PlatformInstaller {
 
   @override
   Future<void> launchAndExit(String launchToken) async {}
-}
-
-class _FakeHttpOverrides extends HttpOverrides {
-  static int requestCount = 0;
-  static _FakeHttpClientResponse Function(Uri uri, _FakeHttpHeaders headers)
-  responder =
-      (uri, headers) => _FakeHttpClientResponse(404, <int>[]);
-
-  @override
-  HttpClient createHttpClient(SecurityContext? context) =>
-      _FakeHttpClient((uri, headers) {
-        requestCount++;
-        return responder(uri, headers);
-      });
-}
-
-class _FakeHttpClient implements HttpClient {
-  _FakeHttpClient(this.respond);
-
-  final _FakeHttpClientResponse Function(Uri uri, _FakeHttpHeaders headers)
-  respond;
-
-  @override
-  Duration? connectionTimeout;
-
-  @override
-  Future<HttpClientRequest> getUrl(Uri url) async =>
-      _FakeHttpClientRequest(url, respond);
-
-  @override
-  void close({bool force = false}) {}
-
-  @override
-  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
-}
-
-class _FakeHttpClientRequest implements HttpClientRequest {
-  _FakeHttpClientRequest(this.uri, this.respond);
-
-  final Uri uri;
-  final _FakeHttpClientResponse Function(Uri uri, _FakeHttpHeaders headers)
-  respond;
-
-  @override
-  final _FakeHttpHeaders headers = _FakeHttpHeaders();
-
-  @override
-  Future<HttpClientResponse> close() async => respond(uri, headers);
-
-  @override
-  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
-}
-
-class _FakeHttpHeaders implements HttpHeaders {
-  final Map<String, List<String>> values = <String, List<String>>{};
-
-  @override
-  void set(String name, Object value, {bool preserveHeaderCase = false}) {
-    values[name.toLowerCase()] = <String>[value.toString()];
-  }
-
-  @override
-  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
-}
-
-class _FakeHttpClientResponse extends Stream<List<int>>
-    implements HttpClientResponse {
-  _FakeHttpClientResponse(this.statusCode, this.bodyBytes);
-
-  @override
-  final int statusCode;
-
-  final List<int> bodyBytes;
-
-  @override
-  StreamSubscription<List<int>> listen(
-    void Function(List<int> event)? onData, {
-    Function? onError,
-    void Function()? onDone,
-    bool? cancelOnError,
-  }) =>
-      Stream<List<int>>.value(bodyBytes).listen(
-        onData,
-        onError: onError,
-        onDone: onDone,
-        cancelOnError: cancelOnError,
-      );
-
-  @override
-  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
-}
-
-_FakeHttpClientResponse _releaseResponse(int status, {String tagName = ''}) {
-  final body = jsonEncode(<String, Object?>{
-    'tag_name': tagName,
-    'html_url': 'https://example.test/release/$tagName',
-    'body': 'notes',
-    'assets': <Map<String, Object?>>[
-      <String, Object?>{
-        'name': 'yoloit-macos-arm64-${tagName.replaceFirst('v', '')}.dmg',
-        'browser_download_url': 'https://example.test/download.dmg',
-      },
-    ],
-  });
-  return _FakeHttpClientResponse(status, utf8.encode(body));
 }

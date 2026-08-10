@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:yoloit/features/board/audio_recorder/transcription_service.dart';
 import 'package:yoloit/features/board/chat/cloud_asr_http_client.dart';
 import 'package:yoloit/features/settings/data/cloud_llm_settings_service.dart';
@@ -248,6 +248,16 @@ class CloudAsrService implements CloudTranscriber {
   static String _normalizedBaseUrl(String baseUrl) {
     return baseUrl.replaceFirst(RegExp(r'/+$'), '');
   }
+
+  /// Test hook for [_prepareTranscriptionUpload].
+  @visibleForTesting
+  Future<(String, String)> prepareTranscriptionUploadForTest({
+    required String audioPath,
+    required bool convertToMp3,
+  }) => _prepareTranscriptionUpload(
+    audioPath: audioPath,
+    convertToMp3: convertToMp3,
+  );
 
   Future<(String, String)> _prepareTranscriptionUpload({
     required String audioPath,

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:js_widget_runtime/js_widget_runtime.dart';
@@ -429,6 +430,238 @@ void main() {
       );
 
       expect(response.statusCode, 404);
+    });
+  });
+
+  group('demo apps and install-zip', () {
+    late _MockWidgetRegistryService mockRegistry;
+    late _MockWidgetAppRegistry mockAppRegistry;
+    late Directory tmp;
+    late Directory appsDir;
+
+    setUp(() {
+      mockRegistry = _MockWidgetRegistryService();
+      mockAppRegistry = _MockWidgetAppRegistry();
+      when(() => mockRegistry.find(any())).thenAnswer((_) async => null);
+      when(() => mockRegistry.loadAll()).thenAnswer((_) async => []);
+      tmp = Directory.systemTemp.createTempSync('apps_demo_test_');
+      appsDir = Directory('${tmp.path}/apps')..createSync(recursive: true);
+      debugAppsDirOverride = appsDir.path;
+    });
+
+    tearDown(() {
+      debugAppsDirOverride = null;
+      if (tmp.existsSync()) tmp.deleteSync(recursive: true);
+    });
+
+    Future<shelf.Response> callApps(
+      String method,
+      List<String> sub, {
+      Map<String, dynamic>? requestBody,
+    }) {
+      final path = '/api/apps/${sub.join('/')}';
+      final request =
+          method == 'POST'
+              ? _postRequest(path, body: requestBody)
+              : _getRequest(path);
+      return handleApps(
+        method,
+        sub,
+        request,
+        body: _body,
+        json: _json,
+        error: _error,
+        notFound: _notFound,
+        registryService: mockRegistry,
+        appRegistry: mockAppRegistry,
+      );
+    }
+
+    Directory writeDemo(String name, {String? manifest, String? widgetJs}) {
+      final dir = Directory('${appsDir.path}/$name')
+        ..createSync(recursive: true);
+      if (manifest != null) {
+        File('${dir.path}/manifest.json').writeAsStringSync(manifest);
+      }
+      if (widgetJs != null) {
+        File('${dir.path}/widget.js').writeAsStringSync(widgetJs);
+      }
+      return dir;
+    }
+
+    Future<File> zipDir(String zipName, Directory source) async {
+      final zipPath = '${tmp.path}/$zipName';
+      final result = await Process.run('zip', [
+        '-qr',
+        zipPath,
+        '.',
+      ], workingDirectory: source.path);
+      expect(result.exitCode, 0, reason: '${result.stderr}');
+      return File(zipPath);
+    }
+
+    Future<Map<String, dynamic>> jsonBody(shelf.Response response) async =>
+        jsonDecode(await response.readAsString()) as Map<String, dynamic>;
+
+    test('GET /demo returns empty list when apps dir is missing', () async {
+      debugAppsDirOverride = '${tmp.path}/missing';
+
+      final response = await callApps('GET', ['demo']);
+
+      expect(response.statusCode, 200);
+      expect((await jsonBody(response))['demos'], isEmpty);
+    });
+
+    test('GET /demo lists demos sorted by id with file paths', () async {
+      writeDemo(
+        'zebra',
+        manifest: '{"id": "zebra", "name": "Zebra"}',
+        widgetJs: '// z',
+      );
+      writeDemo(
+        'alpha',
+        manifest:
+            '{"id": "alpha", "name": "Alpha", "description": "First", '
+            '"icon": "A", "network": true}',
+        widgetJs: '// a',
+      );
+      Directory('${appsDir.path}/no-manifest').createSync();
+      writeDemo('broken', manifest: 'not-json');
+
+      final response = await callApps('GET', ['demo']);
+
+      expect(response.statusCode, 200);
+      final demos = (await jsonBody(response))['demos'] as List;
+      expect(demos.map((d) => (d as Map)['id']), ['alpha', 'zebra']);
+      final alpha = demos.first as Map<String, dynamic>;
+      expect(alpha['name'], 'Alpha');
+      expect(alpha['description'], 'First');
+      expect(alpha['icon'], 'A');
+      expect(alpha['network'], true);
+      expect(alpha['path'], '${appsDir.path}/alpha');
+      expect(alpha['files'], {
+        'manifest': '${appsDir.path}/alpha/manifest.json',
+        'widget': '${appsDir.path}/alpha/widget.js',
+      });
+    });
+
+    test('GET /demo/:id returns 400 for unknown demo', () async {
+      final response = await callApps('GET', ['demo', 'ghost']);
+
+      expect(response.statusCode, 400);
+      expect((await jsonBody(response))['error'], contains('ghost'));
+    });
+
+    test('GET /demo/:id returns manifest and widget source', () async {
+      writeDemo(
+        'clock',
+        manifest: '{"id": "clock", "name": "Clock"}',
+        widgetJs: 'console.log(1);',
+      );
+
+      final response = await callApps('GET', ['demo', 'clock']);
+
+      expect(response.statusCode, 200);
+      final body = await jsonBody(response);
+      expect(body['id'], 'clock');
+      expect(body['path'], '${appsDir.path}/clock');
+      expect(body['manifest'], {'id': 'clock', 'name': 'Clock'});
+      expect(body['manifestRaw'], '{"id": "clock", "name": "Clock"}');
+      expect(body['widgetJs'], 'console.log(1);');
+    });
+
+    test('GET /demo/:id tolerates invalid manifest and missing widget',
+        () async {
+      writeDemo('broken', manifest: 'not-json');
+
+      final response = await callApps('GET', ['demo', 'broken']);
+
+      expect(response.statusCode, 200);
+      final body = await jsonBody(response);
+      expect(body['manifest'], isEmpty);
+      expect(body['manifestRaw'], 'not-json');
+      expect(body['widgetJs'], isNull);
+    });
+
+    test('POST /install-zip installs app using the manifest id', () async {
+      final pkg = Directory('${tmp.path}/src/pkg')..createSync(recursive: true);
+      File('${pkg.path}/manifest.json').writeAsStringSync(
+        '{"id": "zipapp", "name": "Zip App"}',
+      );
+      File('${pkg.path}/widget.js').writeAsStringSync('// zipped');
+      final zip = await zipDir('whatever.zip', pkg.parent);
+
+      final response = await callApps(
+        'POST',
+        ['install-zip'],
+        requestBody: {'zipPath': zip.path},
+      );
+
+      expect(response.statusCode, 200);
+      final body = await jsonBody(response);
+      expect(body['ok'], true);
+      expect(body['appName'], 'zipapp');
+      expect(body['widget'], isNull);
+      expect(
+        File('${appsDir.path}/zipapp/widget.js').readAsStringSync(),
+        '// zipped',
+      );
+      // The temporary extraction directory is cleaned up.
+      expect(
+        appsDir.listSync().map((e) => e.path.split('/').last),
+        ['zipapp'],
+      );
+      verify(() => mockRegistry.find('zipapp')).called(1);
+    });
+
+    test('POST /install-zip falls back to the zip filename', () async {
+      final inner = Directory('${tmp.path}/plain_src/inner')
+        ..createSync(recursive: true);
+      File('${inner.path}/widget.js').writeAsStringSync('// plain');
+      final zip = await zipDir('plainapp.zip', inner.parent);
+
+      final response = await callApps(
+        'POST',
+        ['install-zip'],
+        requestBody: {'zipPath': zip.path},
+      );
+
+      expect(response.statusCode, 200);
+      expect((await jsonBody(response))['appName'], 'plainapp');
+      expect(File('${appsDir.path}/plainapp/widget.js').existsSync(), true);
+    });
+
+    test('POST /install-zip falls back to the extract dir without app files',
+        () async {
+      final src = Directory('${tmp.path}/docs_src')..createSync();
+      File('${src.path}/readme.txt').writeAsStringSync('hello');
+      final zip = await zipDir('docsapp.zip', src);
+
+      final response = await callApps(
+        'POST',
+        ['install-zip'],
+        requestBody: {'zipPath': zip.path},
+      );
+
+      expect(response.statusCode, 200);
+      final body = await jsonBody(response);
+      expect(body['ok'], true);
+      expect(body['appName'], 'docsapp');
+      expect(File('${appsDir.path}/docsapp/readme.txt').existsSync(), true);
+    });
+
+    test('POST /install-zip reports extraction failure', () async {
+      final bad = File('${tmp.path}/bad.zip')..writeAsBytesSync([1, 2, 3, 4]);
+
+      final response = await callApps(
+        'POST',
+        ['install-zip'],
+        requestBody: {'zipPath': bad.path},
+      );
+
+      expect(response.statusCode, 400);
+      expect((await jsonBody(response))['error'],
+          contains('Failed to extract ZIP'));
     });
   });
 }

@@ -32,9 +32,10 @@ BoardPanelInstance _panel({Map<String, dynamic> state = const {}}) =>
     );
 
 class _FakeBackend extends JsWidgetEngineBackend {
-  _FakeBackend({required this.onRender});
+  _FakeBackend({required this.onRender, this.label});
 
   final void Function(Map<String, dynamic> tree) onRender;
+  final String? label;
 
   @override
   Future<void> init() async {}
@@ -45,7 +46,11 @@ class _FakeBackend extends JsWidgetEngineBackend {
     String? hostBootstrapJs,
     Map<String, dynamic> initialTheme = const {},
   }) async {
-    onRender({'type': 'text', 'data': 'Hello from widget'});
+    final id = label;
+    onRender({
+      'type': 'text',
+      'data': id == null ? 'Hello from widget' : 'widget:$id',
+    });
   }
 
   @override
@@ -66,6 +71,31 @@ class _FakeBackend extends JsWidgetEngineBackend {
   @override
   Map<String, dynamic>? get exportedState => null;
 }
+
+WidgetEngineManager _fakeEngineManager() => WidgetEngineManager.testInstance(
+  engineFactory:
+      (config) => JsWidgetEngine(
+        config: config.copyWith(
+          backend: _FakeBackend(
+            onRender: config.onRender,
+            label: config.widgetId,
+          ),
+        ),
+      ),
+  manifestFinder:
+      (id) async => WidgetManifest(
+        id: id,
+        name: 'Test',
+        description: '',
+        version: '1.0.0',
+        icon: '🔧',
+        allowedCommands: const [],
+        networkEnabled: true,
+        widgetPath: 'widgets/$id',
+        isSingleFile: false,
+      ),
+  jsLoader: (manifest, reader) async => '// noop',
+);
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -200,13 +230,13 @@ void main() {
       tester,
     ) async {
       Map<String, dynamic>? updatedState;
-      final manifest = WidgetManifest(
+      const manifest = WidgetManifest(
         id: 'weather',
         name: 'Weather',
         description: 'A weather widget',
         version: '1.0.0',
         icon: '🌤️',
-        allowedCommands: const [],
+        allowedCommands: [],
         networkEnabled: true,
         widgetPath: 'widgets/weather',
         isSingleFile: false,
@@ -274,6 +304,74 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
       expect(find.text('Hello from widget'), findsOneWidget);
+    });
+
+    testWidgets('didUpdateWidget reloads engine when widgetId changes', (
+      tester,
+    ) async {
+      final engineManager = _fakeEngineManager();
+
+      Widget build(String widgetId) => MaterialApp(
+        home: Scaffold(
+          body: CustomWidgetContent(
+            panel: _panel(state: {'widgetId': widgetId}),
+            renderContext: _dummyContext(),
+            engineManager: engineManager,
+          ),
+        ),
+      );
+
+      await tester.pumpWidget(build('one'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.text('widget:one'), findsOneWidget);
+
+      await tester.pumpWidget(build('two'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.text('widget:two'), findsOneWidget);
+      expect(find.text('widget:one'), findsNothing);
+    });
+
+    testWidgets('didUpdateWidget reapplies env vars without engine reload', (
+      tester,
+    ) async {
+      final engineManager = _fakeEngineManager();
+
+      Widget build(Map<String, dynamic> state) => MaterialApp(
+        home: Scaffold(
+          body: CustomWidgetContent(
+            panel: _panel(state: state),
+            renderContext: _dummyContext(),
+            engineManager: engineManager,
+          ),
+        ),
+      );
+
+      await tester.pumpWidget(
+        build({
+          'widgetId': 'one',
+          '_customEnvVars': {'A': '1'},
+        }),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.text('widget:one'), findsOneWidget);
+      final engine = engineManager.engine('p1');
+
+      // Same widgetId, changed env state: env vars re-applied in place.
+      await tester.pumpWidget(
+        build({
+          'widgetId': 'one',
+          '_customEnvVars': {'A': '2'},
+        }),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.text('widget:one'), findsOneWidget);
+      expect(engineManager.engine('p1'), same(engine));
     });
   });
 }

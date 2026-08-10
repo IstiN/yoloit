@@ -31,7 +31,14 @@ Map<String, dynamic> initialPanelStateForBoard(
   if (typeId == kTerminalPluginTypeId) {
     final rawConfig = initialState['config'];
     final config = BoardTerminalConfig.fromJson(
-      Map<String, dynamic>.from(rawConfig is Map ? rawConfig : const {}),
+      <String, dynamic>{
+        // Defaults keep a missing/partial config from throwing — the chat
+        // branch above gets the same tolerance from ChatSessionConfig.
+        'sessionId': '',
+        'sessionName': '',
+        'workingDir': '',
+        if (rawConfig is Map) ...Map<String, dynamic>.from(rawConfig),
+      },
     );
     return {
       ...initialState,

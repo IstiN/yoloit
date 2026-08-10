@@ -60,6 +60,11 @@ class WidgetEngineManager {
   BoardCubit? _cubit;
   void setCubit(BoardCubit cubit) => _cubit = cubit;
 
+  /// Test seam: overrides the yoloit CLI binary path used by `_onExec` so
+  /// unit tests do not depend on the real installed CLI.
+  @visibleForTesting
+  static String? debugYoloitBinPath;
+
   final Map<String, _WidgetEngineEntry> _engines = {};
   final Map<String, Map<String, String>> _envVars = {};
 
@@ -333,7 +338,9 @@ class WidgetEngineManager {
       return;
     }
     try {
-      final yoloitBin = '${Platform.environment['HOME']}/.config/yoloit/yoloit';
+      final yoloitBin =
+          debugYoloitBinPath ??
+          '${Platform.environment['HOME']}/.config/yoloit/yoloit';
       final cmdArgs = cmd.substring('yoloit'.length).trim().split(
         RegExp(r'\s+'),
       );

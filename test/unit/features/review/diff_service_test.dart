@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yoloit/features/review/data/diff_service.dart';
 import 'package:yoloit/features/review/models/review_models.dart';
@@ -111,6 +113,75 @@ void main() {
       const rawDiff = '@@ -42,6 +42,7 @@ class Foo {\n context\n';
       final hunks = service.parseDiff(rawDiff);
       expect(hunks.first.header, contains('@@ -42,6 +42,7 @@'));
+    });
+  });
+
+  group('DiffService.getChangedFiles', () {
+    late Directory repo;
+
+    Future<void> git(List<String> args) async {
+      final result = await Process.run(
+        'git',
+        ['-c', 'user.email=test@example.com', '-c', 'user.name=Test', ...args],
+        workingDirectory: repo.path,
+      );
+      expect(result.exitCode, 0, reason: 'git ${args.join(' ')}: ${result.stderr}');
+    }
+
+    setUp(() async {
+      repo = Directory.systemTemp.createTempSync('diff_service_test_');
+      await git(['init']);
+      File('${repo.path}/committed.txt').writeAsStringSync('base\n');
+      File('${repo.path}/deleted.txt').writeAsStringSync('gone\n');
+      File('${repo.path}/renamed_old.txt').writeAsStringSync('rename me\n');
+      await git(['add', '.']);
+      await git(['commit', '-m', 'init']);
+    });
+
+    tearDown(() {
+      if (repo.existsSync()) repo.deleteSync(recursive: true);
+    });
+
+    test('maps porcelain statuses to file change statuses', () async {
+      // Working tree modifications covering every status branch.
+      File('${repo.path}/committed.txt').writeAsStringSync('changed\n');
+      File('${repo.path}/deleted.txt').deleteSync();
+      await git(['mv', 'renamed_old.txt', 'renamed_new.txt']);
+      File('${repo.path}/staged.txt').writeAsStringSync('staged\n');
+      await git(['add', 'staged.txt']);
+      File('${repo.path}/untracked.txt').writeAsStringSync('untracked\n');
+
+      final changes = await service.getChangedFiles(repo.path);
+      final byPath = {for (final c in changes) c.path: c};
+
+      expect(byPath['committed.txt']!.status, FileChangeStatus.modified);
+      expect(byPath['committed.txt']!.isStaged, isFalse);
+      expect(byPath['committed.txt']!.repoPath, repo.path);
+
+      expect(byPath['deleted.txt']!.status, FileChangeStatus.deleted);
+
+      expect(byPath['staged.txt']!.status, FileChangeStatus.added);
+      expect(byPath['staged.txt']!.isStaged, isTrue);
+
+      final renamed = byPath.values.singleWhere(
+        (c) => c.path.contains('renamed_new.txt'),
+      );
+      expect(renamed.status, FileChangeStatus.renamed);
+
+      expect(byPath['untracked.txt']!.status, FileChangeStatus.untracked);
+    });
+
+    test('returns empty list for a clean repository', () async {
+      final changes = await service.getChangedFiles(repo.path);
+      expect(changes, isEmpty);
+    });
+
+    test('returns empty list for a path that is not a git repo', () async {
+      final plain = Directory.systemTemp.createTempSync('diff_service_plain_');
+      addTearDown(() => plain.deleteSync(recursive: true));
+
+      final changes = await service.getChangedFiles(plain.path);
+      expect(changes, isEmpty);
     });
   });
 }

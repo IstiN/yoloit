@@ -16,6 +16,8 @@ import 'package:yoloit/features/terminal/bloc/terminal_cubit.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_state.dart';
 import 'package:yoloit/features/terminal/models/agent_session.dart';
 import 'package:yoloit/features/terminal/models/agent_type.dart';
+import 'package:yoloit/features/updates/data/update_service.dart';
+import 'package:yoloit/features/updates/ui/update_banner.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_cubit.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_state.dart';
 import 'package:yoloit/features/workspaces/models/workspace.dart';
@@ -376,6 +378,241 @@ void main() {
 
       expect(find.text('RESOURCE USAGE'), findsNothing);
       expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('auto-update flow', () {
+    const info = UpdateInfo(
+      version: '9.9.9',
+      tagName: 'v9.9.9',
+      releaseUrl: 'https://example.com/release',
+      releaseNotes: 'notes',
+      downloadUrl: 'https://example.com/yoloit.dmg',
+    );
+
+    tearDown(() {
+      AutoUpdateTestHooks.isDevBuildOverride = null;
+      AutoUpdateTestHooks.checkForUpdateOverride = null;
+      AutoUpdateTestHooks.downloadAndPrepareOverride = null;
+    });
+
+    Future<void> pumpUpdateShell(WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1920, 1080);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final terminal = _FakeTerminalCubit();
+      addTearDown(terminal.close);
+
+      await tester.pumpWidget(
+        _shellApp(
+          terminal: terminal,
+          workspace: _FakeWorkspaceCubit(),
+          review: _FakeReviewCubit(),
+          run: _FakeRunCubit(),
+          editor: _FakeFileEditorCubit(),
+          board: _FakeBoardCubit(),
+        ),
+      );
+      await tester.pump();
+    }
+
+    testWidgets('dev builds never auto-check for updates', (tester) async {
+      var checked = false;
+      AutoUpdateTestHooks.checkForUpdateOverride = () async {
+        checked = true;
+        return UpdateCheckResult.upToDate();
+      };
+      // isDevBuildOverride left null -> UpdateService.isDevBuild (true here).
+
+      await pumpUpdateShell(tester);
+      await tester.pump(const Duration(seconds: 4));
+
+      expect(checked, isFalse);
+      expect(find.byType(AutoUpdateBanner), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('disabled auto-check pref skips the update check', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({
+        'app.setupCompleted': true,
+        'updates.autoCheck': false,
+      });
+      var checked = false;
+      AutoUpdateTestHooks.isDevBuildOverride = false;
+      AutoUpdateTestHooks.checkForUpdateOverride = () async {
+        checked = true;
+        return UpdateCheckResult.upToDate();
+      };
+
+      await pumpUpdateShell(tester);
+      await tester.pump(const Duration(seconds: 4));
+
+      expect(checked, isFalse);
+      expect(find.byType(AutoUpdateBanner), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('a check within the last 24h is throttled', (tester) async {
+      SharedPreferences.setMockInitialValues({
+        'app.setupCompleted': true,
+        'updates.lastCheckMs': DateTime.now().millisecondsSinceEpoch,
+      });
+      var checked = false;
+      AutoUpdateTestHooks.isDevBuildOverride = false;
+      AutoUpdateTestHooks.checkForUpdateOverride = () async {
+        checked = true;
+        return UpdateCheckResult.upToDate();
+      };
+
+      await pumpUpdateShell(tester);
+      await tester.pump(const Duration(seconds: 4));
+
+      expect(checked, isFalse);
+      expect(find.byType(AutoUpdateBanner), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('up-to-date result shows no banner', (tester) async {
+      var checked = false;
+      AutoUpdateTestHooks.isDevBuildOverride = false;
+      AutoUpdateTestHooks.checkForUpdateOverride = () async {
+        checked = true;
+        return UpdateCheckResult.upToDate();
+      };
+
+      await pumpUpdateShell(tester);
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pump();
+
+      expect(checked, isTrue);
+      expect(find.byType(AutoUpdateBanner), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('available update downloads and shows the ready banner', (
+      tester,
+    ) async {
+      AutoUpdateTestHooks.isDevBuildOverride = false;
+      AutoUpdateTestHooks.checkForUpdateOverride =
+          () async => UpdateCheckResult.available(info);
+      final progressEvents = <double?>[];
+      AutoUpdateTestHooks.downloadAndPrepareOverride = (
+        info, {
+        required onProgress,
+      }) async {
+        onProgress(0.25, 'Downloading…');
+        progressEvents.add(0.25);
+        onProgress(null, 'Preparing…');
+        progressEvents.add(null);
+        return 'token-1';
+      };
+
+      await pumpUpdateShell(tester);
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pump();
+
+      expect(progressEvents, [0.25, null]);
+      expect(find.byType(AutoUpdateBanner), findsOneWidget);
+      expect(find.textContaining('ready — restarting'), findsOneWidget);
+
+      // Dismiss via "Later" so the restart countdown never fires.
+      await tester.tap(find.text('Later'));
+      await tester.pump();
+      expect(find.byType(AutoUpdateBanner), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('download failure shows the error banner', (tester) async {
+      AutoUpdateTestHooks.isDevBuildOverride = false;
+      AutoUpdateTestHooks.checkForUpdateOverride =
+          () async => UpdateCheckResult.available(info);
+      AutoUpdateTestHooks.downloadAndPrepareOverride = (
+        info, {
+        required onProgress,
+      }) async {
+        throw Exception('network boom');
+      };
+
+      await pumpUpdateShell(tester);
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pump();
+
+      expect(find.byType(AutoUpdateBanner), findsOneWidget);
+      expect(find.text('Update failed: network boom'), findsOneWidget);
+
+      // Dismiss via the banner's close icon.
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AutoUpdateBanner),
+          matching: find.byIcon(Icons.close),
+        ),
+      );
+      await tester.pump();
+      expect(find.byType(AutoUpdateBanner), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('four-pane canvas', () {
+    tearDown(() {
+      MainShell.debugForcePanesCanvas = false;
+    });
+
+    testWidgets('renders all panes and toggles them via intents', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(1920, 1080);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      MainShell.debugForcePanesCanvas = true;
+
+      final terminal = _FakeTerminalCubit();
+      addTearDown(terminal.close);
+
+      await tester.pumpWidget(
+        _shellApp(
+          terminal: terminal,
+          workspace: _FakeWorkspaceCubit(),
+          review: _FakeReviewCubit(),
+          run: _FakeRunCubit(),
+          editor: _FakeFileEditorCubit(),
+          board: _FakeBoardCubit(),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.text('WORKSPACES'), findsOneWidget);
+      expect(find.text('AGENTS'), findsOneWidget);
+      expect(find.text('FILE TREE'), findsOneWidget);
+
+      final context = tester.element(find.byType(Scaffold));
+
+      // Close every pane, then reopen — exercises the empty-state filler
+      // and the hidden branches of each pane section.
+      Actions.invoke(context, const ToggleWorkspacePanelIntent());
+      Actions.invoke(context, const ToggleTerminalPanelIntent());
+      Actions.invoke(context, const ToggleReviewPanelIntent());
+      await tester.pump();
+
+      expect(find.text('WORKSPACES'), findsNothing);
+      expect(find.text('AGENTS'), findsNothing);
+      expect(find.text('FILE TREE'), findsNothing);
+
+      Actions.invoke(context, const ToggleWorkspacePanelIntent());
+      Actions.invoke(context, const ToggleTerminalPanelIntent());
+      Actions.invoke(context, const ToggleReviewPanelIntent());
+      await tester.pump();
+
+      expect(find.text('WORKSPACES'), findsOneWidget);
+      expect(find.text('AGENTS'), findsOneWidget);
+      expect(find.text('FILE TREE'), findsOneWidget);
+
+      expect(tester.takeException(), isNull);
+      await tester.pump(const Duration(seconds: 4));
     });
   });
 

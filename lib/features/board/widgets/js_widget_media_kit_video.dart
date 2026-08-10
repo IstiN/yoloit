@@ -17,10 +17,18 @@ class MediaKitVideoController extends JsVideoController {
   final _aspectRatio = StreamController<double?>.broadcast();
   final List<StreamSubscription<dynamic>> _subs = [];
 
+  /// Test seams: override native player/controller construction in [create]
+  /// so unit tests can run without libmpv.
+  @visibleForTesting
+  static Player Function()? debugPlayerFactory;
+  @visibleForTesting
+  static VideoController Function(Player player)? debugVideoControllerFactory;
+
   /// Creates a fully initialized controller.
   static Future<MediaKitVideoController> create(String src) async {
-    final player = Player();
-    final controller = VideoController(player);
+    final player = debugPlayerFactory?.call() ?? Player();
+    final controller =
+        debugVideoControllerFactory?.call(player) ?? VideoController(player);
     final instance = MediaKitVideoController._(player, controller);
     instance._subs.addAll([
       player.stream.position.listen(instance._position.add),

@@ -1,145 +1,30 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yoloit/core/remote/board_share_server.dart';
-import 'package:yoloit/core/theme/app_theme.dart';
 import 'package:yoloit/core/ui/adaptive_dialog.dart';
-import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/bloc/board_state.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
-import 'package:yoloit/features/board/plugins/builtin/markdown_note_plugin.dart';
 import 'package:yoloit/features/board/tools/board_tool.dart';
 import 'package:yoloit/features/board/ui/board_view.dart';
 
-/// Seeded cubit that keeps remote operations offline and records connect
-/// attempts so `_connectRemoteYoloit` can be exercised end to end.
-class _TestBoardCubit extends BoardCubit {
-  _TestBoardCubit(BoardState state) {
-    emit(state);
-  }
-
-  Object? connectError;
-  String? connectedUrl;
-  String? connectedToken;
-  List<BoardDocument> connectResult = const [];
-
-  @override
-  Future<void> refreshRemoteBoards({String? url}) async {}
-
-  @override
-  Future<List<BoardDocument>> connectRemoteBoards({
-    required String url,
-    String? token,
-  }) async {
-    final error = connectError;
-    if (error != null) throw error;
-    connectedUrl = url;
-    connectedToken = token;
-    return connectResult;
-  }
-}
-
-BoardPanelInstance _note(
-  String id,
-  String title, {
-  double x = 56,
-  double y = 74,
-  double width = 520,
-  double height = 300,
-  bool hidden = false,
-}) {
-  return BoardPanelInstance(
-    id: id,
-    type: MarkdownNotePlugin.kTypeId,
-    title: title,
-    bounds: BoardPanelBounds(x: x, y: y, width: width, height: height),
-    hidden: hidden,
-    state: {'markdown': title},
-  );
-}
-
-BoardDocument _board({
-  String id = 'board',
-  String name = 'Board',
-  bool archived = false,
-  List<BoardPanelInstance> panels = const [],
-  List<BoardPanelGroup> groups = const [],
-}) {
-  return BoardDocument(
-    id: id,
-    name: name,
-    archived: archived,
-    viewport: const BoardViewport(scale: 1),
-    panels: panels,
-    groups: groups,
-  );
-}
-
-void _setSurface(WidgetTester tester) {
-  tester.view.physicalSize = const Size(1200, 760);
-  tester.view.devicePixelRatio = 1;
-  addTearDown(tester.view.resetPhysicalSize);
-  addTearDown(tester.view.resetDevicePixelRatio);
-}
-
-Future<void> _pumpBoard(
-  WidgetTester tester,
-  BoardCubit cubit, {
-  bool skipOverviewPreviewCapture = true,
-}) async {
-  await tester.pumpWidget(
-    MaterialApp(
-      theme: AppThemePreset.neonPurple.theme,
-      home: Scaffold(
-        body: BlocProvider.value(
-          value: cubit,
-          child: BoardView(
-            skipOverviewPreviewCapture: skipOverviewPreviewCapture,
-          ),
-        ),
-      ),
-    ),
-  );
-  await tester.pump(const Duration(milliseconds: 450));
-}
+import 'board_view_test_harness.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  const recordChannel = MethodChannel('com.llfbandit.record/messages');
 
-  setUpAll(() {
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(recordChannel, (call) async {
-          switch (call.method) {
-            case 'create':
-              return 1;
-            case 'dispose':
-            case 'hasPermission':
-            case 'isRecording':
-            case 'isPaused':
-              return false;
-            default:
-              return null;
-          }
-        });
-  });
-
-  tearDownAll(() {
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(recordChannel, null);
-  });
+  setUpAll(installBoardViewChannelMocks);
+  tearDownAll(removeBoardViewChannelMocks);
 
   testWidgets('shape catalog entry creates a frame panel', (tester) async {
     SharedPreferences.setMockInitialValues({});
-    _setSurface(tester);
+    setBoardViewSurface(tester);
 
-    final cubit = _TestBoardCubit(
-      BoardState(boards: [_board()], activeBoardId: 'board', isLoaded: true),
+    final cubit = TestBoardViewCubit(
+      BoardState(boards: [boardTestBoard()], activeBoardId: 'board', isLoaded: true),
     );
     addTearDown(cubit.close);
-    await _pumpBoard(tester, cubit);
+    await pumpBoardView(tester, cubit);
 
     await tester.tap(find.byTooltip('Miro basics'));
     await tester.pump();
@@ -161,13 +46,13 @@ void main() {
     tester,
   ) async {
     SharedPreferences.setMockInitialValues({});
-    _setSurface(tester);
+    setBoardViewSurface(tester);
 
-    final cubit = _TestBoardCubit(
-      BoardState(boards: [_board()], activeBoardId: 'board', isLoaded: true),
+    final cubit = TestBoardViewCubit(
+      BoardState(boards: [boardTestBoard()], activeBoardId: 'board', isLoaded: true),
     );
     addTearDown(cubit.close);
-    await _pumpBoard(tester, cubit);
+    await pumpBoardView(tester, cubit);
 
     await tester.tap(find.byTooltip('Miro basics'));
     await tester.pump();
@@ -187,13 +72,13 @@ void main() {
     tester,
   ) async {
     SharedPreferences.setMockInitialValues({});
-    _setSurface(tester);
+    setBoardViewSurface(tester);
 
-    final cubit = _TestBoardCubit(
-      BoardState(boards: [_board()], activeBoardId: 'board', isLoaded: true),
+    final cubit = TestBoardViewCubit(
+      BoardState(boards: [boardTestBoard()], activeBoardId: 'board', isLoaded: true),
     );
     addTearDown(cubit.close);
-    await _pumpBoard(tester, cubit);
+    await pumpBoardView(tester, cubit);
 
     final state =
         tester.state(find.byType(BoardView)) as dynamic; // ignore: avoid_dynamic_calls
@@ -231,13 +116,13 @@ void main() {
     tester,
   ) async {
     SharedPreferences.setMockInitialValues({});
-    _setSurface(tester);
+    setBoardViewSurface(tester);
 
-    final cubit = _TestBoardCubit(
-      BoardState(boards: [_board()], activeBoardId: 'board', isLoaded: true),
+    final cubit = TestBoardViewCubit(
+      BoardState(boards: [boardTestBoard()], activeBoardId: 'board', isLoaded: true),
     );
     addTearDown(cubit.close);
-    await _pumpBoard(tester, cubit);
+    await pumpBoardView(tester, cubit);
 
     final state =
         tester.state(find.byType(BoardView)) as dynamic; // ignore: avoid_dynamic_calls
@@ -267,19 +152,19 @@ void main() {
     tester,
   ) async {
     SharedPreferences.setMockInitialValues({});
-    _setSurface(tester);
+    setBoardViewSurface(tester);
 
-    final board = _board(
+    final board = boardTestBoard(
       panels: [
-        _note('p1', 'Source'),
-        _note('p2', 'Target', x: 640, width: 260, height: 180),
+        boardTestNote('p1', 'Source'),
+        boardTestNote('p2', 'Target', x: 640, width: 260, height: 180),
       ],
     );
-    final cubit = _TestBoardCubit(
+    final cubit = TestBoardViewCubit(
       BoardState(boards: [board], activeBoardId: 'board', isLoaded: true),
     );
     addTearDown(cubit.close);
-    await _pumpBoard(tester, cubit);
+    await pumpBoardView(tester, cubit);
 
     await tester.tap(find.byTooltip('Connect (C)'));
     await tester.pump();
@@ -333,14 +218,14 @@ void main() {
     tester,
   ) async {
     SharedPreferences.setMockInitialValues({});
-    _setSurface(tester);
+    setBoardViewSurface(tester);
 
-    final board = _board(panels: [_note('target', 'Article draft')]);
-    final cubit = _TestBoardCubit(
+    final board = boardTestBoard(panels: [boardTestNote('target', 'Article draft')]);
+    final cubit = TestBoardViewCubit(
       BoardState(boards: [board], activeBoardId: 'board', isLoaded: true),
     );
     addTearDown(cubit.close);
-    await _pumpBoard(tester, cubit);
+    await pumpBoardView(tester, cubit);
 
     await tester.tap(find.byTooltip('More actions'));
     await tester.pump();
@@ -360,19 +245,19 @@ void main() {
 
   testWidgets('rename group dialog renames the group', (tester) async {
     SharedPreferences.setMockInitialValues({});
-    _setSurface(tester);
+    setBoardViewSurface(tester);
 
-    final board = _board(
-      panels: [_note('p1', 'Grouped note')],
+    final board = boardTestBoard(
+      panels: [boardTestNote('p1', 'Grouped note')],
       groups: const [
         BoardPanelGroup(id: 'g1', name: 'Sprint', panelIds: ['p1']),
       ],
     );
-    final cubit = _TestBoardCubit(
+    final cubit = TestBoardViewCubit(
       BoardState(boards: [board], activeBoardId: 'board', isLoaded: true),
     );
     addTearDown(cubit.close);
-    await _pumpBoard(tester, cubit);
+    await pumpBoardView(tester, cubit);
 
     await tester.tap(find.byTooltip('Rename'));
     await tester.pump();
@@ -397,19 +282,19 @@ void main() {
     tester,
   ) async {
     SharedPreferences.setMockInitialValues({});
-    _setSurface(tester);
+    setBoardViewSurface(tester);
 
-    final board = _board(
-      panels: [_note('p1', 'Grouped note')],
+    final board = boardTestBoard(
+      panels: [boardTestNote('p1', 'Grouped note')],
       groups: const [
         BoardPanelGroup(id: 'g1', name: 'Sprint', panelIds: ['p1']),
       ],
     );
-    final cubit = _TestBoardCubit(
+    final cubit = TestBoardViewCubit(
       BoardState(boards: [board], activeBoardId: 'board', isLoaded: true),
     );
     addTearDown(cubit.close);
-    await _pumpBoard(tester, cubit);
+    await pumpBoardView(tester, cubit);
 
     await tester.tap(find.byTooltip('Rename'));
     await tester.pump();
@@ -441,11 +326,11 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    final cubit = _TestBoardCubit(
-      BoardState(boards: [_board()], activeBoardId: 'board', isLoaded: true),
+    final cubit = TestBoardViewCubit(
+      BoardState(boards: [boardTestBoard()], activeBoardId: 'board', isLoaded: true),
     );
     addTearDown(cubit.close);
-    await _pumpBoard(tester, cubit);
+    await pumpBoardView(tester, cubit);
 
     await tester.tap(find.text('Settings'));
     await tester.pump();
@@ -472,17 +357,17 @@ void main() {
 
   testWidgets('board settings unarchives an archived board', (tester) async {
     SharedPreferences.setMockInitialValues({});
-    _setSurface(tester);
+    setBoardViewSurface(tester);
 
-    final cubit = _TestBoardCubit(
+    final cubit = TestBoardViewCubit(
       BoardState(
-        boards: [_board(archived: true)],
+        boards: [boardTestBoard(archived: true)],
         activeBoardId: 'board',
         isLoaded: true,
       ),
     );
     addTearDown(cubit.close);
-    await _pumpBoard(tester, cubit);
+    await pumpBoardView(tester, cubit);
 
     await tester.tap(find.text('Settings'));
     await tester.pump();
@@ -502,13 +387,13 @@ void main() {
     tester,
   ) async {
     SharedPreferences.setMockInitialValues({});
-    _setSurface(tester);
+    setBoardViewSurface(tester);
 
-    final cubit = _TestBoardCubit(
-      BoardState(boards: [_board()], activeBoardId: 'board', isLoaded: true),
+    final cubit = TestBoardViewCubit(
+      BoardState(boards: [boardTestBoard()], activeBoardId: 'board', isLoaded: true),
     );
     addTearDown(cubit.close);
-    await _pumpBoard(tester, cubit);
+    await pumpBoardView(tester, cubit);
 
     await tester.tap(find.text('Settings'));
     await tester.pump();
@@ -537,17 +422,17 @@ void main() {
     tester,
   ) async {
     SharedPreferences.setMockInitialValues({});
-    _setSurface(tester);
+    setBoardViewSurface(tester);
 
-    final cubit = _TestBoardCubit(
-      BoardState(boards: [_board()], activeBoardId: 'board', isLoaded: true),
+    final cubit = TestBoardViewCubit(
+      BoardState(boards: [boardTestBoard()], activeBoardId: 'board', isLoaded: true),
     );
     cubit.connectResult = const [
       BoardDocument(id: 'remote-1', name: 'Remote One'),
       BoardDocument(id: 'remote-2', name: 'Remote Two'),
     ];
     addTearDown(cubit.close);
-    await _pumpBoard(tester, cubit);
+    await pumpBoardView(tester, cubit);
 
     await tester.tap(find.text('Remote'));
     await tester.pump();
@@ -578,14 +463,14 @@ void main() {
     tester,
   ) async {
     SharedPreferences.setMockInitialValues({});
-    _setSurface(tester);
+    setBoardViewSurface(tester);
 
-    final cubit = _TestBoardCubit(
-      BoardState(boards: [_board()], activeBoardId: 'board', isLoaded: true),
+    final cubit = TestBoardViewCubit(
+      BoardState(boards: [boardTestBoard()], activeBoardId: 'board', isLoaded: true),
     );
     cubit.connectError = StateError('server unreachable');
     addTearDown(cubit.close);
-    await _pumpBoard(tester, cubit);
+    await pumpBoardView(tester, cubit);
 
     await tester.tap(find.text('Remote'));
     await tester.pump();
@@ -605,13 +490,13 @@ void main() {
 
   testWidgets('connect remote cancel performs no connection', (tester) async {
     SharedPreferences.setMockInitialValues({});
-    _setSurface(tester);
+    setBoardViewSurface(tester);
 
-    final cubit = _TestBoardCubit(
-      BoardState(boards: [_board()], activeBoardId: 'board', isLoaded: true),
+    final cubit = TestBoardViewCubit(
+      BoardState(boards: [boardTestBoard()], activeBoardId: 'board', isLoaded: true),
     );
     addTearDown(cubit.close);
-    await _pumpBoard(tester, cubit);
+    await pumpBoardView(tester, cubit);
 
     await tester.tap(find.text('Remote'));
     await tester.pump();
@@ -630,13 +515,13 @@ void main() {
     tester,
   ) async {
     SharedPreferences.setMockInitialValues({});
-    _setSurface(tester);
+    setBoardViewSurface(tester);
 
-    final cubit = _TestBoardCubit(
-      BoardState(boards: [_board()], activeBoardId: 'board', isLoaded: true),
+    final cubit = TestBoardViewCubit(
+      BoardState(boards: [boardTestBoard()], activeBoardId: 'board', isLoaded: true),
     );
     addTearDown(cubit.close);
-    await _pumpBoard(tester, cubit);
+    await pumpBoardView(tester, cubit);
 
     await tester.tap(find.text('Delete'));
     await tester.pump();
@@ -656,13 +541,13 @@ void main() {
 
   testWidgets('delete board cancel keeps the board', (tester) async {
     SharedPreferences.setMockInitialValues({});
-    _setSurface(tester);
+    setBoardViewSurface(tester);
 
-    final cubit = _TestBoardCubit(
-      BoardState(boards: [_board()], activeBoardId: 'board', isLoaded: true),
+    final cubit = TestBoardViewCubit(
+      BoardState(boards: [boardTestBoard()], activeBoardId: 'board', isLoaded: true),
     );
     addTearDown(cubit.close);
-    await _pumpBoard(tester, cubit);
+    await pumpBoardView(tester, cubit);
 
     await tester.tap(find.text('Delete'));
     await tester.pump();
@@ -681,13 +566,13 @@ void main() {
     tester,
   ) async {
     SharedPreferences.setMockInitialValues({});
-    _setSurface(tester);
+    setBoardViewSurface(tester);
 
-    final cubit = _TestBoardCubit(
-      BoardState(boards: [_board()], activeBoardId: 'board', isLoaded: true),
+    final cubit = TestBoardViewCubit(
+      BoardState(boards: [boardTestBoard()], activeBoardId: 'board', isLoaded: true),
     );
     addTearDown(cubit.close);
-    await _pumpBoard(tester, cubit);
+    await pumpBoardView(tester, cubit);
     expect(BoardShareServer.instance.isRunning, isFalse);
 
     // The share server binds a real socket: drive the tap and the bind on

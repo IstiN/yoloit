@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:yoloit/core/platform/platform_shell.dart';
 import 'package:yoloit/core/services/resource_monitor_service.dart';
 import 'package:yoloit/features/terminal/data/pty_service.dart';
@@ -30,13 +31,18 @@ class _BufferedUtf8Decoder extends StreamTransformerBase<List<int>, String> {
     }).where((s) => s.isNotEmpty);
   }
 
+  /// Returns the length of the longest prefix of [bytes] that ends on a
+  /// complete UTF-8 character. Only the tail can hold an incomplete
+  /// sequence, so scanning the last 4 bytes (max sequence length) suffices.
   static int _validUtf8Length(List<int> bytes) {
     var i = bytes.length;
-    final min = bytes.length > 3 ? bytes.length - 3 : 0;
+    final min = bytes.length > 4 ? bytes.length - 4 : 0;
     while (i > min) {
       i--;
       if (_isValidUtf8Boundary(bytes, i)) {
-        return i;
+        // bytes[i] starts a character that is fully contained in [bytes];
+        // the valid prefix extends past the whole character.
+        return i + _utf8SequenceLength(bytes[i]);
       }
     }
     return 0;
@@ -77,6 +83,11 @@ class TerminalProcess {
       exitCode: pty.exitCode,
     );
   }
+
+  /// Test seam: exercises the buffered UTF-8 decoder without a real PTY.
+  @visibleForTesting
+  static StreamTransformer<List<int>, String> utf8DecoderForTesting() =>
+      const _BufferedUtf8Decoder();
 }
 
 abstract class TerminalBackend {

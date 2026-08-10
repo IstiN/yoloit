@@ -342,4 +342,113 @@ void main() {
       expect(state.fileTree, hasLength(1));
     });
   });
+
+  group('ReviewCubit toggleNode expanded-path persistence', () {
+    late Directory tempDir;
+    late ReviewCubit cubit;
+
+    setUp(() {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      SharedPreferences.setMockInitialValues({});
+      tempDir = Directory.systemTemp.createTempSync('review_expanded_test_');
+      cubit = ReviewCubit();
+    });
+
+    tearDown(() async {
+      await cubit.close();
+      if (tempDir.existsSync()) {
+        tempDir.deleteSync(recursive: true);
+      }
+    });
+
+    test('toggleNode persists expanded directory paths for the workspace',
+        () async {
+      final sub = Directory('${tempDir.path}/sub')..createSync();
+      Directory('${sub.path}/inner').createSync();
+
+      await cubit.loadWorkspace([tempDir.path], workspaceId: 'ws-expanded');
+
+      // Expanding `sub` collects root + sub as expanded paths.
+      cubit.toggleNode(sub.path);
+      await pumpEventQueue();
+
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getStringList('filetree.expanded.ws-expanded');
+      expect(saved, containsAll(<String>[tempDir.path, sub.path]));
+
+      // Collapsing `sub` again removes it from the persisted set.
+      cubit.toggleNode(sub.path);
+      await pumpEventQueue();
+      final collapsed =
+          prefs.getStringList('filetree.expanded.ws-expanded');
+      expect(collapsed, [tempDir.path]);
+    });
+
+    test('toggleNode without a workspace id does not persist', () async {
+      final sub = Directory('${tempDir.path}/sub')..createSync();
+
+      await cubit.loadWorkspace([tempDir.path]);
+      cubit.toggleNode(sub.path);
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getKeys().where((k) => k.startsWith('filetree.expanded.')),
+          isEmpty);
+    });
+  });
+
+  group('ReviewCubit changed-files timer', () {
+    late Directory tempDir;
+    late ReviewCubit cubit;
+
+    setUp(() {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      SharedPreferences.setMockInitialValues({});
+      tempDir = Directory.systemTemp.createTempSync('review_timer_test_');
+      cubit = ReviewCubit();
+    });
+
+    tearDown(() async {
+      await cubit.close();
+      if (tempDir.existsSync()) {
+        tempDir.deleteSync(recursive: true);
+      }
+    });
+
+    test('periodic refresh picks up git status changes', () async {
+      // A real (tiny) git repo so DiffService.getChangedFiles has something
+      // to report once a change appears after the initial load.
+      final init = await Process.run('git', ['init', tempDir.path]);
+      expect(init.exitCode, 0);
+
+      await cubit.loadWorkspace([tempDir.path]);
+      final initial = cubit.state as ReviewLoaded;
+      expect(initial.changedFiles, isEmpty);
+
+      // Change appears only after loading, so only the 4s periodic timer can
+      // surface it.
+      File('${tempDir.path}/tracked.txt')
+          .writeAsStringSync('tracked content\n');
+
+      // Poll with a generous budget — the full suite runs under heavy load.
+      ReviewLoaded? loaded;
+      for (var i = 0; i < 120; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        final s = cubit.state;
+        if (s is ReviewLoaded && s.changedFiles.isNotEmpty) {
+          loaded = s;
+          break;
+        }
+      }
+
+      expect(loaded, isNotNull, reason: 'timer never reported changed files');
+      expect(
+        loaded!.changedFiles.map((f) => f.path),
+        contains('tracked.txt'),
+      );
+      expect(
+        loaded.changedFiles.singleWhere((f) => f.path == 'tracked.txt').status,
+        FileChangeStatus.untracked,
+      );
+    }, timeout: const Timeout(Duration(seconds: 30)));
+  });
 }

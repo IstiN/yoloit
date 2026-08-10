@@ -143,4 +143,102 @@ void main() {
       expect(results, isEmpty);
     });
   });
+
+  group('FileSearchService._grepFallback', () {
+    test('finds matching files with line numbers via grep', () async {
+      final tmpDir = Directory.systemTemp.createTempSync('grep_fallback_test_');
+      addTearDown(() => tmpDir.deleteSync(recursive: true));
+
+      File('${tmpDir.path}/alpha.txt')
+          .writeAsStringSync('nothing here\nneedle in a haystack\n');
+      File('${tmpDir.path}/beta.txt').writeAsStringSync('no match here\n');
+
+      final results = await FileSearchService.instance.grepFallbackForTest(
+        tmpDir.path,
+        'ws',
+        'needle',
+      );
+
+      expect(results, hasLength(1));
+      final match = results.single;
+      expect(match.fileName, 'alpha.txt');
+      expect(match.workspaceName, 'ws');
+      expect(match.lineNumber, 2);
+      expect(match.lineContent, contains('needle'));
+    });
+
+    test('skips ignored directories', () async {
+      final tmpDir = Directory.systemTemp.createTempSync('grep_fallback_test_');
+      addTearDown(() => tmpDir.deleteSync(recursive: true));
+
+      Directory('${tmpDir.path}/node_modules').createSync();
+      File('${tmpDir.path}/node_modules/dep.js')
+          .writeAsStringSync('needle\n');
+
+      final results = await FileSearchService.instance.grepFallbackForTest(
+        tmpDir.path,
+        'ws',
+        'needle',
+      );
+
+      expect(results, isEmpty);
+    });
+
+    test('returns empty list when nothing matches (grep exit 1)', () async {
+      final tmpDir = Directory.systemTemp.createTempSync('grep_fallback_test_');
+      addTearDown(() => tmpDir.deleteSync(recursive: true));
+
+      File('${tmpDir.path}/file.txt').writeAsStringSync('content\n');
+
+      final results = await FileSearchService.instance.grepFallbackForTest(
+        tmpDir.path,
+        'ws',
+        'absent-pattern',
+      );
+
+      expect(results, isEmpty);
+    });
+
+    test('returns empty list for an invalid regex (grep exit 2)', () async {
+      final tmpDir = Directory.systemTemp.createTempSync('grep_fallback_test_');
+      addTearDown(() => tmpDir.deleteSync(recursive: true));
+
+      File('${tmpDir.path}/file.txt').writeAsStringSync('content\n');
+
+      final results = await FileSearchService.instance.grepFallbackForTest(
+        tmpDir.path,
+        'ws',
+        '[unclosed',
+      );
+
+      expect(results, isEmpty);
+    });
+
+    test('returns empty list for a missing directory', () async {
+      final results = await FileSearchService.instance.grepFallbackForTest(
+        '/nonexistent/path/12345',
+        'ws',
+        'needle',
+      );
+
+      expect(results, isEmpty);
+    });
+
+    test('truncates long matching lines to 80 characters', () async {
+      final tmpDir = Directory.systemTemp.createTempSync('grep_fallback_test_');
+      addTearDown(() => tmpDir.deleteSync(recursive: true));
+
+      final longLine = 'needle${'x' * 200}';
+      File('${tmpDir.path}/long.txt').writeAsStringSync('$longLine\n');
+
+      final results = await FileSearchService.instance.grepFallbackForTest(
+        tmpDir.path,
+        'ws',
+        'needle',
+      );
+
+      expect(results, hasLength(1));
+      expect(results.single.lineContent!.length, 80);
+    });
+  });
 }

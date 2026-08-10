@@ -706,6 +706,11 @@ bool _sameColor(Color a, Color b) {
       (a.b * 255).round() == (b.b * 255).round();
 }
 
+/// Test-only seam for [_sameColor] — its only call site lives in the
+/// (currently uninstantiated) [_ShapePalette], so expose it for unit tests.
+@visibleForTesting
+bool shapeColorsEqual(Color a, Color b) => _sameColor(a, b);
+
 class _ShapePainter extends CustomPainter {
   const _ShapePainter({
     required this.shape,

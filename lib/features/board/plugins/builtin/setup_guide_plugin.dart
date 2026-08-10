@@ -10,6 +10,22 @@ import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/ui/components/typography/caption.dart';
 
+/// Side-effecting operations behind the setup guide panel (local setup
+/// checks, install script execution, special install tasks), extracted so
+/// widget tests can substitute fakes instead of spawning real processes.
+@visibleForTesting
+class SetupGuideBackend {
+  const SetupGuideBackend();
+
+  Future<SetupCheckSnapshot> checkLocal() => SetupCatalog.check();
+
+  Stream<String> runInstallScript(String script) =>
+      runSetupInstallScript(script);
+
+  Stream<String> runSpecialInstallTask(String packageId) =>
+      SetupCatalog.runSpecialInstallTask(packageId);
+}
+
 class SetupGuidePlugin extends BoardPanelPlugin {
   const SetupGuidePlugin();
 
@@ -62,6 +78,14 @@ class SetupGuidePanel extends StatefulWidget {
   final BoardPanelRenderContext renderContext;
   final SetupCheckSnapshot? initialSnapshot;
 
+  /// Backend override for widget tests; null in production.
+  @visibleForTesting
+  static SetupGuideBackend? debugBackend;
+
+  /// Remote poll interval override for widget tests; null uses the 1s default.
+  @visibleForTesting
+  static Duration? debugRemotePollInterval;
+
   @override
   State<SetupGuidePanel> createState() => _SetupGuidePanelState();
 }
@@ -79,6 +103,9 @@ class _SetupGuidePanelState extends State<SetupGuidePanel> {
   late Set<String> _selectedIds;
 
   bool get _isRemote => widget.renderContext.remoteInfo != null;
+
+  SetupGuideBackend get _backend =>
+      SetupGuidePanel.debugBackend ?? const SetupGuideBackend();
 
   @override
   void initState() {
@@ -127,7 +154,7 @@ class _SetupGuidePanelState extends State<SetupGuidePanel> {
       final remote = widget.renderContext.remoteInfo;
       final snapshot =
           remote == null
-              ? await SetupCatalog.check()
+              ? await _backend.checkLocal()
               : await YoloitRemoteClient(
                 baseUrl: remote.url,
                 token: remote.token,
@@ -177,6 +204,10 @@ class _SetupGuidePanelState extends State<SetupGuidePanel> {
       final remote = widget.renderContext.remoteInfo;
       if (remote == null) {
         await _installLocal(snapshot);
+        if (!mounted) return;
+        // The remote path clears this in _pollRemoteInstall once the run
+        // finishes; the local path must clear it here after the refresh.
+        setState(() => _installing = false);
       } else {
         await _installRemote(remote);
       }
@@ -206,7 +237,7 @@ class _SetupGuidePanelState extends State<SetupGuidePanel> {
     _lastScript = script;
     if (script.trim().isNotEmpty) {
       _appendLog('\$ $script');
-      await for (final line in runSetupInstallScript(script)) {
+      await for (final line in _backend.runInstallScript(script)) {
         if (!mounted) return;
         _appendLog(line);
       }
@@ -220,7 +251,7 @@ class _SetupGuidePanelState extends State<SetupGuidePanel> {
   Future<bool> _runSpecialInstallTasks(List<String> specialIds) async {
     for (final id in specialIds) {
       _appendLog('\$ ${SetupCatalog.specialInstallLabel(id)}');
-      await for (final line in SetupCatalog.runSpecialInstallTask(id)) {
+      await for (final line in _backend.runSpecialInstallTask(id)) {
         if (!mounted) return false;
         _appendLog(line);
       }
@@ -245,30 +276,33 @@ class _SetupGuidePanelState extends State<SetupGuidePanel> {
   void _pollRemoteInstall(YoloitRemoteClient client, String runId) {
     _pollTimer?.cancel();
     var seen = 0;
-    _pollTimer = Timer.periodic(const Duration(seconds: 1), (timer) async {
-      try {
-        final log = await client.setupInstallLog(runId);
-        final next = log.lines.skip(seen).toList();
-        seen = log.lines.length;
-        if (next.isNotEmpty && mounted) {
-          setState(() => _log.addAll(next));
-          _scrollLog();
-        }
-        if (!log.running) {
+    _pollTimer = Timer.periodic(
+      SetupGuidePanel.debugRemotePollInterval ?? const Duration(seconds: 1),
+      (timer) async {
+        try {
+          final log = await client.setupInstallLog(runId);
+          final next = log.lines.skip(seen).toList();
+          seen = log.lines.length;
+          if (next.isNotEmpty && mounted) {
+            setState(() => _log.addAll(next));
+            _scrollLog();
+          }
+          if (!log.running) {
+            timer.cancel();
+            if (!mounted) return;
+            setState(() => _installing = false);
+            await _refresh();
+          }
+        } catch (error) {
           timer.cancel();
           if (!mounted) return;
-          setState(() => _installing = false);
-          await _refresh();
+          setState(() {
+            _installing = false;
+            _error = error.toString();
+          });
         }
-      } catch (error) {
-        timer.cancel();
-        if (!mounted) return;
-        setState(() {
-          _installing = false;
-          _error = error.toString();
-        });
-      }
-    });
+      },
+    );
   }
 
   void _appendLog(String line) {

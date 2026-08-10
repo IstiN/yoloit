@@ -30,6 +30,11 @@ class FilePreviewPlugin extends FilePreviewPluginBase {
 
   static const String kTypeId = FilePreviewPluginBase.kTypeId;
 
+  /// Test-only factory so widget tests can substitute a fake audio/video
+  /// [Player] (the real one loads native mpv libraries unavailable in tests).
+  @visibleForTesting
+  static Player Function()? debugAudioPlayerFactory;
+
   @override
   Widget buildContent(
     BuildContext context,
@@ -1354,7 +1359,7 @@ class _AudioPreviewState extends State<_AudioPreview> {
   @override
   void initState() {
     super.initState();
-    _player = Player();
+    _player = FilePreviewPlugin.debugAudioPlayerFactory?.call() ?? Player();
     _subs.add(
       _player.stream.playing.listen((v) {
         if (mounted) setState(() => _isPlaying = v);

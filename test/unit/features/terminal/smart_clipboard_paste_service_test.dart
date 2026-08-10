@@ -2,8 +2,11 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:super_clipboard/super_clipboard.dart';
 import 'package:yoloit/core/platform/platform_dirs.dart';
 import 'package:yoloit/features/terminal/data/smart_clipboard_paste_service.dart';
+
+import 'fake_clipboard_reader.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -169,6 +172,104 @@ void main() {
       final result = await SmartClipboardPasteService.instance
           .readInlineTextOrSavedFilePath(allowInlineText: true);
       expect(result, isNull);
+    });
+  });
+
+  group('SmartClipboardPasteService.readInlineTextOrSavedFilePath super_clipboard',
+      () {
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+
+    void mockClipboardText(String? text) {
+      messenger.setMockMethodCallHandler(SystemChannels.platform, (
+        call,
+      ) async {
+        if (call.method == 'Clipboard.getData') {
+          if (text == null) return null;
+          return <String, dynamic>{'text': text};
+        }
+        return null;
+      });
+    }
+
+    tearDown(() {
+      SmartClipboardPasteService.clipboardReaderOverride = null;
+      messenger.setMockMethodCallHandler(SystemChannels.platform, null);
+    });
+
+    test('image clipboard content is saved through the file fallback',
+        () async {
+      SmartClipboardPasteService.clipboardReaderOverride =
+          () async => ClipboardReader([
+                FakeClipboardDataReader(
+                  files: {Formats.png: Uint8List.fromList([1, 2, 3])},
+                ),
+              ]);
+      // saveClipboardToFile re-reads the clipboard; with super_clipboard
+      // unavailable in tests it lands on the Flutter clipboard fallback.
+      mockClipboardText('image fallback text');
+
+      final result = await SmartClipboardPasteService.instance
+          .readInlineTextOrSavedFilePath(allowInlineText: true);
+
+      expect(result, isNotNull);
+      expect(result, endsWith('.txt'));
+      final file = File(result!);
+      addTearDown(() async {
+        if (await file.exists()) await file.delete();
+      });
+      expect(await file.readAsString(), 'image fallback text');
+    });
+
+    test('jpeg-only clipboard also takes the image branch', () async {
+      SmartClipboardPasteService.clipboardReaderOverride =
+          () async => ClipboardReader([
+                FakeClipboardDataReader(
+                  files: {Formats.jpeg: Uint8List.fromList([1, 2, 3])},
+                ),
+              ]);
+      mockClipboardText('jpeg fallback');
+
+      final result = await SmartClipboardPasteService.instance
+          .readInlineTextOrSavedFilePath(allowInlineText: true);
+
+      expect(result, isNotNull);
+      expect(result, endsWith('.txt'));
+      final file = File(result!);
+      addTearDown(() async {
+        if (await file.exists()) await file.delete();
+      });
+    });
+
+    test('plain text from super_clipboard is used for inline paste', () async {
+      SmartClipboardPasteService.clipboardReaderOverride =
+          () async => ClipboardReader([
+                FakeClipboardDataReader(plainText: 'from super clipboard'),
+              ]);
+      mockClipboardText(null);
+
+      final result = await SmartClipboardPasteService.instance
+          .readInlineTextOrSavedFilePath(allowInlineText: true);
+      expect(result, 'from super clipboard');
+    });
+
+    test('null reader falls back to the Flutter clipboard', () async {
+      SmartClipboardPasteService.clipboardReaderOverride = () async => null;
+      mockClipboardText('flutter clipboard text');
+
+      final result = await SmartClipboardPasteService.instance
+          .readInlineTextOrSavedFilePath(allowInlineText: true);
+      expect(result, 'flutter clipboard text');
+    });
+
+    test('throwing reader falls back to the Flutter clipboard', () async {
+      SmartClipboardPasteService.clipboardReaderOverride =
+          () => Future.error(StateError('no clipboard'));
+      mockClipboardText('rescued text');
+
+      final result = await SmartClipboardPasteService.instance
+          .readInlineTextOrSavedFilePath(allowInlineText: true);
+      expect(result, 'rescued text');
     });
   });
 }

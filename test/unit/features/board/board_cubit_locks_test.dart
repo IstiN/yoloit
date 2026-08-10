@@ -190,4 +190,203 @@ void main() {
     expect(cubit.state.panelLockConflictPanelId, 'panel-1');
     expect(cubit.state.panelLockConflictActorId, isNull);
   });
+
+  group('panelLockActor', () {
+    BoardDocument boardWithLocks(Map<String, dynamic> locks) {
+      return BoardDocument(
+        id: 'b1',
+        name: 'Board',
+        metadata: {'panelLocks': locks},
+      );
+    }
+
+    test('returns null when panelLocks metadata is not a map', () {
+      final cubit = buildCubit(const [
+        BoardDocument(id: 'b1', name: 'Board'),
+      ]);
+      expect(cubit.panelLockActor(cubit.state.boards.first, 'p1'), isNull);
+    });
+
+    test('returns null when the panel has no lock entry', () {
+      final board = boardWithLocks({});
+      final cubit = buildCubit([board]);
+      expect(cubit.panelLockActor(board, 'p1'), isNull);
+    });
+
+    test('returns null when the lock entry is not a map', () {
+      final board = boardWithLocks({'p1': 'bad-value'});
+      final cubit = buildCubit([board]);
+      expect(cubit.panelLockActor(board, 'p1'), isNull);
+    });
+
+    test('returns null when locked by the local actor', () {
+      final board = boardWithLocks({
+        'p1': {'actorId': 'tester', 'expiresAt': farFuture},
+      });
+      final cubit = buildCubit([board]);
+      expect(cubit.panelLockActor(board, 'p1'), isNull);
+    });
+
+    test('returns the actor id for a valid non-expired remote lock', () {
+      final board = boardWithLocks({
+        'p1': {'actorId': 'someone-else', 'expiresAt': farFuture},
+      });
+      final cubit = buildCubit([board]);
+      expect(cubit.panelLockActor(board, 'p1'), 'someone-else');
+    });
+
+    test('returns null for an expired lock', () {
+      final board = boardWithLocks({
+        'p1': {'actorId': 'someone-else', 'expiresAt': 1},
+      });
+      final cubit = buildCubit([board]);
+      expect(cubit.panelLockActor(board, 'p1'), isNull);
+    });
+
+    test('returns the actor id when expiresAt is not an int', () {
+      final board = boardWithLocks({
+        'p1': {'actorId': 'someone-else'},
+      });
+      final cubit = buildCubit([board]);
+      expect(cubit.panelLockActor(board, 'p1'), 'someone-else');
+    });
+
+    test('returns null when actorId is null', () {
+      final board = boardWithLocks({
+        'p1': {'expiresAt': farFuture},
+      });
+      final cubit = buildCubit([board]);
+      expect(cubit.panelLockActor(board, 'p1'), isNull);
+    });
+  });
+
+  group('_panelIdsLockedByActor', () {
+    test('returns panel ids locked by a specific actor', () {
+      final board = BoardDocument(
+        id: 'b1',
+        name: 'Board',
+        metadata: {
+          'panelLocks': {
+            'p1': {'actorId': 'alice', 'expiresAt': farFuture},
+            'p2': {'actorId': 'bob', 'expiresAt': farFuture},
+            'p3': {'actorId': 'alice', 'expiresAt': farFuture},
+          },
+        },
+      );
+      final cubit = buildCubit([board]);
+
+      // panelLockActor returns the actor id when the lock is held by a
+      // non-local actor. 'tester' is the local actor in this cubit.
+      expect(cubit.panelLockActor(board, 'p1'), 'alice');
+      expect(cubit.panelLockActor(board, 'p2'), 'bob');
+      expect(cubit.panelLockActor(board, 'p3'), 'alice');
+    });
+
+    test('skips expired locks', () {
+      final board = BoardDocument(
+        id: 'b1',
+        name: 'Board',
+        metadata: {
+          'panelLocks': {
+            'p1': {'actorId': 'alice', 'expiresAt': 1},
+            'p2': {'actorId': 'alice', 'expiresAt': farFuture},
+          },
+        },
+      );
+      final cubit = buildCubit([board]);
+      expect(cubit.panelLockActor(board, 'p1'), isNull); // expired
+      expect(cubit.panelLockActor(board, 'p2'), 'alice'); // valid
+    });
+
+    test('skips non-map lock entries', () {
+      final board = BoardDocument(
+        id: 'b1',
+        name: 'Board',
+        metadata: {
+          'panelLocks': {
+            'p1': 'bad',
+            'p2': {'actorId': 'alice', 'expiresAt': farFuture},
+          },
+        },
+      );
+      final cubit = buildCubit([board]);
+      expect(cubit.panelLockActor(board, 'p1'), isNull);
+    });
+
+    test('returns empty set when metadata panelLocks is not a map', () {
+      final board = BoardDocument(
+        id: 'b1',
+        name: 'Board',
+        metadata: {'panelLocks': 'not-a-map'},
+      );
+      final cubit = buildCubit([board]);
+      expect(cubit.panelLockActor(board, 'p1'), isNull);
+    });
+  });
+
+  group('releasePanelLock', () {
+    test('removes the lock for a local board', () async {
+      final board = BoardDocument(
+        id: 'local',
+        name: 'Local',
+        metadata: {
+          'panelLocks': {
+            'p1': {'actorId': 'tester', 'expiresAt': farFuture},
+          },
+        },
+      );
+      final cubit = buildCubit([board]);
+
+      await cubit.releasePanelLock('local', 'p1');
+
+      final locks = cubit.state.boards.first.metadata['panelLocks'] as Map;
+      expect(locks.containsKey('p1'), isFalse);
+    });
+
+    test('is a no-op when the board does not exist', () async {
+      final cubit = buildCubit(const [
+        BoardDocument(id: 'local', name: 'Local'),
+      ]);
+
+      // Should not throw.
+      await cubit.releasePanelLock('missing', 'p1');
+    });
+
+    test('is a no-op when the lock does not exist', () async {
+      final board = BoardDocument(
+        id: 'local',
+        name: 'Local',
+        metadata: {
+          'panelLocks': <String, dynamic>{},
+        },
+      );
+      final cubit = buildCubit([board]);
+
+      await cubit.releasePanelLock('local', 'p1');
+
+      final locks = cubit.state.boards.first.metadata['panelLocks'] as Map;
+      expect(locks, isEmpty);
+    });
+
+    test('removes the lock from a remote board', () async {
+      final env = await startServer();
+      final remote = await env.store.createBoard('Release');
+      await env.store.addPanel(remote.id, lockablePanel);
+      final cubit = buildCubit([
+        const BoardDocument(id: 'local', name: 'Local'),
+        remoteBoardDoc(url: env.url, remoteBoardId: remote.id, token: 'secret'),
+      ]);
+
+      // Acquire then release.
+      await cubit.acquirePanelLock('remote', 'panel-1', ttlSec: 120);
+      expect(localLocks(cubit).containsKey('panel-1'), isTrue);
+
+      await cubit.releasePanelLock('remote', 'panel-1');
+      expect(localLocks(cubit).containsKey('panel-1'), isFalse);
+    });
+  });
 }
+
+/// A timestamp far enough in the future that locks won't be expired.
+int get farFuture =>
+    DateTime.now().toUtc().millisecondsSinceEpoch + 3600000;

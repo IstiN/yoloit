@@ -478,9 +478,15 @@ class OpencodeProvider extends CliProviderBase {
 
 @visibleForTesting
 class OpenCodeLogWatcher {
-  OpenCodeLogWatcher({required this.onRetry});
+  OpenCodeLogWatcher({
+    required this.onRetry,
+    @visibleForTesting Directory? logDir,
+  }) : _logDirOverride = logDir;
 
   final void Function(String message, {bool isFatal}) onRetry;
+
+  /// Overrides the auto-discovered opencode log directory (tests only).
+  final Directory? _logDirOverride;
 
   bool _stopped = false;
   final _emittedMessages = <String>{};
@@ -495,7 +501,7 @@ class OpenCodeLogWatcher {
   }
 
   Future<void> start() async {
-    final dir = _logDir;
+    final dir = _logDirOverride ?? _logDir;
     if (dir == null) return;
 
     // Find the log file created most recently (within last 10 seconds)

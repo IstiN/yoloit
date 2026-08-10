@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:super_clipboard/super_clipboard.dart';
 import 'package:yoloit/core/cli/cli_text_argument_resolver.dart';
@@ -10,15 +11,18 @@ class SmartClipboardPasteService {
 
   static final instance = SmartClipboardPasteService._();
 
+  /// Test seam: super_clipboard has no mockable platform channel in unit
+  /// tests, so tests inject a fake [ClipboardReader] through this override.
+  @visibleForTesting
+  static Future<ClipboardReader?> Function()? clipboardReaderOverride;
+
   Future<String?> readInlineTextOrSavedFilePath({bool allowInlineText = false}) async {
     String? text;
 
     // Try super_clipboard first.
     try {
-      final clipboard = SystemClipboard.instance;
-      if (clipboard != null) {
-        final reader = await clipboard.read();
-
+      final reader = await _readClipboard();
+      if (reader != null) {
         // Images always become temp files so terminals/chats can reference them.
         if (reader.canProvide(Formats.png) ||
             reader.canProvide(Formats.jpeg)) {
@@ -46,6 +50,14 @@ class SmartClipboardPasteService {
     if (text == null || text.isEmpty) return null;
 
     return resolveText(text, allowInlineText: allowInlineText);
+  }
+
+  Future<ClipboardReader?> _readClipboard() {
+    final override = clipboardReaderOverride;
+    if (override != null) return override();
+    final clipboard = SystemClipboard.instance;
+    if (clipboard == null) return Future.value();
+    return clipboard.read();
   }
 
   /// Decides whether [text] should be pasted inline or saved to a temp file.

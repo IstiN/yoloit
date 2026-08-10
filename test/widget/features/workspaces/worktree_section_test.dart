@@ -8,12 +8,18 @@ import 'package:yoloit/features/workspaces/ui/worktree_section.dart';
 
 class _FakeWorktreeService implements WorktreeService {
   Map<String, List<WorktreeEntry>> worktrees = {};
+  List<String> branches = [];
+  String? addError;
   final List<String> removed = [];
   final List<String> pruned = [];
+  final List<List<Object?>> added = [];
+  int listCalls = 0;
 
   @override
-  Future<List<WorktreeEntry>> listWorktrees(String repoPath) async =>
-      worktrees[repoPath] ?? const [];
+  Future<List<WorktreeEntry>> listWorktrees(String repoPath) async {
+    listCalls++;
+    return worktrees[repoPath] ?? const [];
+  }
 
   @override
   Future<String?> addWorktree(
@@ -21,8 +27,10 @@ class _FakeWorktreeService implements WorktreeService {
     String worktreePath,
     String branchOrCommit, {
     bool createNewBranch = false,
-  }) async =>
-      null;
+  }) async {
+    added.add([repoPath, worktreePath, branchOrCommit, createNewBranch]);
+    return addError;
+  }
 
   @override
   Future<String?> removeWorktree(
@@ -42,7 +50,7 @@ class _FakeWorktreeService implements WorktreeService {
   }
 
   @override
-  Future<List<String>> listBranches(String repoPath) async => const [];
+  Future<List<String>> listBranches(String repoPath) async => branches;
 }
 
 Widget _buildWorktreeTest(List<String> paths) {
@@ -343,6 +351,130 @@ void main() {
 
       expect(fake.removed, isEmpty);
       expect(find.text('repo-a__wt1'), findsOneWidget);
+    });
+  });
+
+  group('Add worktree dialog', () {
+    late WorktreeService originalService;
+    late _FakeWorktreeService fake;
+
+    setUp(() {
+      originalService = WorktreeService.instance;
+      fake = _FakeWorktreeService();
+      fake.worktrees = {
+        '/foo/repo-a': [
+          const WorktreeEntry(
+            path: '/foo/repo-a',
+            branch: 'main',
+            isMain: true,
+            isLocked: false,
+            isBare: false,
+          ),
+        ],
+      };
+      WorktreeService.instance = fake;
+    });
+
+    tearDown(() {
+      WorktreeService.instance = originalService;
+    });
+
+    Future<void> openAddDialog(WidgetTester tester) async {
+      await tester.pumpWidget(_buildWorktreeTest(['/foo/repo-a']));
+      await tester.pump();
+      await tester.tap(find.text('Add worktree'));
+      await tester.pumpAndSettle();
+      expect(find.text('Add Worktree'), findsOneWidget);
+    }
+
+    testWidgets('submit with empty path shows a validation error', (
+      tester,
+    ) async {
+      fake.branches = ['main'];
+      await openAddDialog(tester);
+
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Add'));
+      await tester.pump();
+
+      expect(find.text('Path cannot be empty'), findsOneWidget);
+      expect(fake.added, isEmpty);
+      // Dialog stays open.
+      expect(find.text('Add Worktree'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 4));
+    });
+
+    testWidgets('create-new-branch with empty name shows a validation error', (
+      tester,
+    ) async {
+      fake.branches = ['main'];
+      await openAddDialog(tester);
+
+      await tester.enterText(find.byType(TextField).first, '/tmp/wt1');
+      await tester.tap(find.byType(Checkbox));
+      await tester.pump();
+
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Add'));
+      await tester.pump();
+
+      expect(find.text('Branch cannot be empty'), findsOneWidget);
+      expect(fake.added, isEmpty);
+      await tester.pump(const Duration(seconds: 4));
+    });
+
+    testWidgets('submit adds a worktree on the selected branch and reloads', (
+      tester,
+    ) async {
+      fake.branches = ['main', 'dev'];
+      await openAddDialog(tester);
+      await tester.pump();
+
+      await tester.enterText(find.byType(TextField).first, '/tmp/wt1');
+      final callsBefore = fake.listCalls;
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Add'));
+      await tester.pumpAndSettle();
+
+      expect(fake.added, [
+        ['/foo/repo-a', '/tmp/wt1', 'main', false],
+      ]);
+      // Dialog closed and onAdded triggered a reload.
+      expect(find.text('Add Worktree'), findsNothing);
+      expect(fake.listCalls, greaterThan(callsBefore));
+    });
+
+    testWidgets('create-new-branch submits the typed branch name', (
+      tester,
+    ) async {
+      fake.branches = ['main'];
+      await openAddDialog(tester);
+
+      await tester.enterText(find.byType(TextField).first, '/tmp/wt2');
+      await tester.tap(find.byType(Checkbox));
+      await tester.pump();
+      await tester.enterText(find.byType(TextField).last, 'feat/x');
+
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Add'));
+      await tester.pumpAndSettle();
+
+      expect(fake.added, [
+        ['/foo/repo-a', '/tmp/wt2', 'feat/x', true],
+      ]);
+      expect(find.text('Add Worktree'), findsNothing);
+    });
+
+    testWidgets('service error surfaces a snackbar and keeps the dialog', (
+      tester,
+    ) async {
+      fake.branches = ['main'];
+      fake.addError = 'git boom';
+      await openAddDialog(tester);
+
+      await tester.enterText(find.byType(TextField).first, '/tmp/wt1');
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Add'));
+      await tester.pump();
+
+      expect(find.text('git boom'), findsOneWidget);
+      expect(find.text('Add Worktree'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 4));
     });
   });
 }

@@ -110,6 +110,7 @@ class AsrPickerDialogState extends State<AsrPickerDialog> {
                     widget.cloudConfigs.any((c) => c.id == _configId)
                         ? _configId
                         : null,
+                isExpanded: true,
                 hint: Text(
                   'Select provider',
                   style: TextStyle(
@@ -155,6 +156,7 @@ class AsrPickerDialogState extends State<AsrPickerDialog> {
               if (catalog.isNotEmpty) ...[
                 DropdownButtonFormField<String>(
                   value: catalog.any((m) => m.id == _model) ? _model : null,
+                  isExpanded: true,
                   hint: Text(
                     'Select model',
                     style: TextStyle(

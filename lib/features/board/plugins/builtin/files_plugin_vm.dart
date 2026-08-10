@@ -10,6 +10,12 @@ import 'package:yoloit/ui/widgets/hover_listener.dart';
 class FilesPlugin extends FilesPluginBase {
   const FilesPlugin();
 
+  /// Test-only hook replacing the platform file picker, which cannot run
+  /// inside widget tests.
+  @visibleForTesting
+  static Future<List<BoardFileSelection>?> Function(BuildContext context)?
+  debugPickFiles;
+
   @override
   Widget buildContent(
     BuildContext context,
@@ -103,11 +109,13 @@ class _FilesContentState extends State<_FilesContent> {
   }
 
   Future<void> _addFiles() async {
-    final result = await BoardFilePicker.pickFiles(
-      context,
-      remoteInfo: widget.renderContext.remoteInfo,
-      title: 'Add files',
-    );
+    final picker = FilesPlugin.debugPickFiles;
+    final result = await (picker?.call(context) ??
+        BoardFilePicker.pickFiles(
+          context,
+          remoteInfo: widget.renderContext.remoteInfo,
+          title: 'Add files',
+        ));
     if (result == null || result.isEmpty) return;
 
     final current = _files;

@@ -2,8 +2,11 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:super_clipboard/super_clipboard.dart';
 import 'package:yoloit/core/platform/platform_dirs.dart';
 import 'package:yoloit/features/terminal/data/clipboard_file_service.dart';
+
+import 'fake_clipboard_reader.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -264,6 +267,71 @@ void main() {
       });
 
       final path = await ClipboardFileService.instance.saveClipboardToFile();
+      expect(path, isNull);
+    });
+  });
+
+  group('ClipboardFileService.tryReadImageForTesting', () {
+    final pngBytes = Uint8List.fromList([0x89, 0x50, 0x4E, 0x47, 1, 2, 3]);
+
+    Future<void> deleteIfExists(String path) async {
+      final file = File(path);
+      if (await file.exists()) await file.delete();
+    }
+
+    test('saves provided png bytes to a temp .png file', () async {
+      final reader = ClipboardReader([
+        FakeClipboardDataReader(files: {Formats.png: pngBytes}),
+      ]);
+
+      final path = await ClipboardFileService.instance
+          .tryReadImageForTesting(reader);
+      expect(path, isNotNull);
+      expect(path, endsWith('.png'));
+      addTearDown(() => deleteIfExists(path!));
+
+      expect(await File(path!).readAsBytes(), pngBytes);
+    });
+
+    test('skips formats the reader cannot provide and saves jpeg', () async {
+      final reader = ClipboardReader([
+        FakeClipboardDataReader(files: {Formats.jpeg: pngBytes}),
+      ]);
+
+      final path = await ClipboardFileService.instance
+          .tryReadImageForTesting(reader);
+      expect(path, isNotNull);
+      expect(path, endsWith('.jpg'));
+      addTearDown(() => deleteIfExists(path!));
+    });
+
+    test('returns null when reading the image fails', () async {
+      final reader = ClipboardReader([
+        FakeClipboardDataReader(throwingFormats: {Formats.png}),
+      ]);
+
+      final path = await ClipboardFileService.instance
+          .tryReadImageForTesting(reader);
+      expect(path, isNull);
+    });
+
+    test('returns null when the image payload is empty', () async {
+      final reader = ClipboardReader([
+        FakeClipboardDataReader(files: {Formats.png: Uint8List(0)}),
+      ]);
+
+      final path = await ClipboardFileService.instance
+          .tryReadImageForTesting(reader);
+      expect(path, isNull);
+    });
+
+    test('returns null when the reader has no image formats', () async {
+      final reader = ClipboardReader([
+        FakeClipboardDataReader(plainText: 'just text'),
+      ]);
+
+      final path = await ClipboardFileService.instance
+          .tryReadImageForTesting(reader);
       expect(path, isNull);
     });
   });

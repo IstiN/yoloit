@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yoloit/core/setup/setup_catalog.dart';
 
@@ -104,6 +106,47 @@ void main() {
         await SetupCatalog.packageManagerForOs(SetupTargetOs.unknown),
         'shell',
       );
+    });
+  });
+
+  group('runSetupInstallScript', () {
+    test('streams script output and reports the exit code', () async {
+      final lines = await runSetupInstallScript(
+        'echo hello-catalog; echo oops-catalog >&2',
+      ).toList();
+
+      expect(lines, contains('hello-catalog'));
+      expect(lines, contains('oops-catalog'));
+      expect(lines.last, '[exit 0]');
+    });
+
+    test('runs the script inside the given working directory', () async {
+      final tempDir = await Directory.systemTemp.createTemp('setup-script-');
+      addTearDown(() => tempDir.delete(recursive: true));
+
+      final lines = await runSetupInstallScript(
+        'echo marker-content > marker.txt',
+        workingDirectory: tempDir.path,
+      ).toList();
+
+      expect(lines.last, '[exit 0]');
+      final marker = File('${tempDir.path}/marker.txt');
+      expect(await marker.readAsString(), 'marker-content\n');
+    });
+
+    test('reports a failing exit code', () async {
+      final lines = await runSetupInstallScript('exit 5').toList();
+
+      expect(lines.last, '[exit 5]');
+    });
+
+    test('emits an error line when the process cannot start', () async {
+      final lines = await runSetupInstallScript(
+        'echo never-runs',
+        workingDirectory: '/yoloit/no/such/dir-xyz',
+      ).toList();
+
+      expect(lines.single, startsWith('[error]'));
     });
   });
 }

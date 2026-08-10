@@ -302,4 +302,54 @@ void main() {
       );
     });
   });
+
+  group('CursorAgentProvider._parseModelList', () {
+    test('parses id - name lines and marks auto as default', () {
+      final models = CursorAgentProvider.parseModelListForTest(
+        'Available models:\n'
+        'auto - Auto (recommended)\n'
+        'gpt-5 - GPT-5\n'
+        'claude-4-sonnet - Claude 4 Sonnet\n',
+      );
+
+      expect(models, hasLength(3));
+      expect(models[0].id, 'auto');
+      expect(models[0].displayName, 'Auto (recommended)');
+      expect(models[0].isDefault, isTrue);
+      expect(models[1].id, 'gpt-5');
+      expect(models[1].displayName, 'GPT-5');
+      expect(models[1].isDefault, isFalse);
+      expect(models[2].id, 'claude-4-sonnet');
+    });
+
+    test('skips blank, header and malformed lines', () {
+      final models = CursorAgentProvider.parseModelListForTest(
+        '\n'
+        'Available models\n'
+        '   \n'
+        'no-separator-line\n'
+        'ok-model - Ok Model\n',
+      );
+
+      expect(models, hasLength(1));
+      expect(models.single.id, 'ok-model');
+      expect(models.single.displayName, 'Ok Model');
+      expect(models.single.isDefault, isFalse);
+    });
+
+    test('keeps extra separators in the display name', () {
+      final models = CursorAgentProvider.parseModelListForTest(
+        'gpt-5 - GPT-5 - latest\n',
+      );
+
+      expect(models, hasLength(1));
+      expect(models.single.id, 'gpt-5');
+      expect(models.single.displayName, 'GPT-5 - latest');
+    });
+
+    test('returns an empty list for empty output', () {
+      expect(CursorAgentProvider.parseModelListForTest(''), isEmpty);
+      expect(CursorAgentProvider.parseModelListForTest('   \n  '), isEmpty);
+    });
+  });
 }

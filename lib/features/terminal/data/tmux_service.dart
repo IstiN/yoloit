@@ -1,8 +1,9 @@
 import 'dart:io';
 
-import 'package:yoloit/features/terminal/data/pty_wrapper.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yoloit/core/platform/platform_dirs.dart';
+import 'package:yoloit/features/terminal/data/pty_wrapper.dart';
 
 /// Manages tmux sessions as a backend for persistent terminal sessions.
 ///
@@ -36,6 +37,11 @@ class TmuxService {
 
   /// Full path to the tmux binary, or null if not found.
   String? get tmuxBin => _tmuxBin;
+
+  /// Test seam: points tmux calls at a fake binary (e.g. a shell script in a
+  /// temp dir) so tests can exercise session management without real tmux.
+  @visibleForTesting
+  set tmuxBinForTesting(String? value) => _tmuxBin = value;
 
   /// Must be called at startup before using any other methods.
   /// Safe to call multiple times — subsequent calls are no-ops.

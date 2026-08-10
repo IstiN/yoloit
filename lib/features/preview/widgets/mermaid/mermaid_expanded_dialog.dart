@@ -26,6 +26,16 @@ class MermaidExpandedDialog extends StatefulWidget {
   final Color backgroundColor;
   final String? backgroundColorHex;
 
+  /// Test-only override for the high-res SVG→PNG re-render (which normally
+  /// shells out to the bundled `resvg` binary).
+  @visibleForTesting
+  static Future<Uint8List> Function(
+    String svg, {
+    double? width,
+    double? height,
+    String? backgroundColor,
+  })? debugSvgToPngOverride;
+
   @override
   State<MermaidExpandedDialog> createState() => _MermaidExpandedDialogState();
 }
@@ -51,7 +61,9 @@ class _MermaidExpandedDialogState extends State<MermaidExpandedDialog> {
       _refineError = null;
     });
     try {
-      final png = await MermaidRenderer.svgToPng(
+      final svgToPng = MermaidExpandedDialog.debugSvgToPngOverride ??
+          MermaidRenderer.svgToPng;
+      final png = await svgToPng(
         widget.svg!,
         width: widget.targetWidth,
         backgroundColor: widget.backgroundColorHex,

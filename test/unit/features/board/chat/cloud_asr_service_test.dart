@@ -270,6 +270,230 @@ void main() {
       timeout: const Timeout(Duration(seconds: 15)),
     );
   });
+
+  group('CloudAsrService._prepareTranscriptionUpload', () {
+    late Directory tmp;
+    late CloudAsrService service;
+
+    setUp(() {
+      tmp = Directory.systemTemp.createTempSync('cloud_asr_prep');
+      service = CloudAsrService(settingsService: _FakeSettings());
+    });
+
+    tearDown(() {
+      if (tmp.existsSync()) {
+        tmp.deleteSync(recursive: true);
+      }
+    });
+
+    test('returns the wav path unchanged when conversion is disabled',
+        () async {
+      final wav = File('${tmp.path}/take.wav')
+        ..writeAsBytesSync(const [1, 2, 3]);
+
+      final (path, mime) = await service.prepareTranscriptionUploadForTest(
+        audioPath: wav.path,
+        convertToMp3: false,
+      );
+
+      expect(path, wav.path);
+      expect(mime, 'audio/wav');
+    });
+
+    test('falls back to the wav when ffmpeg cannot convert the file',
+        () async {
+      // Garbage content makes ffmpeg exit non-zero (or it is absent
+      // entirely) — either way the original wav must be kept.
+      final wav = File('${tmp.path}/broken.wav')
+        ..writeAsBytesSync(const [0, 255, 13]);
+
+      final (path, mime) = await service.prepareTranscriptionUploadForTest(
+        audioPath: wav.path,
+        convertToMp3: true,
+      );
+
+      expect(path, wav.path);
+      expect(mime, 'audio/wav');
+    });
+
+    test('throws when the audio file does not exist', () {
+      expect(
+        () => service.prepareTranscriptionUploadForTest(
+          audioPath: '${tmp.path}/missing.wav',
+          convertToMp3: false,
+        ),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            contains('Recorded audio file not found'),
+          ),
+        ),
+      );
+    });
+  });
+
+  group('CloudAsrService.transcribeFromFile', () {
+    late Directory tmp;
+    late _FakeSettings settings;
+    late CloudAsrService service;
+
+    setUp(() {
+      tmp = Directory.systemTemp.createTempSync('cloud_asr_file');
+      settings = _FakeSettings();
+      service = CloudAsrService(settingsService: settings);
+    });
+
+    tearDown(() {
+      if (tmp.existsSync()) {
+        tmp.deleteSync(recursive: true);
+      }
+    });
+
+    test('chat mode reads the file and posts inline wav audio', () async {
+      await HttpOverrides.runZoned(() async {
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(server.close);
+
+        String? seenPath;
+        String? seenBody;
+        unawaited(() async {
+          await for (final request in server) {
+            seenPath = request.uri.path;
+            seenBody = await utf8.decoder.bind(request).join();
+            request.response.headers.contentType = ContentType.json;
+            request.response.write(
+              jsonEncode({
+                'choices': [
+                  {
+                    'message': {'content': '  file transcript  '},
+                  },
+                ],
+              }),
+            );
+            await request.response.close();
+          }
+        }());
+
+        final wav = File('${tmp.path}/voice.wav')
+          ..writeAsBytesSync(const [10, 20, 30]);
+        settings.active = _config(
+          baseUrl: 'http://${server.address.host}:${server.port}',
+        );
+
+        final result = await service.transcribeFromFile(
+          audioPath: wav.path,
+          voiceSettings: const VoiceSettings(useChatModelForCloudAsr: true),
+        );
+
+        expect(result, 'file transcript');
+        expect(seenPath, '/chat/completions');
+        expect(seenBody, contains(base64Encode(const [10, 20, 30])));
+        expect(seenBody, contains('"wav"'));
+        // No mp3 conversion requested → no temp file cleanup needed.
+        expect(File('${tmp.path}/voice.mp3').existsSync(), isFalse);
+      }, createHttpClient: _PassthroughHttpOverrides().createHttpClient);
+    }, timeout: const Timeout(Duration(seconds: 15)));
+
+    test('dedicated mode uploads the file as multipart form data', () async {
+      await HttpOverrides.runZoned(() async {
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(server.close);
+
+        String? seenPath;
+        String? seenContentType;
+        String? seenBody;
+        unawaited(() async {
+          await for (final request in server) {
+            seenPath = request.uri.path;
+            seenContentType = request.headers.contentType?.toString();
+            seenBody = await utf8.decoder.bind(request).join();
+            request.response.headers.contentType = ContentType.json;
+            request.response.write(jsonEncode({'text': 'cloud file'}));
+            await request.response.close();
+          }
+        }());
+
+        final wav = File('${tmp.path}/meeting.wav')
+          ..writeAsBytesSync(const [7, 7, 7]);
+        settings.active = _config(
+          baseUrl: 'http://${server.address.host}:${server.port}',
+        );
+
+        final result = await service.transcribeFromFile(
+          audioPath: wav.path,
+          voiceSettings: const VoiceSettings(useChatModelForCloudAsr: false),
+        );
+
+        expect(result, 'cloud file');
+        expect(seenPath, '/audio/transcriptions');
+        expect(seenContentType, contains('multipart/form-data'));
+        expect(seenBody, contains('filename="meeting.wav"'));
+      }, createHttpClient: _PassthroughHttpOverrides().createHttpClient);
+    }, timeout: const Timeout(Duration(seconds: 15)));
+
+    test('failed mp3 conversion keeps the original wav upload', () async {
+      await HttpOverrides.runZoned(() async {
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(server.close);
+
+        String? seenBody;
+        unawaited(() async {
+          await for (final request in server) {
+            seenBody = await utf8.decoder.bind(request).join();
+            request.response.headers.contentType = ContentType.json;
+            request.response.write(
+              jsonEncode({
+                'choices': [
+                  {
+                    'message': {'content': 'fallback wav'},
+                  },
+                ],
+              }),
+            );
+            await request.response.close();
+          }
+        }());
+
+        final wav = File('${tmp.path}/corrupt.wav')
+          ..writeAsBytesSync(const [0, 255, 13]);
+        settings.active = _config(
+          baseUrl: 'http://${server.address.host}:${server.port}',
+        );
+
+        final result = await service.transcribeFromFile(
+          audioPath: wav.path,
+          voiceSettings: const VoiceSettings(
+            useChatModelForCloudAsr: true,
+            convertWavToMp3: true,
+          ),
+        );
+
+        expect(result, 'fallback wav');
+        // ffmpeg could not convert the garbage bytes → wav format kept.
+        expect(seenBody, contains('"wav"'));
+        expect(seenBody, contains(base64Encode(const [0, 255, 13])));
+      }, createHttpClient: _PassthroughHttpOverrides().createHttpClient);
+    }, timeout: const Timeout(Duration(seconds: 15)));
+
+    test('throws when the recorded audio file is missing', () {
+      settings.active = _config();
+
+      expect(
+        () => service.transcribeFromFile(
+          audioPath: '${tmp.path}/gone.wav',
+          voiceSettings: const VoiceSettings(),
+        ),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            contains('Recorded audio file not found'),
+          ),
+        ),
+      );
+    });
+  });
 }
 
 final class _PassthroughHttpOverrides extends HttpOverrides {

@@ -116,4 +116,68 @@ void main() {
       expect((children.first as Map)['data'], 'Hi');
     });
   });
+
+  group('parseUiStatePatch', () {
+    test('accepts a map', () {
+      final parsed = parseUiStatePatch(<String, dynamic>{'taps': 1});
+      expect(parsed, <String, dynamic>{'taps': 1});
+    });
+
+    test('parses a JSON object string', () {
+      final parsed = parseUiStatePatch('{"taps": 3, "name": "x"}');
+      expect(parsed?['taps'], 3);
+      expect(parsed?['name'], 'x');
+    });
+
+    test('trims surrounding whitespace', () {
+      expect(parseUiStatePatch('  {"a": true}  ')?['a'], true);
+    });
+
+    test('returns null for blank strings', () {
+      expect(parseUiStatePatch(''), isNull);
+      expect(parseUiStatePatch('   '), isNull);
+    });
+
+    test('returns null for non-object JSON strings', () {
+      expect(parseUiStatePatch('[1, 2]'), isNull);
+      expect(parseUiStatePatch('42'), isNull);
+    });
+
+    test('returns null for invalid JSON strings', () {
+      expect(parseUiStatePatch('{nope'), isNull);
+    });
+
+    test('returns null for null and non-string scalars', () {
+      expect(parseUiStatePatch(null), isNull);
+      expect(parseUiStatePatch(7), isNull);
+    });
+
+    test('set-state accepts a JSON string via the storage alias', () async {
+      final panel = newPanel(
+        state: <String, dynamic>{
+          '_storage': <String, dynamic>{'taps': 1},
+        },
+      );
+      final result = await handler.handleAction(
+        'set-state',
+        <String, dynamic>{'storage': '{"message": "Hi"}'},
+        panel,
+      );
+      expect(result.ok, isTrue);
+      expect(result.stateUpdate?['_storage'], <String, dynamic>{
+        'taps': 1,
+        'message': 'Hi',
+      });
+    });
+
+    test('set-state rejects an invalid state payload', () async {
+      final result = await handler.handleAction(
+        'set-state',
+        <String, dynamic>{'state': '[1, 2]'},
+        newPanel(),
+      );
+      expect(result.ok, isFalse);
+      expect(result.message, contains('state'));
+    });
+  });
 }

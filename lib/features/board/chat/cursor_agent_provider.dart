@@ -469,6 +469,11 @@ class CursorAgentProvider extends CliProviderBase {
     }
   }
 
+  /// Test hook for [_parseModelList].
+  @visibleForTesting
+  static List<ChatModelInfo> parseModelListForTest(String output) =>
+      _parseModelList(output);
+
   /// Parses `cursor-agent --list-models` output.
   ///
   /// Format: one model per line, `id - Display Name`.

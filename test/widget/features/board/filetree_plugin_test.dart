@@ -284,6 +284,65 @@ void main() {
       );
     });
 
+    testWidgets('context menu creates a new file inside a directory', (
+      tester,
+    ) async {
+      final harness = _PanelHarness(_stateFor(fixture));
+      await tester.pumpWidget(_fileTreeApp(harness));
+      await _pumpOut(tester);
+
+      await _runRealIo(tester, () async {
+        await _secondaryTap(tester, find.text('sub'));
+        await tester.tap(find.text('📄 New File'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+        await tester.enterText(find.byType(TextField).last, 'notes.txt');
+        await tester.tap(find.widgetWithText(TextButton, 'OK'));
+        await tester.pump();
+        await Future<void>.delayed(const Duration(milliseconds: 500));
+      });
+
+      expect(
+        File(p.join(fixture.path, 'sub', 'notes.txt')).existsSync(),
+        isTrue,
+      );
+    });
+
+    testWidgets('context menu new file cancelled creates nothing', (
+      tester,
+    ) async {
+      final harness = _PanelHarness(_stateFor(fixture));
+      await tester.pumpWidget(_fileTreeApp(harness));
+      await _pumpOut(tester);
+
+      await _runRealIo(tester, () async {
+        await _secondaryTap(tester, find.text('sub'));
+        await tester.tap(find.text('📄 New File'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+        // Cancelling (null) and confirming an empty name both bail out.
+        await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+
+        await _secondaryTap(tester, find.text('sub'));
+        await tester.tap(find.text('📄 New File'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+        await tester.tap(find.widgetWithText(TextButton, 'OK'));
+        await tester.pump();
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+      });
+
+      // Only the pre-existing nested file remains in `sub`.
+      final names =
+          Directory(p.join(fixture.path, 'sub'))
+              .listSync()
+              .map((e) => p.basename(e.path))
+              .toList();
+      expect(names, ['nested.dart']);
+    });
+
     testWidgets('context menu deletes a file after confirmation', (
       tester,
     ) async {

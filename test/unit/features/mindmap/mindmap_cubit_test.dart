@@ -288,6 +288,125 @@ void main() {
     );
   });
 
+  group('MindMapCubit.updateNodes panel preservation', () {
+    const preservedConn = MindMapConnection(
+      fromId: 'ws1',
+      toId: 'panel:file1',
+      style: ConnectorStyle.solid,
+      color: Colors.blue,
+    );
+
+    WorkspaceNodeData wsNode() => const WorkspaceNodeData(
+          id: 'ws1',
+          workspace: Workspace(id: 'ws1', name: 'WS', paths: ['/tmp/ws1']),
+        );
+
+    blocTest<MindMapCubit, MindMapState>(
+      'preserves manually opened panel nodes and their connections',
+      build: () => MindMapCubit(),
+      seed: () => MindMapState(
+        nodes: [
+          wsNode(),
+          const FilePanelNodeData(id: 'panel:file1', filePath: '/tmp/a.dart'),
+          const FileDiffPanelNodeData(
+            id: 'panel:diff1',
+            filePath: '/tmp/b.dart',
+            repoPath: '/tmp',
+          ),
+        ],
+        connections: const [preservedConn],
+      ),
+      act: (cubit) => cubit.updateNodes([wsNode()], const []),
+      expect: () => [
+        isA<MindMapState>()
+            .having(
+              (s) => s.nodes.map((n) => n.id).toSet(),
+              'node ids',
+              {'ws1', 'panel:file1', 'panel:diff1'},
+            )
+            .having(
+              (s) => s.connections,
+              'preserved connection',
+              [preservedConn],
+            ),
+      ],
+    );
+
+    blocTest<MindMapCubit, MindMapState>(
+      'does not duplicate a panel node the incoming graph re-produces',
+      build: () => MindMapCubit(),
+      seed: () => const MindMapState(
+        nodes: [FilePanelNodeData(id: 'panel:1', filePath: '/tmp/a.dart')],
+      ),
+      act: (cubit) => cubit.updateNodes(
+        const [FilePanelNodeData(id: 'panel:1', filePath: '/tmp/a.dart')],
+        const [],
+      ),
+      expect: () => [
+        isA<MindMapState>().having(
+          (s) => s.nodes.map((n) => n.id).toList(),
+          'node ids',
+          ['panel:1'],
+        ),
+      ],
+    );
+
+    blocTest<MindMapCubit, MindMapState>(
+      'drops editor:active and suppresses editors shadowed by file panels',
+      build: () => MindMapCubit(),
+      seed: () => const MindMapState(
+        nodes: [
+          EditorNodeData(
+            id: 'editor:active',
+            filePath: '/tmp/active.dart',
+            content: '',
+            language: 'dart',
+          ),
+          EditorNodeData(
+            id: 'panel:manual',
+            filePath: '/tmp/manual.dart',
+            content: '',
+            language: 'dart',
+          ),
+        ],
+      ),
+      act: (cubit) => cubit.updateNodes(
+        const [FilePanelNodeData(id: 'panel:f', filePath: '/tmp/manual.dart')],
+        const [],
+      ),
+      expect: () => [
+        isA<MindMapState>().having(
+          (s) => s.nodes.map((n) => n.id).toList(),
+          'node ids',
+          ['panel:f'],
+        ),
+      ],
+    );
+
+    blocTest<MindMapCubit, MindMapState>(
+      'keeps manual editor panels not shadowed by a file panel',
+      build: () => MindMapCubit(),
+      seed: () => const MindMapState(
+        nodes: [
+          EditorNodeData(
+            id: 'panel:ed',
+            filePath: '/tmp/keep.dart',
+            content: '',
+            language: 'dart',
+          ),
+        ],
+      ),
+      act: (cubit) => cubit.updateNodes(const [], const []),
+      expect: () => [
+        isA<MindMapState>().having(
+          (s) => s.nodes.map((n) => n.id).toList(),
+          'node ids',
+          ['panel:ed'],
+        ),
+      ],
+    );
+  });
+
   group('MindMapCubit.loadPersistedPositions', () {
     test('emits empty collections when nothing is persisted', () async {
       final cubit = MindMapCubit();

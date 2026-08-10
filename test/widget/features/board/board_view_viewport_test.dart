@@ -2,17 +2,14 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:yoloit/core/theme/app_theme.dart';
 import 'package:yoloit/core/utils/clipboard_utils.dart';
-import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/bloc/board_state.dart';
-import 'package:yoloit/features/board/model/board_models.dart';
-import 'package:yoloit/features/board/plugins/builtin/markdown_note_plugin.dart';
 import 'package:yoloit/features/board/ui/board_view.dart';
 import 'package:yoloit/features/mindmap/widgets/canvas_interaction_lock.dart';
+
+import 'board_view_test_harness.dart';
 
 /// In-memory clipboard so meta+C/V/D shortcuts can be verified end to end
 /// without touching the platform clipboard channel.
@@ -26,62 +23,6 @@ class _FakeClipboard implements ClipboardInterface {
 
   @override
   Future<String?> getText() async => text;
-}
-
-/// Seeded cubit that keeps remote operations offline and offline-safe.
-class _TestBoardCubit extends BoardCubit {
-  _TestBoardCubit(BoardState state, {super.clipboard}) {
-    emit(state);
-  }
-
-  @override
-  Future<void> refreshRemoteBoards({String? url}) async {}
-}
-
-BoardPanelInstance _note(
-  String id,
-  String title, {
-  double x = 56,
-  double y = 74,
-}) {
-  return BoardPanelInstance(
-    id: id,
-    type: MarkdownNotePlugin.kTypeId,
-    title: title,
-    bounds: BoardPanelBounds(x: x, y: y, width: 520, height: 300),
-    state: {'markdown': title},
-  );
-}
-
-BoardDocument _board({List<BoardPanelInstance> panels = const []}) {
-  return BoardDocument(
-    id: 'board',
-    name: 'Board',
-    viewport: const BoardViewport(scale: 1),
-    panels: panels,
-  );
-}
-
-void _setSurface(WidgetTester tester) {
-  tester.view.physicalSize = const Size(1200, 760);
-  tester.view.devicePixelRatio = 1;
-  addTearDown(tester.view.resetPhysicalSize);
-  addTearDown(tester.view.resetDevicePixelRatio);
-}
-
-Future<void> _pumpBoard(WidgetTester tester, BoardCubit cubit) async {
-  await tester.pumpWidget(
-    MaterialApp(
-      theme: AppThemePreset.neonPurple.theme,
-      home: Scaffold(
-        body: BlocProvider.value(
-          value: cubit,
-          child: const BoardView(skipOverviewPreviewCapture: true),
-        ),
-      ),
-    ),
-  );
-  await tester.pump(const Duration(milliseconds: 450));
 }
 
 dynamic _viewState(WidgetTester tester) =>
@@ -98,42 +39,22 @@ KeyDownEvent _keyDown(LogicalKeyboardKey logical, PhysicalKeyboardKey physical) 
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  const recordChannel = MethodChannel('com.llfbandit.record/messages');
 
-  setUpAll(() {
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(recordChannel, (call) async {
-          switch (call.method) {
-            case 'create':
-              return 1;
-            case 'dispose':
-            case 'hasPermission':
-            case 'isRecording':
-            case 'isPaused':
-              return false;
-            default:
-              return null;
-          }
-        });
-  });
-
-  tearDownAll(() {
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(recordChannel, null);
-  });
+  setUpAll(installBoardViewChannelMocks);
+  tearDownAll(removeBoardViewChannelMocks);
 
   setUp(CanvasInteractionLock.instance.resetForTesting);
   tearDown(CanvasInteractionLock.instance.resetForTesting);
 
   testWidgets('escape key cancels a pending connection', (tester) async {
     SharedPreferences.setMockInitialValues({});
-    _setSurface(tester);
+    setBoardViewSurface(tester);
 
-    final cubit = _TestBoardCubit(
+    final cubit = TestBoardViewCubit(
       BoardState(
         boards: [
-          _board(
-            panels: [_note('p1', 'Source'), _note('p2', 'Target', x: 640)],
+          boardTestBoard(
+            panels: [boardTestNote('p1', 'Source'), boardTestNote('p2', 'Target', x: 640)],
           ),
         ],
         activeBoardId: 'board',
@@ -141,7 +62,7 @@ void main() {
       ),
     );
     addTearDown(cubit.close);
-    await _pumpBoard(tester, cubit);
+    await pumpBoardView(tester, cubit);
 
     final state = _viewState(tester);
 
@@ -170,17 +91,17 @@ void main() {
 
   testWidgets('delete key removes the selected panels', (tester) async {
     SharedPreferences.setMockInitialValues({});
-    _setSurface(tester);
+    setBoardViewSurface(tester);
 
-    final cubit = _TestBoardCubit(
+    final cubit = TestBoardViewCubit(
       BoardState(
-        boards: [_board(panels: [_note('p1', 'Keep'), _note('p2', 'Drop')])],
+        boards: [boardTestBoard(panels: [boardTestNote('p1', 'Keep'), boardTestNote('p2', 'Drop')])],
         activeBoardId: 'board',
         isLoaded: true,
       ),
     );
     addTearDown(cubit.close);
-    await _pumpBoard(tester, cubit);
+    await pumpBoardView(tester, cubit);
 
     final state = _viewState(tester);
 
@@ -209,19 +130,19 @@ void main() {
     tester,
   ) async {
     SharedPreferences.setMockInitialValues({});
-    _setSurface(tester);
+    setBoardViewSurface(tester);
 
     final clipboard = _FakeClipboard();
-    final cubit = _TestBoardCubit(
+    final cubit = TestBoardViewCubit(
       BoardState(
-        boards: [_board(panels: [_note('p1', 'Clonable')])],
+        boards: [boardTestBoard(panels: [boardTestNote('p1', 'Clonable')])],
         activeBoardId: 'board',
         isLoaded: true,
       ),
       clipboard: clipboard,
     );
     addTearDown(cubit.close);
-    await _pumpBoard(tester, cubit);
+    await pumpBoardView(tester, cubit);
 
     final state = _viewState(tester);
     cubit.selectPanels({'p1'});
@@ -276,13 +197,13 @@ void main() {
     tester,
   ) async {
     SharedPreferences.setMockInitialValues({});
-    _setSurface(tester);
+    setBoardViewSurface(tester);
 
-    final cubit = _TestBoardCubit(
-      BoardState(boards: [_board()], activeBoardId: 'board', isLoaded: true),
+    final cubit = TestBoardViewCubit(
+      BoardState(boards: [boardTestBoard()], activeBoardId: 'board', isLoaded: true),
     );
     addTearDown(cubit.close);
-    await _pumpBoard(tester, cubit);
+    await pumpBoardView(tester, cubit);
 
     final state = _viewState(tester);
     // ignore: avoid_dynamic_calls
@@ -327,13 +248,13 @@ void main() {
     tester,
   ) async {
     SharedPreferences.setMockInitialValues({});
-    _setSurface(tester);
+    setBoardViewSurface(tester);
 
-    final cubit = _TestBoardCubit(
-      BoardState(boards: [_board()], activeBoardId: 'board', isLoaded: true),
+    final cubit = TestBoardViewCubit(
+      BoardState(boards: [boardTestBoard()], activeBoardId: 'board', isLoaded: true),
     );
     addTearDown(cubit.close);
-    await _pumpBoard(tester, cubit);
+    await pumpBoardView(tester, cubit);
 
     final state = _viewState(tester);
     // The interaction starts while a scrollable card holds the canvas lock.
@@ -380,13 +301,13 @@ void main() {
     tester,
   ) async {
     SharedPreferences.setMockInitialValues({});
-    _setSurface(tester);
+    setBoardViewSurface(tester);
 
-    final cubit = _TestBoardCubit(
-      BoardState(boards: [_board()], activeBoardId: 'board', isLoaded: true),
+    final cubit = TestBoardViewCubit(
+      BoardState(boards: [boardTestBoard()], activeBoardId: 'board', isLoaded: true),
     );
     addTearDown(cubit.close);
-    await _pumpBoard(tester, cubit);
+    await pumpBoardView(tester, cubit);
 
     expect(cubit.state.activeBoard!.viewport.translation, Offset.zero);
 
@@ -428,17 +349,17 @@ void main() {
     tester,
   ) async {
     SharedPreferences.setMockInitialValues({});
-    _setSurface(tester);
+    setBoardViewSurface(tester);
 
-    final cubit = _TestBoardCubit(
+    final cubit = TestBoardViewCubit(
       BoardState(
-        boards: [_board(panels: [_note('p1', 'Note')])],
+        boards: [boardTestBoard(panels: [boardTestNote('p1', 'Note')])],
         activeBoardId: 'board',
         isLoaded: true,
       ),
     );
     addTearDown(cubit.close);
-    await _pumpBoard(tester, cubit);
+    await pumpBoardView(tester, cubit);
 
     expect(CanvasInteractionLock.instance.isCanvasGestureActive, isFalse);
 
@@ -464,17 +385,17 @@ void main() {
     tester,
   ) async {
     SharedPreferences.setMockInitialValues({});
-    _setSurface(tester);
+    setBoardViewSurface(tester);
 
-    final cubit = _TestBoardCubit(
+    final cubit = TestBoardViewCubit(
       BoardState(
-        boards: [_board(panels: [_note('p1', 'Note')])],
+        boards: [boardTestBoard(panels: [boardTestNote('p1', 'Note')])],
         activeBoardId: 'board',
         isLoaded: true,
       ),
     );
     addTearDown(cubit.close);
-    await _pumpBoard(tester, cubit);
+    await pumpBoardView(tester, cubit);
 
     dispatchToCanvasListener(
       tester,
@@ -513,17 +434,17 @@ void main() {
     'panel lock conflict with an actor shows who holds the lock',
     (tester) async {
       SharedPreferences.setMockInitialValues({});
-      _setSurface(tester);
+      setBoardViewSurface(tester);
 
-      final cubit = _TestBoardCubit(
+      final cubit = TestBoardViewCubit(
         BoardState(
-          boards: [_board(panels: [_note('p1', 'Locked note')])],
+          boards: [boardTestBoard(panels: [boardTestNote('p1', 'Locked note')])],
           activeBoardId: 'board',
           isLoaded: true,
         ),
       );
       addTearDown(cubit.close);
-      await _pumpBoard(tester, cubit);
+      await pumpBoardView(tester, cubit);
 
       cubit.emit(
         cubit.state.copyWith(
@@ -544,17 +465,17 @@ void main() {
     tester,
   ) async {
     SharedPreferences.setMockInitialValues({});
-    _setSurface(tester);
+    setBoardViewSurface(tester);
 
-    final cubit = _TestBoardCubit(
+    final cubit = TestBoardViewCubit(
       BoardState(
-        boards: [_board(panels: [_note('p1', 'Locked note')])],
+        boards: [boardTestBoard(panels: [boardTestNote('p1', 'Locked note')])],
         activeBoardId: 'board',
         isLoaded: true,
       ),
     );
     addTearDown(cubit.close);
-    await _pumpBoard(tester, cubit);
+    await pumpBoardView(tester, cubit);
 
     cubit.emit(cubit.state.copyWith(panelLockConflictPanelId: 'p1'));
     await tester.pump();

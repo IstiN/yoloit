@@ -826,6 +826,37 @@ class SetupCheckService {
   @visibleForTesting
   static String cleanVersionForTest(String raw) => _cleanVersion(raw);
 
+  /// Test hook for [_findPathWindows]: on non-Windows hosts both probes fail
+  /// fast (powershell/where are missing) and the method returns null.
+  @visibleForTesting
+  static Future<String?> findPathWindowsForTest(String cmd) =>
+      _findPathWindows(cmd);
+
+  /// Test hook for [_checkTool] with a fixed id/name so unit tests can probe
+  /// the found, missing, and fallback branches with controlled commands.
+  @visibleForTesting
+  static Future<DependencyStatus> checkToolForTest({
+    required String command,
+    required List<String> versionArgs,
+    String? fallbackCommand,
+    List<String>? fallbackVersionArgs,
+  }) => _checkTool(
+    id: 'test-tool',
+    name: 'Test Tool',
+    description: 'test tool',
+    command: command,
+    versionArgs: versionArgs,
+    installHint: 'install hint',
+    fallbackCommand: fallbackCommand,
+    fallbackVersionArgs: fallbackVersionArgs,
+  );
+
+  /// Test hook for [_checkOpencodeAgent].
+  @visibleForTesting
+  static Future<DependencyStatus> checkOpencodeAgentForTest({
+    required bool winget,
+  }) => _checkOpencodeAgent(winget: winget);
+
   static Future<DependencyStatus> _checkTool({
     required String id,
     required String name,

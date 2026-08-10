@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -5,11 +6,18 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:media_kit/media_kit.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/events/board_event_bus.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/file_preview_plugin.dart';
+import 'package:yoloit/features/board/services/board_offscreen_renderer.dart';
+
+class _MockPlayer extends Mock implements Player {}
+
+class _MockPlayerStream extends Mock implements PlayerStream {}
 
 // 1x1 transparent PNG.
 final Uint8List _kPngBytes = base64Decode(
@@ -24,6 +32,11 @@ void main() {
   const plugin = FilePreviewPlugin();
 
   late Directory tempDir;
+
+  setUpAll(() {
+    registerFallbackValue(Media(''));
+    registerFallbackValue(Duration.zero);
+  });
 
   setUp(() {
     tempDir = Directory.systemTemp.createTempSync('yoloit_file_preview_test');
@@ -453,6 +466,122 @@ void main() {
       greaterThanOrEqualTo(4),
     );
   });
+
+  testWidgets('svg preview re-registers its headless task on flag flips', (
+    tester,
+  ) async {
+    final path = writeTextFile('flip.svg', _kSvg);
+
+    await tester.pumpWidget(_previewHarness(plugin, path));
+    await tester.pump();
+    expect(find.byType(SvgPicture), findsOneWidget);
+    expect(HeadlessRenderRegistry.activeTasks, isEmpty);
+
+    // Same path -> same ValueKey -> didUpdateWidget with headless flipped on.
+    await tester.pumpWidget(
+      _previewHarness(plugin, path, isHeadlessPreview: true),
+    );
+    await tester.pump();
+    await tester.pump();
+    expect(find.byType(SvgPicture), findsOneWidget);
+    // The task is registered during load and released in a microtask.
+    expect(HeadlessRenderRegistry.activeTasks, isEmpty);
+
+    // Flip back off.
+    await tester.pumpWidget(_previewHarness(plugin, path));
+    await tester.pump();
+    expect(find.byType(SvgPicture), findsOneWidget);
+    expect(HeadlessRenderRegistry.activeTasks, isEmpty);
+  });
+
+  testWidgets('restores the saved scroll offset in code previews', (
+    tester,
+  ) async {
+    final lines = List<String>.generate(300, (i) => 'scrollable row $i');
+    final path = writeTextFile('scroll.txt', lines.join('\n'));
+
+    await tester.pumpWidget(
+      _previewHarness(
+        plugin,
+        path,
+        height: 600,
+        extraState: const {'scrollOffset': 200.0},
+      ),
+    );
+    await tester.pump();
+    // restoreAfterLayout retries from post-frame callbacks until the jump
+    // lands.
+    await tester.pump();
+    await tester.pump();
+
+    final listView = tester.widget<ListView>(find.byType(ListView));
+    expect(listView.controller, isNotNull);
+    expect(listView.controller!.offset, greaterThan(0));
+  });
+
+  testWidgets('renders audio controls driven by a fake player', (
+    tester,
+  ) async {
+    final path = writeByteFile('tone.mp3', [0xFF, 0xFB, 0x90, 0x00]);
+
+    final playing = StreamController<bool>.broadcast();
+    final position = StreamController<Duration>.broadcast();
+    final duration = StreamController<Duration>.broadcast();
+    addTearDown(() async {
+      await playing.close();
+      await position.close();
+      await duration.close();
+    });
+
+    final stream = _MockPlayerStream();
+    when(() => stream.playing).thenAnswer((_) => playing.stream);
+    when(() => stream.position).thenAnswer((_) => position.stream);
+    when(() => stream.duration).thenAnswer((_) => duration.stream);
+
+    final player = _MockPlayer();
+    when(() => player.stream).thenReturn(stream);
+    when(
+      () => player.open(any(), play: any(named: 'play')),
+    ).thenAnswer((_) async {});
+    when(() => player.seek(any())).thenAnswer((_) async {});
+    when(() => player.play()).thenAnswer((_) async {});
+    when(() => player.pause()).thenAnswer((_) async {});
+    when(() => player.dispose()).thenAnswer((_) async {});
+
+    FilePreviewPlugin.debugAudioPlayerFactory = () => player;
+    addTearDown(() => FilePreviewPlugin.debugAudioPlayerFactory = null);
+
+    await tester.pumpWidget(_previewHarness(plugin, path, height: 560));
+    await tester.pump();
+
+    expect(find.byIcon(Icons.music_note_rounded), findsOneWidget);
+    expect(find.text('tone.mp3'), findsWidgets);
+    expect(find.text('00:00'), findsNWidgets(2));
+    expect(find.byIcon(Icons.play_arrow_rounded), findsOneWidget);
+    verify(() => player.open(any(), play: false)).called(1);
+
+    // Push playback state through the player streams. A timed pump elapses
+    // fake time, which flushes the microtasks delivering the stream events.
+    duration.add(const Duration(minutes: 1, seconds: 5));
+    position.add(const Duration(seconds: 5));
+    playing.add(true);
+    await tester.pump(const Duration(milliseconds: 50));
+
+    expect(find.text('01:05'), findsOneWidget);
+    expect(find.text('00:05'), findsOneWidget);
+    expect(find.byIcon(Icons.pause_rounded), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.pause_rounded));
+    verify(() => player.pause()).called(1);
+
+    await tester.tap(find.byIcon(Icons.forward_10_rounded));
+    await tester.pump();
+    verify(() => player.seek(const Duration(seconds: 15))).called(1);
+
+    await tester.tap(find.byIcon(Icons.replay_10_rounded));
+    await tester.pump();
+    verify(() => player.seek(Duration.zero)).called(1);
+  });
 }
 
 Widget _previewHarness(
@@ -462,20 +591,27 @@ Widget _previewHarness(
   onCreateLinkedPanel,
   ValueChanged<Map<String, dynamic>>? onUpdateState,
   bool isHeadlessPreview = false,
+  double width = 480,
+  double height = 360,
+  Map<String, dynamic> extraState = const {},
 }) {
   final panel = BoardPanelInstance(
     id: 'preview',
     type: FilePreviewPlugin.kTypeId,
     title: 'Preview',
     bounds: const BoardPanelBounds(x: 0, y: 0, width: 480, height: 360),
-    state: {'path': path, 'title': path.split(Platform.pathSeparator).last},
+    state: {
+      'path': path,
+      'title': path.split(Platform.pathSeparator).last,
+      ...extraState,
+    },
   );
 
   return MaterialApp(
     home: Scaffold(
       body: SizedBox(
-        width: 480,
-        height: 360,
+        width: width,
+        height: height,
         child: Builder(
           builder:
               (context) => plugin.buildContent(

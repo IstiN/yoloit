@@ -65,4 +65,65 @@ void main() {
       expect(registry.tree('unknown'), isNull);
     });
   });
+
+  group('WidgetAppRegistry registerAlias', () {
+    test('ignores alias identical to the canonical id', () async {
+      var called = false;
+      registry.registerReload('weather', () async { called = true; });
+
+      registry.registerAlias('weather', 'weather');
+
+      // No alias entry created; lookup still resolves through the entry.
+      expect(registry.resolveLookupKey('weather'), 'weather');
+      expect(await registry.triggerReload('weather'), isTrue);
+      expect(called, isTrue);
+    });
+
+    test('resolves aliases to the canonical id', () {
+      registry.registerReload('weather', () async {});
+
+      registry.registerAlias('/tmp/apps/weather-dev', 'weather');
+
+      expect(registry.resolveLookupKey('/tmp/apps/weather-dev'), 'weather');
+    });
+
+    test('registers the basename as an additional alias', () async {
+      var calls = 0;
+      registry.registerReload('weather', () async { calls++; });
+
+      registry.registerAlias('/tmp/apps/weather-dev', 'weather');
+
+      // Basename of the aliased path also resolves to the canonical id.
+      expect(registry.resolveLookupKey('weather-dev'), 'weather');
+      expect(await registry.triggerReload('weather-dev'), isTrue);
+      expect(calls, 1);
+    });
+
+    test('does not duplicate basename when it equals the canonical id', () {
+      registry.registerReload('weather', () async {});
+
+      registry.registerAlias('/tmp/apps/weather', 'weather');
+
+      expect(registry.resolveLookupKey('/tmp/apps/weather'), 'weather');
+      expect(registry.resolveLookupKey('weather'), 'weather');
+    });
+
+    test('alias without path separator registers only the alias itself', () {
+      registry.registerReload('weather', () async {});
+
+      registry.registerAlias('meteo', 'weather');
+
+      expect(registry.resolveLookupKey('meteo'), 'weather');
+    });
+
+    test('unregister removes aliases pointing at the entry', () {
+      registry.registerReload('weather', () async {});
+      registry.registerAlias('/tmp/apps/weather-dev', 'weather');
+
+      registry.unregister('weather');
+
+      expect(registry.resolveLookupKey('/tmp/apps/weather-dev'), '/tmp/apps/weather-dev');
+      expect(registry.resolveLookupKey('weather-dev'), 'weather-dev');
+    });
+  });
 }

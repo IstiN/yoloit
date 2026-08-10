@@ -12,6 +12,7 @@ import 'package:yoloit/core/cli/handlers/shape_handler.dart';
 import 'package:yoloit/core/cli/handlers/sticky_note_handler.dart';
 import 'package:yoloit/core/cli/handlers/terminal_handler.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
+import 'package:yoloit/features/board/plugins/builtin/webview_manager.dart';
 
 BoardPanelInstance _panel(
   String type, {
@@ -48,6 +49,141 @@ void main() {
     test('open requires url', () async {
       final r = await h.handleAction('open', {}, _panel('board.webpage'));
       expect(r.ok, isFalse);
+    });
+  });
+
+  group('WebpageCliHandler webview actions', () {
+    final h = const WebpageCliHandler();
+    final manager = WebViewManager.instance;
+
+    tearDown(() => manager.remove('p1'));
+
+    void registerEntry({
+      Future<void> Function(String js)? onRun,
+      Future<Object?> Function(String js)? onRunResult,
+    }) {
+      manager.registerEntry(
+        'p1',
+        WebViewEntry(
+          runJavaScript: onRun,
+          runJavaScriptReturningResult: onRunResult,
+        ),
+      );
+    }
+
+    test('click requires a selector', () async {
+      final r = await h.handleAction('click', {}, _panel('board.webpage'));
+      expect(r.ok, isFalse);
+      expect(r.message, 'Missing selector parameter');
+    });
+
+    test('click fails when the webview is not initialized', () async {
+      final r = await h.handleAction('click', {
+        'selector': '#btn',
+      }, _panel('board.webpage'));
+      expect(r.ok, isFalse);
+      expect(r.message, 'WebView is not initialized for this panel');
+    });
+
+    test('click runs JS and reports the clicked selector', () async {
+      String? captured;
+      registerEntry(onRunResult: (js) async {
+        captured = js;
+        return true;
+      });
+
+      final r = await h.handleAction('click', {
+        'selector': '#btn',
+      }, _panel('board.webpage'));
+
+      expect(r.ok, isTrue);
+      expect(r.message, 'Clicked #btn');
+      expect(r.data, {'selector': '#btn'});
+      expect(captured, contains('document.querySelector("#btn")'));
+    });
+
+    test('click treats a truthy string result as success', () async {
+      registerEntry(onRunResult: (js) async => 'true');
+
+      final r = await h.handleAction('click', {
+        'selector': '.link',
+      }, _panel('board.webpage'));
+
+      expect(r.ok, isTrue);
+      expect(r.message, 'Clicked .link');
+    });
+
+    test('click fails when no element matches', () async {
+      registerEntry(onRunResult: (js) async => false);
+
+      final r = await h.handleAction('click', {
+        'selector': '#nope',
+      }, _panel('board.webpage'));
+
+      expect(r.ok, isFalse);
+      expect(r.message, 'No element matched selector: #nope');
+    });
+
+    test('click reports webview errors', () async {
+      registerEntry(onRunResult: (js) async => throw StateError('boom'));
+
+      final r = await h.handleAction('click', {
+        'selector': '#btn',
+      }, _panel('board.webpage'));
+
+      expect(r.ok, isFalse);
+      expect(r.message, contains('WebView action failed'));
+    });
+
+    test('scroll uses window.scrollTo by default', () async {
+      String? captured;
+      registerEntry(onRun: (js) async => captured = js);
+
+      final r = await h.handleAction('scroll', {
+        'x': 10,
+        'y': 20.5,
+      }, _panel('board.webpage'));
+
+      expect(r.ok, isTrue);
+      expect(r.message, 'Scrolled to (10.0, 20.5)');
+      expect(r.data, {'x': 10.0, 'y': 20.5, 'by': false});
+      expect(captured, 'window.scrollTo(10, 20.5);');
+    });
+
+    test('scroll uses window.scrollBy in by mode', () async {
+      String? captured;
+      registerEntry(onRun: (js) async => captured = js);
+
+      final r = await h.handleAction('scroll', {
+        'x': 0,
+        'y': 100,
+        'by': true,
+      }, _panel('board.webpage'));
+
+      expect(r.ok, isTrue);
+      expect(r.message, 'Scrolled by (0.0, 100.0)');
+      expect(captured, 'window.scrollBy(0, 100);');
+    });
+
+    test('scroll parses string coordinates with fallback', () async {
+      String? captured;
+      registerEntry(onRun: (js) async => captured = js);
+
+      final r = await h.handleAction('scroll', {
+        'x': '15',
+        'y': 'abc',
+      }, _panel('board.webpage'));
+
+      expect(r.ok, isTrue);
+      expect(captured, 'window.scrollTo(15, 0);');
+    });
+
+    test('scroll fails when the webview is not initialized', () async {
+      final r = await h.handleAction('scroll', {
+        'y': 10,
+      }, _panel('board.webpage'));
+      expect(r.ok, isFalse);
+      expect(r.message, 'WebView is not initialized for this panel');
     });
   });
 

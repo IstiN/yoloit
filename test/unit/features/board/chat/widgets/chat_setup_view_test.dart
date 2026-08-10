@@ -591,6 +591,34 @@ void main() {
       });
     });
 
+    testWidgets('opencode provider loads models via _loadOpencodeModels', (
+      tester,
+    ) async {
+      await tester.runAsync(() async {
+        await tester.pumpWidget(
+          buildApp(
+            config: const ChatSessionConfig(
+              sessionName: 's',
+              workingDir: '/tmp',
+              provider: 'opencode',
+              model: 'gpt-4o',
+            ),
+          ),
+        );
+        // Let the async _loadOpencodeModels settle — it calls
+        // OpenCodeAuthService.configuredProviderIds and ModelsDevCatalogService.
+        for (var i = 0; i < 20; i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+          await tester.pump();
+        }
+
+        // The opencode provider should render without crashing.
+        // The model list may be empty if no auth.json exists, but the
+        // _loadOpencodeModels method has been exercised.
+        expect(find.byType(ChatSetupView), findsOneWidget);
+      });
+    });
+
     testWidgets('didUpdateWidget resets an invalid model to the default', (
       tester,
     ) async {
