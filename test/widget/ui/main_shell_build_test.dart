@@ -417,7 +417,7 @@ void main() {
     });
 
     testWidgets('loads git gutter markers from a real git repo with modified file',
-        skip: 'async git deadlock in full suite', (tester) async {
+        skip: true, (tester) async {
       // Create a real git repo, commit a file, modify it, then open the
       // editor pointed at that repo so _loadGitGutter calls GitService.getDiff
       // and parses the diff into _gitMarkers.
@@ -483,7 +483,7 @@ void main() {
     // testWidgets fake-async). The method itself is exercised by the
     // unit test in file_editor_panel_quickfind_test.dart.
     testWidgets('_loadGitGutter does nothing for a non-git workspace path',
-        skip: 'async git deadlock in full suite', (tester) async {
+        skip: true, (tester) async {
       await tester.pumpWidget(
         editorHarness(
           FileEditorState(
