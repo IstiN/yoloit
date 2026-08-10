@@ -185,16 +185,15 @@ void main() {
   });
 
   test('createPlatformCapabilities covers all OS branches', () {
-    for (final combination in [
-      (true, false, false, false, false, RuntimePlatform.macos),
-      (false, true, false, false, false, RuntimePlatform.windows),
-      (false, false, true, false, false, RuntimePlatform.linux),
-      (false, false, false, true, false, RuntimePlatform.android),
-      (false, false, false, false, true, RuntimePlatform.ios),
-      (false, false, false, false, false, RuntimePlatform.web),
-    ]) {
-      final caps = createPlatformCapabilities();
-      expect(caps.platform, isA<RuntimePlatform>());
-    }
+    final caps = createPlatformCapabilities();
+    expect(caps, isA<VmPlatformCapabilities>());
+    expect(caps.platform, RuntimePlatform.macos);
+    // Test all branches via the public test seam.
+    expect(createPlatformCapabilitiesForTest(isMacOS: true, isWindows: false, isLinux: false, isAndroid: false, isIOS: false).platform, RuntimePlatform.macos);
+    expect(createPlatformCapabilitiesForTest(isMacOS: false, isWindows: true, isLinux: false, isAndroid: false, isIOS: false).platform, RuntimePlatform.windows);
+    expect(createPlatformCapabilitiesForTest(isMacOS: false, isWindows: false, isLinux: true, isAndroid: false, isIOS: false).platform, RuntimePlatform.linux);
+    expect(createPlatformCapabilitiesForTest(isMacOS: false, isWindows: false, isLinux: false, isAndroid: true, isIOS: false).platform, RuntimePlatform.android);
+    expect(createPlatformCapabilitiesForTest(isMacOS: false, isWindows: false, isLinux: false, isAndroid: false, isIOS: true).platform, RuntimePlatform.ios);
+    expect(createPlatformCapabilitiesForTest(isMacOS: false, isWindows: false, isLinux: false, isAndroid: false, isIOS: false).platform, RuntimePlatform.linux);
   });
 }

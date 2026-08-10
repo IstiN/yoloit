@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:yoloit/core/platform/platform_capabilities.dart';
 
-PlatformCapabilities createPlatformCapabilities() => _createPlatformCapabilities(
+PlatformCapabilities createPlatformCapabilities() => createPlatformCapabilitiesForTest(
   isMacOS: Platform.isMacOS,
   isWindows: Platform.isWindows,
   isLinux: Platform.isLinux,
@@ -12,7 +12,7 @@ PlatformCapabilities createPlatformCapabilities() => _createPlatformCapabilities
 );
 
 @visibleForTesting
-PlatformCapabilities _createPlatformCapabilities({
+PlatformCapabilities createPlatformCapabilitiesForTest({
   required bool isMacOS,
   required bool isWindows,
   required bool isLinux,
@@ -28,7 +28,7 @@ PlatformCapabilities _createPlatformCapabilities({
       isIOS: false,
     );
   }
-  if (Platform.isWindows) {
+  if (isWindows) {
     return const VmPlatformCapabilities.forTest(
       isMacOS: false,
       isWindows: true,
@@ -37,7 +37,7 @@ PlatformCapabilities _createPlatformCapabilities({
       isIOS: false,
     );
   }
-  if (Platform.isLinux) {
+  if (isLinux) {
     return const VmPlatformCapabilities.forTest(
       isMacOS: false,
       isWindows: false,
@@ -46,7 +46,7 @@ PlatformCapabilities _createPlatformCapabilities({
       isIOS: false,
     );
   }
-  if (Platform.isAndroid) {
+  if (isAndroid) {
     return const VmPlatformCapabilities.forTest(
       isMacOS: false,
       isWindows: false,
@@ -55,7 +55,7 @@ PlatformCapabilities _createPlatformCapabilities({
       isIOS: false,
     );
   }
-  if (Platform.isIOS) {
+  if (isIOS) {
     return const VmPlatformCapabilities.forTest(
       isMacOS: false,
       isWindows: false,

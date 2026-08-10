@@ -417,7 +417,8 @@ void main() {
     });
 
     testWidgets('loads git gutter markers from a real git repo with modified file',
-        skip: true, (tester) async {
+        (tester) async {
+      await tester.runAsync(() async {
       // Create a real git repo, commit a file, modify it, then open the
       // editor pointed at that repo so _loadGitGutter calls GitService.getDiff
       // and parses the diff into _gitMarkers.
@@ -477,13 +478,12 @@ void main() {
       // should have been loaded (line 1126-1128 of _loadGitGutter).
       expect(find.byType(FileEditorPanel), findsOneWidget);
       expect(tester.takeException(), isNull);
+      });
     });
 
-    // Skipped: hangs in full-suite (async git process deadlock under
-    // testWidgets fake-async). The method itself is exercised by the
-    // unit test in file_editor_panel_quickfind_test.dart.
     testWidgets('_loadGitGutter does nothing for a non-git workspace path',
-        skip: true, (tester) async {
+        (tester) async {
+      await tester.runAsync(() async {
       await tester.pumpWidget(
         editorHarness(
           FileEditorState(
@@ -504,6 +504,7 @@ void main() {
       await tester.pump(const Duration(seconds: 3));
       expect(find.byType(FileEditorPanel), findsOneWidget);
       expect(tester.takeException(), isNull);
+      });
     });
   });
 }
