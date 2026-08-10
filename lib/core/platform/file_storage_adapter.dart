@@ -15,7 +15,12 @@ abstract class FileStorageAdapter {
 
   /// Shared instance — VM or web depending on the build target.
   static FileStorageAdapter get instance => _instance;
-  static final FileStorageAdapter _instance = impl.getAdapter();
+  static FileStorageAdapter _instance = impl.getAdapter();
+
+  /// Override for tests.
+  @visibleForTesting
+  static void setInstanceForTest(FileStorageAdapter adapter) =>
+      _instance = adapter;
 
   /// Returns whether anything has been stored at [path].
   Future<bool> exists(String path);

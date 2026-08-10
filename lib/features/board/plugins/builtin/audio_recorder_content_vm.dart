@@ -53,6 +53,12 @@ class AudioRecorderPanelContent extends StatefulWidget {
   static Future<void> Function(String path, String contents)
       writeTranscriptFile = _defaultWriteTranscriptFile;
 
+  /// Test seam: override [Player] construction so [_ensurePlayer] and
+  /// [_togglePlay] can be exercised without libmpv (which is unavailable
+  /// in headless unit tests).
+  @visibleForTesting
+  static Player Function()? debugPlayerFactory;
+
   static Future<void> _defaultWriteTranscriptFile(
     String path,
     String contents,
@@ -194,7 +200,8 @@ class _AudioRecorderPanelContentState extends State<AudioRecorderPanelContent> {
   Player _ensurePlayer() {
     final existing = _player;
     if (existing != null) return existing;
-    final player = Player();
+    final player = AudioRecorderPanelContent.debugPlayerFactory?.call() ??
+        Player();
     _player = player;
     _playerSubs.add(
       player.stream.position.listen((p) {

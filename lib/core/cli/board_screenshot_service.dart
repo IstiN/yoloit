@@ -148,6 +148,20 @@ class BoardScreenshotService {
     } catch (_) {}
   }
 
+  /// Test-only variant of [cleanupOldSnapshots] that reads from [dirPath]
+  /// instead of the hardcoded default.
+  @visibleForTesting
+  Future<void> cleanupOldSnapshotsForTest(String dirPath) async {
+    final paths = await FileStorageAdapter.instance.list(dirPath);
+    final cutoff = DateTime.now().subtract(const Duration(hours: 1));
+    for (final path in paths) {
+      final ts = _snapshotTimestamp(path);
+      if (ts != null && ts.isBefore(cutoff)) {
+        await FileStorageAdapter.instance.delete(path);
+      }
+    }
+  }
+
   static DateTime? _snapshotTimestamp(String path) {
     final name = p.basename(path);
     const prefix = 'board_snapshot_';
