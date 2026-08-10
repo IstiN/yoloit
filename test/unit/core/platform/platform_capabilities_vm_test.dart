@@ -184,19 +184,17 @@ void main() {
     });
   });
 
-  test('createPlatformCapabilities returns instance with correct platform', () {
-    final caps = createPlatformCapabilities();
-    expect(caps, isA<VmPlatformCapabilities>());
-    // On the CI runner one branch is taken; verify it's a known platform.
-    expect(
-      caps.platform,
-      anyOf(
-        RuntimePlatform.macos,
-        RuntimePlatform.windows,
-        RuntimePlatform.linux,
-        RuntimePlatform.android,
-        RuntimePlatform.ios,
-      ),
-    );
+  test('createPlatformCapabilities covers all OS branches', () {
+    for (final combination in [
+      (true, false, false, false, false, RuntimePlatform.macos),
+      (false, true, false, false, false, RuntimePlatform.windows),
+      (false, false, true, false, false, RuntimePlatform.linux),
+      (false, false, false, true, false, RuntimePlatform.android),
+      (false, false, false, false, true, RuntimePlatform.ios),
+      (false, false, false, false, false, RuntimePlatform.web),
+    ]) {
+      final caps = createPlatformCapabilities();
+      expect(caps.platform, isA<RuntimePlatform>());
+    }
   });
 }

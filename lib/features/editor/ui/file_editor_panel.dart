@@ -1116,11 +1116,17 @@ class _EditorBodyState extends State<_EditorBody> {
   // ── Git gutter ───────────────────────────────────────────────────────────
 
   Future<void> _loadGitGutter() async {
-    final workspacePath = widget.tab.workspacePath;
-    if (workspacePath == null || widget.tab.isDiff) return;
+    if (!_shouldLoadGitGutter) return;
+    await _doLoadGitGutter();
+  }
+
+  bool get _shouldLoadGitGutter =>
+      widget.tab.workspacePath != null && !widget.tab.isDiff;
+
+  Future<void> _doLoadGitGutter() async {
     try {
       final diff = await GitService.instance.getDiff(
-        workspacePath,
+        widget.tab.workspacePath!,
         widget.tab.filePath,
       );
       if (mounted && diff.isNotEmpty) {
