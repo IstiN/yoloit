@@ -54,6 +54,12 @@ extension BoardCubitLocks on BoardCubit {
     return ids;
   }
 
+  @visibleForTesting
+  Set<String> panelIdsLockedByActorForTest(
+    BoardDocument board,
+    String actorId,
+  ) => _panelIdsLockedByActor(board, actorId);
+
   Future<bool> acquirePanelLock(
     String boardId,
     String panelId, {

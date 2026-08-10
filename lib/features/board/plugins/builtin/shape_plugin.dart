@@ -789,4 +789,25 @@ Path _polygon(Rect rect, int sides) {
   return path..close();
 }
 
+/// Test-only factory for exercising [_ShapePalette], which is otherwise never
+/// instantiated because the editor dialog builds [ChoiceChip]s directly.
+@visibleForTesting
+Widget createShapePaletteForTest({
+  required String selectedShape,
+  required Color selectedColor,
+  required String textHAlign,
+  required String textVAlign,
+  required String textOrientation,
+  required AppColorScheme colors,
+  required ValueChanged<Map<String, dynamic>> onUpdate,
+}) =>
+    _ShapePalette(
+      selectedShape: selectedShape,
+      selectedColor: selectedColor,
+      textHAlign: textHAlign,
+      textVAlign: textVAlign,
+      textOrientation: textOrientation,
+      colors: colors,
+      onUpdate: onUpdate,
+    );
 

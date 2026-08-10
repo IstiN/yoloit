@@ -30,22 +30,28 @@ class _DependencyPanelsShowcaseState extends State<DependencyPanelsShowcase> {
   static const _sampleVideoUrl =
       'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4';
 
-  late final Player _player;
-  late final VideoController _videoController;
+  Player? _player;
+  VideoController? _videoController;
   var _videoReady = false;
   String? _videoError;
 
   @override
   void initState() {
     super.initState();
-    _player = Player();
-    _videoController = VideoController(_player);
-    _startSampleVideo();
+    try {
+      _player = Player();
+      _videoController = VideoController(_player!);
+      _startSampleVideo();
+    } catch (e) {
+      _videoError = '$e';
+    }
   }
 
   Future<void> _startSampleVideo() async {
+    final player = _player;
+    if (player == null) return;
     try {
-      await _player.open(Media(_sampleVideoUrl), play: false);
+      await player.open(Media(_sampleVideoUrl), play: false);
       if (mounted) setState(() => _videoReady = true);
     } catch (e) {
       if (mounted) setState(() => _videoError = '$e');
@@ -54,7 +60,7 @@ class _DependencyPanelsShowcaseState extends State<DependencyPanelsShowcase> {
 
   @override
   void dispose() {
-    _player.dispose();
+    _player?.dispose();
     super.dispose();
   }
 
@@ -149,9 +155,9 @@ class _DependencyPanelsShowcaseState extends State<DependencyPanelsShowcase> {
                     ),
                   ),
                 )
-              : _videoReady
+              : _videoReady && _videoController != null
                   ? Video(
-                      controller: _videoController,
+                      controller: _videoController!,
                       controls: AdaptiveVideoControls,
                     )
                   : Center(

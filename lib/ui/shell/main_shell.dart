@@ -2185,6 +2185,31 @@ class _SessionRow extends StatelessWidget {
   }
 }
 
+/// Test seam that wraps the private [_SessionRow] so widget tests can pump
+/// it in isolation (without the full resource monitor polling loop).
+@visibleForTesting
+class SessionRowTestWrapper extends StatelessWidget {
+  const SessionRowTestWrapper({
+    super.key,
+    required this.session,
+    required this.boardCubit,
+    this.onClose,
+  });
+
+  final SessionStat session;
+  final BoardCubit boardCubit;
+  final VoidCallback? onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    return _SessionRow(
+      session: session,
+      boardCubit: boardCubit,
+      onClose: onClose,
+    );
+  }
+}
+
 /// Opens the board terminal panel linked to a resource session, switching
 /// boards first when needed. Falls back to a snackbar when the session is
 /// not linked to any board panel.

@@ -159,4 +159,9 @@ class BoardScreenshotService {
     if (ts == null) return null;
     return DateTime.fromMillisecondsSinceEpoch(ts);
   }
+
+  /// Test-only wrapper for [_snapshotTimestamp].
+  @visibleForTesting
+  static DateTime? snapshotTimestampForTest(String path) =>
+      _snapshotTimestamp(path);
 }

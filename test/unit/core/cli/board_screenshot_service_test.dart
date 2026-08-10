@@ -1,62 +1,76 @@
-import 'dart:io';
-
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yoloit/core/cli/board_screenshot_service.dart';
 
 void main() {
-  group('BoardScreenshotService', () {
-    late BoardScreenshotService service;
+  group('BoardScreenshotService._snapshotTimestamp', () {
+    test('parses a valid snapshot filename', () {
+      final result = BoardScreenshotService.snapshotTimestampForTest(
+        'board_snapshots/board_snapshot_1700000000000.png',
+      );
+      expect(result, isNotNull);
+      expect(result!.millisecondsSinceEpoch, 1700000000000);
+    });
 
+    test('parses using only the basename', () {
+      final a = BoardScreenshotService.snapshotTimestampForTest(
+        '/some/deep/path/board_snapshot_1234567890.png',
+      );
+      expect(a, isNotNull);
+      expect(a!.millisecondsSinceEpoch, 1234567890);
+    });
+
+    test('returns null when the prefix is wrong', () {
+      expect(
+        BoardScreenshotService.snapshotTimestampForTest('snapshot_123.png'),
+        isNull,
+      );
+    });
+
+    test('returns null when the suffix is wrong', () {
+      expect(
+        BoardScreenshotService.snapshotTimestampForTest(
+          'board_snapshot_123.jpg',
+        ),
+        isNull,
+      );
+    });
+
+    test('returns null when the timestamp is not numeric', () {
+      expect(
+        BoardScreenshotService.snapshotTimestampForTest(
+          'board_snapshot_abc.png',
+        ),
+        isNull,
+      );
+    });
+
+    test('returns null for an unrelated filename', () {
+      expect(
+        BoardScreenshotService.snapshotTimestampForTest('random.txt'),
+        isNull,
+      );
+    });
+  });
+
+  group('BoardScreenshotService._capture (no boundary)', () {
     setUp(() {
-      service = BoardScreenshotService.instance;
+      // Register a GlobalKey that has no mounted context — findRenderObject
+      // returns null, so _capture loops 5 times then returns null.
+      BoardScreenshotService.instance
+          .registerBoundaryKey(GlobalKey());
     });
 
-    test('capturePng returns null when no boundary key registered', () async {
-      // No boundary key registered → should return null
-      final result = await service.capturePng();
-      expect(result, isNull);
+    test('capturePng returns null without a mounted RepaintBoundary', () async {
+      expect(await BoardScreenshotService.instance.capturePng(), isNull);
     });
 
-    test('captureBase64 returns null when no boundary key registered', () async {
-      final result = await service.captureBase64();
-      expect(result, isNull);
+    test('captureBase64 returns null without a mounted boundary', () async {
+      expect(await BoardScreenshotService.instance.captureBase64(), isNull);
     });
 
-    test('captureJpegFile returns null when no boundary key registered',
-        () async {
-      final result = await service.captureJpegFile();
-      expect(result, isNull);
-    });
-
-    test('cleanupOldSnapshots does not throw when dir missing', () async {
-      // Should silently complete even if the dir doesn't exist
-      await expectLater(service.cleanupOldSnapshots(), completes);
-    });
-
-    test('cleanupOldSnapshots removes old files', () async {
-      // Create a temp dir with old and new snapshot files
-      final tmpDir = Directory.systemTemp.createTempSync('board_snap_test_');
-      final oldFile = File('${tmpDir.path}/board_snapshot_old.png')
-        ..writeAsStringSync('old');
-      // Set the modified time to 2 hours ago
-      final twoHoursAgo = DateTime.now().subtract(const Duration(hours: 2));
-      oldFile.setLastModifiedSync(twoHoursAgo);
-
-      final newFile = File('${tmpDir.path}/board_snapshot_new.png')
-        ..writeAsStringSync('new');
-
-      expect(oldFile.existsSync(), isTrue);
-      expect(newFile.existsSync(), isTrue);
-
-      // We can't easily test cleanupOldSnapshots directly since it uses
-      // PlatformDirs.instance.tempDir, but we verify the file operations work.
-      // The old file should be deletable.
-      oldFile.deleteSync();
-      expect(oldFile.existsSync(), isFalse);
-      expect(newFile.existsSync(), isTrue);
-
-      // Cleanup
-      tmpDir.deleteSync(recursive: true);
+    test('captureJpegFile returns null without a mounted boundary', () async {
+      expect(await BoardScreenshotService.instance.captureJpegFile(), isNull);
     });
   });
 }

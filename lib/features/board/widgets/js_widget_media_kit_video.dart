@@ -104,6 +104,12 @@ class MediaKitVideoController extends JsVideoController {
 
   /// Returns a [JsVideoController] that initializes itself asynchronously.
   static JsVideoController async(String src) => _AsyncVideoController(src);
+
+  /// Test seam for [_AsyncVideoController] – returns an async controller
+  /// whose [JsVideoController.buildVideo] path can be exercised in widget
+  /// tests without waiting on real libmpv initialisation.
+  @visibleForTesting
+  static JsVideoController asyncForTest(String src) => async(src);
 }
 
 /// Wraps async controller creation so [JsVideoWidget] gets a controller

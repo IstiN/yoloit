@@ -159,6 +159,12 @@ class GitHubTemplateLoader extends TemplateLoader {
     return headers;
   }
 
+  @visibleForTesting
+  Future<dynamic> fetchJsonForTest(
+    String url, {
+    required Map<String, String> headers,
+  }) => _fetchJson(url, headers: headers);
+
   Future<dynamic> _fetchJson(
     String url, {
     required Map<String, String> headers,

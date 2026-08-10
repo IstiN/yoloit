@@ -24,6 +24,16 @@ class BoardFilePicker {
   @visibleForTesting
   static Future<String?> Function()? debugPickDirectoryOverride;
 
+  /// Test seam: exposes the private native initial-directory resolver.
+  @visibleForTesting
+  static String? nativeInitialDirectoryForTest(String? initialPath) =>
+      _nativeInitialDirectory(initialPath);
+
+  /// Test seam: exposes the private local-path expander for native pickers.
+  @visibleForTesting
+  static String expandLocalPathForNativeForTest(String rawPath) =>
+      _expandLocalPathForNative(rawPath);
+
   static Future<String?> pickDirectory(
     BuildContext context, {
     RemoteBoardInfo? remoteInfo,

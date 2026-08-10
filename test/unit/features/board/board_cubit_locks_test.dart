@@ -261,66 +261,91 @@ void main() {
   });
 
   group('_panelIdsLockedByActor', () {
-    test('returns panel ids locked by a specific actor', () {
-      final board = BoardDocument(
+    BoardDocument boardWithLocks(Map<String, dynamic> locks) {
+      return BoardDocument(
         id: 'b1',
         name: 'Board',
-        metadata: {
-          'panelLocks': {
-            'p1': {'actorId': 'alice', 'expiresAt': farFuture},
-            'p2': {'actorId': 'bob', 'expiresAt': farFuture},
-            'p3': {'actorId': 'alice', 'expiresAt': farFuture},
-          },
-        },
+        metadata: {'panelLocks': locks},
       );
+    }
+
+    test('returns ids for matching non-expired locks', () {
+      final board = boardWithLocks({
+        'p1': {'actorId': 'alice', 'expiresAt': farFuture},
+        'p2': {'actorId': 'bob', 'expiresAt': farFuture},
+        'p3': {'actorId': 'alice', 'expiresAt': farFuture},
+      });
       final cubit = buildCubit([board]);
 
-      // panelLockActor returns the actor id when the lock is held by a
-      // non-local actor. 'tester' is the local actor in this cubit.
-      expect(cubit.panelLockActor(board, 'p1'), 'alice');
-      expect(cubit.panelLockActor(board, 'p2'), 'bob');
-      expect(cubit.panelLockActor(board, 'p3'), 'alice');
+      expect(cubit.panelIdsLockedByActorForTest(board, 'alice'), {'p1', 'p3'});
+      expect(cubit.panelIdsLockedByActorForTest(board, 'bob'), {'p2'});
     });
 
     test('skips expired locks', () {
-      final board = BoardDocument(
-        id: 'b1',
-        name: 'Board',
-        metadata: {
-          'panelLocks': {
-            'p1': {'actorId': 'alice', 'expiresAt': 1},
-            'p2': {'actorId': 'alice', 'expiresAt': farFuture},
-          },
-        },
-      );
+      final board = boardWithLocks({
+        'p1': {'actorId': 'alice', 'expiresAt': 1},
+        'p2': {'actorId': 'alice', 'expiresAt': farFuture},
+      });
       final cubit = buildCubit([board]);
-      expect(cubit.panelLockActor(board, 'p1'), isNull); // expired
-      expect(cubit.panelLockActor(board, 'p2'), 'alice'); // valid
+
+      expect(cubit.panelIdsLockedByActorForTest(board, 'alice'), {'p2'});
     });
 
     test('skips non-map lock entries', () {
-      final board = BoardDocument(
-        id: 'b1',
-        name: 'Board',
-        metadata: {
-          'panelLocks': {
-            'p1': 'bad',
-            'p2': {'actorId': 'alice', 'expiresAt': farFuture},
-          },
-        },
-      );
+      final board = boardWithLocks({
+        'p1': 'bad',
+        'p2': {'actorId': 'alice', 'expiresAt': farFuture},
+      });
       final cubit = buildCubit([board]);
-      expect(cubit.panelLockActor(board, 'p1'), isNull);
+
+      expect(cubit.panelIdsLockedByActorForTest(board, 'alice'), {'p2'});
     });
 
-    test('returns empty set when metadata panelLocks is not a map', () {
+    test('returns empty when panelLocks is not a map', () {
       final board = BoardDocument(
         id: 'b1',
         name: 'Board',
         metadata: {'panelLocks': 'not-a-map'},
       );
       final cubit = buildCubit([board]);
-      expect(cubit.panelLockActor(board, 'p1'), isNull);
+
+      expect(cubit.panelIdsLockedByActorForTest(board, 'alice'), isEmpty);
+    });
+
+    test('returns empty when panelLocks is missing', () {
+      const board = BoardDocument(id: 'b1', name: 'Board');
+      final cubit = buildCubit([board]);
+
+      expect(cubit.panelIdsLockedByActorForTest(board, 'alice'), isEmpty);
+    });
+
+    test('skips locks by a different actor', () {
+      final board = boardWithLocks({
+        'p1': {'actorId': 'alice', 'expiresAt': farFuture},
+        'p2': {'actorId': 'bob', 'expiresAt': farFuture},
+      });
+      final cubit = buildCubit([board]);
+
+      expect(cubit.panelIdsLockedByActorForTest(board, 'alice'), {'p1'});
+      expect(cubit.panelIdsLockedByActorForTest(board, 'bob'), {'p2'});
+    });
+
+    test('includes locks when expiresAt is a non-int value', () {
+      final board = boardWithLocks({
+        'p1': {'actorId': 'alice', 'expiresAt': 'not-a-number'},
+      });
+      final cubit = buildCubit([board]);
+
+      expect(cubit.panelIdsLockedByActorForTest(board, 'alice'), {'p1'});
+    });
+
+    test('includes locks when expiresAt is null', () {
+      final board = boardWithLocks({
+        'p1': {'actorId': 'alice'},
+      });
+      final cubit = buildCubit([board]);
+
+      expect(cubit.panelIdsLockedByActorForTest(board, 'alice'), {'p1'});
     });
   });
 

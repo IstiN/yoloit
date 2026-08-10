@@ -1886,6 +1886,24 @@ class _GutterPaint extends CustomPainter {
       old.lineHeight != lineHeight;
 }
 
+/// Test seam that constructs the private [_GutterPaint] so unit tests can
+/// exercise [CustomPainter.paint] without building the full widget tree.
+@visibleForTesting
+CustomPainter createGutterPainterForTest({
+  required Map<int, GutterMarkerType> markers,
+  required double lineHeight,
+  required double scrollOffset,
+  required Color addedColor,
+  required Color removedColor,
+}) =>
+    _GutterPaint(
+      markers: markers,
+      lineHeight: lineHeight,
+      scrollOffset: scrollOffset,
+      addedColor: addedColor,
+      removedColor: removedColor,
+    );
+
 // ── Editor toolbar ───────────────────────────────────────────────────────────
 
 class _EditorToolbar extends StatelessWidget {

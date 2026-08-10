@@ -71,6 +71,62 @@ class _FakeVideoController implements VideoController {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
+/// [_FakePlayer] variant whose [open] method blocks on a [Completer] so tests
+/// can control when the async-initialization future resolves.
+class _BlockingFakePlayer implements Player {
+  _BlockingFakePlayer();
+
+  PlayerState _state = const PlayerState();
+  final openCompleter = Completer<void>();
+
+  final positionCtl = StreamController<Duration>.broadcast();
+  final durationCtl = StreamController<Duration>.broadcast();
+  final playingCtl = StreamController<bool>.broadcast();
+  final videoParamsCtl = StreamController<VideoParams>.broadcast();
+
+  @override
+  PlayerState get state => _state;
+  set state(PlayerState value) => _state = value;
+
+  @override
+  PlayerStream get stream => _BlockingPlayerStream(this);
+
+  @override
+  Future<void> open(Playable playable, {bool play = true}) => openCompleter.future;
+
+  @override
+  Future<void> dispose() async {
+    await positionCtl.close();
+    await durationCtl.close();
+    await playingCtl.close();
+    await videoParamsCtl.close();
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _BlockingPlayerStream implements PlayerStream {
+  const _BlockingPlayerStream(this._player);
+
+  final _BlockingFakePlayer _player;
+
+  @override
+  Stream<Duration> get position => _player.positionCtl.stream;
+
+  @override
+  Stream<Duration> get duration => _player.durationCtl.stream;
+
+  @override
+  Stream<bool> get playing => _player.playingCtl.stream;
+
+  @override
+  Stream<VideoParams> get videoParams => _player.videoParamsCtl.stream;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -249,6 +305,87 @@ void main() {
       await controller.dispose();
 
       expect(player.disposed, isTrue);
+    });
+  });
+
+  group('_AsyncVideoController.buildVideo', () {
+    testWidgets('shows a spinner before the future completes', (tester) async {
+      // Use a blocking player so we can control when the internal
+      // MediaKitVideoController.create future resolves.
+      final blockingPlayer = _BlockingFakePlayer();
+      MediaKitVideoController.debugPlayerFactory = () => blockingPlayer;
+      MediaKitVideoController.debugVideoControllerFactory =
+          (_) => _FakeVideoController();
+
+      // Capture a BuildContext from a minimal tree.
+      BuildContext? capturedContext;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (ctx) {
+                capturedContext = ctx;
+                return const SizedBox();
+              },
+            ),
+          ),
+        ),
+      );
+
+      // Create the async controller — player.open hasn't completed yet, so
+      // _delegate is still null and buildVideo shows a FutureBuilder spinner.
+      final controller = MediaKitVideoController.asyncForTest('clip.mp4');
+      addTearDown(controller.dispose);
+
+      final built = controller.buildVideo(capturedContext!);
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: built)));
+      await tester.pump();
+
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+      // Clean up: complete the future before the widget tree is torn down so
+      // no pending timers are left behind.
+      blockingPlayer.openCompleter.complete();
+      await tester.runAsync(() async {
+        await flushMicrotasks();
+      });
+    });
+
+    testWidgets('returns a Video widget after the future completes', (
+      tester,
+    ) async {
+      final blockingPlayer = _BlockingFakePlayer();
+      MediaKitVideoController.debugPlayerFactory = () => blockingPlayer;
+      MediaKitVideoController.debugVideoControllerFactory =
+          (_) => _FakeVideoController();
+
+      BuildContext? capturedContext;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (ctx) {
+                capturedContext = ctx;
+                return const SizedBox();
+              },
+            ),
+          ),
+        ),
+      );
+
+      final controller = MediaKitVideoController.asyncForTest('clip.mp4');
+      addTearDown(controller.dispose);
+
+      // Allow the create() future to resolve.
+      blockingPlayer.openCompleter.complete();
+      await tester.runAsync(() async {
+        await flushMicrotasks();
+      });
+
+      // After completion _delegate is set, so buildVideo delegates directly
+      // and returns a Video widget (not a FutureBuilder).
+      final built = controller.buildVideo(capturedContext!);
+      expect(built, isA<Video>());
     });
   });
 }

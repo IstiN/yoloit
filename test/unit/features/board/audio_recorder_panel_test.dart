@@ -8,6 +8,7 @@ import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/audio_recorder_content_vm.dart';
 import 'package:yoloit/features/board/plugins/builtin/audio_recorder_plugin.dart';
+import 'package:yoloit/features/board/ui/board_file_picker.dart';
 import 'package:yoloit/features/settings/data/cloud_llm_settings_service.dart';
 
 BoardPanelInstance _panel({Map<String, dynamic>? state}) => BoardPanelInstance(
@@ -728,6 +729,180 @@ void main() {
         ),
       );
       expect(find.text('/tmp/recs'), findsOneWidget);
+    });
+
+    testWidgets('_pickFolder writes the chosen directory into config',
+        (tester) async {
+      Map<String, dynamic>? written;
+      final renderContext = BoardPanelRenderContext(
+        isSelected: false,
+        onFocus: () {},
+        onDelete: () {},
+        onUpdateState: (state) => written = state,
+        onShowEditor: () {},
+      );
+
+      BoardFilePicker.debugPickDirectoryOverride =
+          () async => '/tmp/test-recordings';
+      addTearDown(() => BoardFilePicker.debugPickDirectoryOverride = null);
+
+      await tester.pumpWidget(
+        _wrap(AudioRecorderPanelContent(panel: _panel(), renderContext: renderContext)),
+      );
+
+      await tester.tap(find.byKey(const ValueKey('choose-folder')));
+      await tester.pump();
+
+      expect(written, isNotNull);
+      final config = AudioRecorderConfig.fromState(written!);
+      expect(config.saveFolder, '/tmp/test-recordings');
+    });
+
+    testWidgets('_pickFolder does nothing when picker returns null',
+        (tester) async {
+      Map<String, dynamic>? written;
+      final renderContext = BoardPanelRenderContext(
+        isSelected: false,
+        onFocus: () {},
+        onDelete: () {},
+        onUpdateState: (state) => written = state,
+        onShowEditor: () {},
+      );
+
+      BoardFilePicker.debugPickDirectoryOverride = () async => null;
+      addTearDown(() => BoardFilePicker.debugPickDirectoryOverride = null);
+
+      await tester.pumpWidget(
+        _wrap(AudioRecorderPanelContent(panel: _panel(), renderContext: renderContext)),
+      );
+
+      await tester.tap(find.byKey(const ValueKey('choose-folder')));
+      await tester.pump();
+
+      expect(written, isNull);
+    });
+
+    testWidgets('_togglePlay early-returns when recording has no id',
+        (tester) async {
+      Map<String, dynamic>? written;
+      final renderContext = BoardPanelRenderContext(
+        isSelected: false,
+        onFocus: () {},
+        onDelete: () {},
+        onUpdateState: (state) => written = state,
+        onShowEditor: () {},
+      );
+
+      final panel = _panel(
+        state: _stateWith(<String, dynamic>{
+          'recordings': <Map<String, dynamic>>[
+            <String, dynamic>{
+              'id': null,
+              'path': '/nonexistent/rec.wav',
+              'name': 'rec.wav',
+              'durationMs': 100,
+              'sizeBytes': 0,
+              'createdAt': 0,
+              'format': 'wav',
+            },
+          ],
+        }),
+      );
+
+      await tester.pumpWidget(
+        _wrap(AudioRecorderPanelContent(panel: panel, renderContext: renderContext)),
+      );
+
+      await tester.tap(find.byKey(const ValueKey('play-rec.wav')));
+      for (var i = 0; i < 10; i++) {
+        await tester.pump();
+      }
+
+      // The early return means no error is ever written — the player is never
+      // created so the catch path is never reached.
+      expect(written, isNull);
+    });
+
+    testWidgets('_togglePlay early-returns when recording has no path',
+        (tester) async {
+      Map<String, dynamic>? written;
+      final renderContext = BoardPanelRenderContext(
+        isSelected: false,
+        onFocus: () {},
+        onDelete: () {},
+        onUpdateState: (state) => written = state,
+        onShowEditor: () {},
+      );
+
+      final panel = _panel(
+        state: _stateWith(<String, dynamic>{
+          'recordings': <Map<String, dynamic>>[
+            <String, dynamic>{
+              'id': 'rec-1',
+              'path': null,
+              'name': 'no-path.wav',
+              'durationMs': 100,
+              'sizeBytes': 0,
+              'createdAt': 0,
+              'format': 'wav',
+            },
+          ],
+        }),
+      );
+
+      await tester.pumpWidget(
+        _wrap(AudioRecorderPanelContent(panel: panel, renderContext: renderContext)),
+      );
+
+      await tester.tap(find.byKey(const ValueKey('play-no-path.wav')));
+      for (var i = 0; i < 10; i++) {
+        await tester.pump();
+      }
+
+      expect(written, isNull);
+    });
+
+    testWidgets('_ensurePlayer + _togglePlay catch path surfaces playback error',
+        (tester) async {
+      Map<String, dynamic>? written;
+      final renderContext = BoardPanelRenderContext(
+        isSelected: false,
+        onFocus: () {},
+        onDelete: () {},
+        onUpdateState: (state) => written = state,
+        onShowEditor: () {},
+      );
+
+      final panel = _panel(
+        state: _stateWith(<String, dynamic>{
+          'recordings': <Map<String, dynamic>>[
+            <String, dynamic>{
+              'id': 'rec-1',
+              'path': '/nonexistent/ensure-player-test.wav',
+              'name': 'ensure-player-test.wav',
+              'durationMs': 200,
+              'sizeBytes': 0,
+              'createdAt': 0,
+              'format': 'wav',
+            },
+          ],
+        }),
+      );
+
+      await tester.pumpWidget(
+        _wrap(AudioRecorderPanelContent(panel: panel, renderContext: renderContext)),
+      );
+
+      // media_kit's native player is unavailable in the unit-test
+      // environment, so _ensurePlayer creates a Player that throws during
+      // open(), exercising the catch block in _togglePlay.
+      await tester.tap(find.byKey(const ValueKey('play-ensure-player-test.wav')));
+      for (var i = 0; i < 20 && written == null; i++) {
+        await tester.pump();
+      }
+
+      expect(written, isNotNull);
+      expect(written!['lastError'] as String, contains('Playback failed'));
     });
   });
 
