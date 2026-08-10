@@ -2094,19 +2094,11 @@ class _SessionRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final onSurface = Theme.of(context).colorScheme.onSurface;
-    final mutedColor =
-        context.appColors.textMuted;
+    final mutedColor = context.appColors.textMuted;
     final metadata = session.metadata;
-    final label = metadata?.displayLabel ?? formatSessionLabel(session.label);
+    final label = _sessionDisplayLabel(session);
     final canFocus = metadata?.panelId?.isNotEmpty ?? false;
-    final canStop = resourceSessionCanStop(session);
-    final details = [
-      if (metadata?.boardName?.trim().isNotEmpty ?? false)
-        metadata!.boardName!.trim(),
-      if (metadata?.workspacePath?.trim().isNotEmpty ?? false)
-        metadata!.workspacePath!.trim(),
-      'pid ${session.pid}',
-    ].join(' · ');
+    final details = _sessionDetails(session);
     return Tooltip(
       message:
           canFocus
@@ -2173,7 +2165,7 @@ class _SessionRow extends StatelessWidget {
                   textAlign: TextAlign.right,
                 ),
               ),
-              if (canStop) ...[
+              if (resourceSessionCanStop(session)) ...[
                 const SizedBox(width: 4),
                 _StopResourceSessionButton(session: session),
               ],
@@ -2183,9 +2175,22 @@ class _SessionRow extends StatelessWidget {
       ),
     );
   }
-}
+  static String _sessionDisplayLabel(SessionStat session) {
+    final metadata = session.metadata;
+    return metadata?.displayLabel ?? formatSessionLabel(session.label);
+  }
 
-/// Test seam that wraps the private [_SessionRow] so widget tests can pump
+  static String _sessionDetails(SessionStat session) {
+    final metadata = session.metadata;
+    return [
+      if (metadata?.boardName?.trim().isNotEmpty ?? false)
+        metadata!.boardName!.trim(),
+      if (metadata?.workspacePath?.trim().isNotEmpty ?? false)
+        metadata!.workspacePath!.trim(),
+      'pid ${session.pid}',
+    ].join(' · ');
+  }
+}
 /// it in isolation (without the full resource monitor polling loop).
 @visibleForTesting
 class SessionRowTestWrapper extends StatelessWidget {
