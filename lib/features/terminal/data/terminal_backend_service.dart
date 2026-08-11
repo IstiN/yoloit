@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart' show ValueNotifier, visibleForTesting;
 import 'package:yoloit/core/services/resource_monitor_service.dart';
 import 'package:yoloit/core/services/support_log_service.dart';
@@ -15,6 +17,15 @@ class TerminalBackendService {
   final _runtime = RuntimeTerminalBackend();
   final _tmux = TmuxTerminalBackend();
   final _bySession = <String, TerminalBackend>{};
+
+  // ── Write coalescing ───────────────────────────────────────────────
+  // Rapid 1-byte writes (keystrokes) are batched into a single
+  // backend.write call, flushed after [_writeFlushMs] or when a
+  // multi-byte write arrives (paste, control sequence). This reduces
+  // per-char syscall + log overhead, especially under load.
+  static const _writeFlushMs = 2;
+  final _writeBuf = <String, StringBuffer>{};
+  final _writeTimers = <String, Timer>{};
 
   /// Test-only backend override: when set, [launch] always uses it instead of
   /// selecting a real local/runtime/tmux backend (which would spawn processes).
@@ -50,16 +61,35 @@ class TerminalBackendService {
   }
 
   void write(String sessionId, String data) {
+    // Multi-byte writes (paste, control sequences, resize response) flush
+    // the buffer immediately, then write synchronously to preserve ordering.
+    if (data.length > 1) {
+      _flushWrite(sessionId);
+      _doWrite(sessionId, data);
+      return;
+    }
+    // Single-byte writes (keystrokes) are coalesced.
+    (_writeBuf[sessionId] ??= StringBuffer()).write(data);
+    _writeTimers[sessionId] ??= Timer(
+      const Duration(milliseconds: _writeFlushMs),
+      () => _flushWrite(sessionId),
+    );
+  }
+
+  void _flushWrite(String sessionId) {
+    final timer = _writeTimers.remove(sessionId);
+    timer?.cancel();
+    final buf = _writeBuf.remove(sessionId);
+    if (buf == null || buf.isEmpty) return;
+    _doWrite(sessionId, buf.toString());
+  }
+
+  void _doWrite(String sessionId, String data) {
     final backend = _bySession[sessionId] ?? _local;
     SupportLogService.instance.add(
       'terminal-backend',
       'write session=$sessionId backend=${backend.mode.id} dataLen=${data.length}',
     );
-    assert(() {
-      // ignore: avoid_print
-      print('[TerminalBackend] write session=$sessionId backend=${backend.mode.id} dataLen=${data.length}');
-      return true;
-    }());
     backend.write(sessionId, data);
   }
 
@@ -73,6 +103,7 @@ class TerminalBackendService {
   }
 
   Future<void> kill(String sessionId) async {
+    _flushWrite(sessionId);
     SupportLogService.instance.add(
       'terminal-backend',
       'kill session=$sessionId backend=${(_bySession[sessionId] ?? _local).mode.id}',
