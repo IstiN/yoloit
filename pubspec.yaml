@@ -105,6 +105,8 @@ dev_dependencies:
   build_runner: ^2.15.0
 
 dependency_overrides:
+  js_widget_runtime:
+    path: ../../flutter_js_widget_runtime
   volume_controller:
     path: third_party/volume_controller
   # Flutter SDK pins below pub latest — override to stay current.

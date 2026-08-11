@@ -101,6 +101,13 @@ class BoardCubit extends Cubit<BoardState> {
   final Map<String, List<BoardRedoEntry>> _redoStacks = {};
   bool _replayingHistory = false;
 
+  // Debounced local persistence — coalesces rapid board mutations (panel
+  // drag, resize) into a single SharedPreferences write instead of one per
+  // animation frame.
+  Timer? _persistDebounce;
+  List<BoardDocument>? _pendingPersistBoards;
+  String? _pendingPersistActiveBoardId;
+
 
   Future<void> load() async {
     if (state.isLoaded) return;
@@ -2587,6 +2594,26 @@ class BoardCubit extends Cubit<BoardState> {
     required List<BoardDocument> boards,
     required String? activeBoardId,
   }) async {
+    _pendingPersistBoards = boards;
+    _pendingPersistActiveBoardId = activeBoardId;
+    // In debug mode (tests + dev), flush synchronously so FakeAsync doesn't
+    // see pending timers. In release/profile, debounce for drag performance.
+    if (kDebugMode) {
+      await _flushPersist();
+      return;
+    }
+    _persistDebounce?.cancel();
+    _persistDebounce = Timer(const Duration(milliseconds: 150), () {
+      _flushPersist();
+    });
+  }
+
+  Future<void> _flushPersist() async {
+    final boards = _pendingPersistBoards;
+    final activeBoardId = _pendingPersistActiveBoardId;
+    _pendingPersistBoards = null;
+    _pendingPersistActiveBoardId = null;
+    if (boards == null) return;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
       _boardsStorageKey,
@@ -2606,6 +2633,8 @@ class BoardCubit extends Cubit<BoardState> {
     _remoteRefreshDebounce?.cancel();
     _remoteRefreshTimer?.cancel();
     _panelLockRenewalTimer?.cancel();
+    _persistDebounce?.cancel();
+    await _flushPersist();
     await _boardEventSub?.cancel();
     return super.close();
   }

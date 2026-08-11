@@ -167,9 +167,6 @@ class BoardPanelCardState extends State<BoardPanelCard>
   }
 
   Future<void> _endPanelTransform() async {
-    if (_isTransformingPanel) {
-      setState(() => _isTransformingPanel = true);
-    }
     await widget.onDragEnd();
     if (mounted) {
       setState(() => _isTransformingPanel = false);
