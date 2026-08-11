@@ -1155,6 +1155,14 @@ class _WindowControlsState extends State<_WindowControls> with WindowListener {
   @override
   void onWindowUnmaximize() => setState(() => _isMaximized = false);
 
+  Future<void> _toggleMaximize() async {
+    if (await windowManager.isMaximized()) {
+      await windowManager.unmaximize();
+    } else {
+      await windowManager.maximize();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Row(
@@ -1168,13 +1176,7 @@ class _WindowControlsState extends State<_WindowControls> with WindowListener {
         _WinBtn(
           icon: _isMaximized ? Icons.filter_none : Icons.crop_square,
           tooltip: _isMaximized ? 'Restore' : 'Maximize',
-          onTap: () async {
-            if (await windowManager.isMaximized()) {
-              await windowManager.unmaximize();
-            } else {
-              await windowManager.maximize();
-            }
-          },
+          onTap: _toggleMaximize,
         ),
         _WinBtn(
           icon: Icons.close,
