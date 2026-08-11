@@ -82,7 +82,7 @@ void main() {
   }
 
   group('panel pointer down via real pointer events', () {
-    testWidgets('unfocused non-webpage panel focuses on pointer down', (
+    testWidgets('unfocused non-webpage panel does NOT auto-focus on pointer down', (
       tester,
     ) async {
       var taps = 0;
@@ -90,7 +90,7 @@ void main() {
 
       final gesture = await tester.startGesture(const Offset(200, 220));
       await tester.pump();
-      expect(taps, 1);
+      expect(taps, 0);
       await gesture.up();
       await tester.pump();
     });
@@ -137,12 +137,13 @@ void main() {
       );
       expect(taps, 1);
 
-      // Non-webpage + unfocused: focuses.
+      // Non-webpage + unfocused: does NOT auto-focus (removed to prevent
+      // viewport jump / mouse offset when clicking panels to drag).
       cardState.debugHandlePanelPointerDown(
         isWebpage: false,
         isFocused: false,
       );
-      expect(taps, 2);
+      expect(taps, 1);
     });
   });
 }

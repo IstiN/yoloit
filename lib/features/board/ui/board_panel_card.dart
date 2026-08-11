@@ -162,7 +162,6 @@ class BoardPanelCardState extends State<BoardPanelCard>
   }
 
   void _startPanelTransform(DragStartDetails details) {
-    onTap();
     setState(() => _isTransformingPanel = true);
     onDragStart(details);
   }
@@ -351,9 +350,8 @@ class BoardPanelCardState extends State<BoardPanelCard>
       }
       return;
     }
-    if (!isFocused) {
-      onTap();
-    }
+    // Non-webpage panels: do NOT auto-focus on pointer down.
+    // Focus is handled by header tap or content interaction instead.
   }
 
   Color _panelFill(
@@ -458,6 +456,7 @@ class BoardPanelCardState extends State<BoardPanelCard>
       if (showHeader)
         GestureDetector(
           behavior: HitTestBehavior.opaque,
+          onTap: onTap,
           onPanStart: _startPanelTransform,
           onPanUpdate: panel.locked ? null : (details) => onMove(details),
           onPanEnd: (_) => _endPanelTransform(),
