@@ -40,10 +40,22 @@ class YoloitCredentialStore implements SecureStorageLike {
 
   final SecureStorageLike _secure;
 
+  // In-memory cache to avoid repeated file/keychain reads.
+  final Map<String, String?> _readCache = {};
+
   bool get _mirrorsToConfigDir => Platform.isMacOS || Platform.isLinux;
 
   @override
   Future<String?> read({required String key}) async {
+    // Cache hit — avoids file read + keychain lookup on every call.
+    if (_readCache.containsKey(key)) return _readCache[key];
+
+    final result = await _readUncached(key: key);
+    _readCache[key] = result;
+    return result;
+  }
+
+  Future<String?> _readUncached({required String key}) async {
     if (_mirrorsToConfigDir) {
       final fromFile = await _readFile(key);
       if (fromFile != null && fromFile.isNotEmpty) {
@@ -79,6 +91,7 @@ class YoloitCredentialStore implements SecureStorageLike {
 
   @override
   Future<void> write({required String key, required String? value}) async {
+    _readCache[key] = value;
     if (value == null || value.isEmpty) {
       await delete(key: key);
       return;
@@ -98,6 +111,7 @@ class YoloitCredentialStore implements SecureStorageLike {
 
   @override
   Future<void> delete({required String key}) async {
+    _readCache[key] = null;
     if (_mirrorsToConfigDir) {
       final file = _fileForKey(key);
       if (file.existsSync()) {

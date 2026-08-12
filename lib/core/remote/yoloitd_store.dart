@@ -53,10 +53,20 @@ class YoloitdStore {
     return boards;
   }
 
+  String? _activeBoardIdCache;
+  bool _activeBoardIdLoaded = false;
+
   Future<String?> activeBoardId() async {
-    if (!await _activeFile.exists()) return null;
+    if (_activeBoardIdLoaded) return _activeBoardIdCache;
+    if (!await _activeFile.exists()) {
+      _activeBoardIdLoaded = true;
+      _activeBoardIdCache = null;
+      return null;
+    }
     final value = (await _activeFile.readAsString()).trim();
-    return value.isEmpty ? null : value;
+    _activeBoardIdCache = value.isEmpty ? null : value;
+    _activeBoardIdLoaded = true;
+    return _activeBoardIdCache;
   }
 
   Future<void> saveBoards(
@@ -85,6 +95,8 @@ class YoloitdStore {
     List<RemoteBoard> boards,
     String? activeBoardId,
   ) async {
+    _activeBoardIdCache = activeBoardId;
+    _activeBoardIdLoaded = true;
     await rootDir.create(recursive: true);
     await HistoryStoreHelpers.writeJsonAtomic(
       _boardsFile,

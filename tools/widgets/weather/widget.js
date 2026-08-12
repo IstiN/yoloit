@@ -18,12 +18,39 @@
     return '🌡️';
   }
 
+  function fetchWithTimeout(url, opts) {
+    return Promise.race([
+      jsr.fetchJson(url, opts),
+      new Promise(function(_, reject) {
+        setTimeout(function() { reject(new Error('Network timeout')); }, 10000);
+      })
+    ]);
+  }
+
+  function renderError(msg) {
+    var t = jsr.theme || {};
+    jsr.render({
+      type: 'column',
+      crossAxisAlignment: 'center',
+      mainAxisAlignment: 'center',
+      children: [
+        {type: 'text', data: '⚠️ Network error',
+         style: {color: t.text || '#e2e8f0', fontSize: 16, fontWeight: 'w600'}},
+        {type: 'sizedBox', height: 8},
+        {type: 'text', data: msg || 'Request failed',
+         style: {color: t.muted || '#64748b', fontSize: 12, textAlign: 'center'}},
+        {type: 'sizedBox', height: 16},
+        {type: 'textButton', text: 'Retry', onTap: 'retry'}
+      ]
+    });
+  }
+
   async function load() {
     jsr.exportState({ loading: true, query: city });
     jsr.render({type:'center',child:{type:'circularProgressIndicator',size:24}});
     try {
       var url = 'https://wttr.in/' + encodeURIComponent(city) + '?format=j1';
-      var data = await jsr.fetchJson(url);
+      var data = await fetchWithTimeout(url);
       var cur = data.current_condition[0];
       var area = data.nearest_area[0];
       var areaName = area.areaName[0].value;
@@ -102,7 +129,7 @@
       });
     } catch(e) {
       jsr.exportState({ loading: false, query: city, error: e.message || String(e) });
-      jsr.showError('Could not load weather:\n'+e.message);
+      renderError(e.message || String(e));
     }
   }
 
@@ -123,6 +150,7 @@
   }
 
   async function handleEvent(actionId, payload) {
+    if (actionId === 'retry') { await load(); return; }
     if (actionId === 'city_input_change') {
       _inputCity = payload.value;
     } else if (

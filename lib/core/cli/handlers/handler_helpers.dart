@@ -1,5 +1,5 @@
 /// Shared helpers for CLI route handlers.
-library;
+library handler_helpers;
 
 import 'package:shelf/shelf.dart' as shelf;
 

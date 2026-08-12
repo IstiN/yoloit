@@ -10,9 +10,36 @@
     return s + Math.abs(n).toFixed(2);
   }
 
+  function fetchWithTimeout(url, opts) {
+    return Promise.race([
+      jsr.fetchJson(url, opts),
+      new Promise(function(_, reject) {
+        setTimeout(function() { reject(new Error('Network timeout')); }, 10000);
+      })
+    ]);
+  }
+
+  function renderError(msg) {
+    var t = jsr.theme || {};
+    jsr.render({
+      type: 'column',
+      crossAxisAlignment: 'center',
+      mainAxisAlignment: 'center',
+      children: [
+        {type: 'text', data: '⚠️ Network error',
+         style: {color: t.text || '#e2e8f0', fontSize: 16, fontWeight: 'w600'}},
+        {type: 'sizedBox', height: 8},
+        {type: 'text', data: msg || 'Request failed',
+         style: {color: t.muted || '#64748b', fontSize: 12, textAlign: 'center'}},
+        {type: 'sizedBox', height: 16},
+        {type: 'textButton', text: 'Retry', onTap: 'retry'}
+      ]
+    });
+  }
+
   async function fetchQuote(sym) {
     var url = 'https://query2.finance.yahoo.com/v8/finance/chart/' + sym + '?interval=1d&range=5d';
-    var data = await jsr.fetchJson(url, {
+    var data = await fetchWithTimeout(url, {
       headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' }
     });
     var meta = data.chart.result[0].meta;
@@ -98,7 +125,7 @@
       });
     } catch(e) {
       jsr.exportState({ loading: false, symbols: symbols, error: e.message || String(e) });
-      jsr.showError('Could not load stocks:\n' + e.message);
+      renderError(e.message || String(e));
     }
   }
 
@@ -106,7 +133,7 @@
     jsr.render({type:'center',child:{type:'circularProgressIndicator',size:24}});
     try {
       var url = 'https://query2.finance.yahoo.com/v8/finance/chart/' + sym + '?interval=5m&range=1d';
-      var data = await jsr.fetchJson(url, {
+      var data = await fetchWithTimeout(url, {
         headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' }
       });
       var result = data.chart.result[0];
@@ -174,11 +201,12 @@
         ]
       });
     } catch(e) {
-      jsr.showError('Could not load chart:\n' + e.message);
+      renderError(e.message || String(e));
     }
   }
 
   function handleEvent(actionId, payload) {
+    if (actionId === 'retry') { load(); return; }
     if (actionId === 'refresh') { load(); return; }
     if (actionId === 'back') { _chartSymbol = null; load(); return; }
     if (actionId === 'symbol_input_change') {

@@ -4,7 +4,7 @@
 /// without pumping widgets. All functions are side-effect free (except the
 /// bounded outline-symbol cache) and behave exactly like the original
 /// private helpers they replace.
-library;
+library editor_panel_logic;
 
 // ── Git gutter ───────────────────────────────────────────────────────────────
 
