@@ -218,11 +218,15 @@ class _CustomWidgetContentState extends State<CustomWidgetContent> {
 
   void _handleRenderedTree(Map<String, dynamic> tree) {
     if (!mounted) return;
-    // Verify the tree came from the engine we currently own. If the
-    // onRenderUI callback was hijacked by another CustomWidgetContent
-    /// instance (e.g. offscreen capture), the tree might not belong to us.
     final currentEngine = _engineManager.engine(widget.panel.id);
-    if (currentEngine != null && currentEngine != _engine) return;
+    debugPrint(
+      '[WidgetEvent] _handleRenderedTree panel=${widget.panel.id} '
+      'widgetId=$_widgetId '
+      'engineMatch=${currentEngine == _engine} '
+      'hasEngine=${_engine != null} '
+      'treeType=${tree['type']} '
+      'hasScene3d=${tree['children'] != null}',
+    );
     HeadlessRenderRegistry.activeTasks.remove('widget:${widget.panel.id}');
     setState(() => _uiTree = tree);
   }
@@ -238,6 +242,11 @@ class _CustomWidgetContentState extends State<CustomWidgetContent> {
       js3dHost: createJs3dHost(),
       imageResolver: createExternalImageResolver(widget.panel.state),
       onEvent: (actionId, payload) {
+        debugPrint(
+          '[WidgetEvent] onEvent panel=${widget.panel.id} '
+          'widgetId=$_widgetId actionId=$actionId '
+          'engineId=${engine.hashCode}',
+        );
         unawaited(engine.callEvent(actionId, payload));
       },
     );
@@ -319,8 +328,11 @@ class _CustomWidgetContentState extends State<CustomWidgetContent> {
   }
 
   void _onEngineLoaded(JsWidgetEngine engine, String taskKey, int gen) {
-    // Ignore stale load completions (async race: a newer _load superseded this one).
     if (gen != _loadGen) return;
+    debugPrint(
+      '[WidgetEvent] _onEngineLoaded panel=${widget.panel.id} '
+      'widgetId=$_widgetId gen=$gen engineId=${engine.hashCode}',
+    );
     _applyEnvVars(engine, widget.panel.state);
     _engine = engine;
     _renderer = _buildRenderer(engine);

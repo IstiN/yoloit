@@ -83,6 +83,10 @@ class WidgetEngineManager {
       if (existing.widgetId != widgetId) {
         remove(panelId);
       } else {
+        debugPrint(
+          '[WidgetEvent] getOrCreate REUSE panelId=$panelId widgetId=$widgetId '
+          'oldOnRenderUI=${existing.onRenderUI != null}',
+        );
         existing.onRenderUI = onRenderUI;
         existing.engine.updateTheme(initialTheme);
         final tree = existing.uiTree;
@@ -116,6 +120,11 @@ class WidgetEngineManager {
       onRender: (tree) {
         entry.uiTree = Map<String, dynamic>.from(tree);
         _appRegistry.updateTree(canonicalId, tree);
+        debugPrint(
+          '[WidgetEvent] onRender panelId=$panelId widgetId=$canonicalId '
+          'onRenderUI=${entry.onRenderUI != null} '
+          'engineId=${engine.hashCode}',
+        );
         entry.onRenderUI?.call(Map<String, dynamic>.from(tree));
       },
       onSetTitle: (title) => _updatePanelTitle(panelId, title),
