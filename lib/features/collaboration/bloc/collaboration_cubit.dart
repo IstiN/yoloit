@@ -103,6 +103,12 @@ class CollaborationCubit extends Cubit<CollaborationState> {
   StreamSubscription<(String, String)>? _terminalSub;
   MindMapState? _lastBroadcast;
 
+  /// Debounce timer for snapshot broadcasts: coalesces rapid mind-map state
+  /// emissions (drag, resize) into a single delta batch per ~100ms window.
+  Timer? _snapshotDebounce;
+  MindMapState? _pendingSnapshot;
+  MindMapState? _pendingSnapshotPrev;
+
   /// True while a remote-client action (tree_select, file_select, etc.)
   /// is being handled. The host mindmap view should NOT auto-pan in this case.
   bool _handlingRemoteAction = false;
@@ -216,6 +222,10 @@ class CollaborationCubit extends Cubit<CollaborationState> {
   }
 
   Future<void> stopHosting() async {
+    _snapshotDebounce?.cancel();
+    _snapshotDebounce = null;
+    _pendingSnapshot = null;
+    _pendingSnapshotPrev = null;
     await _server?.stop();
     await _stateSub?.cancel();
     await _terminalSub?.cancel();
@@ -284,14 +294,36 @@ class CollaborationCubit extends Cubit<CollaborationState> {
     _lastBroadcast = mmState;
     if (_server == null || _server!.clientCount == 0) return;
 
+    // Structural changes need an immediate full snapshot.
     if (prev == null || _requiresSnapshot(mmState, prev)) {
+      _snapshotDebounce?.cancel();
+      _pendingSnapshot = null;
       _server!.broadcastRaw(_buildSnapshot(mmState));
       return;
     }
 
-    _broadcastPositionDeltas(mmState, prev);
-    _broadcastSizeDeltas(mmState, prev);
-    _broadcastHiddenDeltas(mmState, prev);
+    // Position/size/hidden deltas are debounced so a burst of mind-map state
+    // emissions (e.g. drag → 60fps) doesn't fire 60 broadcasts per second.
+    // Capture the previous state at the first delta emission of a burst;
+    // subsequent emissions within the window just update the pending state.
+    if (_snapshotDebounce == null) {
+      _pendingSnapshotPrev = prev;
+    }
+    _pendingSnapshot = mmState;
+    _snapshotDebounce ??= Timer(const Duration(milliseconds: 100), () {
+      final pending = _pendingSnapshot;
+      final prevSnap = _pendingSnapshotPrev;
+      _snapshotDebounce = null;
+      _pendingSnapshot = null;
+      _pendingSnapshotPrev = null;
+      if (pending == null || prevSnap == null ||
+          _server == null || _server!.clientCount == 0) {
+        return;
+      }
+      _broadcastPositionDeltas(pending, prevSnap);
+      _broadcastSizeDeltas(pending, prevSnap);
+      _broadcastHiddenDeltas(pending, prevSnap);
+    });
   }
 
   /// When structural / non-delta-able fields change (hiddenTypes, connections,
@@ -440,24 +472,24 @@ class CollaborationCubit extends Cubit<CollaborationState> {
         'repoName': d.repoName,
         'hunks': _serializeDiffHunks(d.repoPath ?? '', repoName: d.repoName),
       },
-      final RunNodeData d => {
-        'type': 'run',
-        'name': d.session.config.name,
-        'status': d.session.status.name,
-        'isRunning': d.session.status == RunStatus.running,
-        'lines': d.session.output.reversed
-            .take(80)
-            .toList()
-            .reversed
-            .map((l) => {'text': l.text, 'isError': l.isError})
-            .toList(),
-        'lastLines': d.session.output.reversed
-            .take(80)
-            .toList()
-            .reversed
-            .map((l) => l.text)
-            .toList(),
-      },
+      final RunNodeData d => () {
+        // Single pass: take last 80 lines once, reuse for both fields.
+        final recent = d.session.output.length > 80
+            ? d.session.output.sublist(d.session.output.length - 80)
+            : d.session.output;
+        final linesData = <Map<String, dynamic>>[
+          for (final l in recent) {'text': l.text, 'isError': l.isError},
+        ];
+        final lastLinesData = [for (final l in recent) l.text];
+        return {
+          'type': 'run',
+          'name': d.session.config.name,
+          'status': d.session.status.name,
+          'isRunning': d.session.status == RunStatus.running,
+          'lines': linesData,
+          'lastLines': lastLinesData,
+        };
+      }(),
       final MindMapPluginNodeData d => {
         'type': 'plugin',
         'pluginId': d.pluginId,
