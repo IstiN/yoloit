@@ -15,6 +15,33 @@
     return '$' + n.toFixed(4);
   }
 
+  function fetchWithTimeout(url, opts) {
+    return Promise.race([
+      jsr.fetchJson(url, opts),
+      new Promise(function(_, reject) {
+        setTimeout(function() { reject(new Error('Network timeout')); }, 10000);
+      })
+    ]);
+  }
+
+  function renderError(msg) {
+    var t = jsr.theme || {};
+    jsr.render({
+      type: 'column',
+      crossAxisAlignment: 'center',
+      mainAxisAlignment: 'center',
+      children: [
+        {type: 'text', data: '⚠️ Network error',
+         style: {color: t.text || '#e2e8f0', fontSize: 16, fontWeight: 'w600'}},
+        {type: 'sizedBox', height: 8},
+        {type: 'text', data: msg || 'Request failed',
+         style: {color: t.muted || '#64748b', fontSize: 12, textAlign: 'center'}},
+        {type: 'sizedBox', height: 16},
+        {type: 'textButton', text: 'Retry', onTap: 'retry'}
+      ]
+    });
+  }
+
   async function load() {
     _chartCoin = null;
     jsr.exportState({ loading: true, view: 'list' });
@@ -22,7 +49,7 @@
     try {
       var ids = COINS.map(function(c){return c.id;}).join(',');
       var url = 'https://api.coingecko.com/api/v3/simple/price?ids='+ids+'&vs_currencies=usd&include_24hr_change=true';
-      var data = await jsr.fetchJson(url);
+      var data = await fetchWithTimeout(url);
 
       var now = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
       var rows = COINS.map(function(coin) {
@@ -100,7 +127,7 @@
       jsr.exportState({ loading: false, view: 'list', updatedAt: now, prices: exported });
     } catch(e) {
       jsr.exportState({ loading: false, view: 'list', error: e.message || String(e) });
-      jsr.showError('Could not load prices:\n'+e.message);
+      renderError(e.message || String(e));
     }
   }
 
@@ -108,7 +135,7 @@
     jsr.render({type:'center',child:{type:'circularProgressIndicator',size:24}});
     try {
       var url = 'https://api.coingecko.com/api/v3/coins/'+coin.id+'/market_chart?vs_currency=usd&days=1&interval=hourly';
-      var data = await jsr.fetchJson(url);
+      var data = await fetchWithTimeout(url);
       // data.prices is [[timestamp, price], ...]
       var prices = data.prices.map(function(p){ return p[1]; });
 
@@ -158,11 +185,12 @@
         ]
       });
     } catch(e) {
-      jsr.showError('Could not load chart:\n'+e.message);
+      renderError(e.message || String(e));
     }
   }
 
   function handleEvent(actionId, payload) {
+    if (actionId === 'retry') { load(); return; }
     if (actionId === 'refresh') { load(); return; }
     if (actionId === 'back') { _chartCoin = null; load(); return; }
     if (actionId.startsWith('show_chart_')) {
