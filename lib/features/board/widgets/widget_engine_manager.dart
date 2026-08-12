@@ -118,12 +118,21 @@ class WidgetEngineManager {
       ),
       initialTheme: Map<String, dynamic>.from(initialTheme),
       onRender: (tree) {
+        // On macOS/JSC, sendMessage is process-global — render from engine A
+        // can arrive at engine B's bridge callback. Route by __iid tag.
+        final iid = tree['__iid'] as String?;
+        if (iid != null && iid != panelId) {
+          // Cross-engine render leak: forward to the correct panel's entry.
+          final targetEntry = _engines[iid];
+          if (targetEntry != null) {
+            targetEntry.uiTree = Map<String, dynamic>.from(tree);
+            _appRegistry.updateTree(targetEntry.widgetId, tree);
+            targetEntry.onRenderUI?.call(Map<String, dynamic>.from(tree));
+          }
+          return;
+        }
         entry.uiTree = Map<String, dynamic>.from(tree);
         _appRegistry.updateTree(canonicalId, tree);
-        debugPrint(
-          '[WidgetEvent] onRender panelId=$panelId widgetId=$canonicalId '
-          'onRenderUI=${entry.onRenderUI != null}',
-        );
         entry.onRenderUI?.call(Map<String, dynamic>.from(tree));
       },
       onSetTitle: (title) => _updatePanelTitle(panelId, title),
