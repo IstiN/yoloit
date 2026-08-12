@@ -219,15 +219,18 @@ class _CustomWidgetContentState extends State<CustomWidgetContent> {
 
   void _handleRenderedTree(Map<String, dynamic> tree) {
     if (!mounted) return;
-    final currentEngine = _engineManager.engine(widget.panel.id);
-    debugPrint(
-      '[WidgetEvent] _handleRenderedTree panel=${widget.panel.id} '
-      'widgetId=$_widgetId '
-      'engineMatch=${currentEngine == _engine} '
-      'hasEngine=${_engine != null} '
-      'treeType=${tree['type']} '
-      'hasScene3d=${tree['children'] != null}',
-    );
+    // On macOS (JavaScriptCore), sendMessage is process-global — render
+    // from engine A can leak to engine B's bridge callback. Verify the
+    // tree carries our instance ID (panelId) tag.
+    final treeIid = tree['__iid'];
+    final ourIid = widget.panel.id;
+    if (treeIid != null && treeIid != ourIid) {
+      debugPrint(
+        '[WidgetEvent] _handleRenderedTree SKIP: iid mismatch '
+        'panel=$ourIid treeIid=$treeIid',
+      );
+      return;
+    }
     HeadlessRenderRegistry.activeTasks.remove('widget:${widget.panel.id}');
     setState(() => _uiTree = tree);
   }
