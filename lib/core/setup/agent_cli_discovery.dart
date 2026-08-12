@@ -8,6 +8,10 @@ import 'package:yoloit/core/platform/platform_shell.dart';
 /// [PlatformShell.enrichedPath] and also probes well-known install locations
 /// such as `~/.kimi-code/bin/kimi` and `~/.local/bin/cursor-agent`.
 abstract final class AgentCliDiscovery {
+  /// Cache for subprocess lookups: (command → resolved path).
+  /// Avoids spawning `which`/`where` repeatedly for the same binary.
+  static final _execCache = <String, String?>{};
+
   static Map<String, String> extendedEnvironment() {
     final env = Map<String, String>.from(Platform.environment);
     env['PATH'] = PlatformShell.instance.enrichedPath(env['PATH'] ?? '');
@@ -15,9 +19,13 @@ abstract final class AgentCliDiscovery {
   }
 
   static Future<String?> findExecutable(String command) async {
+    if (_execCache.containsKey(command)) {
+      return _execCache[command];
+    }
     final onPath = await _findOnPath(command);
-    if (onPath != null) return onPath;
-    return _findKnownLocation(command);
+    final result = onPath ?? _findKnownLocation(command);
+    _execCache[command] = result;
+    return result;
   }
 
   static Future<String?> _findOnPath(String command) async {

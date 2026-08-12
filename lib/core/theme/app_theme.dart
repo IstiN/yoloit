@@ -154,13 +154,20 @@ enum AppThemePreset {
   /// global toggle. Presets like "Islands Light" are inherently light.
   final Brightness? defaultBrightness;
 
-  ThemeData get theme => themeForBrightness(defaultBrightness ?? Brightness.dark);
+  ThemeData get theme =>
+      themeForBrightness(defaultBrightness ?? Brightness.dark);
 
-  ThemeData themeForBrightness(Brightness brightness) =>
-      AppTheme.buildTheme(
-        color,
-        bgSeed: bgSeed,
-        brightness: defaultBrightness ?? brightness,
-      );
+  // Cache built themes — ThemeData construction allocates heavily and was
+  // called 3K+ times in profiling (once per build/pump).
+  static final _presetCache = <String, ThemeData>{};
+
+  ThemeData themeForBrightness(Brightness brightness) {
+    final key = '$name:${defaultBrightness ?? brightness}';
+    return _presetCache.putIfAbsent(key, () => AppTheme.buildTheme(
+      color,
+      bgSeed: bgSeed,
+      brightness: defaultBrightness ?? brightness,
+    ));
+  }
 }
 

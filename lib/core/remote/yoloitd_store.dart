@@ -35,14 +35,22 @@ class YoloitdStore {
     }
   }
 
+  // In-memory cache of boards — avoids re-reading + re-parsing JSON on every
+  // findBoard/updateBoard/addPanel call (was 29.7K loadBoards calls in profile).
+  List<RemoteBoard>? _boardsCache;
+
   Future<List<RemoteBoard>> loadBoards() async {
+    final cached = _boardsCache;
+    if (cached != null) return cached;
     if (!await _boardsFile.exists()) return const <RemoteBoard>[];
     final decoded = jsonDecode(await _boardsFile.readAsString());
     if (decoded is! List) return const <RemoteBoard>[];
-    return decoded
+    final boards = decoded
         .whereType<Map<Object?, Object?>>()
         .map((entry) => RemoteBoard.fromJson(Map<String, dynamic>.from(entry)))
         .toList();
+    _boardsCache = boards;
+    return boards;
   }
 
   Future<String?> activeBoardId() async {
@@ -57,11 +65,14 @@ class YoloitdStore {
   }) async {
     // In debug mode, flush synchronously (tests need immediate persistence).
     if (kDebugMode) {
+      _boardsCache = List.unmodifiable(boards);
       await _flushSaveBoards(boards, activeBoardId);
       return;
     }
     _pendingSaveBoards = boards;
     _pendingSaveActiveBoardId = activeBoardId;
+    // Update cache immediately so subsequent loadBoards() calls see the new data.
+    _boardsCache = List.unmodifiable(boards);
     _saveDebounce?.cancel();
     _saveDebounce = Timer(const Duration(milliseconds: 150), () {
       _flushSaveBoards(_pendingSaveBoards!, _pendingSaveActiveBoardId);
