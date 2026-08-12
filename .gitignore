@@ -147,3 +147,7 @@ remote/yoloit-hub/yoloit-hub
 
 # Runtime calendar event cache
 calendar_events/
+
+# crap4dart profiling
+profile-reports/
+.crap_profile_temp/

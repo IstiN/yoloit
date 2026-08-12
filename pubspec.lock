@@ -677,10 +677,11 @@ packages:
   js_widget_runtime:
     dependency: "direct main"
     description:
-      path: "../../flutter_js_widget_runtime"
-      relative: true
-    source: path
-    version: "0.4.32"
+      name: js_widget_runtime
+      sha256: f3900e108d64e57dfaaba8059d8bd98424070c2715070b0e65c0c309e4420a8c
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.4.33"
   json_annotation:
     dependency: "direct main"
     description:
