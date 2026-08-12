@@ -43,6 +43,7 @@ class CollaborationServer {
   /// Per-client metadata (name, colour) accumulated as hellos arrive.
   final Map<String, _PeerMeta> _peerMeta = {};
   String _resolvedIp = '127.0.0.1';
+  bool _localNetworkPermissionTriggered = false;
 
   /// Colour palette for assigning distinct colours to guests.
   static const _palette = [
@@ -317,7 +318,11 @@ class CollaborationServer {
     // OUTGOING connection to a LAN address.  We do a fire-and-forget connect
     // to ourselves via the LAN IP (not localhost) so the OS shows the prompt
     // on first launch; subsequent launches are already approved and succeed.
-    unawaited(_triggerLocalNetworkPermission());
+    // Only trigger once per process — the permission persists across launches.
+    if (!_localNetworkPermissionTriggered) {
+      _localNetworkPermissionTriggered = true;
+      unawaited(_triggerLocalNetworkPermission());
+    }
   }
 
   /// Fire-and-forget: connect to our own HTTP port via the LAN IP so macOS

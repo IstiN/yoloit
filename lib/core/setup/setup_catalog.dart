@@ -538,10 +538,28 @@ class SetupCatalog {
     );
   }
 
-  static Future<String?> _findPath(String command) =>
-      AgentCliDiscovery.findExecutable(command);
+  // Cache for subprocess results: (command → path) and (executable+args → version).
+  // Package checks run many times during setup; avoid spawning the same
+  // subprocess repeatedly.
+  static final _pathCache = <String, String?>{};
+  static final _versionCache = <String, String?>{};
+
+  static Future<String?> _findPath(String command) {
+    final cached = _pathCache[command];
+    if (cached != null || _pathCache.containsKey(command)) {
+      return Future.value(cached);
+    }
+    return AgentCliDiscovery.findExecutable(command).then((result) {
+      _pathCache[command] = result;
+      return result;
+    });
+  }
 
   static Future<String?> _version(String executable, List<String> args) async {
+    final cacheKey = '$executable ${args.join(' ')}';
+    if (_versionCache.containsKey(cacheKey)) {
+      return Future.value(_versionCache[cacheKey]);
+    }
     try {
       final result = await Process.run(
         executable,
@@ -553,9 +571,11 @@ class SetupCatalog {
           (result.stdout as String).trim().isNotEmpty
               ? (result.stdout as String).trim()
               : (result.stderr as String).trim();
-      if (raw.isEmpty) return null;
-      return raw.split('\n').first.trim();
+      final version = raw.isEmpty ? null : raw.split('\n').first.trim();
+      _versionCache[cacheKey] = version;
+      return version;
     } catch (_) {
+      _versionCache[cacheKey] = null;
       return null;
     }
   }

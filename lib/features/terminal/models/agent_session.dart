@@ -94,10 +94,29 @@ class AgentSession extends Equatable {
   /// Last [n] non-empty plain-text lines for display in the browser.
   /// Falls back to reading the xterm buffer when the ring buffer is still empty
   /// (e.g., first snapshot right after app start with existing sessions).
+  ///
+  /// Results are cached: repeated calls with the same [n] and unchanged
+  /// [recentLines] return the cached list without re-iterating.
+  int? _lastLinesHash;
+  int _lastLinesN = -1;
+  List<String>? _lastLinesCache;
+
   List<String> lastLines([int n = 80]) {
     if (recentLines.isNotEmpty) {
+      // Cache hit: same n, same recentLines length (proxy for content change).
+      final fingerprint = recentLines.length;
+      if (_lastLinesN == n &&
+          _lastLinesHash == fingerprint &&
+          _lastLinesCache != null) {
+        return _lastLinesCache!;
+      }
+      _lastLinesN = n;
+      _lastLinesHash = fingerprint;
       final nonEmpty = recentLines.where((l) => l.trim().isNotEmpty).toList();
-      return nonEmpty.length <= n ? nonEmpty : nonEmpty.sublist(nonEmpty.length - n);
+      _lastLinesCache = nonEmpty.length <= n
+          ? nonEmpty
+          : nonEmpty.sublist(nonEmpty.length - n);
+      return _lastLinesCache!;
     }
     // Fallback: read only the current visible screen rows (no scrollback).
     // Using getText() on the full buffer causes duplicates when the terminal
