@@ -77,6 +77,26 @@ class _BoardPanelLayerState extends State<BoardPanelLayer> {
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<BoardCubit, BoardState>(
+      buildWhen: (prev, next) {
+        // Skip rebuilds that don't affect the board (e.g. collaboration state
+        // changes, yolo assistant state) unless they touch our board's panels
+        // or viewport. This is critical during drag: without buildWhen every
+        // emit rebuilds every panel card.
+        final prevBoard = prev.boards.firstWhere(
+          (b) => b.id == widget.board.id,
+          orElse: () => widget.board,
+        );
+        final nextBoard = next.boards.firstWhere(
+          (b) => b.id == widget.board.id,
+          orElse: () => widget.board,
+        );
+        return !identical(prevBoard.panels, nextBoard.panels) ||
+            prevBoard.viewport.focusedPanelId !=
+                nextBoard.viewport.focusedPanelId ||
+            prev.yoloAssistantAnchorPanelId !=
+                next.yoloAssistantAnchorPanelId ||
+            prev.yoloAssistantStartMic != next.yoloAssistantStartMic;
+      },
       builder: (context, boardState) {
         final board = boardState.boards.firstWhere(
           (candidate) => candidate.id == widget.board.id,

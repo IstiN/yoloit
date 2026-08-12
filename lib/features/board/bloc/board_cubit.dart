@@ -1984,6 +1984,33 @@ class BoardCubit extends Cubit<BoardState> {
     String? boardId,
     bool recordHistory = true,
   }) async {
+    final targetId = boardId ?? state.activeBoard?.id;
+    if (targetId == null) return;
+    // Fast path for drag (recordHistory=false): directly splice the one
+    // changed panel into the list without a full .map() over all panels,
+    // and skip the history event machinery entirely.
+    if (!recordHistory) {
+      final boards = state.boards;
+      final index = boards.indexWhere((b) => b.id == targetId);
+      if (index == -1) return;
+      final board = boards[index];
+      final panelIndex = board.panels.indexWhere((p) => p.id == panelId);
+      if (panelIndex == -1) return;
+      final panel = board.panels[panelIndex];
+      final newPanel = panel.copyWith(
+        bounds: panel.bounds.copyWith(
+          x: panel.bounds.x + delta.dx,
+          y: panel.bounds.y + delta.dy,
+        ),
+      );
+      final newPanels = List<BoardPanelInstance>.of(board.panels);
+      newPanels[panelIndex] = newPanel;
+      final newBoard = board.copyWith(panels: newPanels);
+      final newBoards = List<BoardDocument>.of(boards);
+      newBoards[index] = newBoard;
+      await _setBoards(newBoards, activeBoardId: state.activeBoardId ?? targetId);
+      return;
+    }
     await updatePanel(
       panelId,
       (panel) => panel.copyWith(
@@ -2469,16 +2496,20 @@ class BoardCubit extends Cubit<BoardState> {
     );
     await _persist(boards: boards, activeBoardId: activeBoardId);
     if (!_suppressRemoteSync) {
-      final changedRemoteBoards = _changedRemoteBoards(
-        previousBoards: previousBoards,
-        nextBoards: boards,
-      );
-      if (changedRemoteBoards.isNotEmpty) {
-        _scheduleRemoteSync(
-          changedRemoteBoards,
-          currentBoards: boards,
-          activeBoardId: activeBoardId,
+      // Fast path: skip remote diff entirely if no remote boards exist.
+      final hasRemote = boards.any((b) => remoteInfoForBoard(b) != null);
+      if (hasRemote) {
+        final changedRemoteBoards = _changedRemoteBoards(
+          previousBoards: previousBoards,
+          nextBoards: boards,
         );
+        if (changedRemoteBoards.isNotEmpty) {
+          _scheduleRemoteSync(
+            changedRemoteBoards,
+            currentBoards: boards,
+            activeBoardId: activeBoardId,
+          );
+        }
       }
     }
     _startRemoteRefreshTimer();
