@@ -215,6 +215,7 @@ class _CustomWidgetContentState extends State<CustomWidgetContent> {
   /// Monotonic generation counter — each _load call increments it.
   /// Stale callbacks from a previous load (async race) are ignored.
   int _loadGen = 0;
+  int _rendererEngineId = 0;
 
   void _handleRenderedTree(Map<String, dynamic> tree) {
     if (!mounted) return;
@@ -381,9 +382,21 @@ class _CustomWidgetContentState extends State<CustomWidgetContent> {
     // JsKeyboardCapture wires jsr.onKey: claims focus on first tap inside the
     // panel and forwards key events to the engine unless a text field is
     // focused. Without it keystrokes never reach the JS widget on boards.
+    // Ensure renderer matches current engine (async race: engine may have
+    // been recreated by getOrCreate while we were waiting).
+    if (_renderer == null || _rendererEngineId != _engine.hashCode) {
+      if (_engine != null) {
+        _renderer = _buildRenderer(_engine!);
+        _rendererEngineId = _engine.hashCode;
+      }
+    }
+    final r = _renderer;
+    if (r == null || _engine == null) {
+      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+    }
     return JsKeyboardCapture(
       onEvent: (payload) => _engine?.dispatchHostEvent('key', payload),
-      child: ClipRect(child: _renderer!.build(tree, context)),
+      child: ClipRect(child: r.build(tree, context)),
     );
   }
 }
