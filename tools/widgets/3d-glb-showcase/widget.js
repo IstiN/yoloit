@@ -49,9 +49,7 @@
           type: 'expanded',
           child: {
             type: 'scene3d',
-            id: sceneId,
-            width: 320,
-            height: 320
+            id: sceneId
           }
         },
         {
