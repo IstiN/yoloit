@@ -122,8 +122,7 @@ class WidgetEngineManager {
         _appRegistry.updateTree(canonicalId, tree);
         debugPrint(
           '[WidgetEvent] onRender panelId=$panelId widgetId=$canonicalId '
-          'onRenderUI=${entry.onRenderUI != null} '
-          'engineId=${engine.hashCode}',
+          'onRenderUI=${entry.onRenderUI != null}',
         );
         entry.onRenderUI?.call(Map<String, dynamic>.from(tree));
       },
