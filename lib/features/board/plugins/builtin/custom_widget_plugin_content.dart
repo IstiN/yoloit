@@ -212,8 +212,17 @@ class _CustomWidgetContentState extends State<CustomWidgetContent> {
 
   Future<void> _reloadCurrentWidget() => _load(forceReload: true);
 
+  /// Monotonic generation counter — each _load call increments it.
+  /// Stale callbacks from a previous load (async race) are ignored.
+  int _loadGen = 0;
+
   void _handleRenderedTree(Map<String, dynamic> tree) {
     if (!mounted) return;
+    // Verify the tree came from the engine we currently own. If the
+    // onRenderUI callback was hijacked by another CustomWidgetContent
+    /// instance (e.g. offscreen capture), the tree might not belong to us.
+    final currentEngine = _engineManager.engine(widget.panel.id);
+    if (currentEngine != null && currentEngine != _engine) return;
     HeadlessRenderRegistry.activeTasks.remove('widget:${widget.panel.id}');
     setState(() => _uiTree = tree);
   }
@@ -238,6 +247,7 @@ class _CustomWidgetContentState extends State<CustomWidgetContent> {
     bool forceReload = false,
     bool keepExistingUi = false,
   }) async {
+    final gen = ++_loadGen;
     final taskKey = 'widget:${widget.panel.id}';
     if (_widgetId.isNotEmpty) {
       HeadlessRenderRegistry.activeTasks.add(taskKey);
@@ -272,7 +282,7 @@ class _CustomWidgetContentState extends State<CustomWidgetContent> {
         _showWidgetNotFound(taskKey);
         return;
       }
-      _onEngineLoaded(engine, taskKey);
+      _onEngineLoaded(engine, taskKey, gen);
     } catch (e) {
       _showLoadError(taskKey, e);
     }
@@ -308,7 +318,9 @@ class _CustomWidgetContentState extends State<CustomWidgetContent> {
     }
   }
 
-  void _onEngineLoaded(JsWidgetEngine engine, String taskKey) {
+  void _onEngineLoaded(JsWidgetEngine engine, String taskKey, int gen) {
+    // Ignore stale load completions (async race: a newer _load superseded this one).
+    if (gen != _loadGen) return;
     _applyEnvVars(engine, widget.panel.state);
     _engine = engine;
     _renderer = _buildRenderer(engine);
