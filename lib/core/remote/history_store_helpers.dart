@@ -38,17 +38,21 @@ abstract final class HistoryStoreHelpers {
     await writeJsonAtomic(file, json);
   }
 
+  static final JsonEncoder _prettyEncoder = const JsonEncoder.withIndent('  ');
+
   static Future<void> writeJsonAtomic(File file, Object? value) async {
     await file.parent.create(recursive: true);
     final tmp = File('${file.path}.tmp');
-    await tmp.writeAsString(
-      const JsonEncoder.withIndent('  ').convert(value),
-      flush: true,
-    );
-    if (await file.exists()) {
-      await file.delete();
+    await tmp.writeAsString(_prettyEncoder.convert(value), flush: true);
+    // POSIX rename atomically replaces the destination — no need for a
+    // separate exists()+delete() round-trip.
+    try {
+      await tmp.rename(file.path);
+    } catch (_) {
+      // On Windows rename fails if the target exists; fall back to delete+rename.
+      try { await file.delete(); } catch (_) {}
+      await tmp.rename(file.path);
     }
-    await tmp.rename(file.path);
   }
 
   static Future<List<T>> loadHistoryEvents<T extends RemoteHistoryEvent>(

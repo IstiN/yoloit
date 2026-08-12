@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:yoloit/core/remote/history_store_helpers.dart';
 import 'package:yoloit/core/remote/panel_history_undo.dart';
@@ -13,6 +15,11 @@ class YoloitdStore {
   final String actorId;
   final Map<String, List<_RemoteRedoEntry>> _redoStacks = {};
   bool _replayingHistory = false;
+
+  // Debounced persistence — coalesces rapid saveBoards calls.
+  Timer? _saveDebounce;
+  List<RemoteBoard>? _pendingSaveBoards;
+  String? _pendingSaveActiveBoardId;
 
   int redoDepthForBoard(String boardId) => _redoStacks[boardId]?.length ?? 0;
 
@@ -48,6 +55,25 @@ class YoloitdStore {
     List<RemoteBoard> boards, {
     required String? activeBoardId,
   }) async {
+    // In debug mode, flush synchronously (tests need immediate persistence).
+    if (kDebugMode) {
+      await _flushSaveBoards(boards, activeBoardId);
+      return;
+    }
+    _pendingSaveBoards = boards;
+    _pendingSaveActiveBoardId = activeBoardId;
+    _saveDebounce?.cancel();
+    _saveDebounce = Timer(const Duration(milliseconds: 150), () {
+      _flushSaveBoards(_pendingSaveBoards!, _pendingSaveActiveBoardId);
+      _pendingSaveBoards = null;
+      _pendingSaveActiveBoardId = null;
+    });
+  }
+
+  Future<void> _flushSaveBoards(
+    List<RemoteBoard> boards,
+    String? activeBoardId,
+  ) async {
     await rootDir.create(recursive: true);
     await HistoryStoreHelpers.writeJsonAtomic(
       _boardsFile,
