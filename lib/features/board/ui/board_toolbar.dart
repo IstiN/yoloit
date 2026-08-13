@@ -19,6 +19,7 @@ class BoardToolbar extends StatelessWidget {
     required this.onShareBoard,
     required this.onBoardSettings,
     this.onAppSettings,
+    this.onPopOutBoard,
     required this.onDeleteBoard,
     required this.onOpenBoardOverview,
     required this.onSearch,
@@ -31,6 +32,7 @@ class BoardToolbar extends StatelessWidget {
   final VoidCallback onShareBoard;
   final VoidCallback onBoardSettings;
   final VoidCallback? onAppSettings;
+  final VoidCallback? onPopOutBoard;
   final VoidCallback onDeleteBoard;
   final VoidCallback onOpenBoardOverview;
   final VoidCallback onSearch;
@@ -263,6 +265,7 @@ class BoardToolbar extends StatelessWidget {
         onPressed: onShareBoard,
         icon: const Icon(Icons.ios_share_outlined),
       ),
+      // Pop-out button only in full layout — compact is too narrow.
       if (kIsWeb) const _DownloadReleasesButton(compact: true),
       IconButton(
         tooltip: 'Board settings',
@@ -297,6 +300,15 @@ class BoardToolbar extends StatelessWidget {
         icon: const Icon(Icons.ios_share_outlined),
         label: const Text('Share'),
       ),
+      if (onPopOutBoard != null && !kIsWeb) ...[
+        const SizedBox(width: 8),
+        OutlinedButton.icon(
+          style: _toolbarButtonStyle(context, isWeb: kIsWeb),
+          onPressed: onPopOutBoard,
+          icon: const Icon(Icons.open_in_new_outlined),
+          label: const Text('Window'),
+        ),
+      ],
       if (kIsWeb) ...[
         const SizedBox(width: 8),
         const _DownloadReleasesButton(),
