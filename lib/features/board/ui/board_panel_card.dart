@@ -492,6 +492,9 @@ class BoardPanelCardState extends State<BoardPanelCard>
                   onSendToBack: onSendToBack,
                 ),
             onDelete: onDelete,
+            onRename: (title) {
+              context.read<BoardCubit>().updatePanelTitle(panel.id, title);
+            },
           ),
         ),
     ];

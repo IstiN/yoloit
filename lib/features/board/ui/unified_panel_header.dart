@@ -10,7 +10,8 @@ import 'package:yoloit/ui/components/menus/panel_overflow_menu.dart';
 ///
 /// Always shows the primary actions (duplicate, lock, color) and a close
 /// button. Secondary actions live in the hover-reveal overflow menu.
-class UnifiedPanelHeader extends StatelessWidget {
+/// Double-tap the title to rename inline.
+class UnifiedPanelHeader extends StatefulWidget {
   const UnifiedPanelHeader({
     required this.panel,
     required this.isSelected,
@@ -24,6 +25,7 @@ class UnifiedPanelHeader extends StatelessWidget {
     this.onFullscreen,
     required this.onSettings,
     required this.onDelete,
+    required this.onRename,
     this.leadingIcon,
     this.pluginActions = const [],
     this.remoteLockActor,
@@ -42,6 +44,7 @@ class UnifiedPanelHeader extends StatelessWidget {
   final VoidCallback? onFullscreen;
   final VoidCallback onSettings;
   final VoidCallback onDelete;
+  final void Function(String title) onRename;
   final Widget? leadingIcon;
   final List<Widget> pluginActions;
 
@@ -49,11 +52,61 @@ class UnifiedPanelHeader extends StatelessWidget {
   final String? remoteLockActor;
 
   @override
+  State<UnifiedPanelHeader> createState() => _UnifiedPanelHeaderState();
+}
+
+class _UnifiedPanelHeaderState extends State<UnifiedPanelHeader> {
+  bool _editing = false;
+  late final TextEditingController _controller;
+  late final FocusNode _focusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.panel.title);
+    _focusNode = FocusNode();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _startEditing() {
+    setState(() {
+      _controller.text = widget.panel.title;
+      _editing = true;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _focusNode.requestFocus();
+      _controller.selection = TextSelection(
+        baseOffset: 0,
+        extentOffset: _controller.text.length,
+      );
+    });
+  }
+
+  void _commitRename() {
+    final newTitle = _controller.text.trim();
+    if (newTitle.isNotEmpty && newTitle != widget.panel.title) {
+      widget.onRename(newTitle);
+    }
+    setState(() => _editing = false);
+  }
+
+  void _cancelEditing() {
+    setState(() => _editing = false);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
+    final panel = widget.panel;
     final plugin = BoardPluginRegistry.instance.pluginFor(panel.type);
     final accent = panel.color ?? plugin?.accentColor;
-    final headerColor = isSelected || isFocused
+    final headerColor = widget.isSelected || widget.isFocused
         ? colors.surfaceElevated
         : colors.surface;
 
@@ -77,59 +130,95 @@ class UnifiedPanelHeader extends StatelessWidget {
             onPressed: () {},
           ),
           const SizedBox(width: 8),
-          leadingIcon ?? _PanelIcon(plugin: plugin),
+          widget.leadingIcon ?? _PanelIcon(plugin: plugin),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(
-              panel.title,
-              overflow: TextOverflow.ellipsis,
-              maxLines: 1,
-              style: TextStyle(
-                color: colors.textPrimary,
-                fontWeight: FontWeight.w600,
-                fontSize: 13,
-              ),
-            ),
+            child: _editing
+                ? TextField(
+                    controller: _controller,
+                    focusNode: _focusNode,
+                    style: TextStyle(
+                      color: colors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      contentPadding: EdgeInsets.zero,
+                      border: InputBorder.none,
+                    ),
+                    onSubmitted: (_) => _commitRename(),
+                    onTapOutside: (_) => _commitRename(),
+                  )
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          panel.title,
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                          style: TextStyle(
+                            color: colors.textPrimary,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
           ),
-          if (remoteLockActor != null)
+          if (_editing)
+            HeaderIconButton(
+              icon: Icons.check,
+              tooltip: 'Confirm rename',
+              onPressed: _commitRename,
+            )
+          else
+            HeaderIconButton(
+              icon: Icons.edit_outlined,
+              tooltip: 'Rename panel',
+              onPressed: _startEditing,
+            ),
+          if (widget.remoteLockActor != null)
             HeaderIconButton(
               icon: Icons.lock_outline,
-              tooltip: 'Editing by $remoteLockActor',
+              tooltip: 'Editing by ${widget.remoteLockActor}',
               onPressed: () {},
             )
           else ...[
             HeaderIconButton(
               icon: Icons.copy,
               tooltip: 'Duplicate panel',
-              onPressed: onDuplicate,
+              onPressed: widget.onDuplicate,
             ),
             HeaderIconButton(
               icon: Icons.format_color_fill,
               tooltip: 'Panel color',
-              onPressed: onEditColor,
+              onPressed: widget.onEditColor,
               swatch: accent == Colors.transparent ? null : accent,
             ),
-            if (onEdit != null)
+            if (widget.onEdit != null)
               HeaderIconButton(
                 icon: Icons.edit_outlined,
                 tooltip: 'Edit content',
-                onPressed: onEdit!,
+                onPressed: widget.onEdit!,
               ),
           ],
-          ...pluginActions,
+          ...widget.pluginActions,
           PanelOverflowMenu(
-            onToggleLocked: onToggleLocked,
+            onToggleLocked: widget.onToggleLocked,
             locked: panel.locked,
-            onBringToFront: onBringToFront,
-            onSendToBack: onSendToBack,
-            onFullscreen: onFullscreen,
-            onSettings: onSettings,
-            onDelete: onDelete,
+            onBringToFront: widget.onBringToFront,
+            onSendToBack: widget.onSendToBack,
+            onFullscreen: widget.onFullscreen,
+            onSettings: widget.onSettings,
+            onDelete: widget.onDelete,
           ),
           HeaderIconButton(
             icon: Icons.close,
             tooltip: 'Remove panel',
-            onPressed: onDelete,
+            onPressed: widget.onDelete,
           ),
         ],
       ),
