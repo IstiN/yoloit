@@ -12,11 +12,19 @@ import 'package:yoloit/core/services/app_logger.dart';
 import 'package:yoloit/core/services/resource_monitor_service.dart';
 import 'package:yoloit/core/skills/yoloit_global_skills_service.dart';
 import 'package:yoloit/core/theme/theme_manager.dart';
+import 'package:yoloit/features/board/window/board_window.dart';
 import 'package:yoloit/features/settings/data/provider_model_catalog_service.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_cubit.dart';
 import 'package:yoloit/features/terminal/data/tmux_service.dart';
 
 void main(List<String> args) async {
+  // Multi-window: if launched as a board pop-out window, run the board
+  // window entry point instead of the full app.
+  if (args.isNotEmpty && args.first == '--board-window') {
+    await boardWindowMain(args);
+    return;
+  }
+
   WidgetsFlutterBinding.ensureInitialized();
   if (RealLlmToolTestRunner.isRequested(args)) {
     exit(await RealLlmToolTestRunner.run(args));

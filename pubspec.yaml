@@ -89,6 +89,7 @@ dependencies:
   flutter_cube: ^0.1.1
   flame: ^1.38.0
   flame_3d: ^0.3.0
+  desktop_multi_window: ^0.3.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

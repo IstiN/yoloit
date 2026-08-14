@@ -12,7 +12,9 @@ class AppDelegate: FlutterAppDelegate {
   }
 
   override func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-    return true
+    // Don't quit when a popped-out board window is the last one — keep the
+    // app alive so board windows can be re-opened from the main window.
+    return false
   }
 
   override func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
