@@ -23,6 +23,9 @@ class BoardPopoutService {
       return override(context, board);
     }
     try {
+      // createWindow takes a single JSON-encoded string as the window
+      // argument. The secondary window reads it via
+      // WindowController.fromCurrentEngine().windowArgument.
       final windowId = await _channel.invokeMethod<String>(
         'createWindow',
         <String, Object?>{

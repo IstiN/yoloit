@@ -1,6 +1,7 @@
 import 'dart:io' show exit;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:collection/collection.dart';
 import 'package:yoloit/core/theme/theme_manager.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
@@ -18,9 +19,25 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 Future<void> boardWindowMain(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // desktop_multi_window passes ["multi_window", windowId, boardId].
-  final boardId = args.length >= 3 ? args[2] : '';
-  debugPrint('[BoardWindow] starting with boardId=$boardId args=$args');
+  // desktop_multi_window passes ["multi_window", windowId, arguments] to
+  // main(), where arguments is the JSON string we passed to createWindow.
+  String boardId = '';
+  if (args.length >= 3) {
+    final raw = args[2];
+    // The argument is the plain boardId string we passed.
+    boardId = raw;
+  }
+
+  // Fallback: query the window definition from the engine if args are empty.
+  if (boardId.isEmpty) {
+    try {
+      final def = await const MethodChannel('mixin.one/desktop_multi_window')
+          .invokeMethod<Map<dynamic, dynamic>>('getWindowDefinition');
+      boardId = (def?['windowArgument'] as String?) ?? '';
+    } catch (_) {}
+  }
+
+  debugPrint('[BoardWindow] boardId=$boardId');
   if (boardId.isEmpty) {
     runApp(const MaterialApp(
       home: Scaffold(body: Center(child: Text('No board ID provided'))),
