@@ -1,6 +1,7 @@
+import 'dart:io' show exit;
+
 import 'package:flutter/material.dart';
 import 'package:collection/collection.dart';
-import 'package:window_manager/window_manager.dart';
 import 'package:yoloit/core/theme/theme_manager.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
@@ -15,10 +16,10 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 /// board lives exclusively in this window.
 Future<void> boardWindowMain(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
-  await windowManager.ensureInitialized();
 
   // desktop_multi_window passes ["multi_window", windowId, boardId].
   final boardId = args.length >= 3 ? args[2] : '';
+  debugPrint('[BoardWindow] starting with boardId=$boardId args=$args');
   if (boardId.isEmpty) {
     runApp(const MaterialApp(
       home: Scaffold(body: Center(child: Text('No board ID provided'))),
@@ -29,9 +30,11 @@ Future<void> boardWindowMain(List<String> args) async {
   // Load all boards from shared storage and pick the one we need.
   final cubit = BoardCubit();
   await cubit.load();
+  debugPrint('[BoardWindow] loaded ${cubit.state.boards.length} boards');
   final board = cubit.state.boards
       .where((b) => b.id == boardId)
       .firstOrNull;
+  debugPrint('[BoardWindow] board found: ${board?.name}');
 
   if (board == null) {
     runApp(MaterialApp(
@@ -41,9 +44,6 @@ Future<void> boardWindowMain(List<String> args) async {
     ));
     return;
   }
-
-  final windowTitle = board.name;
-  await windowManager.setTitle(windowTitle);
 
   runApp(_BoardWindowApp(cubit: cubit, boardId: boardId));
 }
@@ -107,7 +107,7 @@ class _BoardWindowTitleBar extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.close, size: 18),
             tooltip: 'Close window',
-            onPressed: () => windowManager.close(),
+            onPressed: () => exit(0),
           ),
         ],
       ),
