@@ -302,11 +302,10 @@ class BoardToolbar extends StatelessWidget {
       ),
       if (onPopOutBoard != null && !kIsWeb) ...[
         const SizedBox(width: 8),
-        OutlinedButton.icon(
-          style: _toolbarButtonStyle(context, isWeb: kIsWeb),
+        IconButton(
+          tooltip: 'Open in new window',
           onPressed: onPopOutBoard,
           icon: const Icon(Icons.open_in_new_outlined),
-          label: const Text('Window'),
         ),
       ],
       if (kIsWeb) ...[
