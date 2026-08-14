@@ -57,7 +57,7 @@ class _BoardWindowApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: ThemeManager.instance.themeData,
+      theme: ThemeManager.instance.theme,
       home: BlocProvider.value(
         value: cubit,
         child: Scaffold(
