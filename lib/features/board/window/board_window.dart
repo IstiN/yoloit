@@ -17,7 +17,8 @@ Future<void> boardWindowMain(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
   await windowManager.ensureInitialized();
 
-  final boardId = args.isNotEmpty ? args.first : '';
+  // desktop_multi_window passes ["multi_window", windowId, boardId].
+  final boardId = args.length >= 3 ? args[2] : '';
   if (boardId.isEmpty) {
     runApp(const MaterialApp(
       home: Scaffold(body: Center(child: Text('No board ID provided'))),

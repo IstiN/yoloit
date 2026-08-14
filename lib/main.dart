@@ -20,7 +20,8 @@ import 'package:yoloit/features/terminal/data/tmux_service.dart';
 void main(List<String> args) async {
   // Multi-window: if launched as a board pop-out window, run the board
   // window entry point instead of the full app.
-  if (args.isNotEmpty && args.first == '--board-window') {
+  // desktop_multi_window passes ["multi_window", windowId, boardId].
+  if (args.isNotEmpty && args.first == 'multi_window' && args.length >= 3) {
     await boardWindowMain(args);
     return;
   }
