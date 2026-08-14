@@ -17,6 +17,7 @@ import 'package:yoloit/features/settings/data/provider_model_catalog_service.dar
 import 'package:yoloit/features/terminal/bloc/terminal_cubit.dart';
 import 'package:yoloit/features/terminal/data/tmux_service.dart';
 
+@pragma('vm:entry-point')
 void main(List<String> args) async {
   // Multi-window: if launched as a board pop-out window, run the board
   // window entry point instead of the full app.

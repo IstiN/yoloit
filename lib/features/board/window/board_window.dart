@@ -14,6 +14,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 /// BoardCubit. The board is loaded from SharedPreferences by ID and saves
 /// independently. No real-time sync with the main window — the popped-out
 /// board lives exclusively in this window.
+@pragma('vm:entry-point')
 Future<void> boardWindowMain(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
 
