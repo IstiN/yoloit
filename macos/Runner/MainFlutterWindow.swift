@@ -1,6 +1,7 @@
 import Cocoa
 import FlutterMacOS
 import AVFoundation
+import desktop_multi_window
 
 class MainFlutterWindow: NSWindow {
   override func awakeFromNib() {
@@ -21,6 +22,9 @@ class MainFlutterWindow: NSWindow {
     self.setFrame(windowFrame, display: true)
 
     RegisterGeneratedPlugins(registry: flutterViewController)
+
+    // Multi-window support: register multi_window plugin
+    FlutterMultiWindowPlugin.register(with: flutterViewController.registrar(forPlugin: "FlutterMultiWindowPlugin"))
 
     // Register custom plugins
     WebViewZoomPlugin.register(
