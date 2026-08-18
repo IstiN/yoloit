@@ -109,9 +109,6 @@ extension _BoardViewSections on _BoardViewState {
             onShareBoard: () => _shareBoard(context),
             onBoardSettings: () => _showBoardSettings(context, activeBoard),
             onAppSettings: () => _openAppSettings(context),
-            onPopOutBoard: kIsWeb
-                ? null
-                : () => _popOutBoard(context, activeBoard),
             onDeleteBoard: () => _deleteBoard(context, activeBoard),
             onOpenBoardOverview: () => _openBoardOverview(activeBoard),
             onSearch: () => _openBoardSearch(context),

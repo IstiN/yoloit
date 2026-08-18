@@ -1583,17 +1583,6 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     }
   }
 
-  Future<void> _popOutBoard(BuildContext context, BoardDocument board) async {
-    // Placeholder — desktop_multi_window integration coming next.
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Pop-out "${board.name}" — coming soon!'),
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
-
   Future<void> _shareBoard(BuildContext context) async {
     try {
       final info = await BoardShareServer.instance.start(
