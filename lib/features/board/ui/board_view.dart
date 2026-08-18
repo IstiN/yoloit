@@ -8,7 +8,6 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yoloit/core/cli/board_screenshot_service.dart';
-import 'package:yoloit/features/board/window/board_popout_service.dart';
 import 'package:yoloit/core/platform/platform_info.dart';
 import 'package:yoloit/core/remote/board_share_server.dart';
 import 'package:yoloit/core/remote/yoloit_remote_client.dart';
@@ -1585,8 +1584,14 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   }
 
   Future<void> _popOutBoard(BuildContext context, BoardDocument board) async {
-    // Delegate to a helper that can be overridden in tests.
-    await BoardPopoutService.popOut(context, board);
+    // Placeholder — desktop_multi_window integration coming next.
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Pop-out "${board.name}" — coming soon!'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   Future<void> _shareBoard(BuildContext context) async {
