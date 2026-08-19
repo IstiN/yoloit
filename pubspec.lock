@@ -678,10 +678,10 @@ packages:
     dependency: "direct main"
     description:
       name: js_widget_runtime
-      sha256: c0d3925525a786d1f88289f6a8e0a1b65bf08c51dcacbc71889c5e5694c660b3
+      sha256: "35524159d76eb7df814ec93c7222d57b0c56be1cb92f32d6c3792c6c6aad9876"
       url: "https://pub.dev"
     source: hosted
-    version: "0.4.70"
+    version: "0.4.76"
   json_annotation:
     dependency: "direct main"
     description:
@@ -895,14 +895,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.0.5"
-  multiview_desktop:
-    dependency: "direct main"
-    description:
-      name: multiview_desktop
-      sha256: bd672ff9933726d017eea764e7479861f76df8461254d667059765bf5d46066c
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.2.1"
   nested:
     dependency: transitive
     description:
