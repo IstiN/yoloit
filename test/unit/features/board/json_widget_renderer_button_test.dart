@@ -6,7 +6,7 @@ void main() {
   testWidgets('button without onTap stays enabled and shows label', (
     tester,
   ) async {
-    const renderer = JsonWidgetRenderer(onEvent: _noop);
+    final renderer = JsonWidgetRenderer(onEvent: _noop);
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(

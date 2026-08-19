@@ -78,8 +78,10 @@ class _FileEditorPanelState extends State<FileEditorPanel>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    SessionPrefs.load().then((snap) {
-      if (mounted) _fontSizeNotifier.value = snap.editorFontSize;
+    // Cached getter — the full 15-key prefs load per editor panel showed up
+    // in CPU profiling.
+    SessionPrefs.loadEditorFontSize().then((size) {
+      if (mounted) _fontSizeNotifier.value = size;
     });
     // Restore which files were in preview mode.
     SessionPrefs.loadPreviewPaths().then((saved) {

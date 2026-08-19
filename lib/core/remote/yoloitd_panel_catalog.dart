@@ -348,11 +348,14 @@ final List<Map<String, dynamic>> yoloitdPanelTypes = yoloitdPanelDescriptors
     .map((descriptor) => descriptor.toJson())
     .toList(growable: false);
 
+// Index of panel-type descriptors — the linear scan ran per availability
+// probe (hundreds of thousands of calls per session via toolbar rebuilds).
+final Map<String, RemotePanelTypeDescriptor> _descriptorByType = {
+  for (final descriptor in yoloitdPanelDescriptors) descriptor.type: descriptor,
+};
+
 RemotePanelTypeDescriptor? yoloitdPanelDescriptorFor(String type) {
-  for (final descriptor in yoloitdPanelDescriptors) {
-    if (descriptor.type == type) return descriptor;
-  }
-  return null;
+  return _descriptorByType[type];
 }
 
 bool yoloitdPanelTypeAvailableOn(

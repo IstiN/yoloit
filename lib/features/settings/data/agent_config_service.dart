@@ -70,23 +70,21 @@ class AgentConfig {
     launchCommand: launchCommand ?? this.launchCommand,
     visible: visible ?? this.visible,
     isBuiltIn: isBuiltIn,
-    streamAdapter:
-        streamAdapter == _sentinel
-            ? this.streamAdapter
-            : streamAdapter as String?,
+    streamAdapter: streamAdapter == _sentinel
+        ? this.streamAdapter
+        : streamAdapter as String?,
     passDefaultArgs: passDefaultArgs ?? this.passDefaultArgs,
     disableModel: disableModel ?? this.disableModel,
-    defaultModel:
-        defaultModel == _sentinel ? this.defaultModel : defaultModel as String?,
+    defaultModel: defaultModel == _sentinel
+        ? this.defaultModel
+        : defaultModel as String?,
     asrMode: asrMode ?? this.asrMode,
-    asrCloudConfigId:
-        asrCloudConfigId == _sentinel
-            ? this.asrCloudConfigId
-            : asrCloudConfigId as String?,
-    asrCloudModel:
-        asrCloudModel == _sentinel
-            ? this.asrCloudModel
-            : asrCloudModel as String?,
+    asrCloudConfigId: asrCloudConfigId == _sentinel
+        ? this.asrCloudConfigId
+        : asrCloudConfigId as String?,
+    asrCloudModel: asrCloudModel == _sentinel
+        ? this.asrCloudModel
+        : asrCloudModel as String?,
   );
 
   Map<String, dynamic> toJson() => _$AgentConfigToJson(this);
@@ -103,6 +101,8 @@ class AgentConfigService {
 
   // In-memory cache so cubit can read without async on every spawn.
   List<AgentConfig> _cached = [];
+  bool _hasLoaded = false;
+  String? _loadedFromConfigDir;
   String? _defaultAgentId;
 
   // Global default ASR config (applied to agents whose asrMode == 'default').
@@ -127,12 +127,11 @@ class AgentConfigService {
         launchCommand: t.launchCommand,
         visible: true,
         isBuiltIn: true,
-        streamAdapter:
-            t.name == 'copilot'
-                ? 'copilot'
-                : t.name == 'cursor'
-                ? 'cursor'
-                : null,
+        streamAdapter: t.name == 'copilot'
+            ? 'copilot'
+            : t.name == 'cursor'
+            ? 'cursor'
+            : null,
       ),
     ),
     const AgentConfig(
@@ -180,6 +179,13 @@ class AgentConfigService {
   }
 
   Future<List<AgentConfig>> load() async {
+    // Already loaded from the same config dir in this process — skip the
+    // file read + JSON parse. BoardCubit.load() runs per cubit instance and
+    // re-triggered a full re-read each time. A different config dir (tests
+    // swap PlatformDirs per case) forces a re-read.
+    if (_hasLoaded && _loadedFromConfigDir == _configPath) return configs;
+    _hasLoaded = true;
+    _loadedFromConfigDir = _configPath;
     final storage = FileStorageAdapter.instance;
     try {
       if (!await storage.exists(_configPath)) {
@@ -187,10 +193,9 @@ class AgentConfigService {
       } else {
         final raw = await storage.readString(_configPath);
         final data = jsonDecode(raw ?? '[]') as List;
-        final saved =
-            data
-                .map((e) => AgentConfig.fromJson(e as Map<String, dynamic>))
-                .toList();
+        final saved = data
+            .map((e) => AgentConfig.fromJson(e as Map<String, dynamic>))
+            .toList();
         // Merge: ensure all built-ins are present and have default stream adapters if null
         final updatedSaved = <AgentConfig>[];
         for (final s in saved) {
@@ -221,11 +226,12 @@ class AgentConfigService {
     try {
       if (await storage.exists(_prefsPath)) {
         final raw = await storage.readString(_prefsPath);
-        final prefs =
-            jsonDecode(raw ?? '{}') as Map<String, dynamic>;
+        final prefs = jsonDecode(raw ?? '{}') as Map<String, dynamic>;
         _defaultAgentId = prefs['defaultAgentId'] as String?;
         final savedAsrMode = prefs['defaultAsrMode'] as String?;
-        _defaultAsrMode = savedAsrMode == 'local' ? 'cloud' : (savedAsrMode ?? 'cloud');
+        _defaultAsrMode = savedAsrMode == 'local'
+            ? 'cloud'
+            : (savedAsrMode ?? 'cloud');
         _defaultAsrCloudConfigId = prefs['defaultAsrCloudConfigId'] as String?;
         _defaultAsrCloudModel = prefs['defaultAsrCloudModel'] as String?;
         if (_defaultAsrMode == 'cloud') {

@@ -124,16 +124,37 @@ class CliTextArgumentResolver {
       final value = entry.value;
       if (value is! String) continue;
       if (!_shouldResolveKey(entry.key)) continue;
-      final resolved = resolve(value);
-      if (resolved != null) {
-        arguments[entry.key] = resolved;
-      } else if (isClipTextFilePath(value)) {
-        arguments.remove(entry.key);
+      // Classify once: `_normalizePath` / `unwrapShellQuotedText` used to run
+      // three times per value (resolve → isClipTextFilePath → unwrap) and
+      // showed up as a CPU hotspot.
+      final path = _normalizePath(value);
+      if (path != null && _looksLikeClipTextFile(path)) {
+        final resolved = _readClipFile(path);
+        if (resolved != null) {
+          arguments[entry.key] = resolved;
+        } else {
+          arguments.remove(entry.key);
+        }
       } else {
-        arguments[entry.key] = unwrapShellQuotedText(value);
+        arguments[entry.key] = _unwrapShellQuoted(value);
       }
     }
   }
+
+  /// Reads and materializes a clip file, or null when unreadable/empty.
+  static String? _readClipFile(String path) {
+    final file = File(path);
+    if (!file.existsSync()) return null;
+    try {
+      return _materializeClipContent(file.readAsStringSync());
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Unwraps one outer shell quote pair from a non-clip string value.
+  static String _unwrapShellQuoted(String value) =>
+      unwrapShellQuotedText(value);
 
   /// Expands clip paths inside a JSON tool body (`do` / `board:apply` payloads).
   static String resolveJsonParameter(String value) {

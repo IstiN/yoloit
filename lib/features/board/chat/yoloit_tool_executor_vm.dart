@@ -42,15 +42,14 @@ class YoloitCliToolExecutor implements YoloitToolExecutor {
     if (resolved.response != null) return resolved.response!;
     final tool = resolved.tool!;
 
-    final normalized =
-        argumentsPreNormalized
-            ? arguments
-            : YoloitCliToolArgumentNormalizer.normalize(
-              functionName: functionName,
-              arguments: arguments,
-              userMessage: '',
-              runtimeContext: runtimeContext,
-            );
+    final normalized = argumentsPreNormalized
+        ? arguments
+        : YoloitCliToolArgumentNormalizer.normalize(
+            functionName: functionName,
+            arguments: arguments,
+            userMessage: '',
+            runtimeContext: runtimeContext,
+          );
     final List<String> cliArgs;
     try {
       cliArgs = _buildCliArgs(tool, normalized, runtimeContext);
@@ -181,13 +180,9 @@ class YoloitCliToolExecutor implements YoloitToolExecutor {
       '${DateTime.now().millisecondsSinceEpoch}.yaml',
     );
     await tempFile.writeAsString(yaml);
-    final boardArg =
-        cliArgs.length > 1
-            ? cliArgs[1]
-            : _firstNotEmpty(
-              runtimeContext?.boardId,
-              runtimeContext?.boardName,
-            );
+    final boardArg = cliArgs.length > 1
+        ? cliArgs[1]
+        : _firstNotEmpty(runtimeContext?.boardId, runtimeContext?.boardName);
     if (boardArg == null || boardArg.trim().isEmpty) {
       return (
         error: jsonEncode(<String, Object?>{
@@ -219,10 +214,9 @@ class YoloitCliToolExecutor implements YoloitToolExecutor {
       executable,
       runArgs.map(_argvQuote).toList(),
       runInShell: false,
-      environment:
-          cliPort == null
-              ? null
-              : <String, String>{'YOLOIT_CLI_PORT': '$cliPort'},
+      environment: cliPort == null
+          ? null
+          : <String, String>{'YOLOIT_CLI_PORT': '$cliPort'},
     ).timeout(timeout);
 
     final stdoutText = result.stdout.toString().trim();
@@ -348,20 +342,13 @@ class YoloitCliToolExecutor implements YoloitToolExecutor {
         break;
       }
     }
-    final panelValue =
-        panelParamDef == null
-            ? null
-            : _argumentValue(
-              panelParamDef,
-              arguments,
-              runtimeContext,
-              tool,
-            );
+    final panelValue = panelParamDef == null
+        ? null
+        : _argumentValue(panelParamDef, arguments, runtimeContext, tool);
     // Bash smart-parse treats the first positional arg as a panel hint when
     // board is omitted. Injecting board without panel breaks e.g.
     // checklist:check "My Board" "item" → panel="My Board".
-    final omitBoardForSmartParse =
-        smartPanelGroup && _isMissing(panelValue);
+    final omitBoardForSmartParse = smartPanelGroup && _isMissing(panelValue);
 
     for (final param in tool.params) {
       if (omitBoardForSmartParse && param.key == 'board') {
@@ -536,11 +523,19 @@ class YoloitCliToolExecutor implements YoloitToolExecutor {
 
   /// Validates the built CLI arguments against obvious schema violations.
   /// Returns an error message or null when valid.
+  // flag→param index memoized per tool — the map was rebuilt on every
+  // validation call (hot path: once per executed CLI command).
+  static final Expando<Map<String, YoloitCliToolParam>> _paramByFlagCache =
+      Expando<Map<String, YoloitCliToolParam>>();
+
+  Map<String, YoloitCliToolParam> _paramByFlagFor(YoloitCliTool tool) =>
+      _paramByFlagCache[tool] ??= <String, YoloitCliToolParam>{
+        for (final param in tool.params)
+          if (param.flag != null) param.flag!: param,
+      };
+
   String? _validateCliArgs(YoloitCliTool tool, List<String> cliArgs) {
-    final paramByFlag = <String, YoloitCliToolParam>{
-      for (final param in tool.params)
-        if (param.flag != null) param.flag!: param,
-    };
+    final paramByFlag = _paramByFlagFor(tool);
     final paramsByPosition = tool.params.where((p) => p.flag == null).toList();
     var positionalIndex = 0;
     for (var i = 0; i < cliArgs.length; i++) {
@@ -613,8 +608,10 @@ class YoloitCliToolExecutor implements YoloitToolExecutor {
     return ['yoloit', ...args].map(_shellQuote).join(' ');
   }
 
+  static final RegExp _shellSafe = RegExp(r'^[a-zA-Z0-9_./:=@-]+$');
+
   String _shellQuote(String value) {
-    if (RegExp(r'^[a-zA-Z0-9_./:=@-]+$').hasMatch(value)) {
+    if (_shellSafe.hasMatch(value)) {
       return value;
     }
     return "'${value.replaceAll("'", "'\\''")}'";
@@ -625,7 +622,7 @@ class YoloitCliToolExecutor implements YoloitToolExecutor {
   /// arguments with `"$1"`, so JSON payloads and titles with spaces must be
   /// enclosed in double quotes and have their inner double quotes escaped.
   String _argvQuote(String value) {
-    if (RegExp(r'^[a-zA-Z0-9_./:=@-]+$').hasMatch(value)) {
+    if (_shellSafe.hasMatch(value)) {
       return value;
     }
     return '"${value.replaceAll('"', '\\"')}"';
@@ -653,5 +650,4 @@ class YoloitCliToolExecutor implements YoloitToolExecutor {
   }
 }
 
-YoloitToolExecutor createPlatformToolExecutor() =>
-    YoloitCliToolExecutor();
+YoloitToolExecutor createPlatformToolExecutor() => YoloitCliToolExecutor();

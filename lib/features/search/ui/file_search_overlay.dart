@@ -987,15 +987,31 @@ class _HighlightText extends StatelessWidget {
     }
 
     final indexSet = indices.toSet();
+    // Group adjacent same-style runs into single spans — one span per
+    // character (40+ spans per result row) showed up in CPU profiling.
     final spans = <TextSpan>[];
-    for (int i = 0; i < text.length; i++) {
+    final buffer = StringBuffer();
+    var highlighting = false;
+    void flush() {
+      if (buffer.isEmpty) return;
       spans.add(
         TextSpan(
-          text: text[i],
-          style: indexSet.contains(i) ? highlightStyle : baseStyle,
+          text: buffer.toString(),
+          style: highlighting ? highlightStyle : baseStyle,
         ),
       );
+      buffer.clear();
     }
+
+    for (int i = 0; i < text.length; i++) {
+      final isHighlighted = indexSet.contains(i);
+      if (isHighlighted != highlighting) {
+        flush();
+        highlighting = isHighlighted;
+      }
+      buffer.write(text[i]);
+    }
+    flush();
 
     return RichText(
       overflow: TextOverflow.ellipsis,

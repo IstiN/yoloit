@@ -1,6 +1,11 @@
-
 enum YoloitCliToolParamKind { string, number, boolean }
+
 enum YoloitCliRuntimeDefault { board, panel }
+
+// Per-param memo cache — YoloitCliToolParam stays const, so lookups are
+// cached by instance identity (hot path: called for every param of every
+// tool on every argument normalization round).
+final Expando<List<String>> _lookupKeysCache = Expando<List<String>>();
 
 class YoloitCliToolParam {
   const YoloitCliToolParam({
@@ -38,14 +43,22 @@ class YoloitCliToolParam {
   /// The canonical key used to look up values after normalization. Accepts
   /// the original key, the short key, the compact schema key, and the raw
   /// lowercase key for providers that normalize property names.
-  Iterable<String> get lookupKeys sync* {
-    yield key;
-    if (shortKey != null) yield shortKey!;
+  ///
+  /// Memoized list — the `sync*` generator allocated a fresh iterator on
+  /// every call and this sits on the per-argument hot path.
+  Iterable<String> get lookupKeys =>
+      _lookupKeysCache[this] ??= _computeLookupKeys();
+
+  List<String> _computeLookupKeys() {
+    final keys = <String>[];
+    keys.add(key);
+    if (shortKey != null) keys.add(shortKey!);
     final compact = compactKey;
-    if (compact != key && compact != shortKey) yield compact;
+    if (compact != key && compact != shortKey) keys.add(compact);
     final lower = lowerKey;
-    if (lower != key && lower != shortKey && lower != compact) yield lower;
-    yield* aliases;
+    if (lower != key && lower != shortKey && lower != compact) keys.add(lower);
+    keys.addAll(aliases);
+    return keys;
   }
 
   Map<String, Object?> toJsonSchema() {
@@ -73,6 +86,7 @@ class YoloitCliToolParam {
     };
   }
 }
+
 YoloitCliToolParam toolParam(
   String key,
   String description, {

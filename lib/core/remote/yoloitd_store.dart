@@ -118,16 +118,18 @@ class YoloitdStore {
 
   Future<RemoteBoard?> findBoard(String idOrName) async {
     final boards = await loadBoards();
-    final byId = boards.where((board) => board.id == idOrName).firstOrNull;
-    if (byId != null) return byId;
-    final byName =
-        boards
-            .where(
-              (board) => board.name.toLowerCase() == idOrName.toLowerCase(),
-            )
-            .firstOrNull;
-    if (byName != null) return byName;
-    return boards.where((board) => board.id.startsWith(idOrName)).firstOrNull;
+    // Single pass with pre-normalized query — the old form walked the list
+    // three times and lowercased every board name per lookup.
+    final queryLower = idOrName.toLowerCase();
+    RemoteBoard? byPrefix;
+    for (final board in boards) {
+      if (board.id == idOrName) return board;
+      if (board.name.toLowerCase() == queryLower) return board;
+      if (byPrefix == null && board.id.startsWith(idOrName)) {
+        byPrefix = board;
+      }
+    }
+    return byPrefix;
   }
 
   Future<({RemoteBoard before, RemoteBoard after})?> updateBoard(
@@ -147,11 +149,14 @@ class YoloitdStore {
     final before = boards[index];
     var after = update(before);
     RemoteHistoryEvent? event;
-    if (historyEvent != null &&
-        jsonEncode(before.toJson()) != jsonEncode(after.toJson())) {
-      final revision = before.historyRevision + 1;
-      after = after.withHistoryRevision(revision);
-      event = historyEvent(before, after, revision);
+    if (historyEvent != null && !identical(before, after)) {
+      // identical() short-circuits no-op updates (update returned the same
+      // instance) without serializing anything.
+      if (jsonEncode(before.toJson()) != jsonEncode(after.toJson())) {
+        final revision = before.historyRevision + 1;
+        after = after.withHistoryRevision(revision);
+        event = historyEvent(before, after, revision);
+      }
     }
     final next = <RemoteBoard>[...boards]..[index] = after;
     await saveBoards(next, activeBoardId: activeId ?? boardId);
@@ -165,8 +170,9 @@ class YoloitdStore {
     final boards = await loadBoards();
     final activeId = await activeBoardId();
     final next = boards.where((board) => board.id != boardId).toList();
-    final nextActive =
-        activeId == boardId ? (next.isEmpty ? null : next.first.id) : activeId;
+    final nextActive = activeId == boardId
+        ? (next.isEmpty ? null : next.first.id)
+        : activeId;
     await saveBoards(next, activeBoardId: nextActive);
   }
 
@@ -207,15 +213,11 @@ class YoloitdStore {
 
       final plan = planPanelHistoryUndo<RemotePanel>(
         events: events,
-        currentPanelOf:
-            (entityId) =>
-                board.panels
-                    .where((panel) => panel.id == entityId)
-                    .firstOrNull,
+        currentPanelOf: (entityId) =>
+            board.panels.where((panel) => panel.id == entityId).firstOrNull,
         panelFromJson: RemotePanel.fromJson,
         panelToJson: (panel) => panel.toJson(),
-        previousInRun:
-            (previous, latest) => previous.type == latest.type,
+        previousInRun: (previous, latest) => previous.type == latest.type,
       );
 
       switch (plan.kind) {
@@ -296,8 +298,9 @@ class YoloitdStore {
   Future<bool> _applyPanelSnapshot(String boardId, RemotePanel panel) async {
     final board = await findBoard(boardId);
     if (board == null) return false;
-    final current =
-        board.panels.where((entry) => entry.id == panel.id).firstOrNull;
+    final current = board.panels
+        .where((entry) => entry.id == panel.id)
+        .firstOrNull;
     if (current != null && _samePanel(current, panel)) {
       return false;
     }
@@ -324,14 +327,13 @@ class YoloitdStore {
         );
         return board.copyWith(panels: <RemotePanel>[...board.panels, created]);
       },
-      historyEvent:
-          (before, after, revision) => _event(
-            boardId: boardId,
-            type: 'panel.created',
-            entityId: created.id,
-            revision: revision,
-            after: created.toJson(),
-          ),
+      historyEvent: (before, after, revision) => _event(
+        boardId: boardId,
+        type: 'panel.created',
+        entityId: created.id,
+        revision: revision,
+        after: created.toJson(),
+      ),
     );
     return created;
   }
@@ -358,19 +360,17 @@ class YoloitdStore {
         }
         return board.copyWith(panels: panels);
       },
-      historyEvent:
-          (before, after, revision) => _event(
-            boardId: boardId,
-            type: 'panel.updated',
-            entityId: panelId,
-            revision: revision,
-            before: beforePanel?.toJson(),
-            after: afterPanel?.toJson(),
-            patch:
-                beforePanel == null || afterPanel == null
-                    ? const <String, dynamic>{}
-                    : _panelPatch(beforePanel!, afterPanel!),
-          ),
+      historyEvent: (before, after, revision) => _event(
+        boardId: boardId,
+        type: 'panel.updated',
+        entityId: panelId,
+        revision: revision,
+        before: beforePanel?.toJson(),
+        after: afterPanel?.toJson(),
+        patch: beforePanel == null || afterPanel == null
+            ? const <String, dynamic>{}
+            : _panelPatch(beforePanel!, afterPanel!),
+      ),
     );
     return afterPanel;
   }
@@ -394,28 +394,26 @@ class YoloitdStore {
         }
         return board.copyWith(
           panels: panels,
-          links:
-              board.links
-                  .where(
-                    (link) =>
-                        link['fromPanelId'] != panelId &&
-                        link['toPanelId'] != panelId &&
-                        link['from'] != panelId &&
-                        link['to'] != panelId,
-                  )
-                  .toList(),
+          links: board.links
+              .where(
+                (link) =>
+                    link['fromPanelId'] != panelId &&
+                    link['toPanelId'] != panelId &&
+                    link['from'] != panelId &&
+                    link['to'] != panelId,
+              )
+              .toList(),
         );
       },
-      historyEvent:
-          recordHistory
-              ? (before, after, revision) => _event(
-                boardId: boardId,
-                type: 'panel.deleted',
-                entityId: panelId,
-                revision: revision,
-                before: removed?.toJson(),
-              )
-              : null,
+      historyEvent: recordHistory
+          ? (before, after, revision) => _event(
+              boardId: boardId,
+              type: 'panel.deleted',
+              entityId: panelId,
+              revision: revision,
+              before: removed?.toJson(),
+            )
+          : null,
     );
     return removed != null;
   }
@@ -441,15 +439,14 @@ class YoloitdStore {
         if (!replaced) panels.add(panel);
         return board.copyWith(panels: panels);
       },
-      historyEvent:
-          (before, after, revision) => _event(
-            boardId: boardId,
-            type: 'panel.restored',
-            entityId: panel.id,
-            revision: revision,
-            after: panel.toJson(),
-            restoresOpId: restoresOpId,
-          ),
+      historyEvent: (before, after, revision) => _event(
+        boardId: boardId,
+        type: 'panel.restored',
+        entityId: panel.id,
+        revision: revision,
+        after: panel.toJson(),
+        restoresOpId: restoresOpId,
+      ),
     );
   }
 
@@ -488,6 +485,7 @@ class YoloitdStore {
   }
 
   static bool _samePanel(RemotePanel a, RemotePanel b) {
+    if (identical(a, b)) return true;
     return jsonEncode(a.toJson()) == jsonEncode(b.toJson());
   }
 
@@ -496,13 +494,17 @@ class YoloitdStore {
     RemotePanel after,
   ) {
     final patch = <String, dynamic>{};
+    // Scalar fields compare by identity/==; only maps (bounds/params/state)
+    // need JSON encoding to deep-compare.
     void addIfChanged(String key, Object? beforeValue, Object? afterValue) {
-      if (jsonEncode(beforeValue) != jsonEncode(afterValue)) {
-        patch[key] = <String, dynamic>{
-          'before': beforeValue,
-          'after': afterValue,
-        };
+      if (beforeValue == afterValue) return;
+      if (beforeValue is Map || afterValue is Map) {
+        if (jsonEncode(beforeValue) == jsonEncode(afterValue)) return;
       }
+      patch[key] = <String, dynamic>{
+        'before': beforeValue,
+        'after': afterValue,
+      };
     }
 
     addIfChanged('title', before.title, after.title);
@@ -518,11 +520,7 @@ class YoloitdStore {
   }
 }
 
-enum _RemoteRedoKind {
-  recreatePanel,
-  restorePanel,
-  deletePanel,
-}
+enum _RemoteRedoKind { recreatePanel, restorePanel, deletePanel }
 
 class _RemoteRedoEntry {
   const _RemoteRedoEntry.recreate(this.panel)

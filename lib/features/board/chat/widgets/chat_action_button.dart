@@ -21,6 +21,8 @@ class ChatActionButton extends StatelessWidget {
 
   static const double _size = 28;
   static const double _radius = 14;
+  static final BorderRadius _borderRadius = BorderRadius.circular(_radius);
+  static const EdgeInsets _margin = EdgeInsets.only(bottom: 2);
 
   Widget get _button {
     return GestureDetector(
@@ -28,10 +30,10 @@ class ChatActionButton extends StatelessWidget {
       child: Container(
         width: _size,
         height: _size,
-        margin: const EdgeInsets.only(bottom: 2),
+        margin: _margin,
         decoration: BoxDecoration(
           color: backgroundColor,
-          borderRadius: BorderRadius.circular(_radius),
+          borderRadius: _borderRadius,
         ),
         child: Icon(icon, size: iconSize ?? 14, color: iconColor),
       ),

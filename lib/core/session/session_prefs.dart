@@ -9,24 +9,24 @@ class SessionPrefs {
   SessionPrefs._();
 
   // ── Keys ──────────────────────────────────────────────────────────────────
-  static const _kReviewVisible      = 'session.reviewVisible';
-  static const _kTerminalVisible    = 'session.terminalVisible';
-  static const _kWorkspaceWidth     = 'session.workspaceWidth';
-  static const _kEditorWidth        = 'session.editorWidth';
-  static const _kReviewWidth        = 'session.reviewWidth';
-  static const _kAgentsHeight       = 'session.agentsHeight';
-  static const _kEditorHeight       = 'session.editorHeight';
-  static const _kReviewHeight       = 'session.reviewHeight';
-  static const _kEditorFontSize     = 'session.editorFontSize';
-  static const _kTerminalFontSize   = 'session.terminalFontSize';
-  static const _kActiveTerminalIdx  = 'session.activeTerminalIndex';
-  static const _kActiveWorkspaceId  = 'session.activeWorkspaceId';
+  static const _kReviewVisible = 'session.reviewVisible';
+  static const _kTerminalVisible = 'session.terminalVisible';
+  static const _kWorkspaceWidth = 'session.workspaceWidth';
+  static const _kEditorWidth = 'session.editorWidth';
+  static const _kReviewWidth = 'session.reviewWidth';
+  static const _kAgentsHeight = 'session.agentsHeight';
+  static const _kEditorHeight = 'session.editorHeight';
+  static const _kReviewHeight = 'session.reviewHeight';
+  static const _kEditorFontSize = 'session.editorFontSize';
+  static const _kTerminalFontSize = 'session.terminalFontSize';
+  static const _kActiveTerminalIdx = 'session.activeTerminalIndex';
+  static const _kActiveWorkspaceId = 'session.activeWorkspaceId';
 
   // Panel visibility
   static const _kWorkspaceVis = 'panel.workspace.vis';
-  static const _kFileTreeVis  = 'panel.filetree.vis';
-  static const _kAgentsVis    = 'panel.agents.vis';
-  static const _kEditorVis    = 'panel.editor.vis';
+  static const _kFileTreeVis = 'panel.filetree.vis';
+  static const _kAgentsVis = 'panel.agents.vis';
+  static const _kEditorVis = 'panel.editor.vis';
 
   // First-launch / setup
   static const _kSetupCompleted = 'app.setupCompleted';
@@ -35,13 +35,13 @@ class SessionPrefs {
   static const _kCanvasMode = 'shell.canvasMode';
 
   // Updates
-  static const _kAutoUpdateCheck   = 'updates.autoCheck';
+  static const _kAutoUpdateCheck = 'updates.autoCheck';
   static const _kLastUpdateCheckMs = 'updates.lastCheckMs';
-  static const _kSkippedVersion    = 'updates.skippedVersion';
+  static const _kSkippedVersion = 'updates.skippedVersion';
 
   // Notifications / sounds
-  static const _kAgentSoundsEnabled    = 'notifications.agentSounds';
-  static const _kApprovalSoundEnabled  = 'notifications.approvalSound';
+  static const _kAgentSoundsEnabled = 'notifications.agentSounds';
+  static const _kApprovalSoundEnabled = 'notifications.approvalSound';
   static const _kCompletionSoundEnabled = 'notifications.completionSound';
 
   // Chat context injection
@@ -52,56 +52,130 @@ class SessionPrefs {
   static Future<SessionSnapshot> load() async {
     final p = await SharedPreferences.getInstance();
     return SessionSnapshot(
-      reviewVisible:      p.getBool(_kReviewVisible)      ?? true,
-      terminalVisible:    p.getBool(_kTerminalVisible)    ?? true,
-      workspaceWidth:     p.getDouble(_kWorkspaceWidth)   ?? 220.0,
-      editorWidth:        p.getDouble(_kEditorWidth)      ?? 480.0,
-      reviewWidth:        p.getDouble(_kReviewWidth)      ?? 260.0,
-      agentsHeight:       p.getDouble(_kAgentsHeight),
-      editorHeight:       p.getDouble(_kEditorHeight),
-      reviewHeight:       p.getDouble(_kReviewHeight),
-      editorFontSize:     p.getDouble(_kEditorFontSize)   ?? 13.0,
-      terminalFontSize:   p.getDouble(_kTerminalFontSize) ?? 13.0,
-      activeTerminalIdx:  p.getInt(_kActiveTerminalIdx)   ?? 0,
-      activeWorkspaceId:  p.getString(_kActiveWorkspaceId),
+      reviewVisible: p.getBool(_kReviewVisible) ?? true,
+      terminalVisible: p.getBool(_kTerminalVisible) ?? true,
+      workspaceWidth: p.getDouble(_kWorkspaceWidth) ?? 220.0,
+      editorWidth: p.getDouble(_kEditorWidth) ?? 480.0,
+      reviewWidth: p.getDouble(_kReviewWidth) ?? 260.0,
+      agentsHeight: p.getDouble(_kAgentsHeight),
+      editorHeight: p.getDouble(_kEditorHeight),
+      reviewHeight: p.getDouble(_kReviewHeight),
+      editorFontSize: p.getDouble(_kEditorFontSize) ?? 13.0,
+      terminalFontSize: p.getDouble(_kTerminalFontSize) ?? 13.0,
+      activeTerminalIdx: p.getInt(_kActiveTerminalIdx) ?? 0,
+      activeWorkspaceId: p.getString(_kActiveWorkspaceId),
       workspaceVis: panelVisibilityFromPrefs(p.getString(_kWorkspaceVis)),
-      fileTreeVis:  panelVisibilityFromPrefs(p.getString(_kFileTreeVis)),
-      agentsVis:    panelVisibilityFromPrefs(p.getString(_kAgentsVis)),
-      editorVis:    panelVisibilityFromPrefs(p.getString(_kEditorVis)),
-      canvasMode:   p.getString(_kCanvasMode) ?? 'board',
+      fileTreeVis: panelVisibilityFromPrefs(p.getString(_kFileTreeVis)),
+      agentsVis: panelVisibilityFromPrefs(p.getString(_kAgentsVis)),
+      editorVis: panelVisibilityFromPrefs(p.getString(_kEditorVis)),
+      canvasMode: p.getString(_kCanvasMode) ?? 'board',
     );
   }
 
+  // Font-size getters used by per-terminal / per-editor initState calls.
+  // Each terminal instance used to trigger a full 15-key load(); these
+  // cheap single-key getters are cached until the corresponding save.
+  static double? _cachedTerminalFontSize;
+  static double? _cachedEditorFontSize;
+
+  /// Cached terminal font size (default 13.0) for terminal initState.
+  static Future<double> loadTerminalFontSize() async =>
+      _cachedTerminalFontSize ??=
+          (await _p()).getDouble(_kTerminalFontSize) ?? 13.0;
+
+  /// Cached editor font size (default 13.0) for editor initState.
+  static Future<double> loadEditorFontSize() async => _cachedEditorFontSize ??=
+      (await _p()).getDouble(_kEditorFontSize) ?? 13.0;
+
   // ── Save helpers (individual fields for low-overhead writes) ─────────────
-  static Future<void> saveReviewVisible(bool v)        async => (await _p()).setBool(_kReviewVisible, v);
-  static Future<void> saveTerminalVisible(bool v)      async => (await _p()).setBool(_kTerminalVisible, v);
-  static Future<void> saveWorkspaceWidth(double v)     async => (await _p()).setDouble(_kWorkspaceWidth, v);
-  static Future<void> saveEditorWidth(double v)        async => (await _p()).setDouble(_kEditorWidth, v);
-  static Future<void> saveReviewWidth(double v)        async => (await _p()).setDouble(_kReviewWidth, v);
-  static Future<void> saveAgentsHeight(double? v)      async { final p = await _p(); v == null ? p.remove(_kAgentsHeight) : p.setDouble(_kAgentsHeight, v); }
-  static Future<void> saveEditorHeight(double? v)      async { final p = await _p(); v == null ? p.remove(_kEditorHeight) : p.setDouble(_kEditorHeight, v); }
-  static Future<void> saveReviewHeight(double? v)      async { final p = await _p(); v == null ? p.remove(_kReviewHeight) : p.setDouble(_kReviewHeight, v); }
-  static Future<void> saveEditorFontSize(double v)     async => (await _p()).setDouble(_kEditorFontSize, v);
-  static Future<void> saveTerminalFontSize(double v)   async => (await _p()).setDouble(_kTerminalFontSize, v);
-  static Future<void> saveActiveTerminalIdx(int v)     async => (await _p()).setInt(_kActiveTerminalIdx, v);
+  // Font-size writes invalidate the caches above.
+  static void _invalidate() {
+    _cachedTerminalFontSize = null;
+    _cachedEditorFontSize = null;
+  }
+
+  static Future<void> saveReviewVisible(bool v) async {
+    await (await _p()).setBool(_kReviewVisible, v);
+    _invalidate();
+  }
+
+  static Future<void> saveTerminalVisible(bool v) async {
+    await (await _p()).setBool(_kTerminalVisible, v);
+    _invalidate();
+  }
+
+  static Future<void> saveWorkspaceWidth(double v) async {
+    await (await _p()).setDouble(_kWorkspaceWidth, v);
+    _invalidate();
+  }
+
+  static Future<void> saveEditorWidth(double v) async {
+    await (await _p()).setDouble(_kEditorWidth, v);
+    _invalidate();
+  }
+
+  static Future<void> saveReviewWidth(double v) async {
+    await (await _p()).setDouble(_kReviewWidth, v);
+    _invalidate();
+  }
+
+  static Future<void> saveAgentsHeight(double? v) async {
+    final p = await _p();
+    v == null ? p.remove(_kAgentsHeight) : p.setDouble(_kAgentsHeight, v);
+    _invalidate();
+  }
+
+  static Future<void> saveEditorHeight(double? v) async {
+    final p = await _p();
+    v == null ? p.remove(_kEditorHeight) : p.setDouble(_kEditorHeight, v);
+    _invalidate();
+  }
+
+  static Future<void> saveReviewHeight(double? v) async {
+    final p = await _p();
+    v == null ? p.remove(_kReviewHeight) : p.setDouble(_kReviewHeight, v);
+    _invalidate();
+  }
+
+  static Future<void> saveEditorFontSize(double v) async {
+    await (await _p()).setDouble(_kEditorFontSize, v);
+    _invalidate();
+  }
+
+  static Future<void> saveTerminalFontSize(double v) async {
+    await (await _p()).setDouble(_kTerminalFontSize, v);
+    _invalidate();
+  }
+
+  static Future<void> saveActiveTerminalIdx(int v) async {
+    await (await _p()).setInt(_kActiveTerminalIdx, v);
+    _invalidate();
+  }
+
   static Future<void> saveActiveWorkspaceId(String? v) async {
     final p = await _p();
-    v == null ? p.remove(_kActiveWorkspaceId) : p.setString(_kActiveWorkspaceId, v);
+    v == null
+        ? p.remove(_kActiveWorkspaceId)
+        : p.setString(_kActiveWorkspaceId, v);
+    _invalidate();
   }
 
   static Future<void> savePanelVis(String panelId, PanelVisibility v) async {
     final key = switch (panelId) {
       'workspace' => _kWorkspaceVis,
-      'filetree'  => _kFileTreeVis,
-      'agents'    => _kAgentsVis,
-      'editor'    => _kEditorVis,
+      'filetree' => _kFileTreeVis,
+      'agents' => _kAgentsVis,
+      'editor' => _kEditorVis,
       _ => 'panel.$panelId.vis',
     };
-    (await _p()).setString(key, v.toPrefsString());
+    await (await _p()).setString(key, v.toPrefsString());
+    _invalidate();
   }
 
-  static Future<void> saveCanvasMode(String mode) async =>
-      (await _p()).setString(_kCanvasMode, mode);
+  static Future<void> saveCanvasMode(String mode) async {
+    await (await _p()).setString(_kCanvasMode, mode);
+    _invalidate();
+  }
 
   static Future<SharedPreferences> _p() => SharedPreferences.getInstance();
 
@@ -166,13 +240,19 @@ class SessionPrefs {
 
   // ── Editor tabs (per workspace) ───────────────────────────────────────────
 
-  static Future<void> saveEditorTabs(String workspaceId, List<String> paths, int activeIndex) async {
+  static Future<void> saveEditorTabs(
+    String workspaceId,
+    List<String> paths,
+    int activeIndex,
+  ) async {
     final p = await _p();
     await p.setStringList('editor.tabs.$workspaceId', paths);
     await p.setInt('editor.active.$workspaceId', activeIndex);
   }
 
-  static Future<({List<String> paths, int activeIndex})> loadEditorTabs(String workspaceId) async {
+  static Future<({List<String> paths, int activeIndex})> loadEditorTabs(
+    String workspaceId,
+  ) async {
     final p = await _p();
     final paths = p.getStringList('editor.tabs.$workspaceId') ?? [];
     final active = p.getInt('editor.active.$workspaceId') ?? 0;
@@ -191,7 +271,10 @@ class SessionPrefs {
 
   // ── File tree expanded paths (per workspace) ──────────────────────────────
 
-  static Future<void> saveExpandedPaths(String workspaceId, List<String> paths) async =>
+  static Future<void> saveExpandedPaths(
+    String workspaceId,
+    List<String> paths,
+  ) async =>
       (await _p()).setStringList('filetree.expanded.$workspaceId', paths);
 
   static Future<List<String>> loadExpandedPaths(String workspaceId) async =>
@@ -214,10 +297,10 @@ class SessionSnapshot {
     required this.activeTerminalIdx,
     this.activeWorkspaceId,
     this.workspaceVis = PanelVisibility.open,
-    this.fileTreeVis  = PanelVisibility.open,
-    this.agentsVis    = PanelVisibility.open,
-    this.editorVis    = PanelVisibility.open,
-    this.canvasMode   = 'board',
+    this.fileTreeVis = PanelVisibility.open,
+    this.agentsVis = PanelVisibility.open,
+    this.editorVis = PanelVisibility.open,
+    this.canvasMode = 'board',
   });
 
   final bool reviewVisible;
@@ -236,6 +319,7 @@ class SessionSnapshot {
   final PanelVisibility fileTreeVis;
   final PanelVisibility agentsVis;
   final PanelVisibility editorVis;
+
   /// Last canvas mode: 'panes' or 'board'. Legacy 'mindMap' may still exist in
   /// persisted prefs and is mapped to board by the shell.
   final String canvasMode;

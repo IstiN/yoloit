@@ -5,7 +5,7 @@ import 'package:js_widget_runtime/js_widget_runtime.dart';
 
 void main() {
   testWidgets('svg node renders full markup', (tester) async {
-    const renderer = JsonWidgetRenderer(onEvent: _noop);
+    final renderer = JsonWidgetRenderer(onEvent: _noop);
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
@@ -25,7 +25,7 @@ void main() {
   });
 
   testWidgets('svg node wraps bare path shorthand', (tester) async {
-    const renderer = JsonWidgetRenderer(onEvent: _noop);
+    final renderer = JsonWidgetRenderer(onEvent: _noop);
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(

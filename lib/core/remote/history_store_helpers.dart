@@ -5,17 +5,20 @@ import 'package:path/path.dart' as p;
 import 'package:yoloit/core/remote/yoloitd_models.dart';
 
 abstract final class HistoryStoreHelpers {
+  static final RegExp _unsafeSegmentChars = RegExp(r'[^a-zA-Z0-9._-]');
+
   static String safeSegment(String value) {
-    return value.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
+    return value.replaceAll(_unsafeSegmentChars, '_');
   }
 
   static String historyDirPath(String root, String boardId, DateTime timestamp) {
+    final utc = timestamp.toUtc();
     return p.join(
       root,
       safeSegment(boardId),
       'events',
-      timestamp.toUtc().year.toString().padLeft(4, '0'),
-      timestamp.toUtc().month.toString().padLeft(2, '0'),
+      utc.year.toString().padLeft(4, '0'),
+      utc.month.toString().padLeft(2, '0'),
     );
   }
 

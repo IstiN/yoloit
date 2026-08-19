@@ -966,9 +966,10 @@ class TerminalWidgetState extends State<TerminalWidget> {
     _attachSupportLogging(widget.session);
     if (widget.autoRequestFocus) _requestFocusAfterFrame();
     HardwareKeyboard.instance.addHandler(_handleHardwareKey);
-    // Load persisted font size
-    SessionPrefs.load().then((snap) {
-      if (mounted) setState(() => _fontSize = snap.terminalFontSize);
+    // Load persisted font size (cached getter — a full prefs load per
+    // terminal initState showed up in CPU profiling).
+    SessionPrefs.loadTerminalFontSize().then((size) {
+      if (mounted) setState(() => _fontSize = size);
     });
     // Restore scroll position after the first frame because xterm's
     // RenderTerminal defaults _stickToBottom=true and snaps to maxExtent

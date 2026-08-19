@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart' show visibleForTesting;
+import 'package:flutter/foundation.dart' show setEquals, visibleForTesting;
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:yaml/yaml.dart';
 import 'package:yoloit/core/cli/cli_text_argument_resolver.dart';
@@ -18,7 +18,6 @@ import 'package:yoloit/features/board/chat/cli_tools/panel_tools.dart';
 import 'package:yoloit/features/board/chat/cli_tools/run_tools.dart';
 import 'package:yoloit/features/board/chat/cli_tools/tool_helpers.dart';
 import 'package:yoloit/features/board/chat/cli_tools/ui_tools.dart';
-
 
 class YoloitCliTool {
   const YoloitCliTool({
@@ -48,10 +47,21 @@ class YoloitCliTool {
 
   static final _validFunctionName = RegExp(r'^[a-zA-Z0-9_]+$');
 
+  // Memoized name lookups keyed by tool identity — these getters sit on the
+  // hot path (millions of calls per session via tool normalization). An
+  // Expando keeps the constructor const while caching per instance.
+  static final Expando<String> _functionNameCache = Expando<String>();
+  static final Expando<String> _fullFunctionNameCache = Expando<String>();
+  static final Expando<List<String>> _allFunctionNamesCache =
+      Expando<List<String>>();
+
   List<String> get _allAliases =>
       alias != null ? <String>[alias!, ...aliases] : aliases;
 
-  String get functionName {
+  String get functionName =>
+      _functionNameCache[this] ??= _computeFunctionName();
+
+  String _computeFunctionName() {
     if (_allAliases.isNotEmpty) {
       final validAlias = _allAliases.firstWhere(
         (a) => _validFunctionName.hasMatch(a),
@@ -62,12 +72,11 @@ class YoloitCliTool {
     return fullFunctionName;
   }
 
-  String get fullFunctionName => YoloitCliToolCatalog.functionNameFor(command);
-  List<String> get allFunctionNames => <String>{
-      functionName,
-      fullFunctionName,
-      ..._allAliases,
-    }.toList();
+  String get fullFunctionName => _fullFunctionNameCache[this] ??=
+      YoloitCliToolCatalog.functionNameFor(command);
+
+  List<String> get allFunctionNames => _allFunctionNamesCache[this] ??=
+      <String>{functionName, fullFunctionName, ..._allAliases}.toList();
 
   /// Export for training catalog (help --format catalog).
   Map<String, Object?> toCatalogJson() {
@@ -77,45 +86,57 @@ class YoloitCliTool {
       'description': description,
       'aliases': _allAliases,
       'destructive': destructive,
-      'params':
-          params
-              .map(
-                (p) => {
-                  'name': p.key,
-                  'required': p.required,
-                  'description': p.description,
-                },
-              )
-              .toList(),
+      'params': params
+          .map(
+            (p) => {
+              'name': p.key,
+              'required': p.required,
+              'description': p.description,
+            },
+          )
+          .toList(),
       'human': humanVariants,
     };
   }
-
 
   /// OpenAI-compatible function definition for cloud providers.
   ///
   /// When [compact] is true (default), uses short tool aliases and param keys
   /// without per-field descriptions to reduce token usage.
+  ///
+  /// Memoized per (tool, compact): cloud providers re-request the full
+  /// definition list frequently and rebuilding ~67 JSON maps each time
+  /// showed up in CPU profiling.
+  static final Expando<Map<String, Object?>> _openAiDefCompactCache =
+      Expando<Map<String, Object?>>();
+  static final Expando<Map<String, Object?>> _openAiDefFullCache =
+      Expando<Map<String, Object?>>();
+
   Map<String, Object?> toOpenAiFunctionDefinition({bool compact = true}) {
+    final cache = compact ? _openAiDefCompactCache : _openAiDefFullCache;
+    return cache[this] ??= _buildOpenAiFunctionDefinition(compact: compact);
+  }
+
+  Map<String, Object?> _buildOpenAiFunctionDefinition({bool compact = true}) {
     final useCompact = compact;
     final properties = <String, Object?>{};
     final requiredKeys = <String>[];
     for (final param in params) {
       final propKey = useCompact ? param.compactKey : param.key;
-      properties[propKey] =
-          useCompact ? param.toCompactJsonSchema() : param.toJsonSchema();
+      properties[propKey] = useCompact
+          ? param.toCompactJsonSchema()
+          : param.toJsonSchema();
       if (param.required) requiredKeys.add(propKey);
     }
     if (destructive) {
       final confirmKey = useCompact ? 'cf' : 'confirm';
-      properties[confirmKey] =
-          useCompact
-              ? const <String, Object?>{'type': 'boolean'}
-              : const <String, Object?>{
-                'type': 'boolean',
-                'description':
-                    'Set true only after the user explicitly confirmed this destructive action.',
-              };
+      properties[confirmKey] = useCompact
+          ? const <String, Object?>{'type': 'boolean'}
+          : const <String, Object?>{
+              'type': 'boolean',
+              'description':
+                  'Set true only after the user explicitly confirmed this destructive action.',
+            };
       if (!useCompact) requiredKeys.add(confirmKey);
     }
     final schema = <String, Object?>{
@@ -124,12 +145,12 @@ class YoloitCliTool {
       if (!useCompact) 'additionalProperties': false,
       if (requiredKeys.isNotEmpty) 'required': requiredKeys,
     };
-    final name =
-        useCompact && _allAliases.isNotEmpty ? functionName : fullFunctionName;
-    final desc =
-        useCompact
-            ? description
-            : 'yoloit $command — $description.${destructive ? ' Ask for confirmation before using it.' : ''}';
+    final name = useCompact && _allAliases.isNotEmpty
+        ? functionName
+        : fullFunctionName;
+    final desc = useCompact
+        ? description
+        : 'yoloit $command — $description.${destructive ? ' Ask for confirmation before using it.' : ''}';
     return <String, Object?>{
       'type': 'function',
       'function': <String, Object?>{
@@ -148,36 +169,50 @@ class YoloitCliToolCatalog {
     _tools,
   );
 
+  /// Lazily-built name/command → tool index. Replaces the per-call linear
+  /// scan over all tools with map lookups (byFunctionName is called for every
+  /// tool normalization round-trip).
+  static Map<String, YoloitCliTool>? _byNameIndex;
+
+  static Map<String, YoloitCliTool> _buildIndex() {
+    final index = <String, YoloitCliTool>{};
+    void register(String key, YoloitCliTool tool) {
+      index.putIfAbsent(key, () => tool);
+    }
+
+    for (final tool in _tools) {
+      register(tool.functionName, tool);
+      register(tool.fullFunctionName, tool);
+      for (final a in tool._allAliases) {
+        register(a, tool);
+      }
+      // Command forms so bare names like `board_list` resolve to `board:list`.
+      register(tool.command, tool);
+      register(tool.command.replaceAll(':', '_'), tool);
+    }
+    return index;
+  }
 
   static YoloitCliTool? byFunctionName(String name) {
-    final resolvedName = _functionAliases[name] ?? name;
     if (name == 'get_tools' || name == 'list_tools') {
       return null;
     }
-    final rawCommand =
-        name.startsWith('yoloit ') ? name.substring('yoloit '.length) : name;
+    final index = _byNameIndex ??= _buildIndex();
+    final resolvedName = _functionAliases[name] ?? name;
+    final rawCommand = name.startsWith('yoloit ')
+        ? name.substring('yoloit '.length)
+        : name;
     final rawCommandWithColons = rawCommand.replaceAll('_', ':');
-    final resolvedCommand =
-        resolvedName.startsWith('yoloit ')
-            ? resolvedName.substring('yoloit '.length)
-            : resolvedName;
+    final resolvedCommand = resolvedName.startsWith('yoloit ')
+        ? resolvedName.substring('yoloit '.length)
+        : resolvedName;
     final resolvedCommandWithColons = resolvedCommand.replaceAll('_', ':');
-    for (final tool in _tools) {
-      final names = <String>{
-        tool.functionName,
-        tool.fullFunctionName,
-        ...tool._allAliases,
-      };
-      if (names.contains(resolvedName) ||
-          names.contains(name) ||
-          tool.command == rawCommand ||
-          tool.command == rawCommandWithColons ||
-          tool.command == resolvedCommand ||
-          tool.command == resolvedCommandWithColons) {
-        return tool;
-      }
-    }
-    return null;
+    return index[resolvedName] ??
+        index[name] ??
+        index[rawCommand] ??
+        index[rawCommandWithColons] ??
+        index[resolvedCommand] ??
+        index[resolvedCommandWithColons];
   }
 
   static const Map<String, String> _functionAliases = <String, String>{
@@ -185,14 +220,41 @@ class YoloitCliToolCatalog {
     'yoloit_board_details': 'yoloit_board',
   };
 
+  static final RegExp _sanitizePattern = RegExp(r'[^a-zA-Z0-9]+');
+
   static String functionNameFor(String command) {
-    final sanitized = command.replaceAll(RegExp(r'[^a-zA-Z0-9]+'), '_');
-    return 'yoloit_$sanitized';
+    return 'yoloit_${command.replaceAll(_sanitizePattern, '_')}';
   }
+
+  // Memoized per disabled-set — callers re-request the compact catalog
+  // frequently (e.g. router tool round-trips).
+  static Set<String>? _compactToolsDisabledKey;
+  static String? _compactToolsJsonCache;
 
   static String compactToolsJson({
     Set<String> disabledFunctionNames = const <String>{},
   }) {
+    if (disabledFunctionNames.isEmpty && _compactToolsJsonCache != null) {
+      return _compactToolsJsonCache!;
+    }
+    if (disabledFunctionNames.isNotEmpty &&
+        _compactToolsDisabledKey != null &&
+        setEquals(disabledFunctionNames, _compactToolsDisabledKey) &&
+        _compactToolsJsonCache != null) {
+      return _compactToolsJsonCache!;
+    }
+    final result = _buildCompactToolsJson(disabledFunctionNames);
+    if (disabledFunctionNames.isEmpty ||
+        setEquals(disabledFunctionNames, _compactToolsDisabledKey)) {
+      _compactToolsDisabledKey = disabledFunctionNames.isEmpty
+          ? null
+          : Set<String>.of(disabledFunctionNames);
+      _compactToolsJsonCache = result;
+    }
+    return result;
+  }
+
+  static String _buildCompactToolsJson(Set<String> disabledFunctionNames) {
     final disabled = normalizeFunctionNames(disabledFunctionNames);
     return jsonEncode(<String, Object?>{
       'tools': [
@@ -221,6 +283,23 @@ class YoloitCliToolCatalog {
     Iterable<String> disabledFunctionNames = const <String>{},
     bool compact = true,
   }) {
+    if (disabledFunctionNames.isEmpty) {
+      // Memoized unfiltered list — the common case (no disabled tools).
+      // Cached per compact flag; per-tool definitions are themselves
+      // memoized, but the outer list was rebuilt on every provider request.
+      final existing = compact ? _openAiDefsCompactMemo : _openAiDefsFullMemo;
+      if (existing != null) return existing;
+      final built = <Map<String, Object?>>[
+        for (final tool in _tools)
+          tool.toOpenAiFunctionDefinition(compact: compact),
+      ];
+      if (compact) {
+        _openAiDefsCompactMemo = built;
+      } else {
+        _openAiDefsFullMemo = built;
+      }
+      return built;
+    }
     final disabled = normalizeFunctionNames(disabledFunctionNames);
     return <Map<String, Object?>>[
       for (final tool in _tools)
@@ -229,6 +308,9 @@ class YoloitCliToolCatalog {
           tool.toOpenAiFunctionDefinition(compact: compact),
     ];
   }
+
+  static List<Map<String, Object?>>? _openAiDefsCompactMemo;
+  static List<Map<String, Object?>>? _openAiDefsFullMemo;
 
   static Set<String> normalizeFunctionNames(Iterable<String> values) {
     final out = <String>{};
@@ -380,6 +462,51 @@ class YoloitCliToolCatalog {
 
 class YoloitCliToolArgumentNormalizer {
   YoloitCliToolArgumentNormalizer._();
+
+  // Hoisted regexes for this class — inline RegExp construction on the
+  // per-call normalization path showed up in CPU profiling.
+  static final _reOpaquePanelId = RegExp(r'^p-\d+$');
+  static final _reNonAlnumLower = RegExp(r'[^a-z0-9]+');
+  static final _reSemicolonOrIConfirm = RegExp(
+    r';|,?\s+i confirm\b',
+    caseSensitive: false,
+  );
+  // Hoisted regexes — inline RegExp construction on the per-call hot path
+  // showed up in CPU profiling.
+  static final _reCodeFenceEnd = RegExp(r'\s*```$');
+  static final _reCodeFenceStart = RegExp(r'^```[a-zA-Z]*\s*');
+  static final _reDeleteArchiveBoard = RegExp(
+    r'(delete|archive|unarchive) board',
+  );
+  static final _reDeleteLink = RegExp(r'delete link');
+  static final _reDeletePanel = RegExp(r'delete panel');
+  static final _reDesktop = RegExp(r'\bdesktop\b|\bdesk\b|десктоп');
+  static final _reHeightWord = RegExp(
+    r'\bheight\b|высот',
+    caseSensitive: false,
+  );
+  static final _reHorizontalSpacing = RegExp(r'horizontal spacing|h spacing');
+  static final _reLarge = RegExp(r'\blarge\b|\blg\b|\bxl\b|больш');
+  static final _reListsWord = RegExp(r'\blists?\b');
+  static final _reMedium = RegExp(r'\bmedium\b|\bmd\b|средн');
+  static final _reMobile = RegExp(r'\bmobile\b|\bphone\b|мобил');
+  static final _reNoThink = RegExp(r'\s*/no_think\s*');
+  static final _reNumber = RegExp(r'-?\d+(?:\.\d+)?');
+  static final _rePanelNamed = RegExp(r'panel named|panel called|panel titled');
+  static final _reSizePair = RegExp(r'(\d{2,4})\s*[xх×]\s*(\d{2,4})');
+  static final _reSmall = RegExp(r'\bsmall\b|\bsm\b|маленьк');
+  static final _reSpisk = RegExp(r'списк');
+  static final _reSpiskOrChecklistItem = RegExp(r'списк|checklist item');
+  static final _reTablet = RegExp(r'\btablet\b|\btab\b|планшет');
+  static final _reThink = RegExp(r'\s*/think\s*');
+  static final _reVerticalSpacing = RegExp(r'vertical spacing|v spacing');
+  static final _reWidthWord = RegExp(
+    r'\bwidth\b|ширин|широк',
+    caseSensitive: false,
+  );
+  static final _reZoomOrTo = RegExp(r'\bzoom\b|\bto\b');
+  static final _reXWord = RegExp(r'\bx\b');
+  static final _reYWord = RegExp(r'\by\b');
 
   static String normalizeFunctionName({
     required String functionName,
@@ -706,11 +833,10 @@ class YoloitCliToolArgumentNormalizer {
     if (text.contains('мой список') || text.contains('my list')) {
       return 'Мой список';
     }
-    if (text.contains('пример') && RegExp(r'списк').hasMatch(text)) {
+    if (text.contains('пример') && _reSpisk.hasMatch(text)) {
       return 'Пример списка';
     }
-    if (RegExp(r'списк|checklist item').hasMatch(text) ||
-        RegExp(r'\blists?\b').hasMatch(text)) {
+    if (_reSpiskOrChecklistItem.hasMatch(text) || _reListsWord.hasMatch(text)) {
       return 'Список';
     }
     if (text.contains('карточк') || text.contains('card')) return 'Карточка';
@@ -782,7 +908,7 @@ class YoloitCliToolArgumentNormalizer {
     String userMessage,
   ) {
     if (command == 'board:zoom' && _isMissing(normalized['scale'])) {
-      final scale = _firstNumberAfter(userMessage, RegExp(r'\bzoom\b|\bto\b'));
+      final scale = _firstNumberAfter(userMessage, _reZoomOrTo);
       if (scale != null) normalized['scale'] = scale;
     }
   }
@@ -805,13 +931,13 @@ class YoloitCliToolArgumentNormalizer {
       normalized,
       userMessage,
       'h_spacing',
-      RegExp(r'horizontal spacing|h spacing'),
+      _reHorizontalSpacing,
     );
     _fillNumberFromLabel(
       normalized,
       userMessage,
       'v_spacing',
-      RegExp(r'vertical spacing|v spacing'),
+      _reVerticalSpacing,
     );
   }
 
@@ -821,8 +947,8 @@ class YoloitCliToolArgumentNormalizer {
     String userMessage,
   ) {
     if (command != 'board:translate') return;
-    _fillNumberFromLabel(normalized, userMessage, 'x', RegExp(r'\bx\b'));
-    _fillNumberFromLabel(normalized, userMessage, 'y', RegExp(r'\by\b'));
+    _fillNumberFromLabel(normalized, userMessage, 'x', _reXWord);
+    _fillNumberFromLabel(normalized, userMessage, 'y', _reYWord);
   }
 
   static void _normalizeBoardTargetArguments(
@@ -834,10 +960,7 @@ class YoloitCliToolArgumentNormalizer {
             command == 'board:archive' ||
             command == 'board:unarchive') &&
         _isMissing(normalized['id_or_name'])) {
-      final boardName = _extractNamedTarget(
-        userMessage,
-        RegExp(r'(delete|archive|unarchive) board'),
-      );
+      final boardName = _extractNamedTarget(userMessage, _reDeleteArchiveBoard);
       if (boardName != null) normalized['id_or_name'] = boardName;
     }
   }
@@ -848,8 +971,8 @@ class YoloitCliToolArgumentNormalizer {
     String userMessage,
   ) {
     if (command == 'panel:move') {
-      _fillNumberFromLabel(normalized, userMessage, 'x', RegExp(r'\bx\b'));
-      _fillNumberFromLabel(normalized, userMessage, 'y', RegExp(r'\by\b'));
+      _fillNumberFromLabel(normalized, userMessage, 'x', _reXWord);
+      _fillNumberFromLabel(normalized, userMessage, 'y', _reYWord);
     }
     if (command == 'panel:resize') {
       _normalizePanelResizeArguments(normalized, userMessage);
@@ -864,18 +987,8 @@ class YoloitCliToolArgumentNormalizer {
   ) {
     _applyResizeDimensions(normalized, _extractResizePreset(userMessage));
     _applyResizeDimensions(normalized, _extractSizePair(userMessage));
-    _fillNumberFromLabel(
-      normalized,
-      userMessage,
-      'width',
-      RegExp(r'\bwidth\b|ширин|широк', caseSensitive: false),
-    );
-    _fillNumberFromLabel(
-      normalized,
-      userMessage,
-      'height',
-      RegExp(r'\bheight\b|высот', caseSensitive: false),
-    );
+    _fillNumberFromLabel(normalized, userMessage, 'width', _reWidthWord);
+    _fillNumberFromLabel(normalized, userMessage, 'height', _reHeightWord);
     _applyResizeIntentDefault(normalized, userMessage);
   }
 
@@ -892,13 +1005,14 @@ class YoloitCliToolArgumentNormalizer {
     Map<String, Object?> normalized,
     String userMessage,
   ) {
-    if ((_isMissing(normalized['width']) ||
-            _isMissing(normalized['height'])) &&
+    if ((_isMissing(normalized['width']) || _isMissing(normalized['height'])) &&
         _mentionsResizeIntent(userMessage)) {
-      normalized['width'] =
-          _isMissing(normalized['width']) ? 500 : normalized['width'];
-      normalized['height'] =
-          _isMissing(normalized['height']) ? 400 : normalized['height'];
+      normalized['width'] = _isMissing(normalized['width'])
+          ? 500
+          : normalized['width'];
+      normalized['height'] = _isMissing(normalized['height'])
+          ? 400
+          : normalized['height'];
     }
   }
 
@@ -912,7 +1026,8 @@ class YoloitCliToolArgumentNormalizer {
       if (title != null) normalized['title'] = title;
     }
     if (command == 'ui:create' && _isMissing(normalized['title'])) {
-      final title = _extractTitle(userMessage) ?? _inferUiPanelTitle(userMessage);
+      final title =
+          _extractTitle(userMessage) ?? _inferUiPanelTitle(userMessage);
       if (title != null) normalized['title'] = title;
     }
     if (command == 'ui:render' || command == 'ui:get' || command == 'ui:edit') {
@@ -937,14 +1052,10 @@ class YoloitCliToolArgumentNormalizer {
       normalized.remove('id_or_name');
     }
     if (command == 'panel:focus' || command == 'panel:show') {
-      _fillNamedPanelTarget(
-        normalized,
-        userMessage,
-        RegExp(r'panel named|panel called|panel titled'),
-      );
+      _fillNamedPanelTarget(normalized, userMessage, _rePanelNamed);
     }
     if (command == 'panel:delete') {
-      _fillNamedPanelTarget(normalized, userMessage, RegExp(r'delete panel'));
+      _fillNamedPanelTarget(normalized, userMessage, _reDeletePanel);
     }
   }
 
@@ -966,7 +1077,7 @@ class YoloitCliToolArgumentNormalizer {
     String userMessage,
   ) {
     if (command == 'link:delete' && _isMissing(normalized['link_id'])) {
-      final linkId = _extractNamedTarget(userMessage, RegExp(r'delete link'));
+      final linkId = _extractNamedTarget(userMessage, _reDeleteLink);
       if (linkId != null) normalized['link_id'] = linkId;
     }
   }
@@ -1003,10 +1114,7 @@ class YoloitCliToolArgumentNormalizer {
     if (boardId != null &&
         boardId.isNotEmpty &&
         (_mentionsCurrentBoard(userMessage) ||
-            _looselySameIdentifier(
-              normalized['id_or_name'],
-              'current board',
-            ) ||
+            _looselySameIdentifier(normalized['id_or_name'], 'current board') ||
             _looselySameIdentifier(normalized['board'], 'current board'))) {
       normalized['id_or_name'] = boardId;
     }
@@ -1048,10 +1156,7 @@ class YoloitCliToolArgumentNormalizer {
     final targetsCurrentChatPanel =
         currentPanelValue.isEmpty ||
         _looselySameIdentifier(currentPanelValue, panelId) ||
-        _looselySameIdentifier(
-          currentPanelValue,
-          runtimeContext.panelTitle,
-        ) ||
+        _looselySameIdentifier(currentPanelValue, runtimeContext.panelTitle) ||
         _isChatPanelId(currentPanelValue);
     if (targetsCurrentChatPanel) {
       if (query != null && query.isNotEmpty) {
@@ -1233,11 +1338,10 @@ class YoloitCliToolArgumentNormalizer {
     for (final key in args.keys.toList()) {
       final v = args[key];
       if (v is String) {
-        args[key] =
-            v
-                .replaceAll(RegExp(r'\s*/no_think\s*'), '')
-                .replaceAll(RegExp(r'\s*/think\s*'), '')
-                .trim();
+        args[key] = v
+            .replaceAll(_reNoThink, '')
+            .replaceAll(_reThink, '')
+            .trim();
       }
     }
   }
@@ -1245,8 +1349,8 @@ class YoloitCliToolArgumentNormalizer {
   static String _stripMarkdownFence(String value) {
     var text = value.trim();
     if (!text.startsWith('```')) return text;
-    text = text.replaceFirst(RegExp(r'^```[a-zA-Z]*\s*'), '');
-    text = text.replaceFirst(RegExp(r'\s*```$'), '');
+    text = text.replaceFirst(_reCodeFenceStart, '');
+    text = text.replaceFirst(_reCodeFenceEnd, '');
     return text.trim();
   }
 
@@ -1279,20 +1383,21 @@ class YoloitCliToolArgumentNormalizer {
 
   static num? _numberAfterLabel(String userMessage, RegExp label) {
     final match = label.firstMatch(userMessage.toLowerCase());
-    final source =
-        match == null ? userMessage : userMessage.substring(match.end);
+    final source = match == null
+        ? userMessage
+        : userMessage.substring(match.end);
     return _parseNumber(source);
   }
 
   static num? _parseNumber(String source) {
-    final match = RegExp(r'-?\d+(?:\.\d+)?').firstMatch(source);
+    final match = _reNumber.firstMatch(source);
     if (match == null) return null;
     final value = match.group(0)!;
     return value.contains('.') ? double.parse(value) : int.parse(value);
   }
 
   static (num, num)? _extractSizePair(String source) {
-    final match = RegExp(r'(\d{2,4})\s*[xх×]\s*(\d{2,4})').firstMatch(source);
+    final match = _reSizePair.firstMatch(source);
     if (match == null) return null;
     final width = int.tryParse(match.group(1) ?? '');
     final height = int.tryParse(match.group(2) ?? '');
@@ -1311,18 +1416,18 @@ class YoloitCliToolArgumentNormalizer {
 
   static (num, num)? _extractResizePreset(String userMessage) {
     final text = userMessage.toLowerCase();
-    if (RegExp(r'\bsmall\b|\bsm\b|маленьк').hasMatch(text)) return (420, 300);
-    if (RegExp(r'\bmedium\b|\bmd\b|средн').hasMatch(text)) return (720, 480);
-    if (RegExp(r'\bdesktop\b|\bdesk\b|десктоп').hasMatch(text)) {
+    if (_reSmall.hasMatch(text)) return (420, 300);
+    if (_reMedium.hasMatch(text)) return (720, 480);
+    if (_reDesktop.hasMatch(text)) {
       return (1200, 800);
     }
-    if (RegExp(r'\blarge\b|\blg\b|\bxl\b|больш').hasMatch(text)) {
+    if (_reLarge.hasMatch(text)) {
       return (1400, 900);
     }
-    if (RegExp(r'\bmobile\b|\bphone\b|мобил').hasMatch(text)) {
+    if (_reMobile.hasMatch(text)) {
       return (390, 844);
     }
-    if (RegExp(r'\btablet\b|\btab\b|планшет').hasMatch(text)) {
+    if (_reTablet.hasMatch(text)) {
       return (768, 1024);
     }
     return null;
@@ -1332,11 +1437,7 @@ class YoloitCliToolArgumentNormalizer {
     final match = phrase.firstMatch(userMessage.toLowerCase());
     if (match == null) return null;
     final raw = userMessage.substring(match.end);
-    final beforeConfirm =
-        raw
-            .split(RegExp(r';|,?\s+i confirm\b', caseSensitive: false))
-            .first
-            .trim();
+    final beforeConfirm = raw.split(_reSemicolonOrIConfirm).first.trim();
     return beforeConfirm.isEmpty ? null : beforeConfirm;
   }
 
@@ -1359,20 +1460,16 @@ class YoloitCliToolArgumentNormalizer {
   static String? _extractNamedTarget(String userMessage, RegExp phrase) {
     final raw = _extractAfterPhrase(userMessage, phrase);
     if (raw == null) return null;
-    final cleaned =
-        raw
-            .replaceFirst(
-              RegExp(r'\s+on (this|the current) board$', caseSensitive: false),
-              '',
-            )
-            .replaceFirst(
-              RegExp(
-                r'\s+from (this|the current) board$',
-                caseSensitive: false,
-              ),
-              '',
-            )
-            .trim();
+    final cleaned = raw
+        .replaceFirst(
+          RegExp(r'\s+on (this|the current) board$', caseSensitive: false),
+          '',
+        )
+        .replaceFirst(
+          RegExp(r'\s+from (this|the current) board$', caseSensitive: false),
+          '',
+        )
+        .trim();
     return cleaned.isEmpty ? null : cleaned;
   }
 
@@ -1412,7 +1509,7 @@ class YoloitCliToolArgumentNormalizer {
   }
 
   static bool _looksLikeOpaquePanelId(String value) =>
-      RegExp(r'^p-\d+$').hasMatch(value.trim());
+      _reOpaquePanelId.hasMatch(value.trim());
 
   static bool _mentionsCurrentBoard(String userMessage) {
     final text = userMessage.toLowerCase();
@@ -1424,7 +1521,7 @@ class YoloitCliToolArgumentNormalizer {
   static bool _looselySameIdentifier(Object? first, String? second) {
     if (first == null || second == null) return false;
     String normalize(String value) =>
-        value.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '');
+        value.toLowerCase().replaceAll(_reNonAlnumLower, '');
     return normalize('$first') == normalize(second);
   }
 }
@@ -1443,4 +1540,3 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
   ...fileTools,
   ...linkTools,
 ];
-

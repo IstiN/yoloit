@@ -51,7 +51,9 @@ class ThemeManager extends ChangeNotifier {
     );
   }
 
-  ThemeData get theme {
+  ThemeData get theme => _themeCache ??= _buildTheme();
+
+  ThemeData _buildTheme() {
     var scheme = baseScheme;
     final bright = _activeCustomThemeId != null
         ? (_customThemes
@@ -66,6 +68,11 @@ class ThemeManager extends ChangeNotifier {
     }
     return AppTheme.buildThemeFromScheme(scheme, brightness: bright);
   }
+
+  /// Invalidates the memoized [theme] — must be called whenever any input
+  /// to the scheme changes (preset, brightness, custom theme, overrides).
+  void _invalidateTheme() => _themeCache = null;
+  ThemeData? _themeCache;
 
   AppColorScheme _applyOverrides(AppColorScheme scheme) {
     return scheme.copyWith(
@@ -126,6 +133,7 @@ class ThemeManager extends ChangeNotifier {
     _loadColorOverrides(prefs);
     AppColors.setAccent(_current.color);
     await _loadCustomThemes();
+    _invalidateTheme();
     notifyListeners();
   }
 
@@ -136,6 +144,7 @@ class ThemeManager extends ChangeNotifier {
       _brightness = preset.defaultBrightness!;
     }
     AppColors.setAccent(preset.color);
+    _invalidateTheme();
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('theme_preset', preset.name);
@@ -155,6 +164,7 @@ class ThemeManager extends ChangeNotifier {
     _activeCustomThemeId = id;
     _brightness = custom.brightness;
     AppColors.setAccent(custom.scheme.primary);
+    _invalidateTheme();
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('custom_theme_id', id);
@@ -166,6 +176,7 @@ class ThemeManager extends ChangeNotifier {
 
   Future<void> setBrightness(Brightness brightness) async {
     _brightness = brightness;
+    _invalidateTheme();
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
@@ -242,6 +253,7 @@ class ThemeManager extends ChangeNotifier {
         }
       }
     }
+    _invalidateTheme();
     notifyListeners();
     await _saveColorOverrides();
   }
@@ -255,6 +267,7 @@ class ThemeManager extends ChangeNotifier {
         _colorOverrides.remove(d);
       }
     }
+    _invalidateTheme();
     notifyListeners();
     await _saveColorOverrides();
   }
@@ -262,6 +275,7 @@ class ThemeManager extends ChangeNotifier {
   /// Clears all color overrides, reverting to the base preset/custom theme.
   Future<void> clearColorOverrides() async {
     _colorOverrides.clear();
+    _invalidateTheme();
     notifyListeners();
     await _saveColorOverrides();
   }
@@ -455,6 +469,7 @@ class ThemeManager extends ChangeNotifier {
     _customThemes.add(custom);
     _activeCustomThemeId = custom.id;
     _colorOverrides.clear();
+    _invalidateTheme();
     notifyListeners();
     await _saveColorOverrides();
     final prefs = await SharedPreferences.getInstance();

@@ -102,49 +102,15 @@ class YoloitdServer with ServerProcessMixin {
     final method = request.method.toUpperCase();
 
     try {
-      final response = await _dispatch(method, path, <_RouteEntry>[
-        _RouteEntry(null, const <String?>[], _handleDashboard),
-        _RouteEntry(null, const <String?>['api'], _handleApiInfo),
-        _RouteEntry(null, const <String?>['api', 'health'], _handleHealth),
-        _RouteEntry(
-          null,
-          const <String?>['api', 'boards'],
-          () => _handleBoards(request, method, path.skip(2).toList()),
-          prefix: true,
-        ),
-        _RouteEntry(
-          null,
-          const <String?>['api', 'files'],
-          () => _handleFiles(request, method, path.skip(2).toList()),
-          prefix: true,
-        ),
-        _RouteEntry(
-          null,
-          const <String?>['api', 'runs'],
-          () => _handleRuns(request, method, path.skip(2).toList()),
-          prefix: true,
-        ),
-        _RouteEntry(
-          null,
-          const <String?>['api', 'setup'],
-          () => _handleSetup(request, method, path.skip(2).toList()),
-          prefix: true,
-        ),
-        _RouteEntry(
-          null,
-          const <String?>['api', 'terminals'],
-          () => _handleTerminals(request, method, path.skip(2).toList()),
-          prefix: true,
-        ),
-        _RouteEntry(
-          null,
-          const <String?>['api', 'templates'],
-          () => _handleTemplates(request, method, path.skip(2).toList()),
-          prefix: true,
-        ),
-      ]);
+      // Static route table — this list (entries + per-route closures) was
+      // allocated on every HTTP request.
+      final routes = _routesFor(this, request, method, path);
+      final response = await _dispatch(method, path, routes);
       if (response != null) return response;
-      return jsonResponse(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
+      return jsonResponse(<String, Object?>{
+        'ok': false,
+        'error': 'not found',
+      }, 404);
     } catch (error, stackTrace) {
       stderr.writeln('[yoloitd] $error\n$stackTrace');
       return jsonResponse(<String, Object?>{
@@ -152,6 +118,55 @@ class YoloitdServer with ServerProcessMixin {
         'error': error.toString(),
       }, 500);
     }
+  }
+
+  static List<_RouteEntry> _routesFor(
+    YoloitdServer server,
+    shelf.Request request,
+    String method,
+    List<String> path,
+  ) {
+    return <_RouteEntry>[
+      _RouteEntry(null, const <String?>[], server._handleDashboard),
+      _RouteEntry(null, const <String?>['api'], server._handleApiInfo),
+      _RouteEntry(null, const <String?>['api', 'health'], server._handleHealth),
+      _RouteEntry(
+        null,
+        const <String?>['api', 'boards'],
+        () => server._handleBoards(request, method, path.skip(2).toList()),
+        prefix: true,
+      ),
+      _RouteEntry(
+        null,
+        const <String?>['api', 'files'],
+        () => server._handleFiles(request, method, path.skip(2).toList()),
+        prefix: true,
+      ),
+      _RouteEntry(
+        null,
+        const <String?>['api', 'runs'],
+        () => server._handleRuns(request, method, path.skip(2).toList()),
+        prefix: true,
+      ),
+      _RouteEntry(
+        null,
+        const <String?>['api', 'setup'],
+        () => server._handleSetup(request, method, path.skip(2).toList()),
+        prefix: true,
+      ),
+      _RouteEntry(
+        null,
+        const <String?>['api', 'terminals'],
+        () => server._handleTerminals(request, method, path.skip(2).toList()),
+        prefix: true,
+      ),
+      _RouteEntry(
+        null,
+        const <String?>['api', 'templates'],
+        () => server._handleTemplates(request, method, path.skip(2).toList()),
+        prefix: true,
+      ),
+    ];
   }
 
   Future<shelf.Response> _handleDashboard() async =>
@@ -195,85 +210,75 @@ class YoloitdServer with ServerProcessMixin {
     final response = await _dispatch(method, sub, <_RouteEntry>[
       _RouteEntry('GET', const <String?>[null], () => _getBoard(board)),
       _RouteEntry('DELETE', const <String?>[null], () => _deleteBoard(board)),
-      _RouteEntry(
-        'POST',
-        const <String?>[null, 'archive'],
-        () => _archiveBoard(board),
-      ),
-      _RouteEntry(
-        'POST',
-        const <String?>[null, 'unarchive'],
-        () => _unarchiveBoard(board),
-      ),
-      _RouteEntry(
-        'PUT',
-        const <String?>[null],
-        () => _updateBoard(request, board),
-      ),
+      _RouteEntry('POST', const <String?>[
+        null,
+        'archive',
+      ], () => _archiveBoard(board)),
+      _RouteEntry('POST', const <String?>[
+        null,
+        'unarchive',
+      ], () => _unarchiveBoard(board)),
+      _RouteEntry('PUT', const <String?>[
+        null,
+      ], () => _updateBoard(request, board)),
       _RouteEntry(
         'GET',
         const <String?>[null],
         () => _boardHistory(board),
         when: () => request.url.path.endsWith('/history'),
       ),
-      _RouteEntry(
-        'GET',
-        const <String?>[null, 'history'],
-        () => _boardHistory(board),
-      ),
-      _RouteEntry(
-        'POST',
-        const <String?>[null, 'undo'],
-        () => _undoBoard(board),
-      ),
-      _RouteEntry(
-        'POST',
-        const <String?>[null, 'redo'],
-        () => _redoBoard(board),
-      ),
-      _RouteEntry(
-        'GET',
-        const <String?>[null, 'panel-types'],
-        _boardPanelTypes,
-      ),
-      _RouteEntry(
-        'GET',
-        const <String?>[null, 'snapshot'],
-        () => _boardSnapshot(board),
-      ),
+      _RouteEntry('GET', const <String?>[
+        null,
+        'history',
+      ], () => _boardHistory(board)),
+      _RouteEntry('POST', const <String?>[
+        null,
+        'undo',
+      ], () => _undoBoard(board)),
+      _RouteEntry('POST', const <String?>[
+        null,
+        'redo',
+      ], () => _redoBoard(board)),
+      _RouteEntry('GET', const <String?>[
+        null,
+        'panel-types',
+      ], _boardPanelTypes),
+      _RouteEntry('GET', const <String?>[
+        null,
+        'snapshot',
+      ], () => _boardSnapshot(board)),
       // The lock route must precede the `panels` prefix route below, or it is
       // shadowed and unreachable.
-      _RouteEntry(
+      _RouteEntry(null, const <String?>[
         null,
-        const <String?>[null, 'panels', null, 'lock'],
-        () => _handlePanelLock(request, method, board, sub),
-      ),
+        'panels',
+        null,
+        'lock',
+      ], () => _handlePanelLock(request, method, board, sub)),
       _RouteEntry(
         null,
         const <String?>[null, 'panels'],
         () => _handlePanels(request, method, board, sub.skip(2).toList()),
         prefix: true,
       ),
-      _RouteEntry(
-        'GET',
-        const <String?>[null, 'links'],
-        () => _listLinks(board),
-      ),
-      _RouteEntry(
-        'POST',
-        const <String?>[null, 'links'],
-        () => _createLink(request, board),
-      ),
-      _RouteEntry(
-        'DELETE',
-        const <String?>[null, 'links', null],
-        () => _deleteLink(board, sub),
-      ),
-      _RouteEntry(
-        'PUT',
-        const <String?>[null, 'links', null],
-        () => _updateLink(request, board, sub),
-      ),
+      _RouteEntry('GET', const <String?>[
+        null,
+        'links',
+      ], () => _listLinks(board)),
+      _RouteEntry('POST', const <String?>[
+        null,
+        'links',
+      ], () => _createLink(request, board)),
+      _RouteEntry('DELETE', const <String?>[
+        null,
+        'links',
+        null,
+      ], () => _deleteLink(board, sub)),
+      _RouteEntry('PUT', const <String?>[
+        null,
+        'links',
+        null,
+      ], () => _updateLink(request, board, sub)),
       _RouteEntry(
         null,
         const <String?>[null, 'groups'],
@@ -282,34 +287,33 @@ class YoloitdServer with ServerProcessMixin {
       ),
     ]);
     if (response != null) return response;
-    return jsonResponse(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
+    return jsonResponse(<String, Object?>{
+      'ok': false,
+      'error': 'not found',
+    }, 404);
   }
 
   Future<shelf.Response> _listBoards(shelf.Request request) async {
     final boards = await store.loadBoards();
     final activeId = await store.activeBoardId();
     final includeArchived =
-        request.url.queryParameters['includeArchived']?.toLowerCase() ==
-        'true';
+        request.url.queryParameters['includeArchived']?.toLowerCase() == 'true';
     return jsonResponse(<String, Object?>{
-      'boards':
-          boards
-              .where(
-                (board) =>
-                    includeArchived ||
-                    (board.metadata['archived'] as bool? ?? false) == false,
-              )
-              .map((board) => board.summary(active: board.id == activeId))
-              .toList(),
+      'boards': boards
+          .where(
+            (board) =>
+                includeArchived ||
+                (board.metadata['archived'] as bool? ?? false) == false,
+          )
+          .map((board) => board.summary(active: board.id == activeId))
+          .toList(),
     });
   }
 
   Future<shelf.Response> _createBoard(shelf.Request request) async {
     final body = await readJsonBody(request);
     final name = (body['name'] as String? ?? 'Remote Board').trim();
-    final board = await store.createBoard(
-      name.isEmpty ? 'Remote Board' : name,
-    );
+    final board = await store.createBoard(name.isEmpty ? 'Remote Board' : name);
     return jsonResponse(<String, Object?>{
       'ok': true,
       'board': board.summary(active: true),
@@ -373,9 +377,8 @@ class YoloitdServer with ServerProcessMixin {
     final result = await store.updateBoard(
       board.id,
       (current) => _updatedBoardFromBody(current, body),
-      historyEvent:
-          (before, after, revision) =>
-              _snapshotPanelHistoryEvent(before, after, revision),
+      historyEvent: (before, after, revision) =>
+          _snapshotPanelHistoryEvent(before, after, revision),
     );
     return jsonResponse(<String, Object?>{
       'ok': true,
@@ -385,10 +388,9 @@ class YoloitdServer with ServerProcessMixin {
 
   Future<shelf.Response> _boardHistory(RemoteBoard board) async {
     return jsonResponse(<String, Object?>{
-      'events':
-          (await store.historyForBoard(
-            board.id,
-          )).map((e) => e.toJson()).toList(),
+      'events': (await store.historyForBoard(
+        board.id,
+      )).map((e) => e.toJson()).toList(),
     });
   }
 
@@ -399,10 +401,9 @@ class YoloitdServer with ServerProcessMixin {
       'ok': undone,
       'undone': undone,
       'redoDepth': store.redoDepthForBoard(board.id),
-      'message':
-          undone
-              ? 'Undid latest panel change'
-              : 'No restorable panel history yet',
+      'message': undone
+          ? 'Undid latest panel change'
+          : 'No restorable panel history yet',
       if (updated != null) 'board': updated.summary(active: true),
     });
   }
@@ -414,10 +415,9 @@ class YoloitdServer with ServerProcessMixin {
       'ok': redone,
       'redone': redone,
       'redoDepth': store.redoDepthForBoard(board.id),
-      'message':
-          redone
-              ? 'Redid latest undone panel change'
-              : 'No redoable panel history yet',
+      'message': redone
+          ? 'Redid latest undone panel change'
+          : 'No redoable panel history yet',
       if (updated != null) 'board': updated.summary(active: true),
     });
   }
@@ -467,15 +467,17 @@ class YoloitdServer with ServerProcessMixin {
     };
     final result = await store.updateBoard(
       board.id,
-      (current) => current.copyWith(links: <Map<String, dynamic>>[...current.links, link]),
+      (current) => current.copyWith(
+        links: <Map<String, dynamic>>[...current.links, link],
+      ),
     );
-    return jsonResponse(<String, Object?>{
-      'ok': result != null,
-      'link': link,
-    });
+    return jsonResponse(<String, Object?>{'ok': result != null, 'link': link});
   }
 
-  Future<shelf.Response> _deleteLink(RemoteBoard board, List<String> sub) async {
+  Future<shelf.Response> _deleteLink(
+    RemoteBoard board,
+    List<String> sub,
+  ) async {
     final linkId = Uri.decodeComponent(sub[2]);
     final result = await store.updateBoard(
       board.id,
@@ -520,17 +522,17 @@ class YoloitdServer with ServerProcessMixin {
     final panelId = Uri.decodeComponent(sub[2]);
     final panel = _findPanel(board, panelId);
     if (panel == null) {
-      return jsonResponse(
-        <String, Object?>{'ok': false, 'error': 'panel not found'},
-        404,
-      );
+      return jsonResponse(<String, Object?>{
+        'ok': false,
+        'error': 'panel not found',
+      }, 404);
     }
     if (method == 'PUT') return _putPanelLock(request, board, panelId);
     if (method == 'DELETE') return _deletePanelLock(board, panelId);
-    return jsonResponse(
-      <String, Object?>{'ok': false, 'error': 'method not allowed'},
-      405,
-    );
+    return jsonResponse(<String, Object?>{
+      'ok': false,
+      'error': 'method not allowed',
+    }, 405);
   }
 
   Future<shelf.Response> _putPanelLock(
@@ -542,10 +544,10 @@ class YoloitdServer with ServerProcessMixin {
     final actorId = (body['actorId'] as String? ?? '').trim();
     final ttlSec = (body['ttlSec'] as num?)?.toInt() ?? 60;
     if (actorId.isEmpty) {
-      return jsonResponse(
-        <String, Object?>{'ok': false, 'error': 'actorId required'},
-        400,
-      );
+      return jsonResponse(<String, Object?>{
+        'ok': false,
+        'error': 'actorId required',
+      }, 400);
     }
     final now = DateTime.now().toUtc().millisecondsSinceEpoch;
     final existing = (board.metadata['panelLocks'] as Map?)?[panelId];
@@ -555,14 +557,11 @@ class YoloitdServer with ServerProcessMixin {
       if (existingActor != actorId &&
           existingExpires is int &&
           existingExpires > now) {
-        return jsonResponse(
-          <String, Object?>{
-            'ok': false,
-            'error': 'panel locked by another actor',
-            'actorId': existingActor,
-          },
-          409,
-        );
+        return jsonResponse(<String, Object?>{
+          'ok': false,
+          'error': 'panel locked by another actor',
+          'actorId': existingActor,
+        }, 409);
       }
     }
     final expires = now + ttlSec * 1000;
@@ -570,9 +569,11 @@ class YoloitdServer with ServerProcessMixin {
       board.id,
       (current) => _withPanelLock(current, panelId, actorId, expires),
     );
-    return jsonResponse(
-      <String, Object?>{'ok': true, 'panelId': panelId, 'actorId': actorId},
-    );
+    return jsonResponse(<String, Object?>{
+      'ok': true,
+      'panelId': panelId,
+      'actorId': actorId,
+    });
   }
 
   Future<shelf.Response> _deletePanelLock(
@@ -592,10 +593,9 @@ class YoloitdServer with ServerProcessMixin {
     String actorId,
     int expiresAt,
   ) {
-    final locks =
-        board.metadata['panelLocks'] is Map
-            ? Map<String, dynamic>.from(board.metadata['panelLocks'] as Map)
-            : <String, dynamic>{};
+    final locks = board.metadata['panelLocks'] is Map
+        ? Map<String, dynamic>.from(board.metadata['panelLocks'] as Map)
+        : <String, dynamic>{};
     locks[panelId] = {'actorId': actorId, 'expiresAt': expiresAt};
     return board.copyWith(
       metadata: <String, dynamic>{...board.metadata, 'panelLocks': locks},
@@ -603,10 +603,9 @@ class YoloitdServer with ServerProcessMixin {
   }
 
   static RemoteBoard _withoutPanelLock(RemoteBoard board, String panelId) {
-    final locks =
-        board.metadata['panelLocks'] is Map
-            ? Map<String, dynamic>.from(board.metadata['panelLocks'] as Map)
-            : <String, dynamic>{};
+    final locks = board.metadata['panelLocks'] is Map
+        ? Map<String, dynamic>.from(board.metadata['panelLocks'] as Map)
+        : <String, dynamic>{};
     if (!locks.containsKey(panelId)) return board;
     final next = Map<String, dynamic>.from(locks)..remove(panelId);
     return board.copyWith(
@@ -638,7 +637,10 @@ class YoloitdServer with ServerProcessMixin {
         'error': 'Template not found',
       }, 404);
     }
-    return jsonResponse(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
+    return jsonResponse(<String, Object?>{
+      'ok': false,
+      'error': 'not found',
+    }, 404);
   }
 
   Future<shelf.Response> _handleFiles(
@@ -660,16 +662,15 @@ class YoloitdServer with ServerProcessMixin {
       requested == null || requested.isEmpty ? _defaultFileRoot() : requested,
     );
     final dirEntries = await listDirectoryEntries(directory);
-    final entries =
-        dirEntries
-            .map(
-              (e) => <String, Object?>{
-                'name': e.name,
-                'path': e.path,
-                'isDirectory': e.isDirectory,
-              },
-            )
-            .toList();
+    final entries = dirEntries
+        .map(
+          (e) => <String, Object?>{
+            'name': e.name,
+            'path': e.path,
+            'isDirectory': e.isDirectory,
+          },
+        )
+        .toList();
 
     return buildFileListingResponse(
       directory: directory,
@@ -680,11 +681,10 @@ class YoloitdServer with ServerProcessMixin {
 
   List<Map<String, Object?>> _fileRoots() {
     return buildUniqueRoots({
-      'Home': homePath(),
-      'YoLoIT data': store.rootDir.path,
-      'Current': Directory.current.path,
-    })
-        .entries
+          'Home': homePath(),
+          'YoLoIT data': store.rootDir.path,
+          'Current': Directory.current.path,
+        }).entries
         .map(
           (e) => <String, Object?>{
             'name': e.key,
@@ -718,10 +718,9 @@ class YoloitdServer with ServerProcessMixin {
     RemoteBoard current,
     Map<String, dynamic> body,
   ) {
-    var metadata =
-        body['metadata'] is Map
-            ? Map<String, dynamic>.from(body['metadata'] as Map)
-            : current.metadata;
+    var metadata = body['metadata'] is Map
+        ? Map<String, dynamic>.from(body['metadata'] as Map)
+        : current.metadata;
     if (body.containsKey('defaultFolder')) {
       metadata = <String, dynamic>{
         ...metadata,
@@ -731,30 +730,27 @@ class YoloitdServer with ServerProcessMixin {
     return current.copyWith(
       name: body['name'] as String? ?? current.name,
       viewport: current.viewport,
-      panels:
-          body['panels'] is List
-              ? (body['panels'] as List)
-                  .whereType<Map<Object?, Object?>>()
-                  .map(
-                    (entry) =>
-                        RemotePanel.fromJson(Map<String, dynamic>.from(entry)),
-                  )
-                  .toList()
-              : current.panels,
-      links:
-          body['links'] is List
-              ? (body['links'] as List)
-                  .whereType<Map<Object?, Object?>>()
-                  .map((entry) => Map<String, dynamic>.from(entry))
-                  .toList()
-              : current.links,
-      drawings:
-          body['drawings'] is List
-              ? (body['drawings'] as List)
-                  .whereType<Map<Object?, Object?>>()
-                  .map((entry) => Map<String, dynamic>.from(entry))
-                  .toList()
-              : current.drawings,
+      panels: body['panels'] is List
+          ? (body['panels'] as List)
+                .whereType<Map<Object?, Object?>>()
+                .map(
+                  (entry) =>
+                      RemotePanel.fromJson(Map<String, dynamic>.from(entry)),
+                )
+                .toList()
+          : current.panels,
+      links: body['links'] is List
+          ? (body['links'] as List)
+                .whereType<Map<Object?, Object?>>()
+                .map((entry) => Map<String, dynamic>.from(entry))
+                .toList()
+          : current.links,
+      drawings: body['drawings'] is List
+          ? (body['drawings'] as List)
+                .whereType<Map<Object?, Object?>>()
+                .map((entry) => Map<String, dynamic>.from(entry))
+                .toList()
+          : current.drawings,
       metadata: metadata,
     );
   }
@@ -865,24 +861,22 @@ class YoloitdServer with ServerProcessMixin {
     }
     final response = await _dispatch(method, sub, <_RouteEntry>[
       _RouteEntry('GET', const <String?>[null], () => _getPanel(panel)),
-      _RouteEntry(
-        'DELETE',
-        const <String?>[null],
-        () => _deletePanel(board, panel),
-      ),
-      _RouteEntry(
-        'PUT',
-        const <String?>[null],
-        () => _updatePanel(request, board, panel),
-      ),
-      _RouteEntry(
-        'POST',
-        const <String?>[null, 'action'],
-        () => _panelAction(request, board, panel),
-      ),
+      _RouteEntry('DELETE', const <String?>[
+        null,
+      ], () => _deletePanel(board, panel)),
+      _RouteEntry('PUT', const <String?>[
+        null,
+      ], () => _updatePanel(request, board, panel)),
+      _RouteEntry('POST', const <String?>[
+        null,
+        'action',
+      ], () => _panelAction(request, board, panel)),
     ]);
     if (response != null) return response;
-    return jsonResponse(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
+    return jsonResponse(<String, Object?>{
+      'ok': false,
+      'error': 'not found',
+    }, 404);
   }
 
   Future<shelf.Response> _listPanels(RemoteBoard board) async {
@@ -958,10 +952,9 @@ class YoloitdServer with ServerProcessMixin {
         pinned: body['pinned'] as bool?,
         zIndex: (body['zIndex'] as num?)?.toInt(),
         color: _parseColorValue(body['color']),
-        state:
-            body['state'] is Map
-                ? Map<String, dynamic>.from(body['state'] as Map)
-                : current.state,
+        state: body['state'] is Map
+            ? Map<String, dynamic>.from(body['state'] as Map)
+            : current.state,
       ),
     );
     return jsonResponse(<String, Object?>{
@@ -987,10 +980,7 @@ class YoloitdServer with ServerProcessMixin {
         'content': result.data.isEmpty ? panel.state : result.data,
       });
     }
-    final nextState = <String, dynamic>{
-      ...panel.state,
-      ...result.stateUpdate,
-    };
+    final nextState = <String, dynamic>{...panel.state, ...result.stateUpdate};
     final updated = await store.updatePanel(
       board.id,
       panel.id,
@@ -1018,7 +1008,10 @@ class YoloitdServer with ServerProcessMixin {
     if (topLevel != null) return topLevel;
 
     if (sub.isEmpty) {
-      return jsonResponse(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
+      return jsonResponse(<String, Object?>{
+        'ok': false,
+        'error': 'not found',
+      }, 404);
     }
 
     final groupId = Uri.decodeComponent(sub[0]);
@@ -1031,34 +1024,30 @@ class YoloitdServer with ServerProcessMixin {
     }
 
     final response = await _dispatch(method, sub, <_RouteEntry>[
-      _RouteEntry(
-        'DELETE',
-        const <String?>[null],
-        () => _deleteGroup(board, groups, index),
-      ),
-      _RouteEntry(
-        'PUT',
-        const <String?>[null],
-        () => _updateGroup(request, board, groups, index),
-      ),
-      _RouteEntry(
-        'POST',
-        const <String?>[null, 'panels'],
-        () => _addGroupPanels(request, board, groups, index),
-      ),
-      _RouteEntry(
-        'DELETE',
-        const <String?>[null, 'panels'],
-        () => _removeGroupPanels(request, board, groups, index),
-      ),
-      _RouteEntry(
-        'POST',
-        const <String?>[null, 'move'],
-        () => _moveGroup(request, board, groups, index),
-      ),
+      _RouteEntry('DELETE', const <String?>[
+        null,
+      ], () => _deleteGroup(board, groups, index)),
+      _RouteEntry('PUT', const <String?>[
+        null,
+      ], () => _updateGroup(request, board, groups, index)),
+      _RouteEntry('POST', const <String?>[
+        null,
+        'panels',
+      ], () => _addGroupPanels(request, board, groups, index)),
+      _RouteEntry('DELETE', const <String?>[
+        null,
+        'panels',
+      ], () => _removeGroupPanels(request, board, groups, index)),
+      _RouteEntry('POST', const <String?>[
+        null,
+        'move',
+      ], () => _moveGroup(request, board, groups, index)),
     ]);
     if (response != null) return response;
-    return jsonResponse(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
+    return jsonResponse(<String, Object?>{
+      'ok': false,
+      'error': 'not found',
+    }, 404);
   }
 
   Future<shelf.Response> _listGroups(List<Map<String, dynamic>> groups) async {
@@ -1110,7 +1099,10 @@ class YoloitdServer with ServerProcessMixin {
         metadata: <String, dynamic>{...current.metadata, 'groups': groups},
       ),
     );
-    return jsonResponse(<String, Object?>{'ok': true, 'message': 'Group deleted'});
+    return jsonResponse(<String, Object?>{
+      'ok': true,
+      'message': 'Group deleted',
+    });
   }
 
   Future<shelf.Response> _updateGroup(
@@ -1173,9 +1165,9 @@ class YoloitdServer with ServerProcessMixin {
     final body = await readJsonBody(request);
     final ids = _parsePanelIds(board, body['panels']);
     final group = Map<String, dynamic>.from(groups[index]);
-    group['panelIds'] = _stringList(group['panelIds'])
-        .where((String id) => !ids.contains(id))
-        .toList();
+    group['panelIds'] = _stringList(
+      group['panelIds'],
+    ).where((String id) => !ids.contains(id)).toList();
     groups[index] = group;
     await store.updateBoard(
       board.id,
@@ -1214,15 +1206,19 @@ class YoloitdServer with ServerProcessMixin {
         }).toList(),
       ),
     );
-    return jsonResponse(<String, Object?>{'ok': true, 'message': 'Group moved'});
+    return jsonResponse(<String, Object?>{
+      'ok': true,
+      'message': 'Group moved',
+    });
   }
 
   List<Map<String, dynamic>> _boardGroups(RemoteBoard board) {
     final raw = board.metadata['groups'];
     if (raw is List) {
-      return raw.whereType<Map<Object?, Object?>>().map(
-        (entry) => Map<String, dynamic>.from(entry),
-      ).toList();
+      return raw
+          .whereType<Map<Object?, Object?>>()
+          .map((entry) => Map<String, dynamic>.from(entry))
+          .toList();
     }
     return <Map<String, dynamic>>[];
   }
@@ -1230,14 +1226,17 @@ class YoloitdServer with ServerProcessMixin {
   List<String> _parsePanelIds(RemoteBoard board, dynamic value) {
     List<String> rawIds() {
       if (value is String) {
-        return value.split(',').map((part) => part.trim()).where(
-          (part) => part.isNotEmpty,
-        ).toList();
+        return value
+            .split(',')
+            .map((part) => part.trim())
+            .where((part) => part.isNotEmpty)
+            .toList();
       }
       if (value is List) {
-        return value.map((entry) => entry.toString().trim()).where(
-          (part) => part.isNotEmpty,
-        ).toList();
+        return value
+            .map((entry) => entry.toString().trim())
+            .where((part) => part.isNotEmpty)
+            .toList();
       }
       return const <String>[];
     }
@@ -1260,14 +1259,17 @@ class YoloitdServer with ServerProcessMixin {
 
   List<String> _stringList(dynamic value) {
     if (value is List) {
-      return value.map((entry) => entry.toString().trim()).where(
-        (part) => part.isNotEmpty,
-      ).toList();
+      return value
+          .map((entry) => entry.toString().trim())
+          .where((part) => part.isNotEmpty)
+          .toList();
     }
     if (value is String) {
-      return value.split(',').map((part) => part.trim()).where(
-        (part) => part.isNotEmpty,
-      ).toList();
+      return value
+          .split(',')
+          .map((part) => part.trim())
+          .where((part) => part.isNotEmpty)
+          .toList();
     }
     return const <String>[];
   }
@@ -1281,33 +1283,35 @@ class YoloitdServer with ServerProcessMixin {
       _RouteEntry('GET', const <String?>[], _listRuns),
       _RouteEntry('POST', const <String?>[], () => _startRun(request)),
       _RouteEntry('GET', const <String?>[null, 'log'], () => _runLog(sub[0])),
-      _RouteEntry('POST', const <String?>[null, 'stop'], () => _stopRun(sub[0])),
+      _RouteEntry('POST', const <String?>[
+        null,
+        'stop',
+      ], () => _stopRun(sub[0])),
     ]);
     if (response != null) return response;
-    return jsonResponse(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
+    return jsonResponse(<String, Object?>{
+      'ok': false,
+      'error': 'not found',
+    }, 404);
   }
 
   Future<shelf.Response> _listRuns() async {
-    final ids =
-        <String>{
-            ...runs.keys,
-            ...runExitCodes.keys,
-            ...runLogs.keys,
-          }.toList()
-          ..sort();
+    final ids = <String>{
+      ...runs.keys,
+      ...runExitCodes.keys,
+      ...runLogs.keys,
+    }.toList()..sort();
     return jsonResponse(<String, Object?>{
-      'runs':
-          ids
-              .map(
-                (id) => <String, Object?>{
-                  'id': id,
-                  'running':
-                      runs.containsKey(id) || activeTaskRuns.contains(id),
-                  if (runExitCodes.containsKey(id)) 'exitCode': runExitCodes[id],
-                  'logLines': runLogs[id]?.length ?? 0,
-                },
-              )
-              .toList(),
+      'runs': ids
+          .map(
+            (id) => <String, Object?>{
+              'id': id,
+              'running': runs.containsKey(id) || activeTaskRuns.contains(id),
+              if (runExitCodes.containsKey(id)) 'exitCode': runExitCodes[id],
+              'logLines': runLogs[id]?.length ?? 0,
+            },
+          )
+          .toList(),
     });
   }
 
@@ -1329,9 +1333,11 @@ class YoloitdServer with ServerProcessMixin {
     runs[id] = process;
     runLogs[id] = <String>[];
     unawaited(collectRun(id, process));
-    return jsonResponse(
-      <String, Object?>{'ok': true, 'id': id, 'pid': process.pid},
-    );
+    return jsonResponse(<String, Object?>{
+      'ok': true,
+      'id': id,
+      'pid': process.pid,
+    });
   }
 
   Future<shelf.Response> _runLog(String runId) async {
@@ -1357,12 +1363,8 @@ class YoloitdServer with ServerProcessMixin {
       method: method,
       sub: sub,
       nextId: () => _nextId('setup'),
-      startTasks: (id, specialIds, script) => runSetupInstallTasks(
-        id,
-        specialIds,
-        script,
-        store.rootDir.path,
-      ),
+      startTasks: (id, specialIds, script) =>
+          runSetupInstallTasks(id, specialIds, script, store.rootDir.path),
     );
   }
 
@@ -1393,8 +1395,9 @@ class YoloitdServer with ServerProcessMixin {
   bool _authorized(shelf.Request request) => isAuthorized(request, token);
 
   static RemotePanel? _findPanel(RemoteBoard board, String idOrTitle) {
-    final byId =
-        board.panels.where((panel) => panel.id == idOrTitle).firstOrNull;
+    final byId = board.panels
+        .where((panel) => panel.id == idOrTitle)
+        .firstOrNull;
     if (byId != null) return byId;
     return board.panels
         .where((panel) => panel.title.toLowerCase() == idOrTitle.toLowerCase())
@@ -1441,12 +1444,11 @@ class YoloitdServer with ServerProcessMixin {
   }
 
   static String _snapshot(RemoteBoard board) {
-    final buffer =
-        StringBuffer()
-          ..writeln('# ${board.name}')
-          ..writeln()
-          ..writeln('| Panel | Type | Position | Size |')
-          ..writeln('|-------|------|----------|------|');
+    final buffer = StringBuffer()
+      ..writeln('# ${board.name}')
+      ..writeln()
+      ..writeln('| Panel | Type | Position | Size |')
+      ..writeln('|-------|------|----------|------|');
     for (final panel in board.panels) {
       buffer.writeln(
         '| ${panel.title} | ${panel.type} | ${panel.bounds.x},${panel.bounds.y} | ${panel.bounds.width}x${panel.bounds.height} |',

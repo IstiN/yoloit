@@ -17,6 +17,9 @@ class CalendarEventStorage {
 
   static const _baseDir = 'calendar_events';
 
+  // Hoisted encoder — was allocated per save call.
+  static const JsonEncoder _prettyEncoder = JsonEncoder.withIndent('  ');
+
   String _filePath(String panelId) {
     final safeId = HistoryStoreHelpers.safeSegment(panelId);
     return '$_baseDir/$safeId.json';
@@ -46,15 +49,12 @@ class CalendarEventStorage {
     final payload = events.map((e) => e.toJson()).toList();
     await FileStorageAdapter.instance.writeString(
       path,
-      const JsonEncoder.withIndent('  ').convert(payload),
+      _prettyEncoder.convert(payload),
     );
   }
 
   /// Adds or updates a single event.
-  Future<CalendarEvent> upsertEvent(
-    String panelId,
-    CalendarEvent event,
-  ) async {
+  Future<CalendarEvent> upsertEvent(String panelId, CalendarEvent event) async {
     final events = await loadEvents(panelId);
     final index = events.indexWhere((e) => e.id == event.id);
     final List<CalendarEvent> updated;

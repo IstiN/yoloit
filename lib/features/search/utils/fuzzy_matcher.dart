@@ -31,13 +31,25 @@ class FuzzyMatcher {
 
   /// Converts a string typed with a Russian keyboard layout to its Latin equivalent.
   /// e.g. "ЗкщзукенКуфвук" → "PropertyReader"
-  static String transliterateRu(String text) =>
-      text.split('').map((c) => _rusToEng[c] ?? c).join();
+  static String transliterateRu(String text) {
+    final buffer = StringBuffer();
+    for (final rune in text.runes) {
+      final c = String.fromCharCode(rune);
+      buffer.write(_rusToEng[c] ?? c);
+    }
+    return buffer.toString();
+  }
 
   /// Converts a string typed with an English keyboard layout to its Russian
   /// equivalent. e.g. "ghbdtn" → "привет".
-  static String transliterateEng(String text) =>
-      text.split('').map((c) => _engToRus[c] ?? c).join();
+  static String transliterateEng(String text) {
+    final buffer = StringBuffer();
+    for (final rune in text.runes) {
+      final c = String.fromCharCode(rune);
+      buffer.write(_engToRus[c] ?? c);
+    }
+    return buffer.toString();
+  }
 
   /// Returns true if the string contains any Cyrillic characters.
   static bool isCyrillic(String text) =>
@@ -83,8 +95,11 @@ class FuzzyMatcher {
   ///   "PropertyReaderConfluenceAuthTest.java" (9/36 = 0.25 → +250)
   static int? score(String text, String query) {
     if (query.isEmpty) return null;
-    final t = text.toLowerCase();
-    final q = query.toLowerCase();
+    // Skip re-lowercasing when callers already pass lowercase (quick-open
+    // and file search pre-normalize); toLowerCase allocates on every call
+    // and this runs once per candidate file per keystroke.
+    final t = _isLowerCase(text) ? text : text.toLowerCase();
+    final q = _isLowerCase(query) ? query : query.toLowerCase();
 
     // Density: fraction of the filename covered by the query (0–1000 bonus).
     final densityBonus = (q.length / t.length * 1000).round().clamp(0, 1000);
@@ -96,6 +111,15 @@ class FuzzyMatcher {
     final subScore = _subsequenceScore(t, q);
     if (subScore != null) return 1000 + densityBonus + subScore;
     return null;
+  }
+
+  static bool _isLowerCase(String s) {
+    for (var i = 0; i < s.length; i++) {
+      final c = s.codeUnitAt(i);
+      if (c >= 0x41 && c <= 0x5A) return false; // A-Z
+      if (c >= 0xC0 && c <= 0xDE && c != 0xD7) return false; // À-Þ
+    }
+    return true;
   }
 
   /// Best score across all [queries]. Returns null when nothing matches.

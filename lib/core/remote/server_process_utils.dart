@@ -9,7 +9,8 @@ import 'package:yoloit/core/setup/setup_catalog.dart';
 
 Future<Map<String, dynamic>> readJsonBody(shelf.Request request) async {
   final text = await request.readAsString();
-  if (text.trim().isEmpty) return <String, dynamic>{};
+  // isEmpty check without allocating a trimmed copy.
+  if (text.isEmpty || text.trim().isEmpty) return <String, dynamic>{};
   final decoded = jsonDecode(text);
   if (decoded is Map) return Map<String, dynamic>.from(decoded);
   return <String, dynamic>{};

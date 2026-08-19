@@ -1057,25 +1057,32 @@ class LocalLlmProvider extends ChatProvider {
     );
   }
 
+  // Manifest classification memo — the lowercase/id.contains chain ran
+  // several times per request (router/orchestrator/compact checks overlap).
+  static final Expando<String> _manifestIdLowerCache = Expando<String>();
+
+  String _manifestIdLower(flm.LocalModelManifest manifest) =>
+      _manifestIdLowerCache[manifest] ??= manifest.id.toLowerCase();
+
   bool _isRouterModel(flm.LocalModelManifest manifest) =>
-      manifest.id.toLowerCase().contains('router');
+      _manifestIdLower(manifest).contains('router');
 
   /// Models that support agentic multi-step tool calling loops.
   bool _isOrchestratorModel(flm.LocalModelManifest manifest) {
-    final id = manifest.id.toLowerCase();
+    final id = _manifestIdLower(manifest);
     return id.contains('gemma4') || id.contains('gemma-4');
   }
 
   bool _usesCompactRoutingPrompt(flm.LocalModelManifest manifest) {
-    final id = manifest.id.toLowerCase();
+    final id = _manifestIdLower(manifest);
     return _isRouterModel(manifest) ||
         _isOrchestratorModel(manifest) ||
         id == 'qwen3-0.6b-4bit';
   }
 
   bool _shouldDisableThinking(flm.LocalModelManifest manifest) {
-    final id = manifest.id.toLowerCase();
-    return _usesCompactRoutingPrompt(manifest) || id.contains('qwen3');
+    return _usesCompactRoutingPrompt(manifest) ||
+        _manifestIdLower(manifest).contains('qwen3');
   }
 
   int? _intDefault(Map<String, Object?> defaults, String key) {

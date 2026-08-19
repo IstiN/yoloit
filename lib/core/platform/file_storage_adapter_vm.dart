@@ -14,9 +14,12 @@ class VmFileStorageAdapter implements FileStorageAdapter {
   Directory _dir(String path) => Directory(path);
 
   Future<void> _ensureParent(String path) async {
-    final parent = _file(path).parent;
-    if (!await parent.exists()) {
-      await parent.create(recursive: true);
+    // create(recursive: true) is a no-op when the directory already exists —
+    // the previous exists() check added a stat round-trip on every write.
+    try {
+      await _file(path).parent.create(recursive: true);
+    } on FileSystemException {
+      // Already exists or race with another writer — both fine.
     }
   }
 

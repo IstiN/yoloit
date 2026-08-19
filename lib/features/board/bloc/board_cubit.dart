@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yoloit/core/remote/panel_history_undo.dart';
 import 'package:yoloit/core/remote/yoloit_remote_client.dart';
 import 'package:yoloit/core/utils/clipboard_utils.dart';
+import 'package:yoloit/features/board/bloc/board_remote_diff.dart';
 import 'package:yoloit/features/board/bloc/board_state.dart';
 import 'package:yoloit/features/board/events/board_event_bus.dart';
 import 'package:yoloit/features/board/history/board_history_event.dart';
@@ -27,7 +28,6 @@ import 'package:yoloit/features/board/utils/board_grid_layout.dart';
 import 'package:yoloit/features/calendar/data/calendar_event_storage.dart';
 import 'package:yoloit/features/settings/data/agent_config_service.dart';
 import 'package:yoloit/features/settings/data/provider_model_catalog_service.dart';
-
 
 part 'board_cubit_panel_history.dart';
 part 'board_cubit_locks.dart';
@@ -1156,7 +1156,7 @@ class BoardCubit extends Cubit<BoardState> {
           nextGroups = _removePanelFromAllGroups(nextGroups, panelId);
         }
         final group = BoardPanelGroup(
-          id: _nextId('group'),
+          id: boardNextId('group'),
           name: name.trim().isEmpty ? 'Group' : name.trim(),
           color: color,
           panelIds: panelIds,
@@ -1631,7 +1631,7 @@ class BoardCubit extends Cubit<BoardState> {
       preferredHeight: 220,
     );
     final panel = BoardPanelInstance(
-      id: _nextId('panel'),
+      id: boardNextId('panel'),
       type: 'board.note.markdown',
       title: title.trim().isEmpty ? 'Note' : title.trim(),
       bounds: bounds,
@@ -1691,7 +1691,7 @@ class BoardCubit extends Cubit<BoardState> {
       panelState['messages'] = messages;
     }
     final panel = BoardPanelInstance(
-      id: _nextId('panel'),
+      id: boardNextId('panel'),
       type: kChatPluginTypeId,
       title: title?.trim().isNotEmpty == true ? title!.trim() : 'AI Chat',
       bounds: bounds,
@@ -1729,7 +1729,7 @@ class BoardCubit extends Cubit<BoardState> {
       envGroupIds: envGroupIds,
     );
     final panel = BoardPanelInstance(
-      id: _nextId('panel'),
+      id: boardNextId('panel'),
       type: kTerminalPluginTypeId,
       title:
           title?.trim().isNotEmpty == true
@@ -1773,7 +1773,7 @@ class BoardCubit extends Cubit<BoardState> {
       preferredHeight: size.height,
     );
     final panel = BoardPanelInstance(
-      id: _nextId('panel'),
+      id: boardNextId('panel'),
       type: typeId,
       title:
           title?.trim().isNotEmpty == true ? title!.trim() : plugin.displayName,
@@ -1904,7 +1904,7 @@ class BoardCubit extends Cubit<BoardState> {
     final copiedPanels = rawPanels.map((raw) {
       final json = Map<String, dynamic>.from(raw as Map);
       final oldId = json['id'] as String;
-      final newId = _nextId('panel');
+      final newId = boardNextId('panel');
       idMap[oldId] = newId;
       final bounds = BoardPanelBounds.fromJson(
         Map<String, dynamic>.from(json['bounds'] as Map),
@@ -1929,7 +1929,7 @@ class BoardCubit extends Cubit<BoardState> {
       if (newFrom == null || newTo == null) return null;
       return BoardPanelLink.fromJson({
         ...json,
-        'id': _nextId('link'),
+        'id': boardNextId('link'),
         'fromPanelId': newFrom,
         'toPanelId': newTo,
       });
@@ -2344,7 +2344,7 @@ class BoardCubit extends Cubit<BoardState> {
     String? restoresOpId,
   }) {
     return BoardHistoryEvent(
-      opId: _nextId('op'),
+      opId: boardNextId('op'),
       boardId: boardId,
       type: type,
       entityType: entityType,
@@ -2497,15 +2497,14 @@ class BoardCubit extends Cubit<BoardState> {
     await _persist(boards: boards, activeBoardId: activeBoardId);
     if (!_suppressRemoteSync) {
       // Fast path: skip remote diff entirely if no remote boards exist.
-      final hasRemote = boards.any((b) => remoteInfoForBoard(b) != null);
-      if (hasRemote) {
-        final changedRemoteBoards = _changedRemoteBoards(
+      if (boards.any((b) => remoteInfoForBoard(b) != null)) {
+        final changed = changedRemoteBoards(
           previousBoards: previousBoards,
           nextBoards: boards,
         );
-        if (changedRemoteBoards.isNotEmpty) {
+        if (changed.isNotEmpty) {
           _scheduleRemoteSync(
-            changedRemoteBoards,
+            changed,
             currentBoards: boards,
             activeBoardId: activeBoardId,
           );
@@ -2515,21 +2514,6 @@ class BoardCubit extends Cubit<BoardState> {
     _startRemoteRefreshTimer();
   }
 
-  List<BoardDocument> _changedRemoteBoards({
-    required List<BoardDocument> previousBoards,
-    required List<BoardDocument> nextBoards,
-  }) {
-    final previousById = {for (final board in previousBoards) board.id: board};
-    return nextBoards
-        .where((board) {
-          if (remoteInfoForBoard(board) == null) return false;
-          final previous = previousById[board.id];
-          if (previous == null) return false;
-          return jsonEncode(boardToRemoteJson(previous)) !=
-              jsonEncode(boardToRemoteJson(board));
-        })
-        .toList(growable: false);
-  }
 
   void _scheduleRemoteSync(
     List<BoardDocument> boards, {
@@ -2672,7 +2656,7 @@ class BoardCubit extends Cubit<BoardState> {
 
   BoardDocument _buildDefaultBoard({required String name}) {
     return BoardDocument(
-      id: _nextId('board'),
+      id: boardNextId('board'),
       name: name,
       metadata: const {'version': 1},
     );
@@ -2721,8 +2705,6 @@ class BoardCubit extends Cubit<BoardState> {
     return 'Board $index';
   }
 
-  String _nextId(String prefix) =>
-      '$prefix-${DateTime.now().microsecondsSinceEpoch}';
 
   /// Public API for external widgets (e.g. [BoardPanelLayer]) that need to
   /// place a new panel without duplicating the search logic.

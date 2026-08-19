@@ -435,8 +435,7 @@ class _PanelCatalogCategoryButtonState extends State<PanelCatalogCategoryButton>
     super.dispose();
   }
 
-  bool _hasItems(BuildContext context) =>
-      _itemsFor(context, widget.category).isNotEmpty;
+  bool _hasItems(BuildContext context) => _hasAnyItems();
 
   void _insertOverlay() {
     if (_overlayEntry != null) return;
@@ -462,7 +461,7 @@ class _PanelCatalogCategoryButtonState extends State<PanelCatalogCategoryButton>
     final screenHeight = MediaQuery.sizeOf(context).height;
     final maxMenuHeight = screenHeight - margin * 2;
     final rawHeight =
-        _itemsFor(context, widget.category).length * 52.0 + 12.0;
+        _estimatedItemCount() * 52.0 + 12.0;
     final menuHeight = rawHeight > maxMenuHeight ? maxMenuHeight : rawHeight;
     final overflow = top + menuHeight + margin - screenHeight;
     if (overflow <= 0) return 0;
@@ -772,6 +771,125 @@ class _PanelCatalogCategoryButtonState extends State<PanelCatalogCategoryButton>
       platform: widget.platform,
       remote: isRemoteBoard(widget.board),
     );
+  }
+
+  /// Type ids considered by each category, in display order. Used for the
+  /// cheap availability probe below — building the full item widget list just
+  /// to check `isNotEmpty` showed up as a CPU hotspot on every toolbar
+  /// rebuild.
+  static const Map<PanelCatalogCategory, List<String>> _categoryTypeIds =
+      <PanelCatalogCategory, List<String>>{
+        PanelCatalogCategory.basics: <String>[
+          'board.note.markdown',
+          'board.sticky',
+          'board.shape',
+        ],
+        PanelCatalogCategory.ai: <String>[
+          'board.chat',
+          'board.terminal',
+          'board.yolo_assistant',
+        ],
+        PanelCatalogCategory.files: <String>[
+          'board.filetree',
+          'board.files',
+          'board.file.preview',
+          'board.webpage',
+        ],
+        PanelCatalogCategory.planning: <String>[
+          'board.kanban',
+          'board.checklist',
+          'board.timer',
+          'board.calendar',
+          'board.table',
+          'board.chart',
+        ],
+        PanelCatalogCategory.advanced: <String>[
+          'board.setup_guide',
+          'board.code.snippet',
+          'board.playlist',
+          'board.audio_recorder',
+          'board.run_configs',
+          'board.widget.custom',
+          'board.ui',
+        ],
+      };
+
+  static bool _typeOffered(
+    PanelCatalogCategory category,
+    String typeId,
+    bool hasGeneric,
+    bool hasNote,
+    bool hasChat,
+    bool hasTerminal,
+  ) {
+    switch (category) {
+      case PanelCatalogCategory.basics:
+        switch (typeId) {
+          case 'board.note.markdown':
+            return hasNote;
+          case 'board.shape':
+            return hasGeneric;
+          default: // board.sticky — plugin registry entry
+            return hasGeneric;
+        }
+      case PanelCatalogCategory.ai:
+        switch (typeId) {
+          case 'board.chat':
+            return hasChat;
+          case 'board.terminal':
+            return hasTerminal;
+          default: // board.yolo_assistant — plugin registry entry
+            return hasGeneric;
+        }
+      default:
+        return hasGeneric;
+    }
+  }
+
+  /// Fast availability check without constructing any widgets.
+  bool _hasAnyItems() {
+    final hasGeneric = widget.onAddGeneric != null;
+    final hasNote = widget.onAddNote != null;
+    final hasChat = widget.onAddChat != null;
+    final hasTerminal = widget.onAddTerminal != null;
+    for (final typeId in _categoryTypeIds[widget.category]!) {
+      if (!_typeOffered(
+        widget.category,
+        typeId,
+        hasGeneric,
+        hasNote,
+        hasChat,
+        hasTerminal,
+      )) {
+        continue;
+      }
+      if (_isPanelTypeAvailable(typeId)) return true;
+    }
+    return false;
+  }
+
+  /// Estimated menu item count for the upward-shift computation. Mirrors the
+  /// order and conditions of [_itemsFor] without building widgets.
+  int _estimatedItemCount() {
+    final hasGeneric = widget.onAddGeneric != null;
+    final hasNote = widget.onAddNote != null;
+    final hasChat = widget.onAddChat != null;
+    final hasTerminal = widget.onAddTerminal != null;
+    var count = 0;
+    for (final typeId in _categoryTypeIds[widget.category]!) {
+      if (!_typeOffered(
+        widget.category,
+        typeId,
+        hasGeneric,
+        hasNote,
+        hasChat,
+        hasTerminal,
+      )) {
+        continue;
+      }
+      if (_isPanelTypeAvailable(typeId)) count++;
+    }
+    return count;
   }
 
   Widget _catalogItem(
