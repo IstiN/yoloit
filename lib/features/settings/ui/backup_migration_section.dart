@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
@@ -65,12 +66,18 @@ class _BackupMigrationSectionState extends State<BackupMigrationSection> {
   ImportReport? _lastImportReport;
   String? _importError;
 
+  // Transient success/info message shown inline (ScaffoldMessenger is not
+  // reliably available inside the settings dialog).
+  String? _transientMessage;
+  Timer? _transientTimer;
+
   // Passphrase (used for both export encryption and import decryption).
   final _passphraseCtrl = TextEditingController();
   bool _showPassphrase = false;
 
   @override
   void dispose() {
+    _transientTimer?.cancel();
     _service.close();
     _passphraseCtrl.dispose();
     super.dispose();
@@ -266,9 +273,12 @@ class _BackupMigrationSectionState extends State<BackupMigrationSection> {
   );
 
   void _snack(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    _transientTimer?.cancel();
+    if (!mounted) return;
+    setState(() => _transientMessage = message);
+    _transientTimer = Timer(const Duration(seconds: 4), () {
+      if (mounted) setState(() => _transientMessage = null);
+    });
   }
 
   @override
@@ -334,6 +344,8 @@ class _BackupMigrationSectionState extends State<BackupMigrationSection> {
                   'Last import: ${_lastImportReport!.totalChanges} files '
                   '(${_lastImportReport!.totalConflicts} conflicts kept both)',
                 ),
+              if (_transientMessage != null)
+                _buildInfo(_transientMessage!),
             ],
           ),
         ),

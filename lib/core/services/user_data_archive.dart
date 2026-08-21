@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:math' as math;
 
 import 'package:archive/archive.dart';
@@ -423,6 +424,91 @@ Future<List<int>> _flatten(Stream<List<int>> input) async {
   return out;
 }
 
+@immutable
+class _PackIsolateArgs {
+  const _PackIsolateArgs({
+    required this.contents,
+    required this.manifest,
+    required this.outputPath,
+    this.passphrase,
+  });
+
+  final Map<String, List<int>> contents;
+  final Map<String, dynamic> manifest;
+  final String outputPath;
+  final String? passphrase;
+}
+
+@immutable
+class _UnpackIsolateArgs {
+  const _UnpackIsolateArgs({required this.bytes, this.passphrase});
+
+  final List<int> bytes;
+  final String? passphrase;
+}
+
+@immutable
+class _UnpackIsolateResult {
+  const _UnpackIsolateResult({required this.manifest, required this.entries});
+
+  final Map<String, dynamic> manifest;
+  final Map<String, List<int>> entries;
+}
+
+/// Builds the tar archive, optionally encrypts it, and writes it to disk.
+/// Runs on a background isolate so the UI / event loop stays responsive.
+Future<void> _packInIsolate(_PackIsolateArgs args) async {
+  final archive = Archive();
+  for (final entry in args.contents.entries) {
+    archive.addFile(ArchiveFile(entry.key, entry.value.length, entry.value));
+  }
+  final tarBytes = TarEncoder().encode(archive);
+
+  final outFile = File(args.outputPath);
+  await outFile.parent.create(recursive: true);
+  final sink = outFile.openWrite();
+  try {
+    if (args.passphrase != null && args.passphrase!.isNotEmpty) {
+      await const ArchiveCipher().encrypt(tarBytes, sink, args.passphrase!);
+    } else {
+      sink.add(tarBytes);
+    }
+  } finally {
+    await sink.close();
+  }
+}
+
+/// Decrypts and decodes an archive on a background isolate.
+Future<_UnpackIsolateResult> _unpackInIsolate(_UnpackIsolateArgs args) async {
+  const cipher = ArchiveCipher();
+  final tarBytes = cipher.looksEncrypted(args.bytes)
+      ? await cipher.decrypt(
+          Stream.value(args.bytes),
+          args.passphrase?.isNotEmpty == true
+              ? args.passphrase!
+              : throw const FormatException(
+                  'Archive is encrypted; provide a passphrase',
+                ),
+        )
+      : args.bytes;
+
+  final archive = TarDecoder().decodeBytes(tarBytes);
+  final manifestFile = archive.files.firstWhere(
+    (f) => f.name == 'manifest.json',
+    orElse: () => throw const FormatException('Archive is missing manifest.json'),
+  );
+  final manifestJson = jsonDecode(
+    utf8.decode(manifestFile.content as List<int>),
+  ) as Map<String, dynamic>;
+
+  final entries = <String, List<int>>{};
+  for (final f in archive.files) {
+    if (f.name == 'manifest.json') continue;
+    entries[f.name] = f.content as List<int>;
+  }
+  return _UnpackIsolateResult(manifest: manifestJson, entries: entries);
+}
+
 /// Packs all YoLoIT user state into a single `.tar` archive (optionally
 /// AES-GCM-encrypted) and returns the manifest.
 ///
@@ -432,13 +518,11 @@ Future<List<int>> _flatten(Stream<List<int>> input) async {
 class UserDataArchive {
   UserDataArchive({
     ArchiveRoots? roots,
-    ArchiveCipher? cipher,
     AppVersionReader? appVersion,
     String? sourceHomeOverride,
     String? sourceUsernameOverride,
     String? sourceHostnameOverride,
   })  : _roots = roots ?? ArchiveRoots.detect(),
-        _cipher = cipher ?? const ArchiveCipher(),
         _appVersion = appVersion ?? defaultAppVersionReader,
         // ignore: prefer_initializing_formals
         _sourceHomeOverride = sourceHomeOverride,
@@ -452,19 +536,16 @@ class UserDataArchive {
     required String sourceHome,
     required String sourceUsername,
     String? sourceHostname,
-    ArchiveCipher? cipher,
     AppVersionReader? appVersion,
   })  :
         // ignore: prefer_initializing_formals
         _roots = roots,
-        _cipher = cipher ?? const ArchiveCipher(),
         _appVersion = appVersion ?? defaultAppVersionReader,
         _sourceHomeOverride = sourceHome,
         _sourceUsernameOverride = sourceUsername,
         _sourceHostnameOverride = sourceHostname;
 
   final ArchiveRoots _roots;
-  final ArchiveCipher _cipher;
   final AppVersionReader _appVersion;
   final String? _sourceHomeOverride;
   final String? _sourceUsernameOverride;
@@ -485,19 +566,20 @@ class UserDataArchive {
     ArchiveIncludeOptions include = ArchiveIncludeOptions.defaults,
   }) async {
     final manifest = await _buildManifest(include: include);
-    final tarBytes = await _buildTar(manifest, include: include);
-    final outFile = File(outputPath);
-    await outFile.parent.create(recursive: true);
-    final sink = outFile.openWrite();
-    try {
-      if (passphrase != null && passphrase.isNotEmpty) {
-        await _cipher.encrypt(tarBytes, sink, passphrase);
-      } else {
-        sink.add(tarBytes);
-      }
-    } finally {
-      await sink.close();
-    }
+    final contents = await _buildContents(manifest, include: include);
+
+    // Heavy tar build + encryption run off the main isolate so the desktop
+    // UI / event loop stays responsive during export.
+    await Isolate.run(
+      () => _packInIsolate(
+        _PackIsolateArgs(
+          contents: contents,
+          manifest: manifest.toJson(),
+          outputPath: outputPath,
+          passphrase: passphrase,
+        ),
+      ),
+    );
     return manifest;
   }
 
@@ -507,8 +589,12 @@ class UserDataArchive {
     String? passphrase,
   }) async {
     final bytes = await File(archivePath).readAsBytes();
-    final tarBytes = await _decodeEnvelope(bytes, passphrase: passphrase);
-    return _readManifestFromTar(tarBytes);
+    final unpacked = await Isolate.run(
+      () => _unpackInIsolate(
+        _UnpackIsolateArgs(bytes: bytes, passphrase: passphrase),
+      ),
+    );
+    return ArchiveManifest.fromJson(unpacked.manifest);
   }
 
   /// Restore an archive. When [dryRun] is true (the default) no files are
@@ -523,9 +609,18 @@ class UserDataArchive {
     ImportConflictResolver? onConflict,
   }) async {
     final bytes = await File(archivePath).readAsBytes();
-    final tarBytes = await _decodeEnvelope(bytes, passphrase: passphrase);
-    final manifest = _readManifestFromTar(tarBytes);
-    final entries = _unpackTar(tarBytes);
+
+    // Heavy decryption + tar decoding run off the main isolate so the desktop
+    // UI / event loop stays responsive during import.
+    final unpacked = await Isolate.run(
+      () => _unpackInIsolate(
+        _UnpackIsolateArgs(bytes: bytes, passphrase: passphrase),
+      ),
+    );
+    final manifest = ArchiveManifest.fromJson(unpacked.manifest);
+    final entries = unpacked.entries.entries
+        .map((e) => ArchiveFile(e.key, e.value.length, e.value))
+        .toList();
 
     final existingBoards = await _readExistingBoardIds();
     final existingNames = await _readExistingBoardNamesById();
@@ -695,11 +790,10 @@ class UserDataArchive {
 
   // ── Tar packing ───────────────────────────────────────────────────────
 
-  Future<List<int>> _buildTar(
+  Future<Map<String, List<int>>> _buildContents(
     ArchiveManifest manifest, {
     required ArchiveIncludeOptions include,
   }) async {
-    final archive = Archive();
     final contents = <String, List<int>>{};
 
     contents['manifest.json'] = utf8.encode(
@@ -713,34 +807,30 @@ class UserDataArchive {
       }
     }
 
-    _collectDir(
+    await _collectDir(
       source: _roots.configDir,
       prefix: 'config',
       include: include,
       contents: contents,
     );
-    _collectDir(
+    await _collectDir(
       source: _roots.dataDir,
       prefix: 'data',
       include: include,
       contents: contents,
     );
-    _collectFile(
+    await _collectFile(
       source: File(p.join(_roots.yoloitHome, 'config.json')),
       archiveName: 'workspaces/config.json',
       contents: contents,
     );
-    _collectFile(
+    await _collectFile(
       source: File(p.join(_roots.yoloitHome, 'workspaces.json')),
       archiveName: 'workspaces/workspaces.json',
       contents: contents,
     );
 
-    for (final entry in contents.entries) {
-      archive.addFile(ArchiveFile(entry.key, entry.value.length, entry.value));
-    }
-
-    return TarEncoder().encode(archive);
+    return contents;
   }
 
   /// Dump all YoLoIT-owned SharedPreferences keys as JSON.
@@ -754,16 +844,16 @@ class UserDataArchive {
     return utf8.encode(const JsonEncoder.withIndent('  ').convert(out));
   }
 
-  void _collectDir({
+  Future<void> _collectDir({
     required String source,
     required String prefix,
     required ArchiveIncludeOptions include,
     required Map<String, List<int>> contents,
-  }) {
+  }) async {
     final dir = Directory(source);
     if (!dir.existsSync()) return;
     final excludes = _excludesFor(include, prefix);
-    _walkDir(dir, prefix, contents, excludes);
+    await _walkDir(dir, prefix, contents, excludes);
   }
 
   Set<String> _excludesFor(ArchiveIncludeOptions include, String prefix) {
@@ -782,29 +872,29 @@ class UserDataArchive {
     return out;
   }
 
-  void _walkDir(
+  Future<void> _walkDir(
     Directory dir,
     String prefix,
     Map<String, List<int>> contents,
     Set<String> excludes,
-  ) {
+  ) async {
     if (!dir.existsSync()) return;
-    for (final entity in dir.listSync(recursive: true, followLinks: false)) {
+    await for (final entity in dir.list(recursive: true, followLinks: false)) {
       if (entity is! File) continue;
       final rel = p.relative(entity.path, from: dir.path);
       if (_isExcluded(rel, excludes)) continue;
       final posixRel = rel.replaceAll(Platform.pathSeparator, '/');
-      contents['$prefix/$posixRel'] = entity.readAsBytesSync();
+      contents['$prefix/$posixRel'] = await entity.readAsBytes();
     }
   }
 
-  void _collectFile({
+  Future<void> _collectFile({
     required File source,
     required String archiveName,
     required Map<String, List<int>> contents,
-  }) {
+  }) async {
     if (!source.existsSync()) return;
-    contents[archiveName] = source.readAsBytesSync();
+    contents[archiveName] = await source.readAsBytes();
   }
 
   bool _isExcluded(String relPath, Set<String> excludes) {
@@ -820,38 +910,6 @@ class UserDataArchive {
   }
 
   // ── Unpacking + restore planning ──────────────────────────────────────
-
-  Future<List<int>> _decodeEnvelope(
-    List<int> bytes, {
-    String? passphrase,
-  }) async {
-    if (_cipher.looksEncrypted(bytes)) {
-      if (passphrase == null || passphrase.isEmpty) {
-        throw const FormatException(
-          'Archive is encrypted; provide a passphrase',
-        );
-      }
-      return _cipher.decrypt(Stream.value(bytes), passphrase);
-    }
-    return bytes;
-  }
-
-  ArchiveManifest _readManifestFromTar(List<int> tarBytes) {
-    final archive = TarDecoder().decodeBytes(tarBytes);
-    final manifestFile = archive.files.firstWhere(
-      (f) => f.name == 'manifest.json',
-      orElse: () => throw const FormatException(
-        'Archive is missing manifest.json',
-      ),
-    );
-    final content = manifestFile.content as List<int>;
-    final json = jsonDecode(utf8.decode(content)) as Map<String, dynamic>;
-    return ArchiveManifest.fromJson(json);
-  }
-
-  List<ArchiveFile> _unpackTar(List<int> tarBytes) {
-    return TarDecoder().decodeBytes(tarBytes).files;
-  }
 
   ({List<PlannedChange> changes, List<MissingPathWarning> missing, List<BoardConflict> conflicts}) _planRestore({
     required List<ArchiveFile> entries,
@@ -1065,8 +1123,8 @@ class UserDataArchive {
       final dest = File(p.join(destBase, relPath));
       final plan = _planFileAction(root: root, relPath: relPath, mode: mode);
       if (plan == 'skip') continue;
-      dest.parent.createSync(recursive: true);
-      dest.writeAsBytesSync(content);
+      await dest.parent.create(recursive: true);
+      await dest.writeAsBytes(content);
     }
 
     // Note: conflict resolutions are recorded but the prefs restore above
@@ -1129,7 +1187,9 @@ class UserDataArchive {
     json['workspaces'] = out;
 
     final dest = File(p.join(_roots.yoloitHome, 'workspaces.json'));
-    dest.parent.createSync(recursive: true);
-    dest.writeAsStringSync(const JsonEncoder.withIndent('  ').convert(json));
+    await dest.parent.create(recursive: true);
+    await dest.writeAsString(
+      const JsonEncoder.withIndent('  ').convert(json),
+    );
   }
 }
