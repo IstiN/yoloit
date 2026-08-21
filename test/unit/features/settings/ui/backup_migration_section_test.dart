@@ -55,6 +55,12 @@ void main() {
     if (scratch.existsSync()) scratch.deleteSync(recursive: true);
   });
 
+  BackupMigrationService makeService(http.Client client) =>
+      BackupMigrationService(
+        client: client,
+        dirs: MacosPlatformDirs(homeOverride: scratch.path),
+      );
+
   Future<void> pumpSection(WidgetTester tester) async {
     await tester.pumpWidget(
       const MaterialApp(
@@ -96,7 +102,7 @@ void main() {
       importBody: <String, dynamic>{'ok': true, 'report': <String, dynamic>{}},
     );
 
-    final service = BackupMigrationService(client: mock.client());
+    final service = makeService(mock.client());
 
     await tester.pumpWidget(
       MaterialApp(
@@ -133,7 +139,7 @@ void main() {
       exportBody: <String, dynamic>{'ok': false, 'message': 'CLI server is down'},
       importBody: <String, dynamic>{'ok': true, 'report': <String, dynamic>{}},
     );
-    final service = BackupMigrationService(client: mock.client());
+    final service = makeService(mock.client());
 
     await tester.pumpWidget(
       MaterialApp(
@@ -174,7 +180,7 @@ void main() {
       },
       importBody: <String, dynamic>{'ok': true, 'report': <String, dynamic>{}},
     );
-    final service = BackupMigrationService(client: mock.client());
+    final service = makeService(mock.client());
 
     await tester.pumpWidget(
       MaterialApp(

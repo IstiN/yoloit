@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 
+import 'package:yoloit/core/cli/cli_installed_paths.dart';
 import 'package:yoloit/core/platform/platform_dirs.dart';
 import 'package:yoloit/core/services/user_data_archive.dart';
 
@@ -40,15 +41,24 @@ class BackupMigrationUnavailableError extends Error {
 /// HTTP client for the /api/settings/{export,import} routes registered by
 /// [CliServer]. Lives in the desktop process; talks to itself.
 class BackupMigrationService {
-  BackupMigrationService({http.Client? client, PlatformDirs? dirs})
-    : _client = client ?? http.Client(),
-      _dirs = dirs ?? PlatformDirs.instance;
+  BackupMigrationService({http.Client? client, this._dirs})
+    : _client = client ?? http.Client();
 
   final http.Client _client;
-  final PlatformDirs _dirs;
+  final PlatformDirs? _dirs;
+
+  /// The config directory where the running [CliServer] wrote `cli.port`.
+  /// Debug builds use `~/.config/yoloit-dev`; release builds use
+  /// `~/.config/yoloit`. Tests can override via [PlatformDirs].
+  String get _configDir {
+    if (_dirs != null) return _dirs.configDir;
+    return CliInstalledPaths.configDirForHome(
+      Platform.environment['HOME'] ?? '/tmp',
+    );
+  }
 
   Uri _endpoint(String route) {
-    final portFile = File(p.join(_dirs.configDir, 'cli.port'));
+    final portFile = File(p.join(_configDir, 'cli.port'));
     if (!portFile.existsSync()) {
       throw BackupMigrationUnavailableError(
         'YoLoIT CLI server is not running. '
@@ -89,7 +99,8 @@ class BackupMigrationService {
     );
     final body = jsonDecode(response.body) as Map<String, dynamic>;
     if (body['ok'] != true) {
-      throw StateError(body['message']?.toString() ?? 'Export failed');
+      final msg = (body['message'] ?? body['error'])?.toString();
+      throw StateError(msg ?? 'Export failed');
     }
     final payload = body['manifest'] as Map<String, dynamic>;
     return ExportResult(
@@ -133,7 +144,8 @@ class BackupMigrationService {
     );
     final body = jsonDecode(response.body) as Map<String, dynamic>;
     if (body['ok'] != true) {
-      throw StateError(body['message']?.toString() ?? 'Import failed');
+      final msg = (body['message'] ?? body['error'])?.toString();
+      throw StateError(msg ?? 'Import failed');
     }
     final reportJson = body['report'] as Map<String, dynamic>;
     return ImportResult(

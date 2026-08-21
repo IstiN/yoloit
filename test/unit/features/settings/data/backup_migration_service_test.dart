@@ -28,11 +28,17 @@ void main() {
     if (scratch.existsSync()) scratch.deleteSync(recursive: true);
   });
 
+  BackupMigrationService makeService(http.Client client) =>
+      BackupMigrationService(
+        client: client,
+        dirs: MacosPlatformDirs(homeOverride: scratch.path),
+      );
+
   test('throws BackupMigrationUnavailableError when port file missing',
       () async {
     File(p.join(scratch.path, '.config', 'yoloit', 'cli.port'))
         .deleteSync();
-    final svc = BackupMigrationService(client: MockClient((_) async => http.Response('{}', 200)));
+    final svc = makeService(MockClient((_) async => http.Response('{}', 200)));
     expect(
       () => svc.export(destinationPath: '/tmp/x.tar', passphrase: 'pw'),
       throwsA(isA<BackupMigrationUnavailableError>()),
@@ -54,7 +60,7 @@ void main() {
         headers: {'content-type': 'application/json'},
       );
     });
-    final svc = BackupMigrationService(client: mock);
+    final svc = makeService(mock);
 
     final result = await svc.export(
       destinationPath: '/tmp/x.tar',
@@ -96,7 +102,7 @@ void main() {
         headers: {'content-type': 'application/json'},
       );
     });
-    final svc = BackupMigrationService(client: mock);
+    final svc = makeService(mock);
     await svc.export(destinationPath: '/tmp/x.tar', passphrase: '');
     final body = jsonDecode(captured!.body) as Map<String, dynamic>;
     expect(body['requirePassphrase'], isFalse);
@@ -124,7 +130,7 @@ void main() {
         headers: {'content-type': 'application/json'},
       );
     });
-    final svc = BackupMigrationService(client: mock);
+    final svc = makeService(mock);
 
     final result = await svc.restore(
       archivePath: '/tmp/old.tar',
@@ -163,7 +169,7 @@ void main() {
           200,
           headers: {'content-type': 'application/json'},
         ));
-    final svc = BackupMigrationService(client: mock);
+    final svc = makeService(mock);
     expect(
       () => svc.restore(archivePath: '/tmp/x.tar'),
       throwsA(
@@ -178,7 +184,7 @@ void main() {
 
   test('restore() propagates network errors', () async {
     final mock = MockClient((_) async => http.Response('nope', 500));
-    final svc = BackupMigrationService(client: mock);
+    final svc = makeService(mock);
     expect(
       () => svc.restore(archivePath: '/tmp/x.tar'),
       throwsA(isA<FormatException>()),
