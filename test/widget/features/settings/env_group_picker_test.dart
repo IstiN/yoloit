@@ -222,6 +222,9 @@ class _BrokenPlatformDirs extends PlatformDirs {
   String get dataDir => _configDir;
 
   @override
+  String? get userHome => null;
+
+  @override
   String get logsDir => _configDir;
 
   @override

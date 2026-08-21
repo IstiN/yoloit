@@ -53,4 +53,9 @@ abstract class PlatformDirs {
 
   /// Convenience: a dedicated YoLoIT temp sub-directory.
   String get yoloitTempDir;
+
+  /// User home directory (e.g. `/Users/alice` on macOS, `/home/alice` on
+  /// Linux, `C:\Users\alice` on Windows). Returns `null` on platforms where
+  /// the concept doesn't apply (e.g. web build).
+  String? get userHome;
 }

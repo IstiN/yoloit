@@ -18,6 +18,9 @@ class _TempPlatformDirs extends PlatformDirs {
   String get dataDir => _root;
 
   @override
+  String? get userHome => null;
+
+  @override
   String get logsDir => _root;
 
   @override

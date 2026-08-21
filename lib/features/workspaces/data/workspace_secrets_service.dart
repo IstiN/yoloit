@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:yoloit/core/platform/secure_storage_factory.dart';
 
 class WorkspaceSecretsService {
@@ -7,6 +8,11 @@ class WorkspaceSecretsService {
   static final WorkspaceSecretsService instance = WorkspaceSecretsService._();
 
   final _storage = SecureStorageFactory.create();
+
+  /// Resets the secure-storage cache. Used by tests to avoid stale values
+  /// leaking across test cases.
+  @visibleForTesting
+  void resetForTesting() => _storage.clearCache();
 
   String _key(String workspaceId) => 'ws_secrets_$workspaceId';
 

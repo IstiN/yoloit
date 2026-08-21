@@ -42,6 +42,50 @@ This guide outlines non-obvious developer commands, compilation pipelines, stric
 
 ---
 
+## 💾 Settings & Board Migration (settings:export / settings:import)
+
+YoLoIT user state is fragmented across **four roots** — a naive copy of `~/.config/yoloit/` will miss boards (which live in SharedPreferences) and workspace paths (which live in `~/.yoloit/`):
+
+| Root | macOS | Contents |
+|---|---|---|
+| `PlatformDirs.configDir` | `~/.config/yoloit/` | configs, skills, templates, apps, credential mirror, `state.json` |
+| `PlatformDirs.dataDir` | `~/Library/Application Support/yoloit/` | `boards_history/`, `chat_sessions/`, `calendar_events/` |
+| `~/.yoloit/` | `~/.yoloit/` | `config.json`, `workspaces.json` (absolute paths) |
+| `SharedPreferences` plist | `~/Library/Preferences/com.yoloit.yoloit.plist` | **all boards** + most app prefs |
+
+Migration is done with two CLI commands (also exposed in Settings → **Backup & Migration**):
+
+- `yoloit settings:export <path>` — packs all four roots into a tar archive.
+  - Always AES-GCM-encrypted (PBKDF2-SHA256, 200k iterations). Pass the
+    passphrase via `passphrase` in the body (UI) or `YOLOIT_ARCHIVE_PASSPHRASE`
+    env var (CLI). Set `requirePassphrase=false` to export unencrypted.
+  - Flags: `--include-secrets`, `--no-history`, `--no-chat-sessions`,
+    `--no-calendar`, `--no-state-json`, `--no-passphrase`.
+  - Excluded by default: `runtime/`, `templates/cache/`, `asr_samples/`,
+    credentials mirror (unless `--include-secrets`).
+- `yoloit settings:import <path>` — restores an archive. Defaults to
+  `--dry-run` so you preview the diff first. Use `--no-dry-run` to apply.
+  - `--mode merge|replace`, `--path-rewrite auto|ask|keep` (auto rewrites
+    `/Users/olduser/...` → `/Users/newuser/...`), `--on-conflict keep|overwrite|rename|skip`,
+    `--passphrase <pw>`, plus per-root `--no-prefs|--no-config|--no-data|--no-workspaces`.
+  - The manifest records `sourceHome`; with `--path-rewrite auto` it is
+    replaced by the destination's home so workspace paths, board
+    `defaultFolder`, and panel `rootPath/workingDir` land on existing
+    directories on the new machine.
+  - Board id collisions are surfaced in the report; `--on-conflict`
+    resolves them non-interactively (interactive per-conflict prompts are
+    wired only in the UI today).
+
+The implementation lives in `lib/core/services/user_data_archive.dart` with
+the HTTP route in `lib/core/cli/handlers/settings_handler.dart`. Tests:
+`test/unit/core/services/user_data_archive_test.dart` (18 cases) and
+`test/unit/core/cli/handlers/settings_handler_test.dart` (6 cases).
+The CLI coverage ratchet exempts both commands in
+`scripts/cli_integration_exempt.json` because they require live
+`SharedPreferences` + `PlatformDirs` (not available in headless `yoloitd`).
+
+---
+
 ## 🧭 CodeGraph Usage: CLI Only
 
 - **Do not rely on the CodeGraph MCP server for this repository.**

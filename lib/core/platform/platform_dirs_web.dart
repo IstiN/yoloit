@@ -26,4 +26,7 @@ class WebPlatformDirs extends PlatformDirs {
 
   @override
   String get yoloitTempDir => 'yoloit/tmp';
+
+  @override
+  String? get userHome => null;
 }

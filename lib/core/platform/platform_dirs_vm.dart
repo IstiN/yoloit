@@ -40,6 +40,9 @@ class MacosPlatformDirs extends PlatformDirs {
 
   @override
   String get yoloitTempDir => '${Directory.systemTemp.path}/yoloit_tmp';
+
+  @override
+  String get userHome => _home;
 }
 
 /// iOS paths — all persistent files live inside the app sandbox.
@@ -74,6 +77,9 @@ class IosPlatformDirs extends PlatformDirs {
 
   @override
   String get yoloitTempDir => '${Directory.systemTemp.path}/yoloit_tmp';
+
+  @override
+  String get userHome => _home;
 }
 
 /// Linux paths — follows XDG Base Directory conventions.
@@ -105,6 +111,9 @@ class LinuxPlatformDirs extends PlatformDirs {
 
   @override
   String get yoloitTempDir => '${Directory.systemTemp.path}/yoloit_tmp';
+
+  @override
+  String get userHome => _home;
 }
 
 /// Windows paths — follows AppData conventions.
@@ -143,4 +152,8 @@ class WindowsPlatformDirs extends PlatformDirs {
 
   @override
   String get yoloitTempDir => '${Directory.systemTemp.path}\\yoloit_tmp';
+
+  @override
+  String? get userHome =>
+      Platform.environment['USERPROFILE'] ?? _appDataOverride;
 }

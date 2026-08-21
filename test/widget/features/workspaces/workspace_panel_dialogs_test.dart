@@ -53,6 +53,9 @@ class _TempPlatformDirs extends PlatformDirs {
   String get dataDir => _root;
 
   @override
+  String? get userHome => null;
+
+  @override
   String get logsDir => _root;
 
   @override
@@ -246,6 +249,7 @@ void main() {
     });
 
     tearDown(() {
+      WorkspaceSecretsService.instance.resetForTesting();
       PlatformDirs.reset();
       if (configTmp.existsSync()) configTmp.deleteSync(recursive: true);
     });

@@ -87,6 +87,10 @@ extension _ApiRoutes on CliServer {
     return _handleTheme(ctx.method, ctx.path.sublist(1), ctx.request);
   }
 
+  Future<shelf.Response> _settingsRoute(_ApiRouteContext ctx) {
+    return _handleSettings(ctx.method, ctx.path.sublist(1), ctx.request);
+  }
+
   Future<shelf.Response> _drawingsRoute(_ApiRouteContext ctx) {
     return _handleDrawings(
       ctx.method,
@@ -214,6 +218,12 @@ extension _ApiRoutes on CliServer {
       segments: null,
       matches: (method, path) => path.isNotEmpty && path[0] == 'theme',
       handler: _themeRoute,
+    ),
+    (
+      method: null,
+      segments: null,
+      matches: (method, path) => path.isNotEmpty && path[0] == 'settings',
+      handler: _settingsRoute,
     ),
     (
       method: null,

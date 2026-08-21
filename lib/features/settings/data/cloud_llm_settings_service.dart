@@ -258,10 +258,11 @@ class CloudLlmSettingsService implements VoiceSettingsProvider {
   YoloitCredentialStore get _storage =>
       _secureStorage ??= SecureStorageFactory.create();
 
-  /// Clears the cached secure storage instance so tests can swap
-  /// [PlatformDirs] between runs.
+  /// Clears the cached secure storage instance and its in-memory cache so
+  /// tests can swap [PlatformDirs] between runs without stale values leaking.
   @visibleForTesting
   void resetForTests() {
+    _secureStorage?.clearCache();
     _secureStorage = null;
   }
 

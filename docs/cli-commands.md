@@ -67,3 +67,23 @@ graph TD
   - optional example JSON
 - Agents can discover action docs with: `yoloit panel:help "<board>" "<panel>"`.
 - For bulk board mutations, prefer `yoloit board:apply` with YAML operations.
+
+## Settings & board migration
+
+YoLoIT user state lives across four roots (SharedPreferences, `~/.config/yoloit/`,
+`~/Library/Application Support/yoloit/`, `~/.yoloit/`). Two CLI commands
+move it between machines:
+
+- `yoloit settings:export <path>` — packs everything into an encrypted
+  tar archive (AES-GCM, PBKDF2-SHA256, 200k iters). Pass the passphrase
+  via the `passphrase` body field (UI) or `YOLOIT_ARCHIVE_PASSPHRASE` env
+  var (CLI). Flags: `--include-secrets`, `--no-history`,
+  `--no-chat-sessions`, `--no-calendar`, `--no-state-json`.
+- `yoloit settings:import <path>` — defaults to `--dry-run`; pass
+  `--no-dry-run` to apply. Flags: `--mode merge|replace`,
+  `--path-rewrite auto|ask|keep`, `--on-conflict keep|overwrite|rename|skip`,
+  `--passphrase <pw>`, `--no-prefs|--no-config|--no-data|--no-workspaces`.
+
+UI lives in Settings → **Backup & Migration**. Both commands are exempt
+from the CLI integration-coverage ratchet (`scripts/cli_integration_exempt.json`)
+because they need live `SharedPreferences` + `PlatformDirs`.

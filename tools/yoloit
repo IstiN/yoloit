@@ -823,6 +823,16 @@ commands = [{'group': 'app',
   'description': 'Show available color slot names grouped by category',
   'params': [],
   'example': 'yoloit theme:slots'},
+ {'group': 'settings',
+  'name': 'settings:export',
+  'description': 'Export all YoLoIT user state (boards, preferences, skills, workspaces) to an encrypted tar archive for migration to another machine',
+  'params': [['path', 'Destination archive path (default: ~/Desktop/yoloit-<host>-<date>.tar)', False]],
+  'example': 'yoloit settings:export ~/Desktop/yoloit-old-mac.tar'},
+ {'group': 'settings',
+  'name': 'settings:import',
+  'description': 'Restore YoLoIT user state from an archive. Defaults to --dry-run so you can preview changes before committing. Use --no-dry-run to apply. --on-conflict picks the strategy when a board id already exists locally: keep (default), overwrite, rename, or skip.',
+  'params': [['path', 'Source archive path', True]],
+  'example': 'yoloit settings:import ~/Desktop/yoloit-old-mac.tar --no-dry-run --on-conflict rename'},
  {'group': 'link',
   'name': 'links',
   'description': 'List links on a board',
@@ -4380,6 +4390,56 @@ PY
     ;;
   theme:slots)
     _get "/theme/slots" | python3 -m json.tool 2>/dev/null
+    ;;
+
+  settings:export)
+    dest=""
+    include_secrets="false"
+    include_history="true"
+    include_chat="true"
+    include_calendar="true"
+    include_state="true"
+    no_passphrase="false"
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --include-secrets) include_secrets="true"; shift ;;
+        --no-history) include_history="false"; shift ;;
+        --no-chat-sessions) include_chat="false"; shift ;;
+        --no-calendar) include_calendar="false"; shift ;;
+        --no-state-json) include_state="false"; shift ;;
+        --no-passphrase) no_passphrase="true"; shift ;;
+        -*) echo "Unknown flag: $1" >&2; exit 1 ;;
+        *) [[ -z "$dest" ]] && dest="$1"; shift ;;
+      esac
+    done
+    payload=$(python3 -c "import json,sys; print(json.dumps({'path':sys.argv[1],'includeSecrets':sys.argv[2]=='true','includeHistory':sys.argv[3]=='true','includeChatSessions':sys.argv[4]=='true','includeCalendar':sys.argv[5]=='true','includeStateJson':sys.argv[6]=='true','requirePassphrase':sys.argv[7]!='true'}))" "${dest:-}" "$include_secrets" "$include_history" "$include_chat" "$include_calendar" "$include_state" "$no_passphrase")
+    _post "/settings/export" "$payload" | python3 -m json.tool 2>/dev/null
+    ;;
+  settings:import)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit settings:import <path> [--dry-run|--no-dry-run] [--mode merge|replace] [--path-rewrite auto|ask|keep] [--passphrase <pw>] [--on-conflict keep|overwrite|rename|skip] [--no-prefs] [--no-config] [--no-data] [--no-workspaces]" >&2; exit 1; }
+    src="$1"; shift
+    [[ "$src" == ~* ]] && src="${src/#\~/$HOME}"
+    [[ "$src" != /* ]] && src="$(cd "$(dirname "$src")" && pwd)/$(basename "$src")"
+    dry_run="true"; mode="merge"; rewrite="auto"; passphrase=""
+    no_prefs="false"; no_config="false"; no_data="false"; no_workspaces="false"
+    on_conflict="keep"
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --dry-run) dry_run="true"; shift ;;
+        --no-dry-run) dry_run="false"; shift ;;
+        --mode) mode="${2:-merge}"; shift 2 ;;
+        --path-rewrite) rewrite="${2:-auto}"; shift 2 ;;
+        --passphrase) passphrase="${2:-}"; shift 2 ;;
+        --on-conflict) on_conflict="${2:-keep}"; shift 2 ;;
+        --no-prefs) no_prefs="true"; shift ;;
+        --no-config) no_config="true"; shift ;;
+        --no-data) no_data="true"; shift ;;
+        --no-workspaces) no_workspaces="true"; shift ;;
+        *) echo "Unknown flag: $1" >&2; exit 1 ;;
+      esac
+    done
+    payload=$(python3 -c "import json,sys; print(json.dumps({'path':sys.argv[1],'dryRun':sys.argv[2]=='true','mode':sys.argv[3],'pathRewrite':sys.argv[4],'passphrase':sys.argv[5],'overrides':{'prefs':sys.argv[6]!='true','config':sys.argv[7]!='true','data':sys.argv[8]!='true','workspaces':sys.argv[9]!='true'},'onConflict':sys.argv[10]}))" "$src" "$dry_run" "$mode" "$rewrite" "$passphrase" "$no_prefs" "$no_config" "$no_data" "$no_workspaces" "$on_conflict")
+    _post "/settings/import" "$payload" | python3 -m json.tool 2>/dev/null
     ;;
 
   files:preview)

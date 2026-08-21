@@ -67,6 +67,7 @@ dependencies:
   crypto: ^3.0.0
   vector_math: any
   cryptography: ^2.9.0
+  archive: ^4.0.0
   webview_flutter: ^4.14.0
   fl_chart: ^1.2.0
   pluto_grid: ^8.1.0

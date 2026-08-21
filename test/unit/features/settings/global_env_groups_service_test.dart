@@ -20,6 +20,9 @@ class _TempPlatformDirs extends PlatformDirs {
   String get dataDir => _tmpDir;
 
   @override
+  String? get userHome => null;
+
+  @override
   String get logsDir => _tmpDir;
 
   @override
@@ -66,6 +69,7 @@ void main() {
 
   tearDown(() {
     _cleanupScopedFiles();
+    GlobalEnvGroupsService.instance.resetForTesting();
     PlatformDirs.setInstance(const MacosPlatformDirs());
     tmpDir.deleteSync(recursive: true);
   });

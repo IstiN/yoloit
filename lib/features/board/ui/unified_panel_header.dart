@@ -180,45 +180,58 @@ class _UnifiedPanelHeaderState extends State<UnifiedPanelHeader> {
               tooltip: 'Rename panel',
               onPressed: _startEditing,
             ),
-          if (widget.remoteLockActor != null)
-            HeaderIconButton(
-              icon: Icons.lock_outline,
-              tooltip: 'Editing by ${widget.remoteLockActor}',
-              onPressed: () {},
-            )
-          else ...[
-            HeaderIconButton(
-              icon: Icons.copy,
-              tooltip: 'Duplicate panel',
-              onPressed: widget.onDuplicate,
-            ),
-            HeaderIconButton(
-              icon: Icons.format_color_fill,
-              tooltip: 'Panel color',
-              onPressed: widget.onEditColor,
-              swatch: accent == Colors.transparent ? null : accent,
-            ),
-            if (widget.onEdit != null)
-              HeaderIconButton(
-                icon: Icons.edit_outlined,
-                tooltip: 'Edit content',
-                onPressed: widget.onEdit!,
+          Flexible(
+            fit: FlexFit.loose,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              reverse: true,
+              physics: const ClampingScrollPhysics(),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (widget.remoteLockActor != null)
+                    HeaderIconButton(
+                      icon: Icons.lock_outline,
+                      tooltip: 'Editing by ${widget.remoteLockActor}',
+                      onPressed: () {},
+                    )
+                  else ...[
+                    HeaderIconButton(
+                      icon: Icons.copy,
+                      tooltip: 'Duplicate panel',
+                      onPressed: widget.onDuplicate,
+                    ),
+                    HeaderIconButton(
+                      icon: Icons.format_color_fill,
+                      tooltip: 'Panel color',
+                      onPressed: widget.onEditColor,
+                      swatch: accent == Colors.transparent ? null : accent,
+                    ),
+                    if (widget.onEdit != null)
+                      HeaderIconButton(
+                        icon: Icons.edit_outlined,
+                        tooltip: 'Edit content',
+                        onPressed: widget.onEdit!,
+                      ),
+                  ],
+                  ...widget.pluginActions,
+                  PanelOverflowMenu(
+                    onToggleLocked: widget.onToggleLocked,
+                    locked: panel.locked,
+                    onBringToFront: widget.onBringToFront,
+                    onSendToBack: widget.onSendToBack,
+                    onFullscreen: widget.onFullscreen,
+                    onSettings: widget.onSettings,
+                    onDelete: widget.onDelete,
+                  ),
+                  HeaderIconButton(
+                    icon: Icons.close,
+                    tooltip: 'Remove panel',
+                    onPressed: widget.onDelete,
+                  ),
+                ],
               ),
-          ],
-          ...widget.pluginActions,
-          PanelOverflowMenu(
-            onToggleLocked: widget.onToggleLocked,
-            locked: panel.locked,
-            onBringToFront: widget.onBringToFront,
-            onSendToBack: widget.onSendToBack,
-            onFullscreen: widget.onFullscreen,
-            onSettings: widget.onSettings,
-            onDelete: widget.onDelete,
-          ),
-          HeaderIconButton(
-            icon: Icons.close,
-            tooltip: 'Remove panel',
-            onPressed: widget.onDelete,
+            ),
           ),
         ],
       ),

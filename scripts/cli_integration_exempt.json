@@ -626,5 +626,13 @@
   {
     "command": "terminal:set-session",
     "reason": "Terminal panel state action; covered by test/core/cli/handlers/panel_handlers_test.dart"
+  },
+  {
+    "command": "settings:export",
+    "reason": "Settings migration requires live SharedPreferences + PlatformDirs unavailable in headless yoloitd; covered by test/unit/core/services/user_data_archive_test.dart and test/unit/core/cli/handlers/settings_handler_test.dart"
+  },
+  {
+    "command": "settings:import",
+    "reason": "Settings migration requires live SharedPreferences + PlatformDirs unavailable in headless yoloitd; covered by test/unit/core/services/user_data_archive_test.dart and test/unit/core/cli/handlers/settings_handler_test.dart"
   }
 ]

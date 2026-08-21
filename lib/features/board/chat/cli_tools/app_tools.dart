@@ -809,6 +809,38 @@ final List<YoloitCliTool> appTools = <YoloitCliTool>[
   ),
 
   YoloitCliTool(
+    command: 'settings:export',
+    alias: 'setex',
+    description:
+        'Pack all YoLoIT user state (boards, preferences, skills, workspaces) into an encrypted archive for migration to another machine',
+    group: 'app',
+    params: <YoloitCliToolParam>[
+      toolParam(
+        'path',
+        'Destination archive path',
+        required: false,
+        shortKey: 'p',
+      ),
+    ],
+  ),
+
+  YoloitCliTool(
+    command: 'settings:import',
+    alias: 'setim',
+    description:
+        'Restore YoLoIT user state from an archive. Defaults to --dry-run so you can preview changes before committing.',
+    group: 'app',
+    params: <YoloitCliToolParam>[
+      toolParam(
+        'path',
+        'Source archive path',
+        required: true,
+        shortKey: 'p',
+      ),
+    ],
+  ),
+
+  YoloitCliTool(
     command: 'theme:delete',
     alias: 'thmd',
     description: 'Delete a custom theme by id',

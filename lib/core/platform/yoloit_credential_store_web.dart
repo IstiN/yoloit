@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:yoloit/core/platform/yoloit_credential_store_base.dart';
 
 /// Web stub credential store that keeps secrets in memory.
@@ -20,12 +21,19 @@ class YoloitCredentialStore implements SecureStorageLike {
 
   @override
   Future<void> delete({required String key}) => _secure.delete(key: key);
+
+  /// Clears the in-memory store. Used by tests to avoid stale values leaking
+  /// across test cases.
+  @visibleForTesting
+  void clearCache() => _WebInMemoryStorage.clear();
 }
 
 class _WebInMemoryStorage implements SecureStorageLike {
   const _WebInMemoryStorage();
 
   static final Map<String, String> _memory = {};
+
+  static void clear() => _memory.clear();
 
   @override
   Future<String?> read({required String key}) async => _memory[key];

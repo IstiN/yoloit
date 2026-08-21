@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/ui/adaptive_dialog.dart';
+import 'package:yoloit/features/settings/ui/backup_migration_section.dart';
 import 'package:yoloit/features/settings/ui/cloud_providers_section.dart';
 import 'package:yoloit/features/settings/ui/debug_ui/debug_ui_shell.dart';
 import 'package:yoloit/features/settings/ui/global_env_groups_section.dart';
@@ -38,6 +39,7 @@ const _kDesktopCategories = [
   'Shortcuts',
   'Skills',
   'Sync',
+  'Backup & Migration',
   'Remote',
   'Setup Guide',
   'Apps & Widgets',
@@ -330,6 +332,14 @@ class _SettingsPageState extends State<SettingsPage> {
           SectionHeader(title: 'Sync'),
           SizedBox(height: 12),
           SyncSection(),
+        ],
+      ),
+      'Backup & Migration' => const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionHeader(title: 'Backup & Migration'),
+          SizedBox(height: 12),
+          BackupMigrationSection(),
         ],
       ),
       'Remote' => const Column(

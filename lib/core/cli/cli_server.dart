@@ -23,6 +23,7 @@ import 'package:yoloit/core/cli/handlers/drawings_handler.dart';
 import 'package:yoloit/core/cli/handlers/panel_handler.dart';
 import 'package:yoloit/core/cli/handlers/search_handler.dart';
 import 'package:yoloit/core/cli/handlers/server_helpers.dart';
+import 'package:yoloit/core/cli/handlers/settings_handler.dart';
 import 'package:yoloit/core/cli/handlers/theme_handler.dart';
 import 'package:yoloit/core/cli/handlers/voice_settings_handler.dart';
 import 'package:yoloit/core/cli/handlers/widgets_handler.dart';
@@ -2520,6 +2521,21 @@ class CliServer {
     shelf.Request request,
   ) async {
     return handleTheme(
+      method,
+      path,
+      request,
+      json: cliJson,
+      notFound: cliNotFound,
+    );
+  }
+
+  // ── Settings routes (export / import user data) ────────────────────────
+  Future<shelf.Response> _handleSettings(
+    String method,
+    List<String> path,
+    shelf.Request request,
+  ) async {
+    return handleSettings(
       method,
       path,
       request,

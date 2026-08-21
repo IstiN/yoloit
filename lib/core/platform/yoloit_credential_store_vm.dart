@@ -43,6 +43,11 @@ class YoloitCredentialStore implements SecureStorageLike {
   // In-memory cache to avoid repeated file/keychain reads.
   final Map<String, String?> _readCache = {};
 
+  /// Clears the in-memory read cache. Used by tests to avoid stale values
+  /// leaking across test cases that re-create temp directories.
+  @visibleForTesting
+  void clearCache() => _readCache.clear();
+
   bool get _mirrorsToConfigDir => Platform.isMacOS || Platform.isLinux;
 
   @override

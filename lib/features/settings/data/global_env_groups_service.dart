@@ -29,6 +29,16 @@ class GlobalEnvGroupsService {
   static const _prefsFallbackKey = 'global_env_groups_fallback_v1';
   static const _secureKeyPrefix = 'env_group_';
 
+  /// Resets in-memory caches and secure-storage cache. Used by tests to avoid
+  /// stale values leaking across test cases.
+  @visibleForTesting
+  void resetForTesting() {
+    _loadAllCache = null;
+    _loadAllInFlight = null;
+    _loadAllCacheSignature = null;
+    _storage.clearCache();
+  }
+
   String _canonicalGroupId(String groupId) {
     if (groupId.startsWith(_secureKeyPrefix)) {
       return groupId.substring(_secureKeyPrefix.length);

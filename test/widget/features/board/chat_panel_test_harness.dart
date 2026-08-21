@@ -29,6 +29,9 @@ class ChatTestPlatformDirs extends PlatformDirs {
   String get dataDir => '$root/data';
 
   @override
+  String? get userHome => null;
+
+  @override
   String get logsDir => '$root/logs';
 
   @override
