@@ -840,12 +840,13 @@ class TerminalCubit extends Cubit<TerminalState> {
     final buf = _ptyTailBuffers.putIfAbsent(sessionId, StringBuffer.new)
       ..write(data);
     final tail = buf.toString();
-    if (tail.length > _ptyTailMaxLen) {
-      final trimmed = tail.substring(tail.length - _ptyTailMaxLen);
-      buf.clear();
-      buf.write(trimmed);
+    if (tail.length <= _ptyTailMaxLen) {
+      return tail;
     }
-    return buf.toString();
+    final trimmed = tail.substring(tail.length - _ptyTailMaxLen);
+    buf.clear();
+    buf.write(trimmed);
+    return trimmed;
   }
 
   /// Handles approval-dialog detection for one PTY activity chunk.

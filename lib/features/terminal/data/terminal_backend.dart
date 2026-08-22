@@ -27,7 +27,10 @@ class _BufferedUtf8Decoder extends StreamTransformerBase<List<int>, String> {
         carry = combined;
         return '';
       }
-      final toDecode = combined.sublist(0, validLen);
+      // Reuse the list when fully valid (common case) — the decoder does not
+      // retain it; sublist copies only when an incomplete tail exists.
+      final toDecode =
+          validLen == combined.length ? combined : combined.sublist(0, validLen);
       carry = combined.sublist(validLen);
       return decoder.convert(toDecode);
     }).where((s) => s.isNotEmpty);
