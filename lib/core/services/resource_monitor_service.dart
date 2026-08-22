@@ -770,8 +770,13 @@ class ResourceMonitorService {
 
   Future<void> _collectProcessesPosix() async {
     _processNames.clear();
-    // Single ps call: pid ppid cpu rss.
-    final psResult = await Process.run('ps', ['-eo', 'pid=,ppid=,pcpu=,rss=']);
+    // Single ps call: pid ppid cpu rss comm (comm is the last column, so the
+    // first four whitespace-separated fields are numeric and the remainder is
+    // the process name — one spawn per poll instead of two).
+    final psResult = await Process.run('ps', [
+      '-eo',
+      'pid=,ppid=,pcpu=,rss=,comm=',
+    ]);
     if (psResult.exitCode == 0) {
       for (final line in (psResult.stdout as String).split('\n')) {
         final parts = line.trim().split(RegExp(r'\s+'));
@@ -788,17 +793,9 @@ class ResourceMonitorService {
           memoryBytes: rssKb * 1024,
         );
         _childrenOf.putIfAbsent(pp, () => []).add(p);
-      }
-    }
-    // Second ps call to get process names for agent detection.
-    final commResult = await Process.run('ps', ['-eo', 'pid=,comm=']);
-    if (commResult.exitCode == 0) {
-      for (final line in (commResult.stdout as String).split('\n')) {
-        final parts = line.trim().split(RegExp(r'\s+'));
-        if (parts.length < 2) continue;
-        final p = int.tryParse(parts[0]);
-        if (p == null) continue;
-        _processNames[p] = parts.sublist(1).join(' ');
+        if (parts.length > 4) {
+          _processNames[p] = parts.sublist(4).join(' ');
+        }
       }
     }
   }
