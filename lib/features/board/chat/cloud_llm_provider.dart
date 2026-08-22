@@ -215,7 +215,7 @@ class CloudLlmProvider extends ChatProvider {
       if (_cancelRequested[session] == true) break;
 
       // Reset emitted each iteration — only keep final response text.
-      loopState.emitted = '';
+      loopState.emitted.clear();
 
       // ignore: avoid_print
       print(
@@ -249,7 +249,9 @@ class CloudLlmProvider extends ChatProvider {
           controller: controller,
         );
         if (response.directReply != null && response.directReply!.isNotEmpty) {
-          loopState.emitted = response.directReply!;
+          loopState.emitted
+            ..clear()
+            ..write(response.directReply!);
           break;
         }
         continue;
@@ -257,7 +259,9 @@ class CloudLlmProvider extends ChatProvider {
 
       // No tool calls — done.
       if (response.content != null && response.content!.isNotEmpty) {
-        loopState.emitted = response.content!;
+        loopState.emitted
+          ..clear()
+          ..write(response.content!);
         break;
       }
       if (!loopState.retriedAfterEmptyResponse) {
@@ -280,7 +284,7 @@ class CloudLlmProvider extends ChatProvider {
       loopState.firstTokenMs = stopwatch.elapsedMilliseconds;
     }
     loopState.streamedChunks++;
-    loopState.emitted += delta;
+    loopState.emitted.write(delta);
     controller.add(
       ChatEvent(
         type: ChatEventType.assistantDelta,
@@ -402,7 +406,7 @@ class CloudLlmProvider extends ChatProvider {
 
   /// Computes the final user-visible content from the loop state.
   String _finalizeContent(_CloudLoopState loopState, String message) {
-    var content = _stripThinkTags(loopState.emitted.trim());
+    var content = _stripThinkTags(loopState.emitted.toString().trim());
     if (content.isEmpty) {
       if (loopState.hadToolCalls) {
         content = _looksCyrillic(message) ? 'Готово.' : 'Done.';
@@ -851,7 +855,7 @@ class CloudLlmProvider extends ChatProvider {
       final textDelta =
           (delta?['content'] as String?) ?? (message?['content'] as String?);
       if (textDelta != null && textDelta.isNotEmpty) {
-        sseState.content += textDelta;
+        sseState.content.write(textDelta);
         onDelta(textDelta);
       }
 
@@ -987,7 +991,7 @@ class CloudLlmProvider extends ChatProvider {
     }).toList();
 
     return _ApiResponse(
-      content: sseState.content.isNotEmpty ? sseState.content : null,
+      content: sseState.content.isNotEmpty ? sseState.content.toString() : null,
       toolCalls: parsedToolCalls,
     );
   }
@@ -1075,7 +1079,9 @@ class _ToolCallAccumulator {
 
 /// Mutable state threaded through the agentic loop of a single request.
 class _CloudLoopState {
-  String emitted = '';
+  /// Accumulated streamed text. StringBuffer, not String: appending per token
+  /// to a growing String is O(n^2) copying over a long reply.
+  final emitted = StringBuffer();
   int streamedChunks = 0;
   int firstTokenMs = -1;
   bool hadToolCalls = false;
@@ -1084,6 +1090,8 @@ class _CloudLoopState {
 
 /// Accumulates parsed SSE stream state during a single API call.
 class _SseParseState {
-  String content = '';
+  /// Streamed text content. StringBuffer: per-token `+=` on a growing String
+  /// is O(n^2) copying.
+  final content = StringBuffer();
   final Set<_ToolCallAccumulator> toolCalls = <_ToolCallAccumulator>{};
 }
