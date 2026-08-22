@@ -39,6 +39,21 @@ class ChatSession extends ChangeNotifier {
   String? _copilotSessionId;
   String? _cursorSessionId;
 
+  /// Streaming deltas are accumulated here and flushed into
+  /// [_streamingContent] at most once per [_deltaFlushInterval]. Streaming
+  /// providers emit several deltas per second (one per token); appending each
+  /// directly to the growing string is O(n²) copying, and notifying listeners
+  /// per token re-renders the whole markdown bubble hundreds of times per
+  /// second — that was the dominant main-thread + GC cost while an agent
+  /// streams. Flushing at ~16/s keeps the typewriter feel at a fraction of
+  /// the cost. The buffer is flushed synchronously before any non-delta
+  /// event, stream end/error, stop, and finalize, so no content is ever lost
+  /// or reordered.
+  static const _deltaFlushInterval = Duration(milliseconds: 60);
+  final _deltaBuffer = StringBuffer();
+  Timer? _deltaFlushTimer;
+  ChatEvent? _lastDeltaEvent;
+
   String _getAdapterFor(String providerId) {
     final agentConfig = AgentConfigService.instance.configForAgent(providerId);
     return agentConfig?.streamAdapter ?? providerId;
@@ -310,6 +325,7 @@ class ChatSession extends ChangeNotifier {
     if (onDone != null) _uiDoneCallback = onDone;
 
     // If currently streaming, finalize
+    _flushDeltaBuffer();
     if (_streamingMessageId != null && _streamingContent.isNotEmpty) {
       _finalizeStreamingMessage();
     }
@@ -378,12 +394,26 @@ class ChatSession extends ChangeNotifier {
     _eventSub?.cancel();
     _eventSub = stream.listen(
       (event) {
+        // Delta events are coalesced (see [_deltaFlushInterval]); everything
+        // else flushes pending deltas first to preserve event ordering.
+        if (event.type == ChatEventType.assistantDelta &&
+            event.deltaContent != null) {
+          _onAssistantDelta(event);
+          return;
+        }
+        _flushDeltaBuffer();
         _handleCoreEvent(event);
         // Forward to UI if attached
         _uiEventCallback?.call(event);
       },
-      onError: (Object error) => _handleStreamError(error, wasFirstMessage),
-      onDone: _handleStreamDone,
+      onError: (Object error) {
+        _flushDeltaBuffer();
+        _handleStreamError(error, wasFirstMessage);
+      },
+      onDone: () {
+        _flushDeltaBuffer();
+        _handleStreamDone();
+      },
     );
   }
 
@@ -494,6 +524,7 @@ class ChatSession extends ChangeNotifier {
   Future<void> stopStreaming() async {
     _eventSub?.cancel();
     _eventSub = null;
+    _flushDeltaBuffer();
     if (_streamingMessageId != null && _streamingContent.isNotEmpty) {
       _finalizeStreamingMessage();
     }
@@ -558,10 +589,37 @@ class ChatSession extends ChangeNotifier {
 
   void _onAssistantDelta(ChatEvent event) {
     final delta = event.deltaContent;
-    if (delta != null) {
-      _streamingContent += delta;
-      notifyListeners();
-    }
+    if (delta == null) return;
+    _deltaBuffer.write(delta);
+    _lastDeltaEvent = event;
+    if (_deltaFlushTimer?.isActive ?? false) return;
+    _deltaFlushTimer = Timer(_deltaFlushInterval, _flushDeltaBuffer);
+  }
+
+  /// Moves buffered deltas into [_streamingContent] and notifies/forwards a
+  /// single merged delta event. Called by the flush timer and synchronously
+  /// before any non-delta event, stream end/error, stop, or finalize.
+  void _flushDeltaBuffer() {
+    _deltaFlushTimer?.cancel();
+    _deltaFlushTimer = null;
+    if (_deltaBuffer.isEmpty) return;
+    final chunk = _deltaBuffer.toString();
+    _deltaBuffer.clear();
+    _streamingContent += chunk;
+    notifyListeners();
+    final last = _lastDeltaEvent;
+    if (last == null) return;
+    _uiEventCallback?.call(
+      ChatEvent(
+        type: last.type,
+        rawType: last.rawType,
+        data: <String, dynamic>{...last.data, 'deltaContent': chunk},
+        id: last.id,
+        timestamp: last.timestamp,
+        parentId: last.parentId,
+        ephemeral: last.ephemeral,
+      ),
+    );
   }
 
   void _onAssistantMessage(ChatEvent event) {
@@ -776,6 +834,8 @@ class ChatSession extends ChangeNotifier {
 
   @override
   void dispose() {
+    _deltaFlushTimer?.cancel();
+    _deltaFlushTimer = null;
     _eventSub?.cancel();
     _provider.dispose();
     super.dispose();

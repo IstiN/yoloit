@@ -453,7 +453,8 @@ void main() {
 
       await h.typeAndSend(tester, 'hi cursor');
       h.fake.emit(chatDeltaEvent('yo'));
-      await tester.pump();
+      // Delta events are coalesced by the session core (~60ms flush).
+      await tester.pump(const Duration(milliseconds: 70));
 
       // _captureProviderSessionIds persisted the cursor session id early.
       expect(h.updates.any((u) => u['cursorSessionId'] == 'cur-1'), isTrue);
