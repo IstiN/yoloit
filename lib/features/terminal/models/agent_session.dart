@@ -61,7 +61,15 @@ class AgentSession extends Equatable {
   /// Rolling buffer of RAW PTY bytes (with ANSI) — replayed to new remote
   /// guests so they see the full current terminal state, not just new data.
   /// Capped at [_maxRawBytes] to bound memory.
-  final StringBuffer _rawBuffer = StringBuffer();
+  ///
+  /// Stored as a chunk list with a running length instead of a single
+  /// StringBuffer: trimming a StringBuffer requires toString()+substring on
+  /// the whole ~256 KiB on EVERY flush once the cap is reached, which was a
+  /// major source of GC churn while typing. Trimming here only advances an
+  /// offset; compaction is amortized (once per 512 dropped chunks).
+  final List<String> _rawChunks = [];
+  int _rawChunksStart = 0;
+  int _rawLength = 0;
 
   static const _maxRecentLines = 300;
   static const _maxRawBytes = 256 * 1024; // 256 KiB raw ANSI history
@@ -76,11 +84,16 @@ class AgentSession extends Equatable {
     }
 
     // Append raw bytes to rolling buffer (trim when over limit).
-    _rawBuffer.write(rawData);
-    if (_rawBuffer.length > _maxRawBytes) {
-      final s = _rawBuffer.toString();
-      _rawBuffer.clear();
-      _rawBuffer.write(s.substring(s.length - _maxRawBytes));
+    _rawChunks.add(rawData);
+    _rawLength += rawData.length;
+    while (_rawLength > _maxRawBytes &&
+        _rawChunksStart < _rawChunks.length - 1) {
+      _rawLength -= _rawChunks[_rawChunksStart].length;
+      _rawChunksStart++;
+    }
+    if (_rawChunksStart >= 512) {
+      _rawChunks.removeRange(0, _rawChunksStart);
+      _rawChunksStart = 0;
     }
 
     // Push RAW bytes (with ANSI) so remote web guests can render via xterm.
@@ -89,7 +102,16 @@ class AgentSession extends Equatable {
 
   /// Returns accumulated raw PTY bytes since the session started (capped).
   /// Used to replay history to newly-connected web guests.
-  String rawHistory() => _rawBuffer.toString();
+  String rawHistory() {
+    if (_rawChunksStart == 0 && _rawChunks.length == 1) {
+      return _rawChunks.first;
+    }
+    final buf = StringBuffer();
+    for (var i = _rawChunksStart; i < _rawChunks.length; i++) {
+      buf.write(_rawChunks[i]);
+    }
+    return buf.toString();
+  }
 
   /// Last [n] non-empty plain-text lines for display in the browser.
   /// Falls back to reading the xterm buffer when the ring buffer is still empty

@@ -19,7 +19,9 @@ class _BufferedUtf8Decoder extends StreamTransformerBase<List<int>, String> {
     const decoder = Utf8Decoder(allowMalformed: true);
     var carry = <int>[];
     return stream.map((chunk) {
-      final combined = [...carry, ...chunk];
+      // Avoid the spread-copy when there is no incomplete tail from the
+      // previous chunk (the overwhelmingly common case).
+      final combined = carry.isEmpty ? chunk : [...carry, ...chunk];
       final validLen = _validUtf8Length(combined);
       if (validLen == 0) {
         carry = combined;
