@@ -115,125 +115,146 @@ class _UnifiedPanelHeaderState extends State<UnifiedPanelHeader> {
       padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
         color: headerColor,
-        borderRadius: const BorderRadius.vertical(
-          top: Radius.circular(16),
-        ),
-        border: Border(
-          bottom: BorderSide(color: colors.divider),
-        ),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+        border: Border(bottom: BorderSide(color: colors.divider)),
       ),
-      child: Row(
-        children: [
-          HeaderIconButton(
-            icon: Icons.drag_indicator,
-            tooltip: panel.locked ? 'Panel is locked' : 'Move panel',
-            onPressed: () {},
-          ),
-          const SizedBox(width: 8),
-          widget.leadingIcon ?? _PanelIcon(plugin: plugin),
-          const SizedBox(width: 8),
-          Expanded(
-            child: _editing
-                ? TextField(
-                    controller: _controller,
-                    focusNode: _focusNode,
-                    style: TextStyle(
-                      color: colors.textPrimary,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13,
-                    ),
-                    decoration: const InputDecoration(
-                      isDense: true,
-                      contentPadding: EdgeInsets.zero,
-                      border: InputBorder.none,
-                    ),
-                    onSubmitted: (_) => _commitRename(),
-                    onTapOutside: (_) => _commitRename(),
-                  )
-                : Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Flexible(
-                        child: Text(
-                          panel.title,
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
-                          style: TextStyle(
-                            color: colors.textPrimary,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-          ),
-          if (_editing)
-            HeaderIconButton(
-              icon: Icons.check,
-              tooltip: 'Confirm rename',
-              onPressed: _commitRename,
-            )
-          else
-            HeaderIconButton(
-              icon: Icons.edit_outlined,
-              tooltip: 'Rename panel',
-              onPressed: _startEditing,
-            ),
-          Flexible(
-            fit: FlexFit.loose,
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              reverse: true,
-              physics: const ClampingScrollPhysics(),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (widget.remoteLockActor != null)
-                    HeaderIconButton(
-                      icon: Icons.lock_outline,
-                      tooltip: 'Editing by ${widget.remoteLockActor}',
-                      onPressed: () {},
-                    )
-                  else ...[
-                    HeaderIconButton(
-                      icon: Icons.copy,
-                      tooltip: 'Duplicate panel',
-                      onPressed: widget.onDuplicate,
-                    ),
-                    HeaderIconButton(
-                      icon: Icons.format_color_fill,
-                      tooltip: 'Panel color',
-                      onPressed: widget.onEditColor,
-                      swatch: accent == Colors.transparent ? null : accent,
-                    ),
-                    if (widget.onEdit != null)
-                      HeaderIconButton(
-                        icon: Icons.edit_outlined,
-                        tooltip: 'Edit content',
-                        onPressed: widget.onEdit!,
-                      ),
-                  ],
-                  ...widget.pluginActions,
-                  PanelOverflowMenu(
-                    onToggleLocked: widget.onToggleLocked,
-                    locked: panel.locked,
-                    onBringToFront: widget.onBringToFront,
-                    onSendToBack: widget.onSendToBack,
-                    onFullscreen: widget.onFullscreen,
-                    onSettings: widget.onSettings,
-                    onDelete: widget.onDelete,
-                  ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final actionsRow = Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (widget.remoteLockActor != null)
+                HeaderIconButton(
+                  icon: Icons.lock_outline,
+                  tooltip: 'Editing by ${widget.remoteLockActor}',
+                  onPressed: () {},
+                )
+              else ...[
+                HeaderIconButton(
+                  icon: Icons.copy,
+                  tooltip: 'Duplicate panel',
+                  onPressed: widget.onDuplicate,
+                ),
+                HeaderIconButton(
+                  icon: Icons.format_color_fill,
+                  tooltip: 'Panel color',
+                  onPressed: widget.onEditColor,
+                  swatch: accent == Colors.transparent ? null : accent,
+                ),
+                if (widget.onEdit != null)
                   HeaderIconButton(
-                    icon: Icons.close,
-                    tooltip: 'Remove panel',
-                    onPressed: widget.onDelete,
+                    icon: Icons.edit_outlined,
+                    tooltip: 'Edit content',
+                    onPressed: widget.onEdit!,
                   ),
-                ],
+              ],
+              ...widget.pluginActions,
+              PanelOverflowMenu(
+                onToggleLocked: widget.onToggleLocked,
+                locked: panel.locked,
+                onBringToFront: widget.onBringToFront,
+                onSendToBack: widget.onSendToBack,
+                onFullscreen: widget.onFullscreen,
+                onSettings: widget.onSettings,
+                onDelete: widget.onDelete,
               ),
-            ),
-          ),
-        ],
+              HeaderIconButton(
+                icon: Icons.close,
+                tooltip: 'Remove panel',
+                onPressed: widget.onDelete,
+              ),
+            ],
+          );
+          // Rough natural width of the actions row: each action is a 28x28
+          // HeaderIconButton. Used to decide between a fixed (right-aligned)
+          // row and a scrollable flexible one for very narrow panels.
+          final actionCount =
+              (widget.remoteLockActor != null ? 1 : 2) +
+              (widget.onEdit != null && widget.remoteLockActor == null
+                  ? 1
+                  : 0) +
+              widget.pluginActions.length +
+              2; // overflow menu + close
+          final estimatedActionsWidth = actionCount * 28.0;
+          // Chrome before the title: drag handle + icon + spacings + edit
+          // button; keep at least ~120px for the title text.
+          const minTitleChromeWidth = 28.0 + 8 + 16 + 8 + 28 + 120;
+          final actionsFit =
+              constraints.maxWidth >=
+              estimatedActionsWidth + minTitleChromeWidth;
+          return Row(
+            children: [
+              HeaderIconButton(
+                icon: Icons.drag_indicator,
+                tooltip: panel.locked ? 'Panel is locked' : 'Move panel',
+                onPressed: () {},
+              ),
+              const SizedBox(width: 8),
+              widget.leadingIcon ?? _PanelIcon(plugin: plugin),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _editing
+                    ? TextField(
+                        controller: _controller,
+                        focusNode: _focusNode,
+                        style: TextStyle(
+                          color: colors.textPrimary,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                        decoration: const InputDecoration(
+                          isDense: true,
+                          contentPadding: EdgeInsets.zero,
+                          border: InputBorder.none,
+                        ),
+                        onSubmitted: (_) => _commitRename(),
+                        onTapOutside: (_) => _commitRename(),
+                      )
+                    : Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              panel.title,
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                              style: TextStyle(
+                                color: colors.textPrimary,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
+              if (_editing)
+                HeaderIconButton(
+                  icon: Icons.check,
+                  tooltip: 'Confirm rename',
+                  onPressed: _commitRename,
+                )
+              else
+                HeaderIconButton(
+                  icon: Icons.edit_outlined,
+                  tooltip: 'Rename panel',
+                  onPressed: _startEditing,
+                ),
+              if (actionsFit)
+                actionsRow
+              else
+                Flexible(
+                  fit: FlexFit.loose,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    reverse: true,
+                    physics: const ClampingScrollPhysics(),
+                    child: actionsRow,
+                  ),
+                ),
+            ],
+          );
+        },
       ),
     );
   }
