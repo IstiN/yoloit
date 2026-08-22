@@ -121,23 +121,27 @@ class AssistantBubbleState extends State<AssistantBubble> {
                         child: Padding(
                           padding: const EdgeInsets.all(12),
                           child: RepaintBoundary(
-                            child: SelectionArea(
-                              child: MarkdownBody(
-                                data: processedContent,
-                                selectable: false,
-                                onTapLink: (text, href, title) {
-                                  if (widget.onLinkTap != null) {
-                                    widget.onLinkTap!(href);
-                                  } else if (href != null && href.isNotEmpty) {
-                                    PlatformLauncher.instance.openUrl(href);
-                                  }
-                                },
-                                styleSheet: chatMarkdownStyle(
-                                  context: context,
-                                  colors: colors,
-                                  textColor: textColor,
-                                  codeBg: codeBg,
-                                ),
+                            // No SelectionArea here: streaming rebuilds
+                            // unmount selectables between registration and the
+                            // post-frame _flushAdditions sort, throwing
+                            // getTransformTo NPEs every frame
+                            // (flutter/flutter#184400, unfixed as of 3.47.x).
+                            // Copy is available via ChatBubbleMenu.
+                            child: MarkdownBody(
+                              data: processedContent,
+                              selectable: false,
+                              onTapLink: (text, href, title) {
+                                if (widget.onLinkTap != null) {
+                                  widget.onLinkTap!(href);
+                                } else if (href != null && href.isNotEmpty) {
+                                  PlatformLauncher.instance.openUrl(href);
+                                }
+                              },
+                              styleSheet: chatMarkdownStyle(
+                                context: context,
+                                colors: colors,
+                                textColor: textColor,
+                                codeBg: codeBg,
                               ),
                             ),
                           ),

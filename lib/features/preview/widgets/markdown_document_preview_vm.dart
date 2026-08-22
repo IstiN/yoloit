@@ -100,6 +100,10 @@ class _MarkdownDocumentPreviewState extends State<MarkdownDocumentPreview> {
       return mdBody;
     }
 
-    return RepaintBoundary(child: SelectionArea(child: mdBody));
+    // No SelectionArea: the ValueKey(_rendererReady) swap unmounts
+    // selectables between registration and the post-frame _flushAdditions
+    // sort, throwing getTransformTo NPEs every frame
+    // (flutter/flutter#184400, unfixed as of 3.47.x).
+    return RepaintBoundary(child: mdBody);
   }
 }

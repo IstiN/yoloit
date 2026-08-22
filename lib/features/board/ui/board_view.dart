@@ -413,7 +413,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
         .where(
           (b) =>
               b.id != activeBoardId &&
-              b.panels.isNotEmpty &&
+              (b.panels.isNotEmpty || b.drawings.any((d) => !d.hidden)) &&
               !_previewCache.isFresh(b, themeKey: _previewThemeKey),
         )
         .toList();

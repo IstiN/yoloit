@@ -34,7 +34,7 @@ class BoardPreviewCache {
   ///
   /// Overview thumbnails always fit all panels (not viewport), so viewport is
   /// intentionally excluded. Bump [_renderMode] when capture logic changes.
-  static const _renderMode = 'fit-all-v2';
+  static const _renderMode = 'fit-all-v3';
 
   static String fingerprint(BoardDocument board, {String themeKey = ''}) {
     return '$_renderMode:${historyRevisionOf(board)}:$themeKey';

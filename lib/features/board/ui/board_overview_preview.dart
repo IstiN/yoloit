@@ -8,6 +8,7 @@ import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
+import 'package:yoloit/features/board/ui/board_drawing_widgets.dart';
 import 'package:yoloit/features/board/ui/widgets/board_panel_chrome.dart';
 
 class BoardOverviewPreview extends StatelessWidget {
@@ -109,15 +110,23 @@ class BoardCanvasPreview extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final panels = board.panels.where((panel) => !panel.hidden).toList();
+    final drawings =
+        board.drawings.where((drawing) => !drawing.hidden).toList();
     return LayoutBuilder(
       builder: (context, constraints) {
         final size = Size(constraints.maxWidth, constraints.maxHeight);
-        if (panels.isEmpty) {
+        if (panels.isEmpty && drawings.isEmpty) {
           return ColoredBox(color: colors.background);
         }
 
         final Matrix4 matrix;
-        final bounds = boundsForBoardPanels(panels).inflate(120);
+        var bounds = panels.isNotEmpty
+            ? boundsForBoardPanels(panels)
+            : drawings.first.bounds;
+        for (final drawing in drawings) {
+          bounds = bounds.expandToInclude(drawing.bounds);
+        }
+        bounds = bounds.inflate(120);
 
         if (useViewport) {
           matrix = Matrix4.identity()
@@ -160,6 +169,14 @@ class BoardCanvasPreview extends StatelessWidget {
                   Positioned.fromRect(
                     rect: panel.bounds.rect,
                     child: _OffscreenPanelCard(panel: panel),
+                  ),
+                // Freehand drawings: static CustomPaint only (no gestures).
+                for (final drawing in drawings)
+                  Positioned.fromRect(
+                    rect: drawing.bounds,
+                    child: CustomPaint(
+                      painter: DrawingElementPainter(drawing: drawing),
+                    ),
                   ),
               ],
             ),
@@ -402,7 +419,13 @@ class BoardOverviewPanelContent extends StatelessWidget {
             (isFullScaleCanvas && panel.type == 'board.widget.custom');
 
         if (!supportsRender) {
-          child = _buildHeadlessMockup(context, panel, plugin);
+          // Mockups must not tick: the terminal mockup contains a repeating
+          // pulse animation that otherwise repaints the whole overview layer
+          // every frame for every mocked panel.
+          child = TickerMode(
+            enabled: false,
+            child: _buildHeadlessMockup(context, panel, plugin),
+          );
         } else {
           // Mark previews as headless so shared engine-backed content (e.g.
           // scene3d GameWidget) renders a placeholder instead of stealing the

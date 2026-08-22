@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -1868,8 +1869,11 @@ class _ConsoleState extends State<_Console> {
 }
 
 /// Renders output lines with ListView.builder so only visible lines are
-/// laid out. Selection is enabled via [SelectionArea]; copy-all is handled
-/// by the parent [_ConsoleState] keyboard shortcut.
+/// laid out. No SelectionArea: scrolling/appending unmounts selectables
+/// between registration and the post-frame _flushAdditions sort, throwing
+/// getTransformTo NPEs every frame (flutter/flutter#184400, unfixed as of
+/// 3.47.x). Copy-all is handled by the parent [_ConsoleState] keyboard
+/// shortcut.
 class _FullLogView extends StatelessWidget {
   const _FullLogView({required this.output, required this.scrollController});
 
@@ -1899,24 +1903,22 @@ class _FullLogView extends StatelessWidget {
 
     return Scrollbar(
       controller: scrollController,
-      child: SelectionArea(
-        child: ListView.builder(
-          controller: scrollController,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          itemCount: output.length,
-          itemBuilder: (context, index) {
-            final line = output[index];
-            return Text(
-              _stripAnsi(line.text),
-              style: TextStyle(
-                color: _lineColor(line, colors),
-                fontSize: 12,
-                fontFamily: 'monospace',
-                height: 1.4,
-              ),
-            );
-          },
-        ),
+      child: ListView.builder(
+        controller: scrollController,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        itemCount: output.length,
+        itemBuilder: (context, index) {
+          final line = output[index];
+          return Text(
+            _stripAnsi(line.text),
+            style: TextStyle(
+              color: _lineColor(line, colors),
+              fontSize: 12,
+              fontFamily: 'monospace',
+              height: 1.4,
+            ),
+          );
+        },
       ),
     );
   }
@@ -2044,41 +2046,36 @@ class _PulsingDot extends StatefulWidget {
   State<_PulsingDot> createState() => _PulsingDotState();
 }
 
-class _PulsingDotState extends State<_PulsingDot>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  late final Animation<double> _anim;
+class _PulsingDotState extends State<_PulsingDot> {
+  // Timer-based blink instead of a perpetual vsync AnimationController:
+  // the board canvas shares a single screenshot RepaintBoundary, so a
+  // `repeat()` ticker repaints/rasterizes the whole canvas every frame.
+  static const _blinkInterval = Duration(milliseconds: 700);
+  static const _dimAlpha = 102; // 0.4 * 255
+  Timer? _timer;
+  bool _on = true;
 
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 900),
-    )..repeat(reverse: true);
-    _anim = Tween<double>(
-      begin: 0.4,
-      end: 1.0,
-    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
+    _timer = Timer.periodic(_blinkInterval, (_) {
+      if (mounted) setState(() => _on = !_on);
+    });
   }
 
   @override
   void dispose() {
-    _ctrl.dispose();
+    _timer?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _anim,
-      builder:
-          (context, child) => Container(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: widget.color.withAlpha((_anim.value * 255).round()),
-            ),
-          ),
+    return Container(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: widget.color.withAlpha(_on ? 255 : _dimAlpha),
+      ),
     );
   }
 }

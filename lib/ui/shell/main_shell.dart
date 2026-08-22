@@ -114,6 +114,15 @@ class _MainShellState extends State<MainShell> with WindowListener {
     super.dispose();
   }
 
+  // Slow down the resource monitor (several `ps`/`sysctl` spawns per poll)
+  // while the window is not focused.
+  @override
+  void onWindowBlur() =>
+      ResourceMonitorService.instance.setInteractive(false);
+
+  @override
+  void onWindowFocus() => ResourceMonitorService.instance.setInteractive(true);
+
   Future<void> _loadSessionAndInit() async {
     final snap = await SessionPrefs.load();
     if (!mounted) return;
@@ -1350,7 +1359,7 @@ class _ResourceChipState extends State<_ResourceChip> {
             Icon(Icons.memory, size: 12, color: colors.primary),
             const SizedBox(width: 5),
             Text(
-              cpu > 0 ? '${cpu.toStringAsFixed(1)}%  $mem' : mem,
+              '${cpu.toStringAsFixed(1)}%  $mem',
               style: TextStyle(
                 color: textColor,
                 fontSize: 11,

@@ -339,7 +339,7 @@ class ResourceMonitorService {
   ResourceMonitorService._();
   static final instance = ResourceMonitorService._();
 
-  static const _interactiveInterval = Duration(seconds: 2);
+  static const _interactiveInterval = Duration(seconds: 10);
   static const _backgroundInterval = Duration(seconds: 15);
 
   static const _agentNames = [

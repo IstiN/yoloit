@@ -67,7 +67,8 @@ class BoardOffscreenRenderer {
     bool useViewport = true,
   }) async {
     final panels = board.panels.where((p) => !p.hidden).toList();
-    if (panels.isEmpty) return null;
+    final hasDrawings = board.drawings.any((d) => !d.hidden);
+    if (panels.isEmpty && !hasDrawings) return null;
     final theme = ThemeManager.instance.theme;
     final colors =
         theme.extension<AppColorScheme>() ??

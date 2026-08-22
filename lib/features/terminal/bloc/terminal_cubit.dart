@@ -693,13 +693,16 @@ class TerminalCubit extends Cubit<TerminalState> {
     }
 
     void scheduleFlush() {
-      _batchFlushTimers[sessionId]?.cancel();
-      _batchFlushTimers[sessionId] = Timer(
-        const Duration(milliseconds: _batchFlushIntervalMs),
-        () {
+      // Do not reset an already-scheduled flush: recreating the timer on
+      // every chunk starves it under continuous output, so the flush ends
+      // up running on every 16 KB (full terminal re-raster per flush)
+      // instead of ~20 times/sec.
+      _batchFlushTimers.putIfAbsent(
+        sessionId,
+        () => Timer(const Duration(milliseconds: _batchFlushIntervalMs), () {
           _batchFlushTimers.remove(sessionId);
           flushBatch();
-        },
+        }),
       );
     }
 
