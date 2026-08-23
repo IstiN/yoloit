@@ -32,6 +32,10 @@ class PtyService {
       environment: env,
       columns: 220,
       rows: 50,
+      // Backpressure: the native read thread waits for Pty.ackRead() after
+      // each chunk (acked in TerminalProcess.fromPty), so a busy UI isolate
+      // cannot be flooded faster than it processes output.
+      ackRead: true,
     );
 
     return _registerPty(sessionId, pty, label: label, metadata: metadata);
@@ -121,12 +125,26 @@ class PtyService {
     final pty = _ptys[sessionId];
     if (pty != null) {
       ResourceMonitorService.instance.unregisterSession(pty.pid);
-      pty.kill();
+      _hangupAndTerminate(pty);
     }
     _ptys.remove(sessionId);
     if (_tmuxSessions.remove(sessionId) && onKillTmux != null) {
       onKillTmux(sessionId);
     }
+  }
+
+  /// Sends SIGHUP before SIGTERM, like a real terminal emulator closing its
+  /// pty: shells and TUIs expect SIGHUP on terminal teardown and clean up
+  /// (save history, restore terminal modes) on it, while SIGTERM alone often
+  /// leaves orphaned children running.
+  static void _hangupAndTerminate(Pty pty) {
+    try {
+      pty.kill(ProcessSignal.sighup);
+    } catch (_) {
+      // Platform does not support signals (Windows) or the process is
+      // already gone — SIGTERM below is the fallback.
+    }
+    pty.kill();
   }
 
   /// Detaches all PTYs without killing tmux sessions (called on app exit).

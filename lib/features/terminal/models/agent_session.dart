@@ -50,9 +50,32 @@ class AgentSession extends Equatable {
   /// null = idle (session alive, agent not actively working).
   final AgentPhase? hookPhase;
 
-  /// Rolling plain-text buffer of recent PTY output (max 300 lines).
+  /// Rolling plain-text view of recent PTY output (max 300 lines).
   /// NOT included in [props] — mutations don't trigger state rebuilds.
-  final List<String> recentLines = [];
+  ///
+  /// Computed LAZILY from [_rawChunks]: splitting every flushed batch into
+  /// line Strings allocated millions of short-lived objects per second under
+  /// output floods. Instead we scan the retained raw chunks backwards for
+  /// '\n' boundaries and substring only the tail that can contain the last
+  /// [_maxRecentLines] lines, then strip ANSI and split just that tail.
+  /// ANSI/VT100 escape sequences never contain '\n', so line boundaries in
+  /// the raw buffer match the plain-text ones exactly.
+  List<String> get recentLines {
+    if (_recentLinesVersion == _outputVersion && _recentLinesCache != null) {
+      return _recentLinesCache!;
+    }
+    final tail = _rawTailForLines(_maxRecentLines);
+    final lines = tail.isEmpty ? <String>[] : stripAnsi(tail).split('\n');
+    _recentLinesVersion = _outputVersion;
+    _recentLinesCache = lines;
+    return lines;
+  }
+
+  /// Bumped on every output append; invalidates the lazy [recentLines] and
+  /// [lastLines] views.
+  int _outputVersion = 0;
+  int _recentLinesVersion = -1;
+  List<String>? _recentLinesCache;
 
   /// Last known scroll offset of the terminal view.
   /// NOT included in [props] — persisted across widget rebuilds.
@@ -74,18 +97,36 @@ class AgentSession extends Equatable {
   static const _maxRecentLines = 300;
   static const _maxRawBytes = 256 * 1024; // 256 KiB raw ANSI history
 
-  /// Append raw PTY data: strips ANSI codes, splits into lines, trims buffer.
+  /// Append raw PTY data: stores the chunk by reference and trims the
+  /// rolling raw buffer. The plain-text line view ([recentLines]) is built
+  /// lazily on read — nothing is split or stripped here.
   void appendOutput(String rawData) {
-    final plain = stripAnsi(rawData);
-    final incoming = plain.split('\n');
-    recentLines.addAll(incoming);
-    if (recentLines.length > _maxRecentLines) {
-      recentLines.removeRange(0, recentLines.length - _maxRecentLines);
-    }
-
-    // Append raw bytes to rolling buffer (trim when over limit).
     _rawChunks.add(rawData);
     _rawLength += rawData.length;
+    _trimRawChunks();
+    _outputVersion++;
+
+    // Push RAW bytes (with ANSI) so remote web guests can render via xterm.
+    TerminalOutputBus.instance.write(id, rawData);
+  }
+
+  /// Batch variant of [appendOutput]: stores each chunk by reference (no
+  /// join/copy) and pushes the same chunks to the output bus in order.
+  void appendOutputChunks(List<String> chunks) {
+    if (chunks.isEmpty) return;
+    for (final chunk in chunks) {
+      _rawChunks.add(chunk);
+      _rawLength += chunk.length;
+    }
+    _trimRawChunks();
+    _outputVersion++;
+
+    for (final chunk in chunks) {
+      TerminalOutputBus.instance.write(id, chunk);
+    }
+  }
+
+  void _trimRawChunks() {
     while (_rawLength > _maxRawBytes &&
         _rawChunksStart < _rawChunks.length - 1) {
       _rawLength -= _rawChunks[_rawChunksStart].length;
@@ -95,9 +136,38 @@ class AgentSession extends Equatable {
       _rawChunks.removeRange(0, _rawChunksStart);
       _rawChunksStart = 0;
     }
+  }
 
-    // Push RAW bytes (with ANSI) so remote web guests can render via xterm.
-    TerminalOutputBus.instance.write(id, rawData);
+  /// Returns the raw tail holding at most [maxLines] '\n'-separated
+  /// segments, scanning chunks backwards and copying only that tail.
+  String _rawTailForLines(int maxLines) {
+    if (_rawChunksStart >= _rawChunks.length) return '';
+    var newlines = 0;
+    for (var i = _rawChunks.length - 1; i >= _rawChunksStart; i--) {
+      final chunk = _rawChunks[i];
+      var pos = chunk.length;
+      while (pos > 0) {
+        final idx = chunk.lastIndexOf('\n', pos - 1);
+        if (idx < 0) break;
+        newlines++;
+        if (newlines >= maxLines) {
+          return _joinRawFrom(i, idx + 1);
+        }
+        pos = idx;
+      }
+    }
+    return _joinRawFrom(_rawChunksStart, 0);
+  }
+
+  String _joinRawFrom(int chunkIndex, int offset) {
+    if (chunkIndex == _rawChunks.length - 1) {
+      return _rawChunks[chunkIndex].substring(offset);
+    }
+    final buf = StringBuffer(_rawChunks[chunkIndex].substring(offset));
+    for (var i = chunkIndex + 1; i < _rawChunks.length; i++) {
+      buf.write(_rawChunks[i]);
+    }
+    return buf.toString();
   }
 
   /// Returns accumulated raw PTY bytes since the session started (capped).
@@ -117,24 +187,24 @@ class AgentSession extends Equatable {
   /// Falls back to reading the xterm buffer when the ring buffer is still empty
   /// (e.g., first snapshot right after app start with existing sessions).
   ///
-  /// Results are cached: repeated calls with the same [n] and unchanged
-  /// [recentLines] return the cached list without re-iterating.
-  int? _lastLinesHash;
+  /// Results are cached: repeated calls with the same [n] and no intervening
+  /// output return the cached list without re-iterating.
+  int _lastLinesVersion = -1;
   int _lastLinesN = -1;
   List<String>? _lastLinesCache;
 
   List<String> lastLines([int n = 80]) {
-    if (recentLines.isNotEmpty) {
-      // Cache hit: same n, same recentLines length (proxy for content change).
-      final fingerprint = recentLines.length;
+    final recent = recentLines;
+    if (recent.isNotEmpty) {
+      // Cache hit: same n, no output appended since the last computation.
       if (_lastLinesN == n &&
-          _lastLinesHash == fingerprint &&
+          _lastLinesVersion == _outputVersion &&
           _lastLinesCache != null) {
         return _lastLinesCache!;
       }
       _lastLinesN = n;
-      _lastLinesHash = fingerprint;
-      final nonEmpty = recentLines.where((l) => l.trim().isNotEmpty).toList();
+      _lastLinesVersion = _outputVersion;
+      final nonEmpty = recent.where((l) => l.trim().isNotEmpty).toList();
       _lastLinesCache = nonEmpty.length <= n
           ? nonEmpty
           : nonEmpty.sublist(nonEmpty.length - n);

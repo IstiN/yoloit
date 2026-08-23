@@ -162,6 +162,8 @@ class TmuxService {
       environment: env,
       columns: columns,
       rows: rows,
+      // See PtyService.launch — ack-based backpressure for the read thread.
+      ackRead: true,
     );
   }
 

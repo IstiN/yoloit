@@ -14,7 +14,9 @@ class TerminalOutputBus {
   Stream<(String, String)> get stream => _ctrl.stream;
 
   void write(String sessionId, String data) {
-    if (!_ctrl.isClosed) _ctrl.add((sessionId, data));
+    // Broadcast controllers buffer events when nobody listens — skip building
+    // the record entirely in that case (the common case outside collaboration).
+    if (!_ctrl.isClosed && _ctrl.hasListener) _ctrl.add((sessionId, data));
   }
 
   void dispose() => _ctrl.close();

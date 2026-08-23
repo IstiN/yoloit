@@ -28,7 +28,12 @@ class BoardTerminalSessionManager extends ChangeNotifier {
   // [notifyListeners] bridge on every PTY chunk. When a runner dumps
   // thousands of lines per second, each [Terminal.write] triggers a full
   // UI rebuild; batching reduces that to ~20 rebuilds/sec.
-  final Map<String, StringBuffer> _batchedOutput = {};
+  //
+  // Chunks are kept as a List<String> of the ORIGINAL chunk references with
+  // a running byte counter — a StringBuffer would copy every byte in and
+  // then copy the whole 16 KB batch out again on toString().
+  final Map<String, List<String>> _batchedOutput = {};
+  final Map<String, int> _batchedOutputBytes = {};
   final Map<String, Timer> _batchFlushTimers = {};
   static const _batchFlushIntervalMs = 50;
   static const _batchMaxBytes = 16384;
@@ -196,36 +201,44 @@ class BoardTerminalSessionManager extends ChangeNotifier {
     final sessionId = session.id;
 
     void flushBatch() {
-      final buf = _batchedOutput.remove(sessionId);
-      if (buf == null || buf.isEmpty) return;
-      final data = buf.toString();
-      session.terminal.write(data);
-      session.appendOutput(data);
+      final chunks = _batchedOutput.remove(sessionId);
+      _batchedOutputBytes.remove(sessionId);
+      if (chunks == null || chunks.isEmpty) return;
+      // Ordering is preserved exactly: chunks are written in arrival order.
+      for (final chunk in chunks) {
+        session.terminal.write(chunk);
+      }
+      session.appendOutputChunks(chunks);
     }
 
     void scheduleFlush() {
-      _batchFlushTimers[sessionId]?.cancel();
-      _batchFlushTimers[sessionId] = Timer(
-        const Duration(milliseconds: _batchFlushIntervalMs),
-        () {
+      // Do not reset an already-scheduled flush: recreating the timer on
+      // every chunk starves it under continuous output, so the flush ends
+      // up running on every 16 KB (full terminal re-raster per flush)
+      // instead of ~20 times/sec.
+      _batchFlushTimers.putIfAbsent(
+        sessionId,
+        () => Timer(const Duration(milliseconds: _batchFlushIntervalMs), () {
           _batchFlushTimers.remove(sessionId);
           flushBatch();
-        },
+        }),
       );
     }
 
     _outputSubs[sessionId] = process.output.listen(
       (data) {
-        // Accumulate into batch buffer.
-        final buf = _batchedOutput.putIfAbsent(sessionId, StringBuffer.new);
-        buf.write(data);
+        // Accumulate into batch buffer (chunk references, no copy).
+        final chunks = _batchedOutput.putIfAbsent(sessionId, () => <String>[]);
+        chunks.add(data);
+        final bytes = (_batchedOutputBytes[sessionId] ?? 0) + data.length;
 
         // Flush immediately if the batch is large, otherwise schedule.
-        if (buf.length >= _batchMaxBytes) {
+        if (bytes >= _batchMaxBytes) {
           _batchFlushTimers[sessionId]?.cancel();
           _batchFlushTimers.remove(sessionId);
           flushBatch();
         } else {
+          _batchedOutputBytes[sessionId] = bytes;
           scheduleFlush();
         }
       },

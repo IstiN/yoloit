@@ -151,6 +151,40 @@ void main() {
       expect(output, ['\uFFFDa']);
     });
   });
+
+  group('ack-on-data backpressure wrapper', () {
+    test('acks exactly once per delivered chunk', () async {
+      var acks = 0;
+      final chunks = [
+        [1, 2],
+        [3],
+        [4, 5, 6],
+      ];
+      final received = await TerminalProcess.ackOnDataForTesting(
+        () => acks++,
+        Stream.fromIterable(chunks),
+      ).toList();
+      expect(received, chunks);
+      expect(acks, chunks.length);
+    });
+
+    test('acks once more on cancel so the native read thread can exit',
+        () async {
+      var acks = 0;
+      final source = StreamController<List<int>>();
+      final stream = TerminalProcess.ackOnDataForTesting(
+        () => acks++,
+        source.stream,
+      );
+      final sub = stream.listen((_) {});
+      source.add([1]);
+      await Future<void>.delayed(Duration.zero);
+      expect(acks, 1);
+      await sub.cancel();
+      expect(acks, 2);
+      await source.close();
+    });
+  });
 }
 
 class _FakeRuntimeTerminalClient extends RuntimeTerminalClient {

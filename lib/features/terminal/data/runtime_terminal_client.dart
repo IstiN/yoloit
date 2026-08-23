@@ -30,6 +30,12 @@ class RuntimeTerminalClient {
   final HttpClient _http = HttpClient();
   int? _port;
 
+  /// Water marks (in bytes of pending stream lines) for the session-stream
+  /// backpressure in [streamSession]: pause the HTTP response above the high
+  /// mark, resume below the low mark.
+  static const _streamHighWatermarkBytes = 256 * 1024;
+  static const _streamLowWatermarkBytes = 64 * 1024;
+
   String get _portPath => '$runtimeHome/runtime.port';
   String get _pidPath => '$runtimeHome/runtime.pid';
 
@@ -185,17 +191,49 @@ class RuntimeTerminalClient {
         if (response.statusCode != 200) {
           throw StateError('Runtime stream failed: HTTP ${response.statusCode}');
         }
-        await for (final line in response
+        // Manual subscription with water-mark backpressure: when the consumer
+        // falls behind (UI busy), pause the HTTP response so unread output
+        // stays in the socket buffer / on the runtime side instead of growing
+        // Dart-side queues without bound.
+        final controller = StreamController<String>();
+        var pendingBytes = 0;
+        var pausedForBackpressure = false;
+        late final StreamSubscription<String> sub;
+        sub = response
             .transform(utf8.decoder)
-            .transform(const LineSplitter())) {
-          if (line.trim().isEmpty) continue;
-          final event = jsonDecode(line) as Map<String, dynamic>;
-          if (event['type'] == 'output') {
-            yield event['data'] as String? ?? '';
+            .transform(const LineSplitter())
+            .listen(
+          (line) {
+            pendingBytes += line.length;
+            controller.add(line);
+            if (!pausedForBackpressure &&
+                pendingBytes > _streamHighWatermarkBytes) {
+              pausedForBackpressure = true;
+              sub.pause();
+            }
+          },
+          onError: controller.addError,
+          onDone: controller.close,
+        );
+        try {
+          await for (final line in controller.stream) {
+            pendingBytes -= line.length;
+            if (pausedForBackpressure &&
+                pendingBytes < _streamLowWatermarkBytes) {
+              pausedForBackpressure = false;
+              sub.resume();
+            }
+            if (line.trim().isEmpty) continue;
+            final event = jsonDecode(line) as Map<String, dynamic>;
+            if (event['type'] == 'output') {
+              yield event['data'] as String? ?? '';
+            }
+            if (event['type'] == 'exit') {
+              return;
+            }
           }
-          if (event['type'] == 'exit') {
-            return;
-          }
+        } finally {
+          await sub.cancel();
         }
       } on StateError catch (e) {
         if (e.toString().contains('404')) {

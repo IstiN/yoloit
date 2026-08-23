@@ -82,11 +82,55 @@ class TerminalProcess {
 
   factory TerminalProcess.fromPty(Pty pty) {
     return TerminalProcess(
-      output: pty.output.cast<List<int>>().transform(
+      output: ackOnDataForTesting(pty.ackRead, pty.output.cast<List<int>>())
+          .transform(
         const _BufferedUtf8Decoder(),
       ),
       exitCode: pty.exitCode,
     );
+  }
+
+  /// flutter_pty is started with `ackRead: true` (see PtyService): the native
+  /// read thread blocks after every posted chunk until [Pty.ackRead] releases
+  /// it. This gives real backpressure — when the UI isolate is busy, unread
+  /// output stays in the kernel pty buffer (and the child process eventually
+  /// blocks on write) instead of piling up unboundedly in the Dart port queue.
+  ///
+  /// Contract: ack exactly once per delivered chunk, plus once on cancel so
+  /// the native thread can observe the closed fd and exit instead of blocking
+  /// on the ack mutex forever. At most one chunk is ever unacked, because the
+  /// native thread waits before reading the next one.
+  ///
+  /// Test seam: takes the ack as a closure so tests can count the calls
+  /// without a real PTY.
+  @visibleForTesting
+  static Stream<List<int>> ackOnDataForTesting(
+    void Function() ackRead,
+    Stream<List<int>> source,
+  ) {
+    return Stream.multi((controller) {
+      var sourceEnded = false;
+      final sub = source.listen(
+        (chunk) {
+          ackRead();
+          controller.add(chunk);
+        },
+        onError: (Object error, StackTrace stackTrace) {
+          sourceEnded = true;
+          controller.addError(error, stackTrace);
+        },
+        onDone: () {
+          sourceEnded = true;
+          controller.close();
+        },
+      );
+      controller.onCancel = () async {
+        // Only ack if the source is still live: after done/error the native
+        // read thread has already exited and no ack is owed.
+        if (!sourceEnded) ackRead();
+        await sub.cancel();
+      };
+    });
   }
 
   /// Test seam: exercises the buffered UTF-8 decoder without a real PTY.

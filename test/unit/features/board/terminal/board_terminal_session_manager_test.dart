@@ -23,6 +23,11 @@ class _FakeAgentSession extends AgentSession {
   void appendOutput(String rawData) {
     appended.add(rawData);
   }
+
+  @override
+  void appendOutputChunks(List<String> chunks) {
+    appended.add(chunks.join());
+  }
 }
 
 void main() {

@@ -900,6 +900,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
   Timer? _userScrollPreserveTimer;
   Timer? _resizeDebounce;
   Timer? _terminalDiagnosticsDebounce;
+  int _terminalDiagnosticsQuietTicks = 0;
   Offset? _clickDownPosition;
   String? _pendingTerminalDiagnosticsReason;
 
@@ -1163,11 +1164,23 @@ class TerminalWidgetState extends State<TerminalWidget> {
   void _scheduleTerminalDiagnostics(String reason) {
     if (!_terminalDiagnosticsEnabled || !mounted || !widget.isActive) return;
     _pendingTerminalDiagnosticsReason = reason;
-    _terminalDiagnosticsDebounce?.cancel();
-    _terminalDiagnosticsDebounce = Timer(const Duration(milliseconds: 2000), () {
-      if (!mounted || !widget.isActive) return;
-      _dumpTerminalDiagnostics(_pendingTerminalDiagnosticsReason ?? reason);
-    });
+    _terminalDiagnosticsQuietTicks = 0;
+    // A single periodic ticker instead of cancel+new Timer per buffer change:
+    // under output floods the debounce created thousands of Timer objects per
+    // second in debug builds. The ticker fires the dump once the buffer has
+    // been quiet for 4 ticks (2s) and then stops itself. Tick counting (not
+    // DateTime.now) keeps the debounce testable under fake async time.
+    _terminalDiagnosticsDebounce ??= Timer.periodic(
+      const Duration(milliseconds: 500),
+      (_) {
+        _terminalDiagnosticsQuietTicks++;
+        if (_terminalDiagnosticsQuietTicks < 4) return;
+        _terminalDiagnosticsDebounce?.cancel();
+        _terminalDiagnosticsDebounce = null;
+        if (!mounted || !widget.isActive) return;
+        _dumpTerminalDiagnostics(_pendingTerminalDiagnosticsReason ?? reason);
+      },
+    );
   }
 
   void _dumpTerminalDiagnostics(String reason) {
