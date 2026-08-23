@@ -45,11 +45,11 @@ class ChatSession extends ChangeNotifier {
   /// directly to the growing string is O(n²) copying, and notifying listeners
   /// per token re-renders the whole markdown bubble hundreds of times per
   /// second — that was the dominant main-thread + GC cost while an agent
-  /// streams. Flushing at ~16/s keeps the typewriter feel at a fraction of
+  /// streams. Flushing at ~10/s keeps the typewriter feel at a fraction of
   /// the cost. The buffer is flushed synchronously before any non-delta
   /// event, stream end/error, stop, and finalize, so no content is ever lost
   /// or reordered.
-  static const _deltaFlushInterval = Duration(milliseconds: 60);
+  static const _deltaFlushInterval = Duration(milliseconds: 100);
   final _deltaBuffer = StringBuffer();
   Timer? _deltaFlushTimer;
   ChatEvent? _lastDeltaEvent;

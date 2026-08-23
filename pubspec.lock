@@ -1103,6 +1103,13 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "6.1.5+1"
+  pty2:
+    dependency: "direct main"
+    description:
+      path: "packages/pty2"
+      relative: true
+    source: path
+    version: "0.5.3"
   pub_semver:
     dependency: transitive
     description:

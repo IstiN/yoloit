@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -10,64 +9,6 @@ import 'package:yoloit/features/terminal/data/pty_wrapper.dart';
 import 'package:yoloit/features/terminal/data/runtime_terminal_client.dart';
 import 'package:yoloit/features/terminal/data/tmux_service.dart';
 import 'package:yoloit/features/terminal/models/terminal_backend_mode.dart';
-
-class _BufferedUtf8Decoder extends StreamTransformerBase<List<int>, String> {
-  const _BufferedUtf8Decoder();
-
-  @override
-  Stream<String> bind(Stream<List<int>> stream) {
-    const decoder = Utf8Decoder(allowMalformed: true);
-    var carry = <int>[];
-    return stream.map((chunk) {
-      // Avoid the spread-copy when there is no incomplete tail from the
-      // previous chunk (the overwhelmingly common case).
-      final combined = carry.isEmpty ? chunk : [...carry, ...chunk];
-      final validLen = _validUtf8Length(combined);
-      if (validLen == 0) {
-        carry = combined;
-        return '';
-      }
-      // Reuse the list when fully valid (common case) — the decoder does not
-      // retain it; sublist copies only when an incomplete tail exists.
-      final toDecode =
-          validLen == combined.length ? combined : combined.sublist(0, validLen);
-      carry = combined.sublist(validLen);
-      return decoder.convert(toDecode);
-    }).where((s) => s.isNotEmpty);
-  }
-
-  /// Returns the length of the longest prefix of [bytes] that ends on a
-  /// complete UTF-8 character. Only the tail can hold an incomplete
-  /// sequence, so scanning the last 4 bytes (max sequence length) suffices.
-  static int _validUtf8Length(List<int> bytes) {
-    var i = bytes.length;
-    final min = bytes.length > 4 ? bytes.length - 4 : 0;
-    while (i > min) {
-      i--;
-      if (_isValidUtf8Boundary(bytes, i)) {
-        // bytes[i] starts a character that is fully contained in [bytes];
-        // the valid prefix extends past the whole character.
-        return i + _utf8SequenceLength(bytes[i]);
-      }
-    }
-    return 0;
-  }
-
-  static bool _isValidUtf8Boundary(List<int> bytes, int index) {
-    final b = bytes[index];
-    if (b < 0x80) return true;
-    if ((b & 0xC0) == 0x80) return false;
-    final len = _utf8SequenceLength(b);
-    return index + len <= bytes.length;
-  }
-
-  static int _utf8SequenceLength(int firstByte) {
-    if (firstByte < 0xC0) return 1;
-    if (firstByte < 0xE0) return 2;
-    if (firstByte < 0xF0) return 3;
-    return 4;
-  }
-}
 
 class TerminalProcess {
   TerminalProcess({
@@ -81,62 +22,27 @@ class TerminalProcess {
   final bool attachedExisting;
 
   factory TerminalProcess.fromPty(Pty pty) {
+    // The facade output is already UTF-8-decoded and ack-flow-controlled
+    // (see Pty in pty_wrapper_io.dart).
     return TerminalProcess(
-      output: ackOnDataForTesting(pty.ackRead, pty.output.cast<List<int>>())
-          .transform(
-        const _BufferedUtf8Decoder(),
-      ),
+      output: pty.output,
       exitCode: pty.exitCode,
     );
   }
 
-  /// flutter_pty is started with `ackRead: true` (see PtyService): the native
-  /// read thread blocks after every posted chunk until [Pty.ackRead] releases
-  /// it. This gives real backpressure — when the UI isolate is busy, unread
-  /// output stays in the kernel pty buffer (and the child process eventually
-  /// blocks on write) instead of piling up unboundedly in the Dart port queue.
-  ///
-  /// Contract: ack exactly once per delivered chunk, plus once on cancel so
-  /// the native thread can observe the closed fd and exit instead of blocking
-  /// on the ack mutex forever. At most one chunk is ever unacked, because the
-  /// native thread waits before reading the next one.
-  ///
-  /// Test seam: takes the ack as a closure so tests can count the calls
-  /// without a real PTY.
+  /// Test seam for the facade ack wrapper: takes the ack as a closure so
+  /// tests can count the calls without a real PTY.
   @visibleForTesting
   static Stream<List<int>> ackOnDataForTesting(
     void Function() ackRead,
     Stream<List<int>> source,
-  ) {
-    return Stream.multi((controller) {
-      var sourceEnded = false;
-      final sub = source.listen(
-        (chunk) {
-          ackRead();
-          controller.add(chunk);
-        },
-        onError: (Object error, StackTrace stackTrace) {
-          sourceEnded = true;
-          controller.addError(error, stackTrace);
-        },
-        onDone: () {
-          sourceEnded = true;
-          controller.close();
-        },
-      );
-      controller.onCancel = () async {
-        // Only ack if the source is still live: after done/error the native
-        // read thread has already exited and no ack is owed.
-        if (!sourceEnded) ackRead();
-        await sub.cancel();
-      };
-    });
-  }
+  ) =>
+      ackOnData(ackRead, source);
 
   /// Test seam: exercises the buffered UTF-8 decoder without a real PTY.
   @visibleForTesting
   static StreamTransformer<List<int>, String> utf8DecoderForTesting() =>
-      const _BufferedUtf8Decoder();
+      const BufferedUtf8Decoder();
 }
 
 abstract class TerminalBackend {

@@ -198,22 +198,28 @@ class RunService {
         final raf = _logFiles[sessionId];
         if (raf == null) return;
         try {
-          final bytes = await raf.read(65536);
-          if (bytes.isEmpty) return;
-          final chunk = utf8.decode(bytes, allowMalformed: true);
-          final buffered = (_lineBuffers[sessionId] ?? '') + chunk;
-          final lines = buffered.split('\n');
-          // Last element may be an incomplete line — keep it in the buffer.
-          _lineBuffers[sessionId] = lines.removeLast();
-          for (final line in lines) {
-            final trimmed = line.endsWith('\r') ? line.substring(0, line.length - 1) : line;
-            if (trimmed.startsWith('__YOLOIT_EXIT_')) {
-              final code = int.tryParse(trimmed.substring('__YOLOIT_EXIT_'.length)) ?? 0;
-              _cleanup(sessionId);
-              onExit(code);
-              return;
+          // Under a flood a single 64KB read per 50ms tick would cap
+          // throughput at ~1.3 MB/s. Read back-to-back while the buffer
+          // comes back full (bounded so one session cannot starve others).
+          for (var reads = 0; reads < _maxReadsPerTick; reads++) {
+            final bytes = await raf.read(_readChunkBytes);
+            if (bytes.isEmpty) return;
+            final chunk = utf8.decode(bytes, allowMalformed: true);
+            final buffered = (_lineBuffers[sessionId] ?? '') + chunk;
+            final lines = buffered.split('\n');
+            // Last element may be an incomplete line — keep it in the buffer.
+            _lineBuffers[sessionId] = lines.removeLast();
+            for (final line in lines) {
+              final trimmed = line.endsWith('\r') ? line.substring(0, line.length - 1) : line;
+              if (trimmed.startsWith('__YOLOIT_EXIT_')) {
+                final code = int.tryParse(trimmed.substring('__YOLOIT_EXIT_'.length)) ?? 0;
+                _cleanup(sessionId);
+                onExit(code);
+                return;
+              }
+              onOutput(trimmed, false);
             }
-            onOutput(trimmed, false);
+            if (bytes.length < _readChunkBytes) return;
           }
         } catch (_) {
           // File may have been truncated/replaced; ignore silently.
@@ -221,6 +227,14 @@ class RunService {
       },
     );
   }
+
+  /// Log-tail read size. Larger reads amortize the per-read UTF-8 decode and
+  /// line-split overhead under floods.
+  static const _readChunkBytes = 256 * 1024;
+
+  /// Bounds the back-to-back reads a single 50ms tick may do, so one flooding
+  /// session cannot starve the timers of other sessions.
+  static const _maxReadsPerTick = 32;
 
   /// Exposes [_tailLog] so unit tests can drive the log-tailing logic
   /// directly (missing file, partial lines, from-end reconnects).

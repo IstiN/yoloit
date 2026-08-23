@@ -1,6 +1,7 @@
 package session
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -89,5 +90,81 @@ func TestSessionAccessors(t *testing.T) {
 	}
 	if s.Command() != "/bin/sh" {
 		t.Fatalf("unexpected command")
+	}
+}
+
+// Floods should be coalesced into few, large output events while delivering
+// the full byte stream intact.
+func TestReadLoopCoalescesFlood(t *testing.T) {
+	// ~200KB of deterministic output.
+	sess, err := New(&CreateRequest{
+		ID:      "flood",
+		Command: "seq 1 20000",
+	})
+	if err != nil {
+		t.Fatalf("failed to start session: %v", err)
+	}
+	defer sess.Kill()
+
+	ch := sess.Subscribe()
+	defer sess.Unsubscribe(ch)
+
+	var events, bytes int
+	deadline := time.After(15 * time.Second)
+	for {
+		select {
+		case ev, ok := <-ch:
+			if !ok {
+				return
+			}
+			if ev.Type == "exit" {
+				goto done
+			}
+			events++
+			bytes += len(ev.Data)
+		case <-deadline:
+			t.Fatal("timeout waiting for flood output")
+		}
+	}
+done:
+	if bytes < 100*1024 {
+		t.Fatalf("expected >=100KB of output, got %d bytes", bytes)
+	}
+	// Without coalescing every PTY read (~4-16KB on macOS) is one event —
+	// 200KB would be dozens of events. Coalescing must keep this small.
+	if events > 24 {
+		t.Fatalf("expected coalesced events (<=24), got %d", events)
+	}
+}
+
+// A single small interactive write must still be delivered promptly — the
+// coalescing window must not stall trickle output.
+func TestReadLoopInteractiveLatency(t *testing.T) {
+	sess, err := New(&CreateRequest{
+		ID:      "interactive",
+		Command: "cat",
+	})
+	if err != nil {
+		t.Fatalf("failed to start session: %v", err)
+	}
+	defer sess.Kill()
+
+	ch := sess.Subscribe()
+	defer sess.Unsubscribe(ch)
+
+	if err := sess.Write("hello\n"); err != nil {
+		t.Fatalf("write failed: %v", err)
+	}
+
+	timeout := time.After(500 * time.Millisecond)
+	for {
+		select {
+		case ev := <-ch:
+			if ev.Type == "output" && strings.Contains(ev.Data, "hello") {
+				return // echo arrived well within interactive latency
+			}
+		case <-timeout:
+			t.Fatal("interactive echo not delivered within 500ms")
+		}
 	}
 }

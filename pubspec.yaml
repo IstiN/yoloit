@@ -36,6 +36,8 @@ dependencies:
   bloc: ^9.2.1
   equatable: ^2.0.7
   flutter_pty: ^0.4.2
+  pty2:
+    path: packages/pty2
   meta: any
   xterm:
     path: packages/xterm

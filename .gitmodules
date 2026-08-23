@@ -7,3 +7,6 @@
 [submodule "packages/xterm"]
 	path = packages/xterm
 	url = https://github.com/IstiN/xterm.git
+[submodule "packages/pty2"]
+	path = packages/pty2
+	url = https://github.com/IstiN/pty2.git

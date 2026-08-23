@@ -523,12 +523,12 @@ void main() {
     test('flushes immediately once the pending threshold is reached', () async {
       await loadWithSession();
 
-      for (var i = 0; i < 200; i++) {
+      for (var i = 0; i < 5000; i++) {
         cubit.debugAppendOutput('s1', 'line $i', i.isOdd);
       }
 
       final output = cubit.state.sessions.single.output;
-      expect(output, hasLength(200));
+      expect(output, hasLength(5000));
       expect(output.first.text, 'line 0');
       expect(output.first.isError, isFalse);
       expect(output[1].isError, isTrue);
@@ -571,15 +571,21 @@ void main() {
     test('trims output beyond the maximum line count', () async {
       await loadWithSession();
 
-      for (var batch = 0; batch < 26; batch++) {
-        for (var i = 0; i < 200; i++) {
-          cubit.debugAppendOutput('s1', 'b${batch}_$i', false);
-        }
+      // First 5000 lines flush immediately via the pending threshold.
+      for (var i = 0; i < 5000; i++) {
+        cubit.debugAppendOutput('s1', 'line $i', false);
       }
+      // 3000 more wait for the debounce timer; combined they exceed the
+      // 5000-line cap, so the oldest 3000 are dropped.
+      for (var i = 5000; i < 8000; i++) {
+        cubit.debugAppendOutput('s1', 'line $i', false);
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 300));
 
       final output = cubit.state.sessions.single.output;
       expect(output, hasLength(5000));
-      expect(output.last.text, 'b25_199');
+      expect(output.first.text, 'line 3000');
+      expect(output.last.text, 'line 7999');
     });
 
     test('flushes pending output via the debounce timer', () async {

@@ -143,35 +143,84 @@ func New(req *CreateRequest) (*Session, error) {
 	return s, nil
 }
 
-func (s *Session) readLoop() {
-	buf := make([]byte, 8192)
-	var carry []byte
+const (
+	// PTY read buffer. 32KB keeps syscall and publish rates low under floods
+	// while staying small enough that interactive writes are unaffected.
+	readChunkBytes = 32 * 1024
 
-	for {
-		n, err := s.ptmx.Read(buf)
-		if n > 0 {
-			debugLog("[session] read id=%s bytes=%d", s.id, n)
-			combined := append(carry, buf[:n]...)
-			validLen := validUTF8Prefix(combined)
-			if validLen > 0 {
-				data := string(combined[:validLen])
-				debugLog("[session] publish id=%s dataLen=%d", s.id, len(data))
-				s.appendRing(data)
-				s.publish(Event{Type: "output", SessionID: s.id, Data: data})
-				carry = append([]byte(nil), combined[validLen:]...)
-			} else {
-				carry = append([]byte(nil), combined...)
+	// maxBatchBytes bounds how much output one published event may carry.
+	maxBatchBytes = 128 * 1024
+
+	// coalesceWindow bounds how long the publisher waits to accumulate more
+	// output before emitting an event. Well under one display frame, so
+	// interactive echo is not perceptibly delayed, while bursts collapse
+	// into few large events instead of one event per PTY read.
+	coalesceWindow = 10 * time.Millisecond
+)
+
+func (s *Session) readLoop() {
+	// A dedicated goroutine does the blocking PTY reads; the publisher below
+	// batches whatever arrives within the coalesce window so floods produce
+	// few large events instead of one event per (often tiny) PTY read.
+	// (SetReadDeadline is not supported on creack/pty master fds, so a
+	// deadline-based drain is not an option.)
+	chunks := make(chan []byte, 64)
+	go func() {
+		defer close(chunks)
+		buf := make([]byte, readChunkBytes)
+		for {
+			n, err := s.ptmx.Read(buf)
+			if n > 0 {
+				debugLog("[session] read id=%s bytes=%d", s.id, n)
+				chunks <- append([]byte(nil), buf[:n]...)
+			}
+			if err != nil {
+				debugLog("[session] read err id=%s err=%v", s.id, err)
+				return
 			}
 		}
-		if err != nil {
-			debugLog("[session] read err id=%s err=%v carry=%d", s.id, err, len(carry))
-			if len(carry) > 0 {
-				data := string(carry)
-				s.appendRing(data)
-				s.publish(Event{Type: "output", SessionID: s.id, Data: data})
-			}
-			break
+	}()
+
+	var carry []byte
+	publish := func(batch []byte) {
+		combined := append(carry, batch...)
+		validLen := validUTF8Prefix(combined)
+		if validLen > 0 {
+			data := string(combined[:validLen])
+			debugLog("[session] publish id=%s dataLen=%d", s.id, len(data))
+			s.appendRing(data)
+			s.publish(Event{Type: "output", SessionID: s.id, Data: data})
+			carry = append([]byte(nil), combined[validLen:]...)
+		} else {
+			carry = append([]byte(nil), combined...)
 		}
+	}
+
+	for batch := range chunks {
+		timer := time.NewTimer(coalesceWindow)
+		drain := true
+		for drain && len(batch) < maxBatchBytes {
+			select {
+			case c, ok := <-chunks:
+				if !ok {
+					drain = false
+				} else {
+					batch = append(batch, c...)
+				}
+			case <-timer.C:
+				drain = false
+			}
+		}
+		timer.Stop()
+		publish(batch)
+	}
+
+	// PTY closed: flush any trailing incomplete UTF-8 bytes verbatim.
+	debugLog("[session] read loop done id=%s carry=%d", s.id, len(carry))
+	if len(carry) > 0 {
+		data := string(carry)
+		s.appendRing(data)
+		s.publish(Event{Type: "output", SessionID: s.id, Data: data})
 	}
 }
 

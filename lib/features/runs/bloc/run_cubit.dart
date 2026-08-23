@@ -15,10 +15,27 @@ class RunCubit extends Cubit<RunState> {
 
   static const _maxOutputLines = 5000;
   static const _outputFlushInterval = Duration(milliseconds: 100);
-  static const _pendingOutputThreshold = 200;
+  // Memory backstop only: flushing every 200 lines under heavy output causes
+  // hundreds of emits per second, each copying up to [_maxOutputLines] lines.
+  // The [_outputFlushInterval] timer is the normal flush path; this threshold
+  // just bounds pending memory under extreme floods.
+  static const _pendingOutputThreshold = 5000;
 
   final _pendingOutput = <String, List<RunOutputLine>>{};
   final _flushTimers = <String, Timer>{};
+
+  // Cached set of live session ids, rebuilt only when the sessions list
+  // instance changes, so the per-line hot path avoids an O(n) scan.
+  List<RunSession> _sessionIdsSource = const [];
+  Set<String> _sessionIds = const {};
+
+  bool _hasSession(String sessionId) {
+    if (!identical(_sessionIdsSource, state.sessions)) {
+      _sessionIdsSource = state.sessions;
+      _sessionIds = state.sessions.map((s) => s.id).toSet();
+    }
+    return _sessionIds.contains(sessionId);
+  }
 
   Future<void> loadForWorkspace(String workspacePath) async {
     final configs = await RunConfigStorage.instance.load(workspacePath);
@@ -311,7 +328,7 @@ class RunCubit extends Cubit<RunState> {
 
   void _appendOutput(String sessionId, String line, bool isError) {
     // Ignore output for sessions that no longer belong to the active workspace.
-    if (!state.sessions.any((s) => s.id == sessionId)) {
+    if (!_hasSession(sessionId)) {
       _flushTimers.remove(sessionId)?.cancel();
       _pendingOutput.remove(sessionId);
       return;

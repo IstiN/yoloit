@@ -18,7 +18,7 @@ This guide outlines non-obvious developer commands, compilation pipelines, stric
   - Windows builds have a known Cargokit symlink resolution bug. **Always** run this patch before compiling on Windows:
     `.\windows\flutter\tools\patch_cargokit.ps1`
 - **Git Submodules**:
-  - Submodules are used for `packages/mermaid_renderer_flutter` and `third_party/flutter_local_models`. Initialize them using:
+  - Submodules are used for `packages/mermaid_renderer_flutter`, `packages/xterm`, `packages/pty2` and `third_party/flutter_local_models`. Initialize them using:
     `git submodule update --init --recursive --depth=1`
 
 ---

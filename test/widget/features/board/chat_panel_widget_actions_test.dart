@@ -47,7 +47,8 @@ void main() {
       h.fake.emit(chatDeltaEvent('partial answer'));
       // Delta events are coalesced by the session core (~60ms flush), so
       // advance fake time past the flush interval for the UI to update.
-      await tester.pump(const Duration(milliseconds: 70));
+      // Wait past the streaming delta flush interval (100ms).
+      await tester.pump(const Duration(milliseconds: 150));
       expect(find.byIcon(Icons.stop_rounded), findsOneWidget);
       expect(h.session.isProcessing, isTrue);
 
@@ -239,7 +240,8 @@ void main() {
       await h.typeAndSend(tester, 'hi');
       h.fake.emit(chatDeltaEvent('half-written'));
       // Delta events are coalesced by the session core (~60ms flush).
-      await tester.pump(const Duration(milliseconds: 70));
+      // Wait past the streaming delta flush interval (100ms).
+      await tester.pump(const Duration(milliseconds: 150));
 
       await tester.tap(copySessionButton());
       await tester.pump();
