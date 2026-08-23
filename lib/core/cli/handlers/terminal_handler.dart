@@ -1,6 +1,7 @@
 import 'package:yoloit/core/cli/panel_cli_handler.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/terminal_panel_models.dart';
+import 'package:yoloit/features/board/terminal/board_terminal_full_view.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_session_manager.dart';
 
 /// CLI handler for Terminal panels (`board.terminal`).
@@ -11,7 +12,13 @@ class TerminalCliHandler extends PanelCliHandler {
   String get typeId => 'board.terminal';
 
   @override
-  List<String> get supportedActions => ['config', 'set-dir', 'set-session', 'output'];
+  List<String> get supportedActions => [
+    'config',
+    'set-dir',
+    'set-session',
+    'output',
+    'fullview',
+  ];
 
   @override
   Map<String, dynamic> getContent(BoardPanelInstance panel) {
@@ -117,6 +124,17 @@ class TerminalCliHandler extends PanelCliHandler {
         );
       case 'output':
         return _readOutput(args, panel);
+      case 'fullview':
+        if (!BoardTerminalFullViewBridge.open(panel.id)) {
+          return const CliActionResult(
+            ok: false,
+            message: 'Terminal panel is not mounted (hidden board?)',
+          );
+        }
+        return CliActionResult(
+          message: 'Full view opened',
+          data: {'panelId': panel.id},
+        );
       default:
         return CliActionResult(ok: false, message: 'Unknown action: $action');
     }
@@ -146,6 +164,10 @@ class TerminalCliHandler extends PanelCliHandler {
       },
       example:
           'yoloit do "<board>" "<terminal>" output \'{"limit":40}\'',
+    ),
+    'fullview': const CliActionHelp(
+      description: 'Open the terminal in a fullscreen view (UI must be running)',
+      example: 'yoloit do "<board>" "<terminal>" fullview',
     ),
   };
 }

@@ -629,6 +629,27 @@ final terminalUrlPattern = RegExp(
   ']+',
 );
 
+/// One widget's claim on the shared single-slot `terminal.onOutput` /
+/// `terminal.onResize` callbacks. See [TerminalWidgetState._pushTerminalBinding].
+class _TerminalBinding {
+  const _TerminalBinding({
+    required this.owner,
+    required this.onOutput,
+    required this.onResize,
+  });
+
+  final Object owner;
+  final void Function(String)? onOutput;
+  final void Function(int, int, int, int)? onResize;
+}
+
+/// Per-terminal stack of widget bindings. Keyed weakly (Expando) so dead
+/// terminals don't leak; entries are removed by
+/// [TerminalWidgetState._unbindTerminal] and the empty stack is dropped.
+final _terminalBindingStacks = Expando<List<_TerminalBinding>>(
+  'terminalWidgetBindings',
+);
+
 @visibleForTesting
 class TerminalUrlLine {
   const TerminalUrlLine(this.text, {this.isWrapped = false});
@@ -943,9 +964,10 @@ class TerminalWidgetState extends State<TerminalWidget> {
 
   late final ScrollController _scrollController;
 
-  // Identity-checked callbacks stored as fields so we can null them safely in
-  // dispose without clobbering another TerminalWidget that rebound the same
-  // shared `session.terminal` (e.g. panel + mindmap viewing same session).
+  // Identity-checked callbacks stored as fields so unbind can safely restore
+  // the previous binding instead of clobbering another TerminalWidget that
+  // rebound the same shared `session.terminal` (panel + full-view dialog +
+  // mindmap viewing the same session).
   void Function(String)? _boundOnOutput;
   void Function(int, int, int, int)? _boundOnResize;
 
@@ -995,7 +1017,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
   void didUpdateWidget(TerminalWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.session.id != widget.session.id) {
-      _unbindTerminalIfOurs(oldWidget.session);
+      _unbindTerminal(oldWidget.session.terminal);
       _detachTerminalDiagnostics(oldWidget.session);
       _detachSupportLogging(oldWidget.session);
       _bindTerminal();
@@ -1032,7 +1054,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
   }
 
   void _bindTerminal() {
-    _unbindTerminalIfOurs(widget.session);
+    final terminal = widget.session.terminal;
     _boundOnOutput = (data) {
       final writer =
           widget.terminalOutputWriter ?? TerminalBackendService.instance.write;
@@ -1050,20 +1072,39 @@ class TerminalWidgetState extends State<TerminalWidget> {
       _scheduleTerminalDiagnostics('resize cols=$cols rows=$rows');
       _restoreResizeScrollAnchor();
     };
-    widget.session.terminal.onOutput = _boundOnOutput;
-    widget.session.terminal.onResize = _boundOnResize;
+    _pushTerminalBinding(terminal);
   }
 
-  void _unbindTerminalIfOurs(AgentSession session) {
-    // Only clear if the bound callback is still ours — otherwise another
-    // TerminalWidget (e.g. panel vs mindmap) has since rebound and we'd wipe
-    // its binding.
-    if (identical(session.terminal.onOutput, _boundOnOutput)) {
-      session.terminal.onOutput = null;
-    }
-    if (identical(session.terminal.onResize, _boundOnResize)) {
-      session.terminal.onResize = null;
-    }
+  /// Pushes this widget's callbacks onto the terminal's binding stack and
+  /// makes them active. `onOutput`/`onResize` are single slots shared by
+  /// every TerminalWidget attached to the same terminal, so the last binder
+  /// wins; the stack lets an unbinding widget restore whoever came before it
+  /// instead of leaving the slots null (which used to kill keyboard input on
+  /// the panel terminal after the full-view dialog closed).
+  void _pushTerminalBinding(Terminal terminal) {
+    final stack = (_terminalBindingStacks[terminal] ??= []);
+    stack.removeWhere((b) => identical(b.owner, this));
+    stack.add(
+      _TerminalBinding(
+        owner: this,
+        onOutput: _boundOnOutput,
+        onResize: _boundOnResize,
+      ),
+    );
+    terminal.onOutput = _boundOnOutput;
+    terminal.onResize = _boundOnResize;
+  }
+
+  void _unbindTerminal(Terminal terminal) {
+    final stack = _terminalBindingStacks[terminal];
+    if (stack == null) return;
+    final wasActive = identical(terminal.onOutput, _boundOnOutput);
+    stack.removeWhere((b) => identical(b.owner, this));
+    if (stack.isEmpty) _terminalBindingStacks[terminal] = null;
+    if (!wasActive) return;
+    final previous = stack.isEmpty ? null : stack.last;
+    terminal.onOutput = previous?.onOutput;
+    terminal.onResize = previous?.onResize;
   }
 
   void _attachTerminalDiagnostics(AgentSession session) {
@@ -1570,7 +1611,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
     _userScrollPreserveTimer?.cancel();
     _resizeDebounce?.cancel();
     HardwareKeyboard.instance.removeHandler(_handleHardwareKey);
-    _unbindTerminalIfOurs(widget.session);
+    _unbindTerminal(widget.session.terminal);
     _detachTerminalDiagnostics(widget.session);
     _detachSupportLogging(widget.session);
     _terminalDiagnosticsDebounce?.cancel();

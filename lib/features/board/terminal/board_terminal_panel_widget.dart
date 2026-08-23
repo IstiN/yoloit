@@ -1,28 +1,26 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:path/path.dart' as p;
-import 'package:yoxterm/xterm.dart';
 import 'package:yoloit/core/remote/yoloit_remote_client.dart';
 import 'package:yoloit/core/services/resource_monitor_service.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/terminal_panel_models.dart';
+import 'package:yoloit/features/board/terminal/board_terminal_full_view.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_session_history.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_session_manager.dart';
 import 'package:yoloit/features/board/ui/board_file_picker.dart';
 import 'package:yoloit/features/mindmap/widgets/canvas_interaction_lock.dart';
 import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
 import 'package:yoloit/features/settings/ui/env_group_picker.dart';
-import 'package:yoloit/features/terminal/data/terminal_backend_service.dart';
 import 'package:yoloit/features/terminal/models/agent_session.dart';
 import 'package:yoloit/features/terminal/ui/terminal_panel.dart';
 import 'package:yoloit/ui/components/buttons/action_icon_button.dart';
+import 'package:yoxterm/xterm.dart';
 
 class BoardTerminalPanelWidget extends StatefulWidget {
   const BoardTerminalPanelWidget({
@@ -54,6 +52,7 @@ class _BoardTerminalPanelWidgetState extends State<BoardTerminalPanelWidget> {
     super.initState();
     _config = _readConfig(widget.panel.state);
     _manager.addListener(_onManagerChanged);
+    BoardTerminalFullViewBridge.register(widget.panel.id, _openFullView);
     _ensureConfiguredSession();
   }
 
@@ -87,6 +86,7 @@ class _BoardTerminalPanelWidgetState extends State<BoardTerminalPanelWidget> {
 
   @override
   void dispose() {
+    BoardTerminalFullViewBridge.unregister(widget.panel.id);
     _manager.removeListener(_onManagerChanged);
     super.dispose();
   }
@@ -304,276 +304,29 @@ class _BoardTerminalPanelWidgetState extends State<BoardTerminalPanelWidget> {
   }
 
   void _openFullView() {
-    if (_session == null) return;
-    final termKey = GlobalKey<TerminalWidgetState>();
-    final logs = <String>[];
-    final logScroll = ScrollController();
-    var forceAltScrollKeys = false;
-
-    void addLog(String msg) {
-      final now = DateTime.now().toIso8601String().substring(11, 23);
-      logs.add('$now $msg');
-      if (logs.length > 400) logs.removeAt(0);
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!logScroll.hasClients) return;
-        logScroll.jumpTo(logScroll.position.maxScrollExtent);
-      });
-    }
-
-    String escapeForLog(String data) {
-      return data
-          .replaceAll('\x1B', r'\e')
-          .replaceAll('\r', r'\r')
-          .replaceAll('\n', r'\n')
-          .replaceAll('\x02', r'\x02');
-    }
-
-    showDialog<void>(
-      context: context,
-      builder:
-          (ctx) => StatefulBuilder(
-            builder: (ctx, dialogSetState) {
-              final terminal = _session!.terminal;
-              final state = termKey.currentState;
-              final fontSize = state?.currentFontSize ?? 13.0;
-              final debugState =
-                  state?.debugStateSummary ??
-                  'alt=${terminal.isUsingAltBuffer} '
-                      'mouse=${terminal.mouseMode} '
-                      'altScroll=${terminal.altBufferMouseScrollMode} '
-                      'buf=${terminal.buffer.height} '
-                      'lines=${terminal.lines.length}';
-
-              void logAndRefresh(String msg) {
-                dialogSetState(() => addLog(msg));
-              }
-
-              void send(String seq, String label) {
-                logAndRefresh('send $label bytes="${escapeForLog(seq)}"');
-                state?.writeToPty(seq);
-              }
-
-              return Dialog(
-                insetPadding: const EdgeInsets.all(12),
-                child: SizedBox(
-                  width: 1000,
-                  height: 800,
-                  child: Column(
-                    children: [
-                      _BoardTerminalInfoBar(
-                        config: _config,
-                        onHistory: () {},
-                        onKill: () {},
-                        onEnvGroupsChanged: (_) {},
-                      ),
-                      Expanded(
-                        flex: 3,
-                        child: TerminalWidget(
-                          key: termKey,
-                          session: _session!,
-                          isActive: true,
-                          debugForceAltScrollKeyFallback: forceAltScrollKeys,
-                          debugLabel:
-                              'fullview:${widget.panel.id}:session:${_session!.id}',
-                          debugLogSink:
-                              (message) => logAndRefresh('scroll $message'),
-                          terminalOutputWriter: (sessionId, data) {
-                            logAndRefresh(
-                              'pty[$sessionId] "${escapeForLog(data)}"',
-                            );
-                            TerminalBackendService.instance.write(
-                              sessionId,
-                              data,
-                            );
-                          },
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 6,
-                        ),
-                        color:
-                            Theme.of(
-                              context,
-                            ).colorScheme.surfaceContainerHighest,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    debugState,
-                                    style: const TextStyle(fontSize: 11),
-                                  ),
-                                ),
-                                IconButton(
-                                  tooltip: 'Dump terminal state',
-                                  icon: const Icon(Icons.bug_report, size: 16),
-                                  onPressed:
-                                      () => logAndRefresh('state $debugState'),
-                                ),
-                                IconButton(
-                                  tooltip: 'Copy logs',
-                                  icon: const Icon(Icons.copy, size: 16),
-                                  onPressed: () {
-                                    Clipboard.setData(
-                                      ClipboardData(text: logs.join('\n')),
-                                    );
-                                    logAndRefresh(
-                                      'copied ${logs.length} log lines',
-                                    );
-                                  },
-                                ),
-                                IconButton(
-                                  tooltip: 'Clear logs',
-                                  icon: const Icon(Icons.clear_all, size: 16),
-                                  onPressed: () => dialogSetState(logs.clear),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Wrap(
-                              spacing: 4,
-                              runSpacing: 4,
-                              children: [
-                                ElevatedButton(
-                                  onPressed: () => send('\x1B[5~', 'PgUp'),
-                                  child: const Text('PgUp'),
-                                ),
-                                ElevatedButton(
-                                  onPressed: () => send('\x1B[6~', 'PgDn'),
-                                  child: const Text('PgDn'),
-                                ),
-                                ElevatedButton(
-                                  onPressed: () => send('\x1B[A', 'Up'),
-                                  child: const Text('↑'),
-                                ),
-                                ElevatedButton(
-                                  onPressed: () => send('\x1B[B', 'Down'),
-                                  child: const Text('↓'),
-                                ),
-                                ElevatedButton(
-                                  onPressed: () => send('\x02[', 'CopyMode'),
-                                  child: const Text('Copy'),
-                                ),
-                                ElevatedButton(
-                                  onPressed: () => send('q', 'ExitCopy'),
-                                  child: const Text('Exit'),
-                                ),
-                                ElevatedButton(
-                                  onPressed:
-                                      () => send(
-                                        '\x1B[?1000h\x1B[?1002h\x1B[?1006h',
-                                        'MouseOn',
-                                      ),
-                                  child: const Text('MouseOn'),
-                                ),
-                                ElevatedButton(
-                                  onPressed:
-                                      () => send(
-                                        '\x1B[?1000l\x1B[?1002l\x1B[?1006l',
-                                        'MouseOff',
-                                      ),
-                                  child: const Text('MouseOff'),
-                                ),
-                                ElevatedButton(
-                                  onPressed:
-                                      () => send('\x1B[?1049l', 'NormBuf'),
-                                  child: const Text('NormBuf'),
-                                ),
-                                ElevatedButton(
-                                  onPressed:
-                                      () => send('\x1B[?1049h', 'AltBuf'),
-                                  child: const Text('AltBuf'),
-                                ),
-                                ElevatedButton(
-                                  onPressed: () {
-                                    dialogSetState(() {
-                                      forceAltScrollKeys = !forceAltScrollKeys;
-                                      addLog(
-                                        'forceAltScrollKeys=$forceAltScrollKeys',
-                                      );
-                                    });
-                                  },
-                                  child: Text(
-                                    forceAltScrollKeys
-                                        ? 'ForceKeysOn'
-                                        : 'ForceKeysOff',
-                                  ),
-                                ),
-                                ElevatedButton(
-                                  onPressed: () {
-                                    state?.setFontSize(fontSize + 1);
-                                    dialogSetState(() {});
-                                  },
-                                  child: const Text('Font+'),
-                                ),
-                                ElevatedButton(
-                                  onPressed: () {
-                                    state?.setFontSize(fontSize - 1);
-                                    dialogSetState(() {});
-                                  },
-                                  child: const Text('Font-'),
-                                ),
-                                ElevatedButton(
-                                  onPressed: () {
-                                    GestureBinding.instance.handlePointerEvent(
-                                      const PointerScrollEvent(
-                                        device: 0,
-                                        position: Offset.zero,
-                                        scrollDelta: Offset(0, -50),
-                                      ),
-                                    );
-                                    addLog('sim scroll -50');
-                                  },
-                                  child: const Text('Wheel↑'),
-                                ),
-                                ElevatedButton(
-                                  onPressed: () {
-                                    GestureBinding.instance.handlePointerEvent(
-                                      const PointerScrollEvent(
-                                        device: 0,
-                                        position: Offset.zero,
-                                        scrollDelta: Offset(0, 50),
-                                      ),
-                                    );
-                                    addLog('sim scroll +50');
-                                  },
-                                  child: const Text('Wheel↓'),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      Expanded(
-                        flex: 1,
-                        child: Container(
-                          color: context.appColors.background,
-                          padding: const EdgeInsets.all(4),
-                          child: ListView.builder(
-                            controller: logScroll,
-                            itemCount: logs.length,
-                            itemBuilder:
-                                (_, i) => Text(
-                                  logs[i],
-                                  style: const TextStyle(
-                                    color: Colors.lightGreenAccent,
-                                    fontSize: 10,
-                                    fontFamily: 'monospace',
-                                  ),
-                                ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
+    final session = _session;
+    if (session == null) return;
+    final title =
+        widget.panel.title.trim().isEmpty
+            ? _config.sessionName
+            : widget.panel.title;
+    unawaited(
+      showGeneralDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        barrierColor: context.appColors.terminalBackground,
+        barrierLabel: 'Terminal full view',
+        transitionDuration: const Duration(milliseconds: 180),
+        pageBuilder:
+            (ctx, animation, secondaryAnimation) => BoardTerminalFullView(
+              session: session,
+              title: title.trim().isEmpty ? 'Terminal' : title,
+              debugLabel:
+                  kDebugMode
+                      ? 'fullview:${widget.panel.id}:session:${session.id}'
+                      : null,
+            ),
+      ),
     );
   }
 

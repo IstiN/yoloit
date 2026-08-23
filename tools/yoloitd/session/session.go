@@ -33,6 +33,11 @@ type Event struct {
 	SessionID string `json:"sessionId"`
 	Data      string `json:"data,omitempty"`
 	ExitCode  int    `json:"exitCode,omitempty"`
+	// Seq is a per-session monotonic sequence number. Clients use it to
+	// request incremental replay (?since=N) after a reconnect and to dedupe
+	// events around the replay/live boundary. 0 means "no seq" (never
+	// emitted by the daemon; reserved for old peers).
+	Seq int64 `json:"seq,omitempty"`
 }
 
 // CreateRequest holds parameters for starting a new session.
@@ -53,10 +58,12 @@ type Session struct {
 	createdAt    time.Time
 	ptmx         *os.File
 	cmd          *exec.Cmd
+	readDone     chan struct{}
 	subscribers  []chan Event
-	ring         []string
+	ring         []Event
 	ringBytes    int
 	maxRingBytes int
+	seq          atomic.Int64
 	alive        bool
 	exitCode     int
 	mu           sync.RWMutex
@@ -129,8 +136,9 @@ func New(req *CreateRequest) (*Session, error) {
 		createdAt:    time.Now(),
 		ptmx:         ptmx,
 		cmd:          cmd,
+		readDone:     make(chan struct{}),
 		subscribers:  make([]chan Event, 0),
-		ring:         make([]string, 0),
+		ring:         make([]Event, 0),
 		maxRingBytes: 512 * 1024,
 		alive:        true,
 	}
@@ -156,9 +164,24 @@ const (
 	// interactive echo is not perceptibly delayed, while bursts collapse
 	// into few large events instead of one event per PTY read.
 	coalesceWindow = 10 * time.Millisecond
+
+	// maxCarryBytes bounds how many bytes may sit in the UTF-8 carry buffer
+	// without a valid prefix before they are sanitized and flushed. A
+	// genuinely invalid byte stream (not a split multi-byte boundary) would
+	// otherwise stall all output forever.
+	maxCarryBytes = 4096
 )
 
+// slowSubscriberTimeout bounds how long publish waits for one subscriber
+// to accept an event before detaching it. Output is NEVER dropped —
+// dropped ANSI bytes corrupt the client terminal screen. Backpressure
+// propagates to the PTY read instead (like tmux), and only a subscriber
+// that has made zero progress for this long (a hung HTTP client) is
+// detached. A var so tests can shorten it.
+var slowSubscriberTimeout = 30 * time.Second
+
 func (s *Session) readLoop() {
+	defer close(s.readDone)
 	// A dedicated goroutine does the blocking PTY reads; the publisher below
 	// batches whatever arrives within the coalesce window so floods produce
 	// few large events instead of one event per (often tiny) PTY read.
@@ -185,11 +208,15 @@ func (s *Session) readLoop() {
 	publish := func(batch []byte) {
 		combined := append(carry, batch...)
 		validLen := validUTF8Prefix(combined)
+		if validLen == 0 && len(combined) > maxCarryBytes {
+			s.emitOutput(strings.ToValidUTF8(string(combined), ""))
+			carry = nil
+			return
+		}
 		if validLen > 0 {
 			data := string(combined[:validLen])
 			debugLog("[session] publish id=%s dataLen=%d", s.id, len(data))
-			s.appendRing(data)
-			s.publish(Event{Type: "output", SessionID: s.id, Data: data})
+			s.emitOutput(data)
 			carry = append([]byte(nil), combined[validLen:]...)
 		} else {
 			carry = append([]byte(nil), combined...)
@@ -218,9 +245,7 @@ func (s *Session) readLoop() {
 	// PTY closed: flush any trailing incomplete UTF-8 bytes verbatim.
 	debugLog("[session] read loop done id=%s carry=%d", s.id, len(carry))
 	if len(carry) > 0 {
-		data := string(carry)
-		s.appendRing(data)
-		s.publish(Event{Type: "output", SessionID: s.id, Data: data})
+		s.emitOutput(string(carry))
 	}
 }
 
@@ -240,6 +265,13 @@ func validUTF8Prefix(p []byte) int {
 
 func (s *Session) waitLoop() {
 	_ = s.cmd.Wait()
+	// Close the PTY master first so readLoop unblocks and flushes whatever
+	// the process emitted on its way out; publish the exit event only after
+	// readLoop is done so subscribers never see "exit" ahead of the final
+	// output.
+	_ = s.ptmx.Close()
+	<-s.readDone
+
 	s.mu.Lock()
 	s.alive = false
 	if s.cmd.ProcessState != nil {
@@ -249,20 +281,26 @@ func (s *Session) waitLoop() {
 
 	log.Printf("[session] exited id=%s exitCode=%d", s.id, s.exitCode)
 
-	s.publish(Event{Type: "exit", SessionID: s.id, ExitCode: s.exitCode})
-	_ = s.ptmx.Close()
+	s.publish(Event{Type: "exit", SessionID: s.id, ExitCode: s.exitCode, Seq: s.seq.Add(1)})
 }
 
-func (s *Session) appendRing(data string) {
+// emitOutput assigns the next sequence number, appends the event to the
+// replay ring and publishes it to subscribers.
+func (s *Session) emitOutput(data string) {
+	ev := Event{Type: "output", SessionID: s.id, Data: data, Seq: s.seq.Add(1)}
+	s.appendRing(ev)
+	s.publish(ev)
+}
+
+func (s *Session) appendRing(ev Event) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.ring = append(s.ring, data)
-	s.ringBytes += len(data)
+	s.ring = append(s.ring, ev)
+	s.ringBytes += len(ev.Data)
 	for s.ringBytes > s.maxRingBytes && len(s.ring) > 0 {
-		removed := s.ring[0]
+		s.ringBytes -= len(s.ring[0].Data)
 		s.ring = s.ring[1:]
-		s.ringBytes -= len(removed)
 	}
 }
 
@@ -273,24 +311,32 @@ func (s *Session) publish(ev Event) {
 	s.mu.RUnlock()
 
 	for _, ch := range subs {
+		timer := time.NewTimer(slowSubscriberTimeout)
 		select {
 		case ch <- ev:
-		default:
-			log.Printf("[session] dropped event id=%s type=%s (subscriber channel full)", s.id, ev.Type)
+			timer.Stop()
+		case <-timer.C:
+			log.Printf("[session] detaching slow subscriber id=%s type=%s (no progress for %s)", s.id, ev.Type, slowSubscriberTimeout)
+			s.Unsubscribe(ch)
 		}
 	}
 }
 
-// Subscribe registers a new event channel.
+// Subscribe registers a new event channel. The buffer is bounded so a slow
+// consumer applies backpressure to the publisher (and thus the PTY) instead
+// of growing memory without bound; publish never drops events.
 func (s *Session) Subscribe() chan Event {
-	ch := make(chan Event, 1000)
+	ch := make(chan Event, 256)
 	s.mu.Lock()
 	s.subscribers = append(s.subscribers, ch)
 	s.mu.Unlock()
 	return ch
 }
 
-// Unsubscribe removes a channel and closes it.
+// Unsubscribe removes a channel. It is idempotent and never closes the
+// channel: a concurrent publish may already hold a snapshot containing the
+// channel, and sending on a closed channel would panic. A detached (slow)
+// subscriber's handler exits via its request context instead.
 func (s *Session) Unsubscribe(ch chan Event) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -300,7 +346,6 @@ func (s *Session) Unsubscribe(ch chan Event) {
 			break
 		}
 	}
-	close(ch)
 }
 
 // Write sends input to the PTY.
@@ -364,11 +409,12 @@ func (s *Session) PID() int {
 	return 0
 }
 
-// Ring returns a copy of the replay buffer.
-func (s *Session) Ring() []string {
+// Ring returns a copy of the replay buffer (most recent output events,
+// each carrying its sequence number).
+func (s *Session) Ring() []Event {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	r := make([]string, len(s.ring))
+	r := make([]Event, len(s.ring))
 	copy(r, s.ring)
 	return r
 }

@@ -157,6 +157,81 @@ void main() {
       expect(events, ['a']);
       expect(fixture.runtime.streamRequests, 1);
     });
+
+    test('reconnects with ?since= last delivered seq to avoid replay '
+        'duplicates', () async {
+      final fixture = await _createFixture();
+      addTearDown(fixture.dispose);
+      fixture.runtime.streamScripts = [
+        ['{"type":"output","data":"a","seq":5}\n'],
+        ['{"type":"output","data":"b","seq":6}\n{"type":"exit","seq":7}\n'],
+      ];
+
+      final events = await fixture.client.streamSession('s1').toList();
+
+      expect(events, ['a', 'b']);
+      expect(fixture.runtime.streamRequests, 2);
+      expect(fixture.runtime.streamQueries[0], isEmpty);
+      expect(fixture.runtime.streamQueries[1], 'since=5');
+    });
+
+    test('never yields the same seq twice on reconnect', () async {
+      final fixture = await _createFixture();
+      addTearDown(fixture.dispose);
+      // The reconnected stream re-sends seq 5 (replay/live overlap) before
+      // continuing with new output — the client must drop the duplicate.
+      const replayed =
+          '{"type":"output","data":"a","seq":5}\n'
+          '{"type":"output","data":"b","seq":6}\n'
+          '{"type":"exit","seq":7}\n';
+      fixture.runtime.streamScripts = [
+        ['{"type":"output","data":"a","seq":5}\n'],
+        [replayed],
+      ];
+
+      final events = await fixture.client.streamSession('s1').toList();
+
+      expect(events, ['a', 'b']);
+    });
+  });
+
+  group('runtime log rotation', () {
+    test('rotates an oversized log to runtime.log.old', () async {
+      final dir = await Directory.systemTemp.createTemp('log_rotate_test');
+      addTearDown(() => dir.delete(recursive: true));
+      final log = File('${dir.path}/runtime.log');
+      await log.writeAsBytes(List.filled(2048, 120));
+      await File('${dir.path}/runtime.log.old').writeAsString('stale');
+
+      await RuntimeTerminalClient.rotateLogIfNeeded(log.path, maxBytes: 1024);
+
+      expect(await log.exists(), isFalse);
+      expect(await File('${dir.path}/runtime.log.old').length(), 2048);
+    });
+
+    test('leaves a small log untouched', () async {
+      final dir = await Directory.systemTemp.createTemp('log_rotate_test');
+      addTearDown(() => dir.delete(recursive: true));
+      final log = File('${dir.path}/runtime.log');
+      await log.writeAsString('small');
+
+      await RuntimeTerminalClient.rotateLogIfNeeded(log.path, maxBytes: 1024);
+
+      expect(await log.readAsString(), 'small');
+      expect(await File('${dir.path}/runtime.log.old').exists(), isFalse);
+    });
+
+    test('ignores a missing log file', () async {
+      final dir = await Directory.systemTemp.createTemp('log_rotate_test');
+      addTearDown(() => dir.delete(recursive: true));
+
+      await RuntimeTerminalClient.rotateLogIfNeeded(
+        '${dir.path}/runtime.log',
+        maxBytes: 1024,
+      );
+
+      expect(await File('${dir.path}/runtime.log.old').exists(), isFalse);
+    });
   });
 
   group('input, resize and kill', () {
@@ -423,6 +498,7 @@ class _FakeRuntime {
   int streamRequests = 0;
   List<int> streamStatuses = const [];
   List<List<String>> streamScripts = const [];
+  final List<String> streamQueries = [];
   void Function(int requestNumber)? onStreamRequest;
 
   int get port => server.port;
@@ -487,6 +563,7 @@ class _FakeRuntime {
 
   Future<void> _handleStream(HttpRequest request) async {
     streamRequests++;
+    streamQueries.add(request.uri.query);
     final index = streamRequests - 1;
     onStreamRequest?.call(streamRequests);
     final status = index < streamStatuses.length

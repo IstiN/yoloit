@@ -178,9 +178,19 @@ class RuntimeTerminalClient {
   Stream<String> streamSession(String sessionId) async* {
     await ensureStarted();
 
+    // Sequence number of the last event delivered to the consumer. On a
+    // reconnect we pass it as ?since=N so the runtime replays only newer
+    // events — a full replay would duplicate already-rendered output and
+    // corrupt the terminal screen. Runtimes older than the seq protocol
+    // neither send seq nor understand since: lastSeq stays null and the
+    // behavior degrades to today's full replay (no worse than before).
+    int? lastSeq;
     while (true) {
       try {
-        final request = await _http.getUrl(_uri('/sessions/$sessionId/stream'));
+        final query = lastSeq != null ? '?since=$lastSeq' : '';
+        final request = await _http.getUrl(
+          _uri('/sessions/$sessionId/stream$query'),
+        );
         final response = await request.close().timeout(
           const Duration(seconds: 5),
         );
@@ -225,6 +235,13 @@ class RuntimeTerminalClient {
             }
             if (line.trim().isEmpty) continue;
             final event = jsonDecode(line) as Map<String, dynamic>;
+            final seq = event['seq'];
+            if (seq is int) {
+              // Defensive dedupe: never deliver the same event twice, even
+              // around the replay/live boundary of a fresh connection.
+              if (seq <= (lastSeq ?? 0)) continue;
+              lastSeq = seq;
+            }
             if (event['type'] == 'output') {
               yield event['data'] as String? ?? '';
             }
@@ -315,6 +332,8 @@ class RuntimeTerminalClient {
       return;
     }
 
+    await rotateLogIfNeeded('$runtimeHome/runtime.log');
+
     await Process.run('sh', [
       '-c',
       r'nohup "$1" --home "$2" >> "$2/runtime.log" 2>&1 < /dev/null &',
@@ -322,6 +341,29 @@ class RuntimeTerminalClient {
       binary,
       runtimeHome,
     ]);
+  }
+
+  /// Rotates the runtime log when it has grown past [maxBytes]: the current
+  /// file becomes `runtime.log.old` (overwriting a previous rotation) and the
+  /// daemon starts appending to a fresh file. Unbounded per-event logging
+  /// (e.g. a flood of terminal output) once produced multi-GB logs.
+  @visibleForTesting
+  static Future<void> rotateLogIfNeeded(
+    String logPath, {
+    int maxBytes = 50 * 1024 * 1024,
+  }) async {
+    try {
+      final log = File(logPath);
+      if (!await log.exists()) return;
+      if (await log.length() <= maxBytes) return;
+      final old = File('$logPath.old');
+      if (await old.exists()) {
+        await old.delete();
+      }
+      await log.rename(old.path);
+    } catch (_) {
+      // Log rotation must never block runtime startup.
+    }
   }
 
   Future<String> _runtimeBinaryPath() async {

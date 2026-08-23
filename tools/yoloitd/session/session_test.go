@@ -35,18 +35,21 @@ func TestAppendRing(t *testing.T) {
 	s := &Session{
 		id:           "test",
 		maxRingBytes: 30,
-		ring:         make([]string, 0),
+		ring:         make([]Event, 0),
 	}
 
-	s.appendRing("hello")
-	s.appendRing("world")
+	s.appendRing(Event{Type: "output", Data: "hello", Seq: 1})
+	s.appendRing(Event{Type: "output", Data: "world", Seq: 2})
 	if len(s.ring) != 2 {
 		t.Fatalf("expected 2 entries, got %d", len(s.ring))
 	}
 
-	s.appendRing("this is a long string")
+	s.appendRing(Event{Type: "output", Data: "this is a long string", Seq: 3})
 	if len(s.ring) != 2 {
 		t.Fatalf("expected ring to stay at 2 entries, got %d", len(s.ring))
+	}
+	if s.ring[0].Seq != 2 || s.ring[1].Seq != 3 {
+		t.Fatalf("expected evicted oldest entry, got seqs %d,%d", s.ring[0].Seq, s.ring[1].Seq)
 	}
 }
 
@@ -165,6 +168,168 @@ func TestReadLoopInteractiveLatency(t *testing.T) {
 			}
 		case <-timeout:
 			t.Fatal("interactive echo not delivered within 500ms")
+		}
+	}
+}
+
+// A slow subscriber must never lose output: publish blocks (backpressure)
+// instead of dropping events, and everything arrives once the subscriber
+// starts reading again.
+func TestPublishNeverDropsForSlowSubscriber(t *testing.T) {
+	s := &Session{
+		id:          "test",
+		subscribers: make([]chan Event, 0),
+	}
+
+	ch := s.Subscribe()
+	defer s.Unsubscribe(ch)
+
+	const total = 1000 // > channel capacity (256)
+	go func() {
+		for i := 0; i < total; i++ {
+			s.publish(Event{Type: "output", Data: "x"})
+		}
+	}()
+
+	deadline := time.After(10 * time.Second)
+	for i := 0; i < total; i++ {
+		select {
+		case ev := <-ch:
+			if ev.Data != "x" {
+				t.Fatalf("unexpected data: %q", ev.Data)
+			}
+		case <-deadline:
+			t.Fatalf("timeout after %d/%d events — events were dropped or publish stalled", i, total)
+		}
+	}
+}
+
+// A subscriber that makes zero progress for the slow-subscriber timeout is
+// detached instead of blocking the publisher forever.
+func TestPublishDetachesStuckSubscriber(t *testing.T) {
+	old := slowSubscriberTimeout
+	slowSubscriberTimeout = 50 * time.Millisecond
+	defer func() { slowSubscriberTimeout = old }()
+
+	s := &Session{
+		id:          "test",
+		subscribers: make([]chan Event, 0),
+	}
+
+	// Fill the channel to capacity and never read from it.
+	ch := s.Subscribe()
+	for i := 0; i < cap(ch); i++ {
+		s.publish(Event{Type: "output", Data: "x"})
+	}
+
+	// This publish blocks until the timeout fires and detaches the channel.
+	done := make(chan struct{})
+	go func() {
+		s.publish(Event{Type: "output", Data: "overflow"})
+		close(done)
+	}()
+
+	// Publish must not complete while the subscriber is merely slow.
+	select {
+	case <-done:
+		t.Fatal("publish returned immediately for a stuck subscriber — event would be dropped")
+	case <-time.After(10 * time.Millisecond):
+	}
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("publish did not detach the stuck subscriber")
+	}
+
+	s.mu.RLock()
+	subs := len(s.subscribers)
+	s.mu.RUnlock()
+	if subs != 0 {
+		t.Fatalf("expected stuck subscriber detached, got %d subscribers", subs)
+	}
+	s.Unsubscribe(ch) // already detached — must be a safe no-op
+}
+
+// Unsubscribe must be safe to call twice (handler defer + slow-subscriber
+// detach can race).
+func TestUnsubscribeIdempotent(t *testing.T) {
+	s := &Session{
+		id:          "test",
+		subscribers: make([]chan Event, 0),
+	}
+	ch := s.Subscribe()
+	s.Unsubscribe(ch)
+	s.Unsubscribe(ch) // must not panic (no double close)
+	if len(s.subscribers) != 0 {
+		t.Fatalf("expected 0 subscribers, got %d", len(s.subscribers))
+	}
+}
+
+// emitOutput assigns monotonic sequence numbers and the ring carries the
+// same seqs that subscribers receive.
+func TestEmitOutputAssignsMonotonicSeq(t *testing.T) {
+	s := &Session{
+		id:           "test",
+		subscribers:  make([]chan Event, 0),
+		ring:         make([]Event, 0),
+		maxRingBytes: 1024,
+	}
+	ch := s.Subscribe()
+	defer s.Unsubscribe(ch)
+
+	s.emitOutput("a")
+	s.emitOutput("b")
+
+	var got []Event
+	for i := 0; i < 2; i++ {
+		select {
+		case ev := <-ch:
+			got = append(got, ev)
+		case <-time.After(time.Second):
+			t.Fatal("timeout waiting for event")
+		}
+	}
+	if got[0].Seq != 1 || got[1].Seq != 2 {
+		t.Fatalf("expected seqs 1,2 got %d,%d", got[0].Seq, got[1].Seq)
+	}
+	ring := s.Ring()
+	if len(ring) != 2 || ring[0].Seq != 1 || ring[1].Seq != 2 || ring[0].Data != "a" || ring[1].Data != "b" {
+		t.Fatalf("unexpected ring: %+v", ring)
+	}
+}
+
+// A stream of genuinely invalid UTF-8 bytes must not stall the carry buffer
+// forever: once it exceeds maxCarryBytes it is sanitized and flushed.
+func TestReadLoopInvalidUTF8DoesNotStall(t *testing.T) {
+	sess, err := New(&CreateRequest{
+		ID:      "invalid-utf8",
+		Command: "head -c 8192 /dev/urandom",
+	})
+	if err != nil {
+		t.Fatalf("failed to start session: %v", err)
+	}
+	defer sess.Kill()
+
+	ch := sess.Subscribe()
+	defer sess.Unsubscribe(ch)
+
+	var bytes int
+	deadline := time.After(15 * time.Second)
+	for {
+		select {
+		case ev, ok := <-ch:
+			if !ok {
+				return
+			}
+			// The exit event can race ahead of the flushed output; success is
+			// defined by receiving sanitized output, not by the exit ordering.
+			if ev.Type == "output" && len(ev.Data) > 0 {
+				return
+			}
+			bytes += len(ev.Data)
+		case <-deadline:
+			t.Fatalf("timeout: invalid UTF-8 stream stalled after %d bytes", bytes)
 		}
 	}
 }

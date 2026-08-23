@@ -533,7 +533,7 @@ void main() {
   });
 
   group('full view dialog', () {
-    testWidgets('opens debug overlay and exercises its controls', (
+    testWidgets('opens fullscreen view and exercises its controls', (
       tester,
     ) async {
       tester.view.physicalSize = const Size(1600, 1200);
@@ -560,6 +560,11 @@ void main() {
 
       // Two terminals: the panel one and the full-view one.
       expect(find.byType(TerminalWidget), findsNWidgets(2));
+
+      // The debug pane is hidden by default; toggle it on.
+      expect(find.text('PgUp'), findsNothing);
+      await tester.tap(find.byTooltip('Show debug pane'));
+      await tester.pump();
       expect(find.text('PgUp'), findsOneWidget);
 
       for (final label in [
@@ -586,9 +591,9 @@ void main() {
       await tester.tap(find.text('ForceKeysOn'));
       await tester.pump();
 
-      await tester.tap(find.text('Font+'));
+      await tester.tap(find.byTooltip('Increase font size'));
       await tester.pump();
-      await tester.tap(find.text('Font-'));
+      await tester.tap(find.byTooltip('Decrease font size'));
       await tester.pump();
 
       await tester.tap(find.text('Wheel↑'));
@@ -597,15 +602,15 @@ void main() {
       await tester.pump();
 
       // Debug log controls.
-      await tester.tap(find.byIcon(Icons.bug_report));
+      await tester.tap(find.byTooltip('Dump terminal state'));
       await tester.pump();
-      await tester.tap(find.byIcon(Icons.copy));
+      await tester.tap(find.byTooltip('Copy logs'));
       await tester.pump();
-      await tester.tap(find.byIcon(Icons.clear_all));
+      await tester.tap(find.byTooltip('Clear logs'));
       await tester.pump();
 
-      // Dismiss via the barrier (dialog is 1000x800 on a 1600x1200 surface).
-      await tester.tapAt(const Offset(5, 5));
+      // Close via the control bar (barrier tap does not dismiss fullscreen).
+      await tester.tap(find.byTooltip('Close full view'));
       await tester.pump();
       await tester.pump();
       expect(find.text('PgUp'), findsNothing);

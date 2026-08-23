@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -136,6 +137,9 @@ func (h *Handler) streamSession(w http.ResponseWriter, r *http.Request, id strin
 	}
 
 	replay := r.URL.Query().Get("replay") != "0"
+	sinceStr := r.URL.Query().Get("since")
+	hasSince := sinceStr != ""
+	since, _ := strconv.ParseInt(sinceStr, 10, 64)
 
 	w.Header().Set("Content-Type", "application/x-ndjson")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -146,15 +150,24 @@ func (h *Handler) streamSession(w http.ResponseWriter, r *http.Request, id strin
 		return
 	}
 
+	// Subscribe BEFORE snapshotting the ring so output published in between
+	// is not lost; per-event sequence numbers dedupe the overlap below.
+	ch := sess.Subscribe()
+	defer sess.Unsubscribe(ch)
+
+	var lastSeq int64
 	if replay {
-		for _, data := range sess.Ring() {
-			writeEvent(w, session.Event{Type: "output", SessionID: id, Data: data})
+		for _, ev := range sess.Ring() {
+			if hasSince && ev.Seq <= since {
+				continue
+			}
+			if ev.Seq > lastSeq {
+				lastSeq = ev.Seq
+			}
+			writeEvent(w, ev)
 		}
 		flusher.Flush()
 	}
-
-	ch := sess.Subscribe()
-	defer sess.Unsubscribe(ch)
 
 	// Heartbeat to prevent OS / NAT idle timeouts from closing the stream.
 	heartbeat := time.NewTicker(15 * time.Second)
@@ -166,6 +179,13 @@ func (h *Handler) streamSession(w http.ResponseWriter, r *http.Request, id strin
 		case ev, ok := <-ch:
 			if !ok {
 				return
+			}
+			// Already delivered via the ring replay (or an earlier live event).
+			if ev.Seq != 0 && ev.Seq <= lastSeq {
+				continue
+			}
+			if ev.Seq > lastSeq {
+				lastSeq = ev.Seq
 			}
 			writeEvent(w, ev)
 			flusher.Flush()
