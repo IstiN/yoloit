@@ -1,4 +1,4 @@
-import 'package:xterm/xterm.dart';
+import 'package:yoxterm/xterm.dart';
 
 /// Guest-side registry of live xterm [Terminal] instances keyed by agent-node id.
 ///

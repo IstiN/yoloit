@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:xterm/xterm.dart' hide TerminalState;
+import 'package:yoxterm/xterm.dart' hide TerminalState;
 import 'package:yoloit/core/hotkeys/hotkeys.dart';
 import 'package:yoloit/features/settings/data/agent_config_service.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_cubit.dart';

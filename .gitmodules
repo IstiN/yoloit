@@ -6,7 +6,7 @@
 	url = https://github.com/IstiN/flutter_local_models.git
 [submodule "packages/xterm"]
 	path = packages/xterm
-	url = https://github.com/IstiN/xterm.git
+	url = https://github.com/IstiN/yoxterm.git
 [submodule "packages/pty2"]
 	path = packages/pty2
 	url = https://github.com/IstiN/pty2.git

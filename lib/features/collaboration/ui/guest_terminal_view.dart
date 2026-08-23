@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:xterm/xterm.dart';
+import 'package:yoxterm/xterm.dart';
 
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/collaboration/services/guest_terminal_registry.dart';

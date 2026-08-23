@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:path/path.dart' as p;
-import 'package:xterm/xterm.dart';
+import 'package:yoxterm/xterm.dart';
 import 'package:yoloit/core/remote/yoloit_remote_client.dart';
 import 'package:yoloit/core/services/resource_monitor_service.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';

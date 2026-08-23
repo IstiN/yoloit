@@ -1,5 +1,5 @@
 import 'package:equatable/equatable.dart';
-import 'package:xterm/xterm.dart';
+import 'package:yoxterm/xterm.dart';
 import 'package:yoloit/features/terminal/data/terminal_output_bus.dart';
 import 'package:yoloit/features/terminal/models/agent_phase.dart';
 import 'package:yoloit/features/terminal/models/agent_type.dart';

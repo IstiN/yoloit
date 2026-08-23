@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:xterm/xterm.dart' hide TerminalState;
+import 'package:yoxterm/xterm.dart' hide TerminalState;
 import 'package:yoloit/core/theme/app_colors.dart';
 import 'package:yoloit/core/theme/app_theme.dart';
 import 'package:yoloit/features/collaboration/services/guest_terminal_registry.dart';

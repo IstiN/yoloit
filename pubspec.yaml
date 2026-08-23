@@ -39,7 +39,7 @@ dependencies:
   pty2:
     path: packages/pty2
   meta: any
-  xterm:
+  yoxterm:
     path: packages/xterm
   window_manager: ^0.5.1
   file_picker: ^11.0.2

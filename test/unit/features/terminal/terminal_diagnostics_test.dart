@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:xterm/src/core/buffer/line.dart' as xterm_buffer;
-import 'package:xterm/src/core/cursor.dart' as xterm_cursor;
+import 'package:yoxterm/src/core/buffer/line.dart' as xterm_buffer;
+import 'package:yoxterm/src/core/cursor.dart' as xterm_cursor;
 import 'package:yoloit/features/terminal/ui/terminal_panel.dart';
 
 xterm_buffer.BufferLine _lineWith(String text) {

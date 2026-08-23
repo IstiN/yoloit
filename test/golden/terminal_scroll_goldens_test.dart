@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golden_toolkit/golden_toolkit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:xterm/xterm.dart' hide TerminalState;
+import 'package:yoxterm/xterm.dart' hide TerminalState;
 import 'package:yoloit/core/theme/app_theme.dart';
 import 'package:yoloit/features/mindmap/widgets/canvas_interaction_lock.dart';
 import 'package:yoloit/features/terminal/models/agent_session.dart';
