@@ -383,7 +383,13 @@ class RuntimeTerminalClient {
     // Re-extract if missing or different size (cheap proxy for "outdated").
     if (!await installed.exists() || await installed.length() != bytes.length) {
       await installed.parent.create(recursive: true);
-      await installed.writeAsBytes(bytes, flush: true);
+      // Write to a temp file and atomically rename instead of truncating the
+      // installed binary in place: on macOS, rewriting the inode of a signed
+      // executable that was recently running taints its code-signature cache
+      // and every subsequent exec is SIGKILLed ("Code Signature Invalid").
+      final tmp = File('${installed.path}.new');
+      await tmp.writeAsBytes(bytes, flush: true);
+      await tmp.rename(installed.path);
       if (!Platform.isWindows) {
         await Process.run('chmod', ['+x', installed.path]);
       }
