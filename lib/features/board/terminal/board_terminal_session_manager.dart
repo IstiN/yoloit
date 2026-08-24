@@ -25,6 +25,9 @@ class BoardTerminalSessionManager extends ChangeNotifier {
   // decoded backends, Uint8List for the byte path), hence <void>.
   final Map<String, StreamSubscription<void>> _outputSubs = {};
   final Map<String, List<String>> _envGroupIdsBySession = {};
+  // In-flight spawn per sessionId — concurrent ensureSession callers share
+  // one spawn instead of racing into _spawn twice.
+  final Map<String, Future<AgentSession>> _inflightSpawns = {};
 
   // Batched output buffer per session to avoid flooding the xterm
   // [notifyListeners] bridge on every PTY chunk. When a runner dumps
@@ -63,16 +66,26 @@ class BoardTerminalSessionManager extends ChangeNotifier {
     BoardTerminalConfig config, {
     RemoteBoardInfo? remoteInfo,
     ResourceSessionMetadata? metadata,
-  }) async {
+  }) {
     final existing = _sessions[config.sessionId];
-    if (existing != null) return existing;
-    return _spawn(
+    if (existing != null) return Future.value(existing);
+    // Serialize concurrent spawns for the same sessionId: two callers racing
+    // ensureSession (e.g. panel mount + CLI ensure) must share one spawn,
+    // otherwise each creates its own backend process + output subscription
+    // and every PTY chunk is delivered twice.
+    final inflight = _inflightSpawns[config.sessionId];
+    if (inflight != null) return inflight;
+    final future = _spawn(
       sessionId: config.sessionId,
       sessionName: config.sessionName,
       workingDir: config.workingDir,
       envGroupIds: config.envGroupIds,
       remoteInfo: remoteInfo,
       metadata: metadata,
+    );
+    _inflightSpawns[config.sessionId] = future;
+    return future.whenComplete(
+      () => _inflightSpawns.remove(config.sessionId),
     );
   }
 
@@ -207,6 +220,13 @@ class BoardTerminalSessionManager extends ChangeNotifier {
 
   void _attachProcess(TerminalProcess process, AgentSession session) {
     final sessionId = session.id;
+    // Idempotent attach: cancel any previous output subscription for this
+    // session BEFORE registering the new one. Two concurrent spawns for the
+    // same sessionId interleave as spawnA.cancel → spawnA.launch →
+    // spawnB.cancel(none) → spawnB.launch → spawnA.attach → spawnB.attach;
+    // without this cancel both subscriptions stay live and every PTY chunk
+    // reaches the terminal twice ("ki" renders as "kkii").
+    _outputSubs.remove(sessionId)?.cancel();
     // Byte-level output is preferred when the backend offers it: the chunks
     // skip the per-KB UTF-8 decode on the UI isolate and are flushed through
     // Terminal.writeBytes, which decodes incrementally itself. Exactly one of

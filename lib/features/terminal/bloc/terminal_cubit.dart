@@ -492,6 +492,7 @@ class TerminalCubit extends Cubit<TerminalState> {
   void closeSession(String sessionId) {
     final current = _loaded;
     if (current == null) return;
+    _outputSubs.remove(sessionId)?.cancel();
 
     // Find session before removing it (needed for cleanup).
     final session = _allSessions.firstWhere(
@@ -687,11 +688,19 @@ class TerminalCubit extends Cubit<TerminalState> {
   final Map<String, List<Uint8List>> _batchedByteOutput = {};
   final Map<String, int> _batchedOutputBytes = {};
   final Map<String, Timer> _batchFlushTimers = {};
+  // One output subscription per session; cancelled on re-attach / close so a
+  // racing attach can never double-deliver PTY chunks to the terminal.
+  final Map<String, StreamSubscription<void>> _outputSubs = {};
   static const _batchFlushIntervalMs = 50;
   static const _batchMaxBytes = 16384;
 
   void _attachProcessToSession(TerminalProcess process, AgentSession session) {
     final sessionId = session.id;
+    // Idempotent attach: cancel any previous output subscription for this
+    // session BEFORE registering the new one — a racing re-attach would
+    // otherwise double-deliver every PTY chunk to the terminal (the same
+    // bug class as the board session manager).
+    _outputSubs.remove(sessionId)?.cancel();
     // Byte-level output is preferred when the backend offers it (see
     // Pty.outputBytes): chunks skip the per-KB UTF-8 decode on the UI
     // isolate and are flushed through Terminal.writeBytes, which decodes
@@ -786,7 +795,7 @@ class TerminalCubit extends Cubit<TerminalState> {
     }
 
     if (byteStream != null) {
-      byteStream.listen(
+      _outputSubs[sessionId] = byteStream.listen(
         (chunk) {
           // Accumulate into the chunk list (original references, no copying).
           final chunks =
@@ -810,7 +819,7 @@ class TerminalCubit extends Cubit<TerminalState> {
       return;
     }
 
-    process.output.listen(
+    _outputSubs[sessionId] = process.output.listen(
       (data) {
         // Accumulate into the chunk list (original references, no copying).
         final chunks = _batchedOutput.putIfAbsent(sessionId, () => <String>[]);
@@ -1021,6 +1030,7 @@ class TerminalCubit extends Cubit<TerminalState> {
   }
 
   void _onSessionDone(String sessionId) {
+    _outputSubs.remove(sessionId);
     final current = _loaded;
     if (current == null) return;
     // Update status in _allSessions

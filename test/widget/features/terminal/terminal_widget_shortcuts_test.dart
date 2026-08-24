@@ -255,6 +255,9 @@ void main() {
       await _pressCmd(tester, LogicalKeyboardKey.keyO);
 
       expect(fileSearchInvoked, 1);
+      // Drain pending timers (e.g. the terminal's 300ms focus-retry timer)
+      // so the test-end invariant "no pending timers" holds deterministically.
+      await tester.pump(const Duration(milliseconds: 400));
     });
   });
 
