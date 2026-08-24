@@ -1383,11 +1383,11 @@ class TerminalWidgetState extends State<TerminalWidget> {
         return true;
       // Cmd+= → increase font size
       case TerminalShortcutAction.increaseFontSize:
-        setState(() => _fontSize = (_fontSize + 1).clamp(8.0, 32.0));
+        setFontSize(_fontSize + 1);
         return true;
       // Cmd+- → decrease font size
       case TerminalShortcutAction.decreaseFontSize:
-        setState(() => _fontSize = (_fontSize - 1).clamp(8.0, 32.0));
+        setFontSize(_fontSize - 1);
         return true;
       // Cmd+A → select all terminal buffer content
       case TerminalShortcutAction.selectAll:
@@ -1482,7 +1482,10 @@ class TerminalWidgetState extends State<TerminalWidget> {
   }
 
   void setFontSize(double size) {
-    if (mounted) setState(() => _fontSize = size.clamp(8.0, 32.0));
+    if (!mounted) return;
+    final clamped = size.clamp(8.0, 32.0);
+    setState(() => _fontSize = clamped);
+    SessionPrefs.saveTerminalFontSize(clamped);
   }
 
   Future<void> _pasteAsFileRef() async {

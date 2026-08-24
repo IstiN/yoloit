@@ -219,14 +219,19 @@ class _BoardTerminalFullViewState extends State<BoardTerminalFullView> {
         child: Stack(
           children: [
             Positioned.fill(
-              child: TerminalWidget(
-                key: _termKey,
-                session: _activeSession,
-                isActive: true,
-                debugLabel: widget.debugLabel,
-                debugForceAltScrollKeyFallback: _forceAltScrollKeys,
-                debugLogSink: (message) => _addLog('scroll $message'),
-                terminalOutputWriter: _writePty,
+              // Keep the terminal clear of the auto-hiding top bar (and of
+              // the floating macOS traffic lights when the bar is hidden).
+              child: Padding(
+                padding: const EdgeInsets.only(top: 52, left: 8, right: 4),
+                child: TerminalWidget(
+                  key: _termKey,
+                  session: _activeSession,
+                  isActive: true,
+                  debugLabel: widget.debugLabel,
+                  debugForceAltScrollKeyFallback: _forceAltScrollKeys,
+                  debugLogSink: (message) => _addLog('scroll $message'),
+                  terminalOutputWriter: _writePty,
+                ),
               ),
             ),
             Positioned(
