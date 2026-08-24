@@ -310,6 +310,18 @@ class _BoardTerminalPanelWidgetState extends State<BoardTerminalPanelWidget> {
         widget.panel.title.trim().isEmpty
             ? _config.sessionName
             : widget.panel.title;
+    final resolvedTitle = title.trim().isEmpty ? 'Terminal' : title;
+    final tabs = _collectBoardTerminalTabs();
+    if (!tabs.any((tab) => tab.session.id == session.id)) {
+      tabs.insert(
+        0,
+        BoardTerminalFullViewTab(
+          panelId: widget.panel.id,
+          title: resolvedTitle,
+          session: session,
+        ),
+      );
+    }
     unawaited(
       showGeneralDialog<void>(
         context: context,
@@ -320,7 +332,8 @@ class _BoardTerminalPanelWidgetState extends State<BoardTerminalPanelWidget> {
         pageBuilder:
             (ctx, animation, secondaryAnimation) => BoardTerminalFullView(
               session: session,
-              title: title.trim().isEmpty ? 'Terminal' : title,
+              title: resolvedTitle,
+              tabs: tabs,
               debugLabel:
                   kDebugMode
                       ? 'fullview:${widget.panel.id}:session:${session.id}'
@@ -328,6 +341,38 @@ class _BoardTerminalPanelWidgetState extends State<BoardTerminalPanelWidget> {
             ),
       ),
     );
+  }
+
+  /// Collects every visible terminal panel of the board that currently has a
+  /// live session, so the fullscreen view can offer them as switchable tabs.
+  List<BoardTerminalFullViewTab> _collectBoardTerminalTabs() {
+    final board = _boardForPanel(context.read<BoardCubit>());
+    if (board == null) return [];
+    final tabs = <BoardTerminalFullViewTab>[];
+    for (final panel in board.panels) {
+      if (panel.type != 'board.terminal' || panel.hidden) continue;
+      final raw = panel.state['config'];
+      if (raw is! Map) continue;
+      final config = BoardTerminalConfig.fromJson(
+        Map<String, dynamic>.from(raw),
+      );
+      if (config.sessionId.isEmpty) continue;
+      final session = _manager.sessionFor(config.sessionId);
+      if (session == null) continue;
+      final panelTitle = panel.title.trim();
+      final sessionName = config.sessionName.trim();
+      tabs.add(
+        BoardTerminalFullViewTab(
+          panelId: panel.id,
+          title:
+              panelTitle.isNotEmpty
+                  ? panelTitle
+                  : (sessionName.isNotEmpty ? sessionName : 'Terminal'),
+          session: session,
+        ),
+      );
+    }
+    return tabs;
   }
 
   Future<void> _respawnSessionWithEnvGroups(List<String> envGroupIds) async {

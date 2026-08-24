@@ -26,8 +26,8 @@ void main() {
     CanvasInteractionLock.instance.resetForTesting();
   });
 
-  AgentSession newSession() => AgentSession(
-    id: 'sess_fullview',
+  AgentSession newSession([String id = 'sess_fullview']) => AgentSession(
+    id: id,
     type: AgentType.copilot,
     workspacePath: '/project',
   );
@@ -46,6 +46,36 @@ void main() {
                           (ctx, _, __) => BoardTerminalFullView(
                             session: session,
                             title: 'My Terminal',
+                          ),
+                    ),
+                child: const Text('open'),
+              ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> openFullViewWithTabs(
+    WidgetTester tester,
+    List<BoardTerminalFullViewTab> tabs,
+    AgentSession selected,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder:
+              (context) => ElevatedButton(
+                onPressed:
+                    () => showGeneralDialog<void>(
+                      context: context,
+                      barrierColor: Colors.black,
+                      pageBuilder:
+                          (ctx, _, __) => BoardTerminalFullView(
+                            session: selected,
+                            title: 'Selected',
+                            tabs: tabs,
                           ),
                     ),
                 child: const Text('open'),
@@ -101,5 +131,80 @@ void main() {
 
     expect(find.byTooltip('Dump terminal state'), findsOneWidget);
     expect(find.text('MouseOn'), findsOneWidget);
+  });
+
+  testWidgets('shows a tab per board terminal with the opening terminal '
+      'selected', (tester) async {
+    final sessionA = newSession('sess_a');
+    final sessionB = newSession('sess_b');
+    final sessionC = newSession('sess_c');
+    await openFullViewWithTabs(
+      tester,
+      [
+        BoardTerminalFullViewTab(
+          panelId: 'p-a',
+          title: 'Alpha',
+          session: sessionA,
+        ),
+        BoardTerminalFullViewTab(
+          panelId: 'p-b',
+          title: 'Beta',
+          session: sessionB,
+        ),
+        BoardTerminalFullViewTab(
+          panelId: 'p-c',
+          title: 'Gamma',
+          session: sessionC,
+        ),
+      ],
+      sessionB,
+    );
+
+    expect(find.text('Alpha'), findsOneWidget);
+    expect(find.text('Beta'), findsOneWidget);
+    expect(find.text('Gamma'), findsOneWidget);
+    // The opening tab is the one bound to the terminal widget.
+    expect(
+      tester.widget<TerminalWidget>(find.byType(TerminalWidget)).session.id,
+      'sess_b',
+    );
+  });
+
+  testWidgets('tapping another tab switches the terminal session', (
+    tester,
+  ) async {
+    final sessionA = newSession('sess_a');
+    final sessionB = newSession('sess_b');
+    await openFullViewWithTabs(
+      tester,
+      [
+        BoardTerminalFullViewTab(
+          panelId: 'p-a',
+          title: 'Alpha',
+          session: sessionA,
+        ),
+        BoardTerminalFullViewTab(
+          panelId: 'p-b',
+          title: 'Beta',
+          session: sessionB,
+        ),
+      ],
+      sessionA,
+    );
+    expect(
+      tester.widget<TerminalWidget>(find.byType(TerminalWidget)).session.id,
+      'sess_a',
+    );
+
+    await tester.tap(find.text('Beta'));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.widget<TerminalWidget>(find.byType(TerminalWidget)).session.id,
+      'sess_b',
+    );
+    // Only one terminal widget stays mounted — the inactive tab does not
+    // keep rendering offscreen.
+    expect(find.byType(TerminalWidget), findsOneWidget);
   });
 }

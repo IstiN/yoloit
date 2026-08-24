@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -33,10 +34,25 @@ class BoardTerminalFullViewBridge {
   }
 }
 
+/// A single terminal tab in the fullscreen view — one live terminal panel
+/// from the board the view was opened on.
+class BoardTerminalFullViewTab {
+  const BoardTerminalFullViewTab({
+    required this.panelId,
+    required this.title,
+    required this.session,
+  });
+
+  final String panelId;
+  final String title;
+  final AgentSession session;
+}
+
 /// Modern fullscreen terminal view: the terminal fills the whole screen, a
-/// floating control bar auto-hides after a few seconds of mouse inactivity,
-/// and pinch-to-zoom (touch or trackpad) changes the font size via the
-/// gesture handling already built into [TerminalWidget].
+/// tab bar on top lists every live terminal of the current board (the one
+/// the view was opened from is selected), and pinch-to-zoom (touch or
+/// trackpad) changes the font size via the gesture handling already built
+/// into [TerminalWidget].
 ///
 /// A collapsible debug pane (hidden by default) keeps the diagnostics that
 /// the previous fixed-size debug dialog exposed.
@@ -44,12 +60,21 @@ class BoardTerminalFullView extends StatefulWidget {
   const BoardTerminalFullView({
     required this.session,
     required this.title,
+    this.tabs,
     this.debugLabel,
     super.key,
   });
 
+  /// The session that is selected when the view opens.
   final AgentSession session;
+
+  /// Title of the opening tab — used when [tabs] is not provided.
   final String title;
+
+  /// All live terminal sessions of the board, shown as tabs on top. When
+  /// null or empty a single tab is derived from [session] and [title].
+  final List<BoardTerminalFullViewTab>? tabs;
+
   final String? debugLabel;
 
   @override
@@ -57,7 +82,7 @@ class BoardTerminalFullView extends StatefulWidget {
 }
 
 class _BoardTerminalFullViewState extends State<BoardTerminalFullView> {
-  final _termKey = GlobalKey<TerminalWidgetState>();
+  final _termKeys = <String, GlobalKey<TerminalWidgetState>>{};
   final _logScroll = ScrollController();
   final _logs = <String>[];
 
@@ -67,6 +92,38 @@ class _BoardTerminalFullViewState extends State<BoardTerminalFullView> {
   Timer? _hideTimer;
 
   static const _autoHideDelay = Duration(seconds: 3);
+
+  late final List<BoardTerminalFullViewTab> _tabs =
+      widget.tabs != null && widget.tabs!.isNotEmpty
+          ? widget.tabs!
+          : [
+            BoardTerminalFullViewTab(
+              panelId: '',
+              title: widget.title,
+              session: widget.session,
+            ),
+          ];
+
+  late int _activeIndex = () {
+    final index = _tabs.indexWhere(
+      (tab) => tab.session.id == widget.session.id,
+    );
+    return index < 0 ? 0 : index;
+  }();
+
+  AgentSession get _activeSession => _tabs[_activeIndex].session;
+
+  GlobalKey<TerminalWidgetState> get _termKey => _termKeys.putIfAbsent(
+    _activeSession.id,
+    () => GlobalKey<TerminalWidgetState>(),
+  );
+
+  /// The native macOS traffic lights float over the fullscreen content, so
+  /// the top bar keeps clear of them (same inset as the app title bar).
+  static bool get _hasMacOSTrafficLights {
+    if (kIsWeb) return false;
+    return defaultTargetPlatform == TargetPlatform.macOS;
+  }
 
   @override
   void initState() {
@@ -137,6 +194,21 @@ class _BoardTerminalFullViewState extends State<BoardTerminalFullView> {
     _pokeControls();
   }
 
+  void _selectTab(int index) {
+    if (index == _activeIndex || index < 0 || index >= _tabs.length) return;
+    // Carry the current font size over to the newly bound tab so pinch /
+    // button zoom survives tab switches.
+    final fontSize = _termKey.currentState?.currentFontSize;
+    setState(() => _activeIndex = index);
+    if (fontSize != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _termKey.currentState?.setFontSize(fontSize);
+      });
+    }
+    _pokeControls();
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
@@ -149,7 +221,7 @@ class _BoardTerminalFullViewState extends State<BoardTerminalFullView> {
             Positioned.fill(
               child: TerminalWidget(
                 key: _termKey,
-                session: widget.session,
+                session: _activeSession,
                 isActive: true,
                 debugLabel: widget.debugLabel,
                 debugForceAltScrollKeyFallback: _forceAltScrollKeys,
@@ -158,15 +230,15 @@ class _BoardTerminalFullViewState extends State<BoardTerminalFullView> {
               ),
             ),
             Positioned(
-              top: 12,
-              left: 12,
-              right: 12,
+              top: 0,
+              left: 0,
+              right: 0,
               child: AnimatedOpacity(
                 opacity: _controlsVisible ? 1.0 : 0.0,
                 duration: const Duration(milliseconds: 180),
                 child: IgnorePointer(
                   ignoring: !_controlsVisible,
-                  child: _buildControlsBar(),
+                  child: _buildTopBar(),
                 ),
               ),
             ),
@@ -184,64 +256,123 @@ class _BoardTerminalFullViewState extends State<BoardTerminalFullView> {
     );
   }
 
-  Widget _buildControlsBar() {
+  Widget _buildTopBar() {
     final colors = context.appColors;
     final fontSize = _termKey.currentState?.currentFontSize ?? 13.0;
-    return Center(
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 720),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: colors.surface.withAlpha(230),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: colors.border),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.terminal, size: 16, color: colors.textSecondary),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                widget.title,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: colors.textPrimary, fontSize: 13),
+    return Container(
+      padding: EdgeInsets.only(
+        left: _hasMacOSTrafficLights ? 82 : 12,
+        right: 12,
+        top: 10,
+        bottom: 10,
+      ),
+      decoration: BoxDecoration(
+        color: colors.surface.withAlpha(235),
+        border: Border(bottom: BorderSide(color: colors.border, width: 0.5)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.terminal, size: 16, color: colors.textSecondary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  for (var i = 0; i < _tabs.length; i++) _buildTab(i, colors),
+                ],
               ),
             ),
-            const SizedBox(width: 12),
-            _barButton(
-              tooltip: 'Decrease font size',
-              icon: Icons.remove,
-              onPressed: () => _changeFontSize(-1),
+          ),
+          const SizedBox(width: 12),
+          _barButton(
+            tooltip: 'Decrease font size',
+            icon: Icons.remove,
+            onPressed: () => _changeFontSize(-1),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Text(
+              fontSize.toStringAsFixed(0),
+              style: TextStyle(color: colors.textSecondary, fontSize: 12),
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Text(
-                fontSize.toStringAsFixed(0),
-                style: TextStyle(color: colors.textSecondary, fontSize: 12),
+          ),
+          _barButton(
+            tooltip: 'Increase font size',
+            icon: Icons.add,
+            onPressed: () => _changeFontSize(1),
+          ),
+          const SizedBox(width: 4),
+          _barButton(
+            tooltip: _debugVisible ? 'Hide debug pane' : 'Show debug pane',
+            icon: Icons.bug_report,
+            onPressed: () {
+              setState(() => _debugVisible = !_debugVisible);
+              _pokeControls();
+            },
+          ),
+          const SizedBox(width: 4),
+          _barButton(
+            tooltip: 'Close full view',
+            icon: Icons.close,
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTab(int index, AppColorScheme colors) {
+    final tab = _tabs[index];
+    final selected = index == _activeIndex;
+    return Padding(
+      padding: const EdgeInsets.only(right: 4),
+      child: Tooltip(
+        message: tab.title,
+        child: GestureDetector(
+          onTap: () => _selectTab(index),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 120),
+            constraints: const BoxConstraints(maxWidth: 200),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color:
+                  selected
+                      ? colors.accentGreen.withAlpha(30)
+                      : colors.surfaceElevated.withAlpha(120),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: selected ? colors.accentGreen : colors.border,
+                width: selected ? 1 : 0.5,
               ),
             ),
-            _barButton(
-              tooltip: 'Increase font size',
-              icon: Icons.add,
-              onPressed: () => _changeFontSize(1),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (selected) ...[
+                  Icon(
+                    Icons.circle,
+                    size: 6,
+                    color: colors.accentGreen,
+                  ),
+                  const SizedBox(width: 6),
+                ],
+                Flexible(
+                  child: Text(
+                    tab.title,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color:
+                          selected ? colors.textPrimary : colors.textSecondary,
+                      fontWeight:
+                          selected ? FontWeight.w600 : FontWeight.w400,
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 4),
-            _barButton(
-              tooltip: _debugVisible ? 'Hide debug pane' : 'Show debug pane',
-              icon: Icons.bug_report,
-              onPressed: () {
-                setState(() => _debugVisible = !_debugVisible);
-                _pokeControls();
-              },
-            ),
-            const SizedBox(width: 4),
-            _barButton(
-              tooltip: 'Close full view',
-              icon: Icons.close,
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -262,7 +393,7 @@ class _BoardTerminalFullViewState extends State<BoardTerminalFullView> {
 
   Widget _buildDebugPane() {
     final colors = context.appColors;
-    final terminal = widget.session.terminal;
+    final terminal = _activeSession.terminal;
     final state = _termKey.currentState;
     final debugState =
         state?.debugStateSummary ??
