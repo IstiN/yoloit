@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
@@ -1000,13 +1001,17 @@ class TerminalWidgetState extends State<TerminalWidget> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
         final position = _scrollController.position;
+        final liveMax = _liveMaxScrollExtent;
+        final maxExtent = liveMax == null
+            ? position.maxScrollExtent
+            : math.max(position.maxScrollExtent, liveMax);
         final stored = widget.session.scrollOffset;
         final isDefault = stored <= position.minScrollExtent + 1;
         final target = isDefault
-            ? position.maxScrollExtent
+            ? maxExtent
             : stored.clamp(
                 position.minScrollExtent,
-                position.maxScrollExtent,
+                maxExtent,
               );
         _scrollController.jumpTo(target);
       }
@@ -1801,9 +1806,16 @@ class TerminalWidgetState extends State<TerminalWidget> {
       return;
     }
     final position = _scrollController.position;
+    // Scrolling down is "towards the bottom": the framework-cached max trails
+    // the live buffer by a frame while output streams, so allow reaching the
+    // live extent. Upward (user-relative) scrolls keep the cached clamp.
+    final liveMax = delta > 0 ? _liveMaxScrollExtent : null;
+    final upperBound = liveMax == null
+        ? position.maxScrollExtent
+        : math.max(position.maxScrollExtent, liveMax);
     final target =
         (position.pixels + delta)
-            .clamp(position.minScrollExtent, position.maxScrollExtent)
+            .clamp(position.minScrollExtent, upperBound)
             .toDouble();
     if (target == position.pixels) {
       _debugScrollLog(
@@ -1828,6 +1840,15 @@ class TerminalWidgetState extends State<TerminalWidget> {
     scheduleMicrotask(() {
       if (!mounted || !_scrollController.hasClients) return;
       final nextPosition = _scrollController.position;
+      // When the viewport is (still) at the bottom, xterm's stick-to-bottom
+      // follow owns it — jumping back to the captured offset would yank
+      // against the follow correction while output streams during the
+      // gesture. A viewport that moved up (canvas pan leaking into the
+      // terminal's Scrollable) is still restored below.
+      if (nextPosition.hasContentDimensions &&
+          nextPosition.maxScrollExtent - nextPosition.pixels <= 24) {
+        return;
+      }
       final clamped =
           offset
               .clamp(nextPosition.minScrollExtent, nextPosition.maxScrollExtent)
@@ -1839,7 +1860,17 @@ class TerminalWidgetState extends State<TerminalWidget> {
 
   void _markUserScrollActive() {
     final anchor = _captureScrollAnchor();
-    if (anchor == null || anchor.stickToBottom) return;
+    if (anchor == null || anchor.stickToBottom) {
+      // The user (re)attached to the bottom: a stale anchor would keep the
+      // 50ms preserve timer yanking the viewport back up while output
+      // streams, fighting xterm's stick-to-bottom. Disarm it instead.
+      _userScrollAnchor = null;
+      _userScrollAnchorTimer?.cancel();
+      _userScrollAnchorTimer = null;
+      _userScrollPreserveTimer?.cancel();
+      _userScrollPreserveTimer = null;
+      return;
+    }
     _userScrollAnchor = anchor;
     _userScrollAnchorTimer?.cancel();
     _userScrollAnchorTimer = Timer(const Duration(milliseconds: 900), () {
@@ -1890,6 +1921,16 @@ class TerminalWidgetState extends State<TerminalWidget> {
     );
   }
 
+  /// The render object's live maximum scroll extent, or null when the
+  /// terminal view is not laid out yet. Unlike the framework-cached
+  /// `ScrollPosition.maxScrollExtent` this does not lag a frame behind
+  /// freshly written output, so "go to bottom" targets should prefer it.
+  double? get _liveMaxScrollExtent {
+    final state = _terminalViewKey.currentState;
+    if (state == null) return null;
+    return state.renderTerminal.maxScrollExtentLive;
+  }
+
   void _captureResizeScrollAnchor() {
     _resizeScrollAnchor = _captureScrollAnchor();
   }
@@ -1900,13 +1941,17 @@ class TerminalWidgetState extends State<TerminalWidget> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_scrollController.hasClients) return;
       final position = _scrollController.position;
+      final liveMax = _liveMaxScrollExtent;
+      final upperBound = liveMax == null
+          ? position.maxScrollExtent
+          : math.max(position.maxScrollExtent, liveMax);
       final target =
           anchor.stickToBottom
-              ? position.maxScrollExtent
+              ? upperBound
               : position.maxScrollExtent * anchor.fraction;
       position.jumpTo(
         target
-            .clamp(position.minScrollExtent, position.maxScrollExtent)
+            .clamp(position.minScrollExtent, upperBound)
             .toDouble(),
       );
     });
