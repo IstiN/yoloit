@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:yoloit/features/board/chat/widgets/chat_markdown_styles.dart';
 import 'package:yoloit/features/board/chat/widgets/chat_typing_indicator.dart';
+import 'package:yoloit/features/board/chat/widgets/memoized_markdown_body.dart';
 
 /// Streaming assistant response bubble with Markdown rendering.
 class StreamingBubble extends StatelessWidget {
@@ -27,18 +27,15 @@ class StreamingBubble extends StatelessWidget {
             processedContent.isEmpty
                 ? const ChatTypingIndicator()
                 : RepaintBoundary(
-                  child: MarkdownBody(
+                  child: MemoizedMarkdownBody(
                     data: processedContent,
+                    colors: colors,
+                    textColor: textColor,
+                    codeBg: codeBg,
                     onTapLink:
                         onLinkTap != null
                             ? (text, href, title) => onLinkTap!(href)
                             : null,
-                    styleSheet: chatMarkdownStyle(
-                      context: context,
-                      colors: colors,
-                      textColor: textColor,
-                      codeBg: codeBg,
-                    ),
                   ),
                 ),
       ),

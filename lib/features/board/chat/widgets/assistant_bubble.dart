@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/chat/widgets/chat_attachment_preview.dart';
 import 'package:yoloit/features/board/chat/widgets/chat_bubble_menu.dart';
 import 'package:yoloit/features/board/chat/widgets/chat_markdown_styles.dart';
+import 'package:yoloit/features/board/chat/widgets/memoized_markdown_body.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 
 class AssistantBubble extends StatefulWidget {
@@ -127,9 +127,11 @@ class AssistantBubbleState extends State<AssistantBubble> {
                             // getTransformTo NPEs every frame
                             // (flutter/flutter#184400, unfixed as of 3.47.x).
                             // Copy is available via ChatBubbleMenu.
-                            child: MarkdownBody(
+                            child: MemoizedMarkdownBody(
                               data: processedContent,
-                              selectable: false,
+                              colors: colors,
+                              textColor: textColor,
+                              codeBg: codeBg,
                               onTapLink: (text, href, title) {
                                 if (widget.onLinkTap != null) {
                                   widget.onLinkTap!(href);
@@ -137,12 +139,6 @@ class AssistantBubbleState extends State<AssistantBubble> {
                                   PlatformLauncher.instance.openUrl(href);
                                 }
                               },
-                              styleSheet: chatMarkdownStyle(
-                                context: context,
-                                colors: colors,
-                                textColor: textColor,
-                                codeBg: codeBg,
-                              ),
                             ),
                           ),
                         ),
