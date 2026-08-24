@@ -661,6 +661,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
 
   @override
   void dispose() {
+    _streamFlushTimer?.cancel();
     widget.controller?._detach();
     ToolCallSettingsService.instance.ignoredToolsListenable.removeListener(
       _handleIgnoredToolsChanged,
@@ -1339,15 +1340,35 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
 
   void _onAssistantDelta(ChatEvent event) {
     final delta = event.deltaContent;
-    if (delta != null) {
-      setState(() {
-        _streamingContent += delta;
-      });
-      _scrollToBottom();
-    }
+    if (delta == null) return;
+    // Accumulate without setState: deltas can arrive dozens of times per
+    // second and each setState re-parses the whole accumulated markdown of
+    // every visible bubble. Flush at ~12fps instead — visually identical
+    // for text streaming, but an order of magnitude less parse/layout/GC
+    // work (this path dominated CPU spikes in profiling).
+    _streamingContent += delta;
+    _streamFlushPending = true;
+    _streamFlushTimer ??= Timer(
+      const Duration(milliseconds: 80),
+      _flushStreamingContent,
+    );
+  }
+
+  Timer? _streamFlushTimer;
+  bool _streamFlushPending = false;
+
+  void _flushStreamingContent() {
+    _streamFlushTimer = null;
+    if (!mounted || !_streamFlushPending) return;
+    _streamFlushPending = false;
+    setState(() {});
+    _scrollToBottom();
   }
 
   void _onAssistantMessage(ChatEvent event) {
+    _streamFlushTimer?.cancel();
+    _streamFlushTimer = null;
+    _streamFlushPending = false;
     setState(() {
       // Sync from session to avoid duplicates with _onSessionChanged.
       _messages..clear()..addAll(_session!.messages);
