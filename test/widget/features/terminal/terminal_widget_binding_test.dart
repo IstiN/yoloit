@@ -147,4 +147,61 @@ void main() {
       expect(outB, ['x']);
     },
   );
+
+  testWidgets(
+    'closing the second widget re-syncs the terminal to the restored '
+    'widget viewport size',
+    (tester) async {
+      final session = newSession();
+
+      // A (panel) and B (full view) get clearly different heights, so the
+      // shared terminal is resized whenever B's render object lays out.
+      Widget build({required bool showB}) => MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 600,
+            height: 500,
+            child: Column(
+              children: [
+                SizedBox(
+                  height: 400,
+                  child: TerminalWidget(
+                    session: session,
+                    isActive: true,
+                    autoRequestFocus: false,
+                  ),
+                ),
+                if (showB)
+                  SizedBox(
+                    height: 100,
+                    child: TerminalWidget(
+                      session: session,
+                      isActive: true,
+                      autoRequestFocus: false,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpWidget(build(showB: false));
+      await tester.pump(const Duration(milliseconds: 300));
+      final panelHeight = session.terminal.viewHeight;
+
+      await tester.pumpWidget(build(showB: true));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(session.terminal.viewHeight, lessThan(panelHeight));
+
+      // Close B: the restored binding must re-push A's viewport size,
+      // otherwise the panel keeps rendering at B's dimensions (blank /
+      // clipped content until a manual resize).
+      await tester.pumpWidget(build(showB: false));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(session.terminal.viewHeight, panelHeight);
+    },
+  );
 }

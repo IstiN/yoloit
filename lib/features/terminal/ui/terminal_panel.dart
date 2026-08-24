@@ -1105,6 +1105,25 @@ class TerminalWidgetState extends State<TerminalWidget> {
     final previous = stack.isEmpty ? null : stack.last;
     terminal.onOutput = previous?.onOutput;
     terminal.onResize = previous?.onResize;
+    // The widget that just unbound (e.g. the fullscreen view) resized the
+    // shared terminal to its own viewport. The restored widget's render
+    // object saw no size change of its own, so without a nudge it keeps
+    // rendering the terminal at the other widget's dimensions — stale or
+    // fully blank content until the next manual resize.
+    final owner = previous?.owner;
+    if (owner is TerminalWidgetState && owner.mounted) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (owner.mounted) owner._onBindingRestored();
+      });
+    }
+  }
+
+  /// Re-syncs this widget after its terminal binding was restored: re-pushes
+  /// this viewport's dimensions to the shared terminal (undoing whatever
+  /// size the detached widget had set) and repaints.
+  void _onBindingRestored() {
+    _terminalViewKey.currentState?.renderTerminal.forceResizeTerminal();
+    if (mounted) setState(() {});
   }
 
   void _attachTerminalDiagnostics(AgentSession session) {
