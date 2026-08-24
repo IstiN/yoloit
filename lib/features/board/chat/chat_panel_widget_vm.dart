@@ -105,15 +105,13 @@ class ChatPanelWidget extends StatefulWidget {
   State<ChatPanelWidget> createState() => _ChatPanelWidgetState();
 }
 
-class _ChatPanelWidgetState extends State<ChatPanelWidget>
-    with SingleTickerProviderStateMixin {
+class _ChatPanelWidgetState extends State<ChatPanelWidget> {
   static final RegExp _brTagRe = RegExp(r'<br\s*/?>');
 
   final _inputController = TextEditingController();
   late ScrollController _scrollController;
   PanelScrollSaveHandle? _scrollSave;
   final _inputFocusNode = FocusNode();
-  late AnimationController _glowCtrl;
 
   final _modelScrollCtrl = ScrollController();
   String _modelQuery = '';
@@ -168,10 +166,6 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   @override
   void initState() {
     super.initState();
-    _glowCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    );
     _initConfig();
     _initToolCallSettings();
     _initSession();
@@ -703,7 +697,6 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     _scrollController.dispose();
     _inputFocusNode.dispose();
     _modelScrollCtrl.dispose();
-    _glowCtrl.dispose();
     unawaited(_micHandler.dispose());
     ChatPanelWidget.processingNotifiers.remove(widget.panel.id);
     processingNotifier.dispose();
@@ -973,12 +966,6 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     processingNotifier.value = value;
     // Notify minimap and other global listeners
     ChatPanelWidget.processingChangeNotifier.value++;
-    if (value) {
-      _glowCtrl.repeat(reverse: true);
-    } else {
-      _glowCtrl.stop();
-      _glowCtrl.value = 0;
-    }
   }
 
   bool _isSending = false;

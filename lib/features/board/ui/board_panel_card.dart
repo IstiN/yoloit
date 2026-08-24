@@ -80,6 +80,11 @@ class BoardPanelCardState extends State<BoardPanelCard>
   late final Animation<double> _opacity;
   late final Animation<double> _scale;
   bool _isTransformingPanel = false;
+  // First build has no known "previous" position/size, so AnimatedPositioned
+  // would slide from origin and the entry tween would scale from 0.88 — both
+  // create a visible "frozen" mismatch against the persisted bounds until
+  // they finish. The first build uses absolute Positioned + opacity/scale=1.
+  bool _firstBuild = true;
 
   // Convenience getters so build code can still use widget.panel etc.
   BoardPanelInstance get panel => widget.panel;
@@ -108,13 +113,22 @@ class BoardPanelCardState extends State<BoardPanelCard>
     super.initState();
     _entryController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 280),
+      duration: const Duration(milliseconds: 140),
     );
     _opacity = CurvedAnimation(parent: _entryController, curve: Curves.easeOut);
-    _scale = Tween<double>(begin: 0.88, end: 1.0).animate(
+    _scale = Tween<double>(begin: 0.96, end: 1.0).animate(
       CurvedAnimation(parent: _entryController, curve: Curves.easeOutBack),
     );
-    _entryController.forward();
+    // Skip the entry tween on the very first build — first mount has no
+    // previous bounds, so the scale/opacity flight just paints a mismatch.
+    if (_firstBuild) {
+      _entryController.value = 1.0;
+    } else {
+      _entryController.forward();
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() => _firstBuild = false);
+    });
   }
 
   @override
@@ -208,22 +222,12 @@ class BoardPanelCardState extends State<BoardPanelCard>
     const selectionBottomGutter = BoardPanelSelectionMetrics.bottomGutter;
     final selectionWrapperWidth = panel.bounds.width + selectionSideGutter * 2;
     final contentToolbar = _buildContentToolbar(context, panel);
-    return AnimatedPositioned(
-      duration:
-          _isTransformingPanel
-              ? Duration.zero
-              : const Duration(milliseconds: 320),
-      curve: Curves.easeOutCubic,
-      left: panel.bounds.x + positionOffset.dx - selectionSideGutter,
-      top: panel.bounds.y + positionOffset.dy - selectionTopGutter,
-      width: selectionWrapperWidth,
-      height: panel.bounds.height + selectionTopGutter + selectionBottomGutter,
-      child: FadeTransition(
-        opacity: _opacity,
-        child: ScaleTransition(
-          scale: _scale,
-          alignment: Alignment.topLeft,
-          child: Stack(
+    final positionedChild = FadeTransition(
+      opacity: _opacity,
+      child: ScaleTransition(
+        scale: _scale,
+        alignment: Alignment.topLeft,
+        child: Stack(
             clipBehavior: Clip.none,
             children: [
               Positioned(
@@ -296,7 +300,27 @@ class BoardPanelCardState extends State<BoardPanelCard>
             ],
           ), // Stack
         ), // ScaleTransition
-      ), // FadeTransition
+      ); // FadeTransition
+    if (_firstBuild) {
+      return Positioned(
+        left: panel.bounds.x + positionOffset.dx - selectionSideGutter,
+        top: panel.bounds.y + positionOffset.dy - selectionTopGutter,
+        width: selectionWrapperWidth,
+        height: panel.bounds.height + selectionTopGutter + selectionBottomGutter,
+        child: positionedChild,
+      );
+    }
+    return AnimatedPositioned(
+      duration:
+          _isTransformingPanel
+              ? Duration.zero
+              : const Duration(milliseconds: 320),
+      curve: Curves.easeOutCubic,
+      left: panel.bounds.x + positionOffset.dx - selectionSideGutter,
+      top: panel.bounds.y + positionOffset.dy - selectionTopGutter,
+      width: selectionWrapperWidth,
+      height: panel.bounds.height + selectionTopGutter + selectionBottomGutter,
+      child: positionedChild,
     );
   }
 

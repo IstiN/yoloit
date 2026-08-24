@@ -152,12 +152,18 @@ extension _BoardViewSections on _BoardViewState {
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        _buildScreenshotBoundary(
-          context,
-          activeBoard,
-          colors,
-          focusedPanelId,
-          selectedPanelIds,
+        // While the (opaque) board overview layer covers the canvas, pause
+        // all canvas tickers — e.g. the chat processing glow — so hidden
+        // animations stop scheduling frames.
+        TickerMode(
+          enabled: !_isBoardOverviewOpen,
+          child: _buildScreenshotBoundary(
+            context,
+            activeBoard,
+            colors,
+            focusedPanelId,
+            selectedPanelIds,
+          ),
         ),
         if (_isBoardOverviewOpen)
           _buildBoardOverviewLayer(context, state, activeBoard),
