@@ -1,8 +1,11 @@
+import 'dart:convert';
+
 import 'package:equatable/equatable.dart';
-import 'package:yoxterm/xterm.dart';
+import 'package:flutter/foundation.dart';
 import 'package:yoloit/features/terminal/data/terminal_output_bus.dart';
 import 'package:yoloit/features/terminal/models/agent_phase.dart';
 import 'package:yoloit/features/terminal/models/agent_type.dart';
+import 'package:yoxterm/xterm.dart';
 
 enum AgentStatus { idle, live, error }
 
@@ -90,33 +93,86 @@ class AgentSession extends Equatable {
   /// the whole ~256 KiB on EVERY flush once the cap is reached, which was a
   /// major source of GC churn while typing. Trimming here only advances an
   /// offset; compaction is amortized (once per 512 dropped chunks).
-  final List<String> _rawChunks = [];
+  ///
+  /// The list holds RAW UTF-8 [Uint8List]s; text never lives in this list.
+  /// [historyText] decodes lazily on read with caching by [_outputVersion].
+  final List<Uint8List> _rawChunks = [];
   int _rawChunksStart = 0;
   int _rawLength = 0;
+
+  /// Lazily-decoded text view of [_rawChunks]. Built once per
+  /// [_outputVersion] change; subsequent reads reuse [historyTextCache].
+  int _historyTextVersion = -1;
+  String? historyTextCache;
 
   static const _maxRecentLines = 300;
   static const _maxRawBytes = 256 * 1024; // 256 KiB raw ANSI history
 
-  /// Append raw PTY data: stores the chunk by reference and trims the
-  /// rolling raw buffer. The plain-text line view ([recentLines]) is built
-  /// lazily on read — nothing is split or stripped here.
+  /// Lazily-decoded history text. Decoded per-append from the stored byte
+  /// chunks using [utf8.decode] with `allowMalformed: true`. This matches
+  /// the OLD per-flush decode semantics — so a multibyte sequence split
+  /// across two appends renders U+FFFD at the split edge, the same way the
+  /// old per-flush decoder did.
+  ///
+  /// Decoded once per [_outputVersion] change; subsequent reads reuse the
+  /// cache. While typing, no decoder runs at all — the cache only fills
+  /// when a consumer (e.g. the `terminal output` CLI command, the
+  /// collaboration guest, or the run panel) actually reads history.
+  String get historyText {
+    if (_historyTextVersion == _outputVersion && historyTextCache != null) {
+      return historyTextCache!;
+    }
+    final buf = StringBuffer();
+    for (var i = _rawChunksStart; i < _rawChunks.length; i++) {
+      buf.write(_decodeRaw(_rawChunks[i]));
+    }
+    final text = buf.toString();
+    _historyTextVersion = _outputVersion;
+    historyTextCache = text;
+    return text;
+  }
+
+  /// Test seam: count of [utf8.decode] invocations made on behalf of
+  /// [historyText]. Incremented once per cached chunk per read; resets when
+  /// the cache is invalidated (i.e. on every new append).
+  @visibleForTesting
+  int utf8DecodeCallsForTesting = 0;
+
+  /// Test seam: attach a side-effect to [utf8.decode] inside [historyText].
+  /// Used by tests to verify caching; not invoked in production.
+  @visibleForTesting
+  void Function(Uint8List bytes)? utf8DecodeSpyForTesting;
+
+  /// Append raw PTY data as already-decoded text: kept for backends whose
+  /// output stream is `Stream<String>` (e.g. pty2). Encodes the text to
+  /// UTF-8 bytes and stores them — no separate `String` list is kept, so
+  /// there is no second copy of the data in memory.
   void appendOutput(String rawData) {
-    _rawChunks.add(rawData);
-    _rawLength += rawData.length;
+    final bytes = Uint8List.fromList(utf8.encode(rawData));
+    _rawChunks.add(bytes);
+    _rawLength += bytes.length;
     _trimRawChunks();
     _outputVersion++;
 
-    // Push RAW bytes (with ANSI) so remote web guests can render via xterm.
+    // Push the (already-decoded) text so remote web guests can render via
+    // xterm — guests need the text form, not the raw bytes.
     TerminalOutputBus.instance.write(id, rawData);
   }
 
-  /// Batch variant of [appendOutput]: stores each chunk by reference (no
-  /// join/copy) and pushes the same chunks to the output bus in order.
+  /// Batch variant of [appendOutput]: encodes each chunk and stores the
+  /// resulting bytes (no join/copy of the input chunks). Pushes the same
+  /// decoded chunks to the output bus in order.
+  ///
+  /// Kept for the String-output backend path. Prefer
+  /// [appendOutputChunksBytes] on the byte-output path — it stores raw
+  /// bytes without any UTF-8 decode, eliminating the per-flush decode that
+  /// the byte path used to do for history storage.
   void appendOutputChunks(List<String> chunks) {
     if (chunks.isEmpty) return;
     for (final chunk in chunks) {
-      _rawChunks.add(chunk);
-      _rawLength += chunk.length;
+      final bytes = Uint8List.fromList(utf8.encode(chunk));
+      _rawChunks.add(bytes);
+      _rawLength += bytes.length;
     }
     _trimRawChunks();
     _outputVersion++;
@@ -124,6 +180,27 @@ class AgentSession extends Equatable {
     for (final chunk in chunks) {
       TerminalOutputBus.instance.write(id, chunk);
     }
+  }
+
+  /// Byte-output backend path: stores raw UTF-8 chunks without decoding.
+  /// Mirrors [appendOutputChunks] semantics but skips the per-flush
+  /// `utf8.decode` — the CLI / collaboration / UI consumers of history only
+  /// decode when they actually read [historyText].
+  void appendOutputChunksBytes(List<Uint8List> chunks) {
+    if (chunks.isEmpty) return;
+    for (final chunk in chunks) {
+      _rawChunks.add(chunk);
+      _rawLength += chunk.length;
+    }
+    _trimRawChunks();
+    _outputVersion++;
+  }
+
+  String _decodeRaw(Uint8List bytes) {
+    final spy = utf8DecodeSpyForTesting;
+    if (spy != null) spy(bytes);
+    utf8DecodeCallsForTesting++;
+    return utf8.decode(bytes, allowMalformed: true);
   }
 
   void _trimRawChunks() {
@@ -139,49 +216,29 @@ class AgentSession extends Equatable {
   }
 
   /// Returns the raw tail holding at most [maxLines] '\n'-separated
-  /// segments, scanning chunks backwards and copying only that tail.
+  /// segments from the lazily-decoded [historyText]. The cached history
+  /// text already exists by the time this is called from [lastLines], so
+  /// the substring scan costs nothing extra.
   String _rawTailForLines(int maxLines) {
-    if (_rawChunksStart >= _rawChunks.length) return '';
+    final history = historyText;
+    if (history.isEmpty) return '';
     var newlines = 0;
-    for (var i = _rawChunks.length - 1; i >= _rawChunksStart; i--) {
-      final chunk = _rawChunks[i];
-      var pos = chunk.length;
-      while (pos > 0) {
-        final idx = chunk.lastIndexOf('\n', pos - 1);
-        if (idx < 0) break;
-        newlines++;
-        if (newlines >= maxLines) {
-          return _joinRawFrom(i, idx + 1);
-        }
-        pos = idx;
+    for (var i = history.length - 1; i >= 0; i--) {
+      if (history.codeUnitAt(i) != 0x0A) continue;
+      newlines++;
+      if (newlines >= maxLines) {
+        return history.substring(i + 1);
       }
     }
-    return _joinRawFrom(_rawChunksStart, 0);
+    return history;
   }
 
-  String _joinRawFrom(int chunkIndex, int offset) {
-    if (chunkIndex == _rawChunks.length - 1) {
-      return _rawChunks[chunkIndex].substring(offset);
-    }
-    final buf = StringBuffer(_rawChunks[chunkIndex].substring(offset));
-    for (var i = chunkIndex + 1; i < _rawChunks.length; i++) {
-      buf.write(_rawChunks[i]);
-    }
-    return buf.toString();
-  }
-
-  /// Returns accumulated raw PTY bytes since the session started (capped).
+  /// Returns accumulated raw PTY bytes since the session started (capped),
+  /// decoded from [_rawChunks] with the same per-chunk `allowMalformed`
+  /// semantics as [historyText].
+  ///
   /// Used to replay history to newly-connected web guests.
-  String rawHistory() {
-    if (_rawChunksStart == 0 && _rawChunks.length == 1) {
-      return _rawChunks.first;
-    }
-    final buf = StringBuffer();
-    for (var i = _rawChunksStart; i < _rawChunks.length; i++) {
-      buf.write(_rawChunks[i]);
-    }
-    return buf.toString();
-  }
+  String rawHistory() => historyText;
 
   /// Last [n] non-empty plain-text lines for display in the browser.
   /// Falls back to reading the xterm buffer when the ring buffer is still empty

@@ -31,6 +31,25 @@ class _FakeAgentSession extends AgentSession {
   void appendOutputChunks(List<String> chunks) {
     appended.add(chunks.join());
   }
+
+  @override
+  void appendOutputChunksBytes(List<Uint8List> chunks) {
+    appended.add(utf8.decode(_concat(chunks), allowMalformed: true));
+  }
+
+  static Uint8List _concat(List<Uint8List> chunks) {
+    var total = 0;
+    for (final c in chunks) {
+      total += c.length;
+    }
+    final out = Uint8List(total);
+    var off = 0;
+    for (final c in chunks) {
+      out.setAll(off, c);
+      off += c.length;
+    }
+    return out;
+  }
 }
 
 void main() {

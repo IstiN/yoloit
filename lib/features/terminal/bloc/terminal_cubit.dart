@@ -731,12 +731,16 @@ class TerminalCubit extends Cubit<TerminalState> {
         offset += chunk.length;
       }
       session.terminal.writeBytes(combined);
-      // History, logging, and pattern detection all consume the SAME single
-      // malformed-tolerant decode of the flush — the exact text the String
-      // path would have produced from these bytes.
+      // History stores raw bytes — no UTF-8 decode for history storage.
+      // The session's lazy [historyText] getter decodes on demand (CLI read,
+      // collaboration guest, panel UI), never on the streaming hot path.
+      session.appendOutputChunksBytes([combined]);
+
+      // Logging and PTY pattern detection consume a per-flush decoded text.
+      // One decode per flush; this is the only place these features still
+      // require it.
       final text = utf8.decode(combined, allowMalformed: true);
       _logging.write(sessionId, text);
-      session.appendOutputChunks([text]);
 
       // PTY activity detection (backup when hooks don't fire). Runs once per
       // flush on the byte path (vs per chunk on the String path); the

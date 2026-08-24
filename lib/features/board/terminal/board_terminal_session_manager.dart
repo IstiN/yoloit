@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:yoloit/core/remote/yoloit_remote_client.dart';
@@ -246,9 +245,10 @@ class BoardTerminalSessionManager extends ChangeNotifier {
         offset += chunk.length;
       }
       session.terminal.writeBytes(combined);
-      // History receives the exact text the String path would have produced:
-      // one malformed-tolerant decode of the same bytes.
-      session.appendOutputChunks([utf8.decode(combined, allowMalformed: true)]);
+      // Store raw bytes — no UTF-8 decode per flush. The history getter
+      // decodes lazily on demand (CLI read, panel render, collaboration
+      // replay), never during normal typing.
+      session.appendOutputChunksBytes([combined]);
     }
 
     void flushBatch() {
