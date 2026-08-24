@@ -67,6 +67,12 @@ class BoardView extends StatefulWidget {
   /// a real frame/image pipeline, so they can render the overview directly.
   final bool skipOverviewPreviewCapture;
 
+  /// When `true`, `onSelectedBoard` skips the PNG preview overlay entirely
+  /// and goes straight to `setActiveBoard`. Useful for users / agents that
+  /// do not want any fade animation between boards. Off by default.
+  @visibleForTesting
+  static bool debugDisablePreviewOverlayForTesting = false;
+
   @override
   State<BoardView> createState() => _BoardViewState();
 }
@@ -108,6 +114,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   bool _boardSwitchPreviewVisible = false;
   BoardDocument? _boardSwitchPreviewBoard;
   Uint8List? _boardSwitchPreviewPng;
+  Timer? _boardSwitchPreviewFadeTimer;
+  int _debugFadeOutCount = 0;
   final Map<String, Uint8List> _boardPreviewPngs = {};
   final BoardPreviewCache _previewCache = BoardPreviewCache.instance;
 
@@ -162,6 +170,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     _cancelBgCapture = true;
     BoardUndoRedo.undo = null;
     BoardUndoRedo.redo = null;
+    _boardSwitchPreviewFadeTimer?.cancel();
+    _boardSwitchPreviewFadeTimer = null;
     _stopPanAnimation();
     _transformController.removeListener(_scheduleCanvasExpansionIfNeeded);
     _panController.dispose();
@@ -997,6 +1007,24 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   @visibleForTesting
   set debugCanvasTransform(Matrix4 transform) =>
       _transformController.value = transform;
+
+  @visibleForTesting
+  void debugSimulateBoardSelection(BoardDocument board, Uint8List? previewPng) {
+    if (!mounted) return;
+    _runBoardSwitchPreview(board, previewPng);
+  }
+
+  @visibleForTesting
+  bool get debugIsBoardSwitchPreviewVisible => _boardSwitchPreviewVisible;
+
+  @visibleForTesting
+  BoardDocument? get debugBoardSwitchPreviewBoard => _boardSwitchPreviewBoard;
+
+  @visibleForTesting
+  Uint8List? get debugBoardSwitchPreviewPng => _boardSwitchPreviewPng;
+
+  @visibleForTesting
+  int get debugFadeOutCount => _debugFadeOutCount;
 
   Future<void> _restoreLatestPanelHistory(
     BuildContext context,

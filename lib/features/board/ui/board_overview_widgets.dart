@@ -27,7 +27,7 @@ class BoardSwitchPreviewOverlay extends StatelessWidget {
     return IgnorePointer(
       child: AnimatedOpacity(
         opacity: visible ? 1 : 0,
-        duration: const Duration(milliseconds: 260),
+        duration: const Duration(milliseconds: 80),
         curve: Curves.easeOutCubic,
         onEnd: onHidden,
         child:

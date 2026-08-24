@@ -994,41 +994,7 @@ extension _BoardViewSections on _BoardViewState {
         },
         onSelectedBoard: (board, previewPng) {
           if (!mounted) return;
-          final switchWatch = Stopwatch()..start();
-          _boardOverviewLog(
-            'select.parent.start board=${board.id} '
-            'hasPng=${previewPng != null}',
-          );
-          _rebuild(() {
-            _isBoardOverviewOpen = false;
-            _cancelBgCapture = true;
-            _boardSwitchPreviewBoard = board;
-            _boardSwitchPreviewPng = previewPng;
-            _boardSwitchPreviewVisible = true;
-          });
-          _boardOverviewLog(
-            'select.parent.previewVisible '
-            'elapsed=${switchWatch.elapsedMilliseconds}ms',
-          );
-          context.read<BoardCubit>().setActiveBoard(board.id);
-          _boardOverviewLog(
-            'select.parent.setActiveBoard.called '
-            'elapsed=${switchWatch.elapsedMilliseconds}ms',
-          );
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            _boardOverviewLog(
-              'select.parent.postFrame '
-              'elapsed=${switchWatch.elapsedMilliseconds}ms',
-            );
-            Future<void>.delayed(const Duration(milliseconds: 80), () {
-              if (!mounted) return;
-              _boardOverviewLog(
-                'select.parent.fadeStart '
-                'elapsed=${switchWatch.elapsedMilliseconds}ms',
-              );
-              _rebuild(() => _boardSwitchPreviewVisible = false);
-            });
-          });
+          _runBoardSwitchPreview(board, previewPng);
         },
       ),
     );
@@ -1054,6 +1020,49 @@ extension _BoardViewSections on _BoardViewState {
           });
         },
       ),
+    );
+  }
+
+  // Drives both the production overview tap and the `@visibleForTesting`
+  // `debugSimulateBoardSelection` forwarder. Centralized so the fade-out
+  // timer coalescing and the debug-toggle fast-path stay in lock-step.
+  void _runBoardSwitchPreview(BoardDocument board, Uint8List? previewPng) {
+    _boardOverviewLog(
+      'select.parent.start board=${board.id} '
+      'hasPng=${previewPng != null} '
+      'disabled=${BoardView.debugDisablePreviewOverlayForTesting}',
+    );
+    if (BoardView.debugDisablePreviewOverlayForTesting) {
+      _boardOverviewLog('select.parent.disabled branch=${board.id}');
+      _rebuild(() {
+        _isBoardOverviewOpen = false;
+        _cancelBgCapture = true;
+      });
+      context.read<BoardCubit>().setActiveBoard(board.id);
+      return;
+    }
+    // Cancel any pending fade-out: when a new switch comes in within the
+    // 80ms visible window, the previous preview is dropped in favor of
+    // this one and a fresh timer is scheduled. Without cancellation, rapid
+    // switches would stack redundant setState(visible=false) calls and
+    // trigger overlapping fade-out animations on the AnimatedOpacity.
+    _boardSwitchPreviewFadeTimer?.cancel();
+    _boardSwitchPreviewFadeTimer = null;
+    _rebuild(() {
+      _isBoardOverviewOpen = false;
+      _cancelBgCapture = true;
+      _boardSwitchPreviewBoard = board;
+      _boardSwitchPreviewPng = previewPng;
+      _boardSwitchPreviewVisible = true;
+    });
+    context.read<BoardCubit>().setActiveBoard(board.id);
+    _boardSwitchPreviewFadeTimer = Timer(
+      const Duration(milliseconds: 80),
+      () {
+        if (!mounted) return;
+        _debugFadeOutCount += 1;
+        _rebuild(() => _boardSwitchPreviewVisible = false);
+      },
     );
   }
 
