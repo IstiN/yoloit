@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -680,6 +681,10 @@ class TerminalCubit extends Cubit<TerminalState> {
   /// a running byte counter — a StringBuffer would copy every byte in and
   /// then copy the whole 16 KB batch out again on toString().
   final Map<String, List<String>> _batchedOutput = {};
+  // Byte-path twin of [_batchedOutput]: raw UTF-8 chunks when the process
+  // exposes [TerminalProcess.outputBytes]. A session uses exactly one of the
+  // two buffers, picked at attach time.
+  final Map<String, List<Uint8List>> _batchedByteOutput = {};
   final Map<String, int> _batchedOutputBytes = {};
   final Map<String, Timer> _batchFlushTimers = {};
   static const _batchFlushIntervalMs = 50;
@@ -687,8 +692,14 @@ class TerminalCubit extends Cubit<TerminalState> {
 
   void _attachProcessToSession(TerminalProcess process, AgentSession session) {
     final sessionId = session.id;
+    // Byte-level output is preferred when the backend offers it (see
+    // Pty.outputBytes): chunks skip the per-KB UTF-8 decode on the UI
+    // isolate and are flushed through Terminal.writeBytes, which decodes
+    // incrementally itself. Exactly one of the two streams is listened —
+    // they wrap the same single-subscription native stream.
+    final byteStream = process.outputBytes;
 
-    void flushBatch() {
+    void flushStringBatch() {
       final chunks = _batchedOutput.remove(sessionId);
       _batchedOutputBytes.remove(sessionId);
       if (chunks == null || chunks.isEmpty) return;
@@ -698,6 +709,48 @@ class TerminalCubit extends Cubit<TerminalState> {
         _logging.write(sessionId, chunk);
       }
       session.appendOutputChunks(chunks);
+    }
+
+    void flushByteBatch() {
+      final chunks = _batchedByteOutput.remove(sessionId);
+      _batchedOutputBytes.remove(sessionId);
+      if (chunks == null || chunks.isEmpty) return;
+      // Concatenate the batch into ONE buffer so writeBytes runs a single
+      // decode+parse pass per flush instead of one per KB-sized PTY chunk.
+      // The buffer is freshly allocated and never reused afterwards —
+      // writeBytes may retain it when the flush ends mid UTF-8/escape
+      // sequence.
+      var total = 0;
+      for (final chunk in chunks) {
+        total += chunk.length;
+      }
+      final combined = Uint8List(total);
+      var offset = 0;
+      for (final chunk in chunks) {
+        combined.setAll(offset, chunk);
+        offset += chunk.length;
+      }
+      session.terminal.writeBytes(combined);
+      // History, logging, and pattern detection all consume the SAME single
+      // malformed-tolerant decode of the flush — the exact text the String
+      // path would have produced from these bytes.
+      final text = utf8.decode(combined, allowMalformed: true);
+      _logging.write(sessionId, text);
+      session.appendOutputChunks([text]);
+
+      // PTY activity detection (backup when hooks don't fire). Runs once per
+      // flush on the byte path (vs per chunk on the String path); the
+      // rolling tail buffer keeps patterns split across flushes detectable.
+      final ptyConfig = session.type.ptyConfig;
+      if (ptyConfig.hasDetection) {
+        _onPtyActivity(session, text, ptyConfig);
+      }
+    }
+
+    void flushBatch() {
+      // Only one of the two buffers is ever non-empty per session.
+      flushStringBatch();
+      flushByteBatch();
     }
 
     void scheduleFlush() {
@@ -712,6 +765,45 @@ class TerminalCubit extends Cubit<TerminalState> {
           flushBatch();
         }),
       );
+    }
+
+    void handleDone() {
+      _batchFlushTimers[sessionId]?.cancel();
+      _batchFlushTimers.remove(sessionId);
+      flushBatch();
+      _onSessionDone(sessionId);
+    }
+
+    void handleError(Object e) {
+      _batchFlushTimers[sessionId]?.cancel();
+      _batchFlushTimers.remove(sessionId);
+      flushBatch();
+      _onSessionDone(sessionId);
+    }
+
+    if (byteStream != null) {
+      byteStream.listen(
+        (chunk) {
+          // Accumulate into the chunk list (original references, no copying).
+          final chunks =
+              _batchedByteOutput.putIfAbsent(sessionId, () => <Uint8List>[]);
+          chunks.add(chunk);
+          final bytes = (_batchedOutputBytes[sessionId] ?? 0) + chunk.length;
+          _batchedOutputBytes[sessionId] = bytes;
+
+          // Flush immediately if the batch is large, otherwise schedule.
+          if (bytes >= _batchMaxBytes) {
+            _batchFlushTimers[sessionId]?.cancel();
+            _batchFlushTimers.remove(sessionId);
+            flushBatch();
+          } else {
+            scheduleFlush();
+          }
+        },
+        onDone: handleDone,
+        onError: handleError,
+      );
+      return;
     }
 
     process.output.listen(
@@ -738,19 +830,8 @@ class TerminalCubit extends Cubit<TerminalState> {
           _onPtyActivity(session, data, ptyConfig);
         }
       },
-      onDone: () {
-        _batchFlushTimers[sessionId]?.cancel();
-        _batchFlushTimers.remove(sessionId);
-        flushBatch();
-        _onSessionDone(sessionId);
-      },
-      // ignore: avoid_types_on_closure_parameters
-      onError: (Object e) {
-        _batchFlushTimers[sessionId]?.cancel();
-        _batchFlushTimers.remove(sessionId);
-        flushBatch();
-        _onSessionDone(sessionId);
-      },
+      onDone: handleDone,
+      onError: handleError,
     );
   }
 
@@ -988,6 +1069,7 @@ class TerminalCubit extends Cubit<TerminalState> {
     }
     _batchFlushTimers.clear();
     _batchedOutput.clear();
+    _batchedByteOutput.clear();
     _hookService.stop();
     // Local PTY sessions are owned by their backend. Runtime sessions are
     // intentionally left alive across app shutdowns.

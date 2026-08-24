@@ -18,6 +18,11 @@ class Pty {
   final List<String> arguments;
 
   Stream<String> get output => Stream<String>.empty();
+
+  /// No byte channel on the web stub (no PTY at all) — mirrors the io
+  /// facade's default.
+  Stream<Uint8List>? get outputBytes => null;
+
   Future<int> get exitCode => Future.value(0);
   int get pid => 0;
 

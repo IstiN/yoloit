@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yoloit/core/platform/platform_shell.dart';
 import 'package:yoloit/core/services/resource_monitor_service.dart';
+import 'package:yoloit/features/terminal/data/pty_wrapper.dart';
 import 'package:yoloit/features/terminal/data/runtime_terminal_client.dart';
 import 'package:yoloit/features/terminal/data/terminal_backend.dart';
 
@@ -184,7 +186,93 @@ void main() {
       expect(acks, 2);
       await source.close();
     });
+
+    test('acks exactly once per delivered byte chunk (Uint8List)', () async {
+      var acks = 0;
+      final chunks = [
+        Uint8List.fromList([1, 2]),
+        Uint8List.fromList([3]),
+        Uint8List.fromList([4, 5, 6]),
+      ];
+      final received = await TerminalProcess.ackOnDataForTesting(
+        () => acks++,
+        Stream<Uint8List>.fromIterable(chunks),
+      ).toList();
+      expect(received, chunks);
+      expect(acks, chunks.length);
+    });
   });
+
+  group('terminal process byte channel', () {
+    test('fromPty propagates the byte stream when the PTY provides one', () {
+      final pty = _FakePty(withBytes: true);
+      final process = TerminalProcess.fromPty(pty);
+
+      expect(process.output, same(pty.outputStream));
+      expect(process.outputBytes, same(pty.byteStream));
+    });
+
+    test('fromPty leaves outputBytes null for String-only PTYs', () {
+      final pty = _FakePty(withBytes: false);
+      final process = TerminalProcess.fromPty(pty);
+
+      expect(process.outputBytes, isNull);
+    });
+  });
+}
+
+/// A [Pty] with manually driven streams; [withBytes] toggles the optional
+/// byte channel the flutter_pty backend exposes.
+class _FakePty implements Pty {
+  _FakePty({required this.withBytes});
+
+  final bool withBytes;
+
+  // Only declared on the web-stub Pty variant, which the analyzer resolves
+  // the conditional export to; harmless extra members against the io one.
+  @override
+  String get executable => 'fake';
+
+  @override
+  List<String> get arguments => const [];
+
+  // ignore: close_sinks — streams are never pumped in these tests.
+  final stringController = StreamController<String>();
+  // ignore: close_sinks — streams are never pumped in these tests.
+  final byteController = StreamController<Uint8List>();
+
+  // StreamController.stream hands out a NEW wrapper per access, so the
+  // stream instances are captured once here — identity is what fromPty
+  // propagation is asserted against.
+  late final Stream<String> outputStream = stringController.stream;
+  late final Stream<Uint8List> byteStream = byteController.stream;
+
+  @override
+  Stream<String> get output => outputStream;
+
+  @override
+  Stream<Uint8List>? get outputBytes => withBytes ? byteStream : null;
+
+  @override
+  Future<int> get exitCode => Completer<int>().future;
+
+  @override
+  int get pid => 0;
+
+  @override
+  void write(Uint8List data) {}
+
+  @override
+  void resize(int rows, int cols) {}
+
+  // Parameter typed dynamic so the override is valid against BOTH the io
+  // (ProcessSignal) and web-stub (dynamic) Pty variants — the analyzer
+  // resolves the conditional export to the stub.
+  @override
+  bool kill([dynamic signal]) => true;
+
+  @override
+  void ackRead() {}
 }
 
 class _FakeRuntimeTerminalClient extends RuntimeTerminalClient {

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:mocktail/mocktail.dart';
 import 'package:yoloit/core/services/agent_hook_service.dart';
@@ -56,13 +57,24 @@ class FakeAgentHookService extends AgentHookService {
 }
 
 /// A launched fake PTY: tests drive [output] and [exitCode] manually.
+/// With [useByteOutput] the process also exposes [outputBytes], simulating
+/// the flutter_pty byte path (consumers must then leave [output] unlistened).
 class FakePty {
+  FakePty({this.useByteOutput = false});
+
+  final bool useByteOutput;
+
   // ignore: close_sinks — owned/closed by individual tests.
   final output = StreamController<String>(sync: true);
+  // ignore: close_sinks — owned/closed by individual tests.
+  final outputBytes = StreamController<Uint8List>(sync: true);
   final exitCompleter = Completer<int>();
 
-  TerminalProcess get process =>
-      TerminalProcess(output: output.stream, exitCode: exitCompleter.future);
+  TerminalProcess get process => TerminalProcess(
+    output: output.stream,
+    outputBytes: useByteOutput ? outputBytes.stream : null,
+    exitCode: exitCompleter.future,
+  );
 }
 
 /// Bundles all mocked dependencies of [TerminalCubit] with sane defaults so
@@ -93,7 +105,7 @@ class TerminalCubitHarness {
       ),
     ).thenAnswer((invocation) async {
       final id = invocation.namedArguments[#sessionId] as String;
-      final pty = FakePty();
+      final pty = FakePty(useByteOutput: useByteOutput);
       ptys[id] = pty;
       return pty.process;
     });
@@ -105,7 +117,7 @@ class TerminalCubitHarness {
       ),
     ).thenAnswer((invocation) async {
       final id = invocation.namedArguments[#sessionId] as String;
-      final pty = FakePty();
+      final pty = FakePty(useByteOutput: useByteOutput);
       ptys[id] = pty;
       return pty.process;
     });
@@ -160,6 +172,10 @@ class TerminalCubitHarness {
 
   /// Launched fake PTYs keyed by session id.
   final ptys = <String, FakePty>{};
+
+  /// When true, fake PTYs launched from now on expose a byte-output channel
+  /// (the flutter_pty path) instead of being String-only.
+  var useByteOutput = false;
 
   /// Workspace paths passed to the hook installer.
   final hookInstallPaths = <String>[];

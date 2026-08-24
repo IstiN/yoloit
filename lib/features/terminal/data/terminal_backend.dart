@@ -14,18 +14,28 @@ class TerminalProcess {
   TerminalProcess({
     required this.output,
     required this.exitCode,
+    this.outputBytes,
     this.attachedExisting = false,
   });
 
   final Stream<String> output;
+
+  /// Raw UTF-8-encoded output chunks when the backend can deliver bytes
+  /// (flutter_pty path; see Pty.outputBytes). When non-null, consumers must
+  /// listen to this INSTEAD of [output] — both wrap the same
+  /// single-subscription native stream.
+  final Stream<Uint8List>? outputBytes;
+
   final Future<int> exitCode;
   final bool attachedExisting;
 
   factory TerminalProcess.fromPty(Pty pty) {
     // The facade output is already UTF-8-decoded and ack-flow-controlled
-    // (see Pty in pty_wrapper_io.dart).
+    // (see Pty in pty_wrapper_io.dart). outputBytes is the not-yet-decoded
+    // twin of the same stream, for consumers with a byte-level terminal.
     return TerminalProcess(
       output: pty.output,
+      outputBytes: pty.outputBytes,
       exitCode: pty.exitCode,
     );
   }

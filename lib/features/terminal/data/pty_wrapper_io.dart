@@ -63,6 +63,18 @@ abstract class Pty {
 
   /// Decoded UTF-8 output of the process (stdout+stderr are merged by PTYs).
   Stream<String> get output;
+
+  /// Raw (still UTF-8-encoded) output chunks when the backend delivers bytes
+  /// on the UI isolate — currently only the flutter_pty backend. Null means
+  /// the backend has no byte channel (pty2 already decodes off the UI
+  /// isolate) and consumers must use [output].
+  ///
+  /// When non-null, consumers should listen to this INSTEAD of [output]:
+  /// both wrap the same single-subscription native stream, so listening to
+  /// both throws. Carries the exact same ack flow-control contract as
+  /// [output] (see [ackOnData]).
+  Stream<Uint8List>? get outputBytes => null;
+
   Future<int> get exitCode;
   int get pid;
 
@@ -128,6 +140,11 @@ class _Pty2Impl implements Pty {
 
   final pty2.PseudoTerminal _inner;
 
+  // pty2's worker isolate already decodes UTF-8 off the UI thread — exposing
+  // bytes here would just move that decode back onto the UI isolate.
+  @override
+  Stream<Uint8List>? get outputBytes => null;
+
   @override
   Stream<String> get output => ackOnData(_inner.ackProcessed, _inner.out);
 
@@ -184,6 +201,13 @@ class _FlutterPtyImpl implements Pty {
         _inner.ackRead,
         _inner.output.cast<List<int>>(),
       ).transform(const BufferedUtf8Decoder());
+
+  @override
+  // flutter_pty's output is already Stream<Uint8List>, so this is a direct
+  // ack-wrapped passthrough — no copy, no decode. Skipping the
+  // BufferedUtf8Decoder is the point: Terminal.writeBytes reassembles split
+  // multibyte sequences itself.
+  Stream<Uint8List> get outputBytes => ackOnData(_inner.ackRead, _inner.output);
 
   @override
   Future<int> get exitCode => _inner.exitCode;

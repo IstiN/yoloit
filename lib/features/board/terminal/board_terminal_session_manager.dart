@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:yoloit/core/remote/yoloit_remote_client.dart';
@@ -21,7 +22,9 @@ class BoardTerminalSessionManager extends ChangeNotifier {
 
   final _backendService = TerminalBackendService.instance;
   final Map<String, AgentSession> _sessions = {};
-  final Map<String, StreamSubscription<String>> _outputSubs = {};
+  // One output subscription per session; the element type varies (String for
+  // decoded backends, Uint8List for the byte path), hence <void>.
+  final Map<String, StreamSubscription<void>> _outputSubs = {};
   final Map<String, List<String>> _envGroupIdsBySession = {};
 
   // Batched output buffer per session to avoid flooding the xterm
@@ -33,6 +36,10 @@ class BoardTerminalSessionManager extends ChangeNotifier {
   // a running byte counter — a StringBuffer would copy every byte in and
   // then copy the whole 16 KB batch out again on toString().
   final Map<String, List<String>> _batchedOutput = {};
+  // Byte-path twin of [_batchedOutput]: raw UTF-8 chunks when the process
+  // exposes [TerminalProcess.outputBytes]. A session uses exactly one of the
+  // two buffers, picked at attach time.
+  final Map<String, List<Uint8List>> _batchedByteOutput = {};
   final Map<String, int> _batchedOutputBytes = {};
   final Map<String, Timer> _batchFlushTimers = {};
   static const _batchFlushIntervalMs = 50;
@@ -119,6 +126,7 @@ class BoardTerminalSessionManager extends ChangeNotifier {
     _outputSubs.remove(sessionId)?.cancel();
     _batchFlushTimers.remove(sessionId)?.cancel();
     _batchedOutput.remove(sessionId);
+    _batchedByteOutput.remove(sessionId);
     await _backendService.kill(sessionId);
     final session = _sessions.remove(sessionId);
     if (session != null) {
@@ -156,6 +164,7 @@ class BoardTerminalSessionManager extends ChangeNotifier {
     _outputSubs.remove(sessionId)?.cancel();
     _batchFlushTimers.remove(sessionId)?.cancel();
     _batchedOutput.remove(sessionId);
+    _batchedByteOutput.remove(sessionId);
     _envGroupIdsBySession[sessionId] = List<String>.from(envGroupIds);
     final session = AgentSession(
       id: sessionId,
@@ -199,8 +208,14 @@ class BoardTerminalSessionManager extends ChangeNotifier {
 
   void _attachProcess(TerminalProcess process, AgentSession session) {
     final sessionId = session.id;
+    // Byte-level output is preferred when the backend offers it: the chunks
+    // skip the per-KB UTF-8 decode on the UI isolate and are flushed through
+    // Terminal.writeBytes, which decodes incrementally itself. Exactly one of
+    // the two streams is listened — they wrap the same single-subscription
+    // native stream (see Pty.outputBytes).
+    final byteStream = process.outputBytes;
 
-    void flushBatch() {
+    void flushStringBatch() {
       final chunks = _batchedOutput.remove(sessionId);
       _batchedOutputBytes.remove(sessionId);
       if (chunks == null || chunks.isEmpty) return;
@@ -209,6 +224,37 @@ class BoardTerminalSessionManager extends ChangeNotifier {
         session.terminal.write(chunk);
       }
       session.appendOutputChunks(chunks);
+    }
+
+    void flushByteBatch() {
+      final chunks = _batchedByteOutput.remove(sessionId);
+      _batchedOutputBytes.remove(sessionId);
+      if (chunks == null || chunks.isEmpty) return;
+      // Concatenate the batch into ONE buffer so writeBytes runs a single
+      // decode+parse pass per flush instead of one per KB-sized PTY chunk.
+      // The buffer is freshly allocated and never reused afterwards —
+      // writeBytes may retain it when the flush ends mid UTF-8/escape
+      // sequence.
+      var total = 0;
+      for (final chunk in chunks) {
+        total += chunk.length;
+      }
+      final combined = Uint8List(total);
+      var offset = 0;
+      for (final chunk in chunks) {
+        combined.setAll(offset, chunk);
+        offset += chunk.length;
+      }
+      session.terminal.writeBytes(combined);
+      // History receives the exact text the String path would have produced:
+      // one malformed-tolerant decode of the same bytes.
+      session.appendOutputChunks([utf8.decode(combined, allowMalformed: true)]);
+    }
+
+    void flushBatch() {
+      // Only one of the two buffers is ever non-empty per session.
+      flushStringBatch();
+      flushByteBatch();
     }
 
     void scheduleFlush() {
@@ -223,6 +269,53 @@ class BoardTerminalSessionManager extends ChangeNotifier {
           flushBatch();
         }),
       );
+    }
+
+    void handleDone() {
+      _batchFlushTimers[sessionId]?.cancel();
+      _batchFlushTimers.remove(sessionId);
+      flushBatch();
+      SupportLogService.instance.add(
+        'terminal-session-manager',
+        'outputStreamDone sessionId=$sessionId',
+      );
+      _onSessionEnded(sessionId);
+    }
+
+    void handleError(Object e) {
+      _batchFlushTimers[sessionId]?.cancel();
+      _batchFlushTimers.remove(sessionId);
+      flushBatch();
+      SupportLogService.instance.add(
+        'terminal-session-manager',
+        'outputStreamError sessionId=$sessionId error=$e',
+      );
+      _onSessionEnded(sessionId);
+    }
+
+    if (byteStream != null) {
+      _outputSubs[sessionId] = byteStream.listen(
+        (chunk) {
+          // Accumulate into batch buffer (chunk references, no copy).
+          final chunks =
+              _batchedByteOutput.putIfAbsent(sessionId, () => <Uint8List>[]);
+          chunks.add(chunk);
+          final bytes = (_batchedOutputBytes[sessionId] ?? 0) + chunk.length;
+
+          // Flush immediately if the batch is large, otherwise schedule.
+          if (bytes >= _batchMaxBytes) {
+            _batchFlushTimers[sessionId]?.cancel();
+            _batchFlushTimers.remove(sessionId);
+            flushBatch();
+          } else {
+            _batchedOutputBytes[sessionId] = bytes;
+            scheduleFlush();
+          }
+        },
+        onDone: handleDone,
+        onError: handleError,
+      );
+      return;
     }
 
     _outputSubs[sessionId] = process.output.listen(
@@ -242,27 +335,8 @@ class BoardTerminalSessionManager extends ChangeNotifier {
           scheduleFlush();
         }
       },
-      onDone: () {
-        _batchFlushTimers[sessionId]?.cancel();
-        _batchFlushTimers.remove(sessionId);
-        flushBatch();
-        SupportLogService.instance.add(
-          'terminal-session-manager',
-          'outputStreamDone sessionId=$sessionId',
-        );
-        _onSessionEnded(sessionId);
-      },
-      // ignore: avoid_types_on_closure_parameters
-      onError: (Object e) {
-        _batchFlushTimers[sessionId]?.cancel();
-        _batchFlushTimers.remove(sessionId);
-        flushBatch();
-        SupportLogService.instance.add(
-          'terminal-session-manager',
-          'outputStreamError sessionId=$sessionId error=$e',
-        );
-        _onSessionEnded(sessionId);
-      },
+      onDone: handleDone,
+      onError: handleError,
     );
   }
 
@@ -274,6 +348,7 @@ class BoardTerminalSessionManager extends ChangeNotifier {
     _outputSubs.remove(sessionId);
     _batchFlushTimers.remove(sessionId)?.cancel();
     _batchedOutput.remove(sessionId);
+    _batchedByteOutput.remove(sessionId);
     _sessions.remove(sessionId);
     notifyListeners();
   }

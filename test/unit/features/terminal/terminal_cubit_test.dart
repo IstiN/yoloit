@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:bloc_test/bloc_test.dart';
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -5,8 +8,10 @@ import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_cubit.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_state.dart';
+import 'package:yoloit/features/terminal/models/agent_phase.dart';
 import 'package:yoloit/features/terminal/models/agent_session.dart';
 import 'package:yoloit/features/terminal/models/agent_type.dart';
+import 'package:yoxterm/xterm.dart' show Terminal;
 
 import 'terminal_cubit_fakes.dart';
 
@@ -632,6 +637,111 @@ void main() {
         ).called(1);
 
         settle(async, cubit);
+      });
+    });
+
+    group('byte output path', () {
+      AgentSession sessionOf(TerminalCubit cubit, String id) =>
+          loaded(cubit).allSessions.firstWhere((s) => s.id == id);
+
+      test('batches byte chunks and flushes them in one writeBytes pass', () {
+        fakeAsync((async) {
+          harness.useByteOutput = true;
+          final cubit = initCubit(async);
+          restoreTwoSessions(async, cubit);
+
+          final pty = harness.ptys['saved_a']!;
+          final session = sessionOf(cubit, 'saved_a');
+
+          // The String channel must stay unlistened: both channels wrap the
+          // same single-subscription native stream.
+          expect(pty.output.hasListener, isFalse);
+
+          pty.outputBytes.add(Uint8List.fromList(utf8.encode('hel')));
+          pty.outputBytes.add(Uint8List.fromList(utf8.encode('lo')));
+
+          // Batched: nothing rendered, logged, or stored before the 50ms
+          // window closes.
+          expect(session.terminal.buffer.lines[0].toString(), isEmpty);
+          expect(session.rawHistory(), isEmpty);
+          verifyNever(() => harness.logging.write(any(), any()));
+
+          async.elapse(const Duration(milliseconds: 50));
+
+          expect(session.terminal.buffer.lines[0].toString(), 'hello');
+          // History and logging receive the single decode of the flush.
+          expect(session.rawHistory(), 'hello');
+          verify(() => harness.logging.write('saved_a', 'hello')).called(1);
+
+          settle(async, cubit);
+        });
+      });
+
+      test('split multibyte UTF-8 across chunks and flushes renders correctly',
+          () {
+        fakeAsync((async) {
+          harness.useByteOutput = true;
+          final cubit = initCubit(async);
+          restoreTwoSessions(async, cubit);
+
+          final pty = harness.ptys['saved_a']!;
+          final session = sessionOf(cubit, 'saved_a');
+
+          // 'é' = 0xC3 0xA9 — split the sequence across two chunks AND two
+          // flushes; writeBytes keeps decoder state across both.
+          pty.outputBytes.add(Uint8List.fromList([0x61, 0xC3])); // 'a' + lead
+          async.elapse(const Duration(milliseconds: 50));
+          pty.outputBytes.add(Uint8List.fromList([0xA9, 0x62])); // tail + 'b'
+          async.elapse(const Duration(milliseconds: 50));
+
+          expect(session.terminal.buffer.lines[0].toString(), 'aéb');
+          // History decodes per flush (allowMalformed), so the truncated
+          // lead byte is recorded as U+FFFD — the terminal itself stitches.
+          expect(session.rawHistory(), 'a\uFFFD\uFFFDb');
+
+          settle(async, cubit);
+        });
+      });
+
+      test('flushes immediately when the byte batch reaches 16 KB', () {
+        fakeAsync((async) {
+          harness.useByteOutput = true;
+          final cubit = initCubit(async);
+          restoreTwoSessions(async, cubit);
+
+          final pty = harness.ptys['saved_a']!;
+          final session = sessionOf(cubit, 'saved_a');
+
+          pty.outputBytes.add(Uint8List.fromList(List.filled(16384, 0x78)));
+          async.flushMicrotasks();
+
+          expect(session.rawHistory(), 'x' * 16384);
+          // The terminal state matches the String path on the same payload.
+          final reference = Terminal(maxLines: 2000)..write('x' * 16384);
+          expect(session.terminal.buffer.cursorX, reference.buffer.cursorX);
+          expect(session.terminal.buffer.cursorY, reference.buffer.cursorY);
+
+          settle(async, cubit);
+        });
+      });
+
+      test('PTY activity detection runs on the decoded flush', () {
+        fakeAsync((async) {
+          harness.useByteOutput = true;
+          final cubit = initCubit(async);
+          restoreTwoSessions(async, cubit);
+
+          final pty = harness.ptys['saved_a']!;
+
+          pty.outputBytes.add(Uint8List.fromList(utf8.encode('○ compiling')));
+          // Detection is deferred to the flush on the byte path.
+          expect(sessionOf(cubit, 'saved_a').hookPhase, isNull);
+
+          async.elapse(const Duration(milliseconds: 50));
+          expect(sessionOf(cubit, 'saved_a').hookPhase, isA<ThinkingPhase>());
+
+          settle(async, cubit);
+        });
       });
     });
   });
