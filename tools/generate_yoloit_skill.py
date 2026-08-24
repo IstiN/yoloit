@@ -182,6 +182,22 @@ def _build_skill(commands: list[dict], group_order: list[str]) -> str:
         'with `yoloit do`, not by blocking the terminal.'
     )
     lines.append('')
+    lines.append('## Tool gotchas')
+    lines.append('')
+    lines.append(
+        '- When searching inside file contents, prefer the dedicated '
+        '`yoloit files:grep` command. Do not invent ripgrep flags.'
+    )
+    lines.append(
+        '- `rg --json-seq-paths` and `rg --json-path` are **not real flags**. '
+        'If you need structured ripgrep output, use `rg --json` and pipe it '
+        'to `jq`.'
+    )
+    lines.append(
+        '- For file-name search only, use `yoloit files:search`. For '
+        'searching YoLoIT boards/chats/sessions, use `yoloit search`.'
+    )
+    lines.append('')
     return '\n'.join(lines)
 
 

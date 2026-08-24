@@ -736,6 +736,14 @@ commands = [{'group': 'app',
              ['--limit N', 'Max results', False]],
   'example': 'yoloit files:search README.md --root ~/ai.m'},
  {'group': 'files',
+  'name': 'files:grep',
+  'description': 'Read-only search inside file contents on the local file system using ripgrep. Use this for "найди в файлах", "grep for X", "search file contents". Prefer this over raw rg/bash commands.',
+  'params': [['query', 'Text to search for', True],
+             ['--root path', 'Search root path (default: current directory)', False],
+             ['--glob pattern', 'Glob filter, repeatable (e.g. *.md)', False],
+             ['--limit N', 'Max results', False]],
+  'example': 'yoloit files:grep "class Foo" --root ~/ai.m --glob *.dart --limit 20'},
+ {'group': 'files',
   'name': 'files:list',
   'description': 'Read-only list of directory entries for a file system path',
   'params': [['path', 'Directory path', True]],
@@ -4496,6 +4504,74 @@ for path in root_path.rglob('*'):
         results.append({"path": str(path), "type": "dir" if is_dir else "file"})
     if len(results) >= limit:
         break
+print(json.dumps({"ok": True, "query": query, "root": str(root_path), "results": results}, ensure_ascii=False, indent=2))
+PYEOF
+    ;;
+  files:grep)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit files:grep <query> [--root <path>] [--glob <pattern>]... [--limit N]" >&2; exit 1; }
+    query=""; root="."; limit="50"; globs=()
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --root) root="${2:-.}"; shift 2 ;;
+        --glob) globs+=("${2:-}"); shift 2 ;;
+        --limit) limit="${2:-50}"; shift 2 ;;
+        *) query="${query:+$query }$1"; shift ;;
+      esac
+    done
+    [[ "$root" == ~* ]] && root="${root/#\~/$HOME}"
+    [[ -z "$query" ]] && { echo "Usage: yoloit files:grep <query> [--root <path>] [--glob <pattern>]... [--limit N]" >&2; exit 1; }
+    python3 - "$query" "$root" "$limit" ${globs[@]+"${globs[@]}"} <<'PYEOF'
+import json, os, sys, subprocess
+from pathlib import Path
+query, root, limit = sys.argv[1], os.path.expanduser(sys.argv[2]), int(sys.argv[3] or 50)
+globs = sys.argv[4:]
+root_path = Path(root).expanduser()
+if not root_path.exists():
+    print(json.dumps({"ok": False, "error": f"Path not found: {root}"}))
+    raise SystemExit(0)
+rg = None
+for candidate in ['/opt/homebrew/bin/rg', '/usr/local/bin/rg', '/usr/bin/rg']:
+    if Path(candidate).exists():
+        rg = candidate
+        break
+if rg is None:
+    try:
+        rg = subprocess.check_output(['which', 'rg'], text=True).strip()
+    except Exception:
+        rg = None
+if rg is None:
+    print(json.dumps({"ok": False, "error": "ripgrep (rg) not found"}))
+    raise SystemExit(0)
+args = [rg, '--line-number', '--no-heading', '--max-count=1', '-m', '1']
+for d in ['.git', '.dart_tool', 'build', 'node_modules', '.idea', '.vscode', '__pycache__', '.gradle', '.venv', 'venv', '.tox']:
+    args.append(f'--glob=!{d}/**')
+for g in globs:
+    if g:
+        args.append(f'--glob={g}')
+args.extend([query, str(root_path)])
+try:
+    proc = subprocess.run(args, capture_output=True, text=True)
+except Exception as e:
+    print(json.dumps({"ok": False, "error": str(e)}))
+    raise SystemExit(0)
+results = []
+for line in proc.stdout.splitlines():
+    if len(results) >= limit:
+        break
+    idx1 = line.find(':')
+    if idx1 < 0:
+        continue
+    idx2 = line.find(':', idx1 + 1)
+    if idx2 < 0:
+        continue
+    path = line[:idx1]
+    line_num_str = line[idx1 + 1:idx2]
+    content = line[idx2 + 1:]
+    try:
+        line_num = int(line_num_str)
+    except ValueError:
+        continue
+    results.append({"path": path, "line": line_num, "content": content})
 print(json.dumps({"ok": True, "query": query, "root": str(root_path), "results": results}, ensure_ascii=False, indent=2))
 PYEOF
     ;;

@@ -77,6 +77,50 @@ final List<YoloitCliTool> fileTools = <YoloitCliTool>[
   ),
 
   YoloitCliTool(
+    command: 'files:grep',
+    alias: 'fgp',
+    description:
+        'Read-only search inside file contents on the local file system '
+        'using ripgrep. Use this for "найди в файлах", "grep for X", '
+        '"search file contents". Prefer this over raw rg/bash commands.',
+    group: 'files',
+    params: <YoloitCliToolParam>[
+      toolParam('query', 'Text to search for', required: true, shortKey: 'q'),
+      toolParam(
+        'root',
+        'Search root path (default: current directory)',
+        flag: '--root',
+        shortKey: 'r',
+      ),
+      toolParam(
+        'glob',
+        'Glob filter, repeatable (e.g. *.md)',
+        flag: '--glob',
+        shortKey: 'g',
+      ),
+      toolParam(
+        'limit',
+        'Max results',
+        flag: '--limit',
+        kind: YoloitCliToolParamKind.number,
+        shortKey: 'lim',
+      ),
+    ],
+    humanVariants: const {
+      'ru': [
+        'найди в файлах {query}',
+        'поиск текста {query} в {root}',
+        'grep {query}',
+      ],
+      'en': [
+        'grep {query}',
+        'search file contents for {query}',
+        'find {query} in files under {root}',
+      ],
+    },
+  ),
+
+  YoloitCliTool(
     command: 'files:list',
     alias: 'fls',
     description: 'Read-only list of directory entries for a file system path',

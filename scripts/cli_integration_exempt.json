@@ -156,6 +156,10 @@
     "reason": "Local file preview/read/search commands operate on client filesystem and are not remote server features"
   },
   {
+    "command": "files:grep",
+    "reason": "Local file preview/read/search commands operate on client filesystem and are not remote server features"
+  },
+  {
     "command": "files:read",
     "reason": "Local file preview/read/search commands operate on client filesystem and are not remote server features"
   },

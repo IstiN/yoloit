@@ -183,10 +183,11 @@ graph LR
   g_yolochat --> g_yolochat_12["yolochat:follow-up"]
   root --> g_files(("files"))
   g_files --> g_files_0["files:search"]
-  g_files --> g_files_1["files:list"]
-  g_files --> g_files_2["files:read"]
-  g_files --> g_files_3["files:preview"]
-  g_files --> g_files_4["filetree:read · ftr"]
+  g_files --> g_files_1["files:grep"]
+  g_files --> g_files_2["files:list"]
+  g_files --> g_files_3["files:read"]
+  g_files --> g_files_4["files:preview"]
+  g_files --> g_files_5["filetree:read · ftr"]
   root --> g_search(("search"))
   g_search --> g_search_0["search"]
   root --> g_link(("link"))
@@ -718,6 +719,9 @@ graph LR
 - **`files:search`** — Read-only search for files and folders on the local file system. If user names a folder/scope ("в папке ai.m", "in ~/project"), pass it via --root to restrict results.
   - params: query*, --root path, --type files|dirs|all, --limit N
   - example: `yoloit files:search README.md --root ~/ai.m`
+- **`files:grep`** — Read-only search inside file contents on the local file system using ripgrep. Use this for "найди в файлах", "grep for X", "search file contents". Prefer this over raw rg/bash commands.
+  - params: query*, --root path, --glob pattern, --limit N
+  - example: `yoloit files:grep "class Foo" --root ~/ai.m --glob *.dart --limit 20`
 - **`files:list`** — Read-only list of directory entries for a file system path
   - params: path*
   - example: `yoloit files:list ~/ai.m`
@@ -921,3 +925,9 @@ Run `yoloit help --format tools` for a machine-readable JSON catalog of every co
 3. Prefer `yoloit board:apply "<board>" flow.yaml` for multi-step mutations.
 4. Use `yoloit board:snapshot "<board>" --format mermaid` to understand layout.
 5. Long-running processes should be created as Run panels and started with `yoloit do`, not by blocking the terminal.
+
+## Tool gotchas
+
+- When searching inside file contents, prefer the dedicated `yoloit files:grep` command. Do not invent ripgrep flags.
+- `rg --json-seq-paths` and `rg --json-path` are **not real flags**. If you need structured ripgrep output, use `rg --json` and pipe it to `jq`.
+- For file-name search only, use `yoloit files:search`. For searching YoLoIT boards/chats/sessions, use `yoloit search`.
