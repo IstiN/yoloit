@@ -173,6 +173,63 @@ class HostMetrics {
   );
 }
 
+/// Computes used RAM from `vm_stat` output the way Activity Monitor does:
+/// Memory Used = App Memory (anonymous − purgeable) + Wired + Compressed.
+///
+/// `total − Pages free` is NOT used memory on macOS — the OS keeps almost no
+/// pages fully free and parks the rest in inactive/speculative/file-backed
+/// caches, so that formula pins the meter at ~100% permanently. The page
+/// size is parsed from the header (16384 on Apple Silicon, not 4096).
+@visibleForTesting
+({int usedBytes, int freeBytes}) parseMacVmStatMemory(
+  String vmStatOut,
+  int totalBytes,
+) {
+  final pageSizeMatch = RegExp(r'page size of (\d+) bytes').firstMatch(
+    vmStatOut,
+  );
+  final pageSize = int.tryParse(pageSizeMatch?.group(1) ?? '') ?? 4096;
+  int pagesOf(String label) {
+    final match = RegExp(
+      '^$label\\s+(\\d+)\\.',
+      multiLine: true,
+    ).firstMatch(vmStatOut);
+    return int.tryParse(match?.group(1) ?? '') ?? 0;
+  }
+
+  final anonymous = pagesOf('Anonymous pages:');
+  final purgeable = pagesOf('Pages purgeable:');
+  final wired = pagesOf('Pages wired down:');
+  final compressor = pagesOf('Pages occupied by compressor:');
+  final appMemoryPages = math.max(0, anonymous - purgeable);
+  final usedBytes = math.max(
+    0,
+    (appMemoryPages + wired + compressor) * pageSize,
+  );
+  // Everything else (free + inactive + cached files) is reclaimable,
+  // so for the UI "free" is simply what is not used.
+  final freeBytes = math.max(0, totalBytes - usedBytes);
+  return (usedBytes: usedBytes, freeBytes: freeBytes);
+}
+
+/// Parses `/proc/meminfo` totals. `MemAvailable` (not `MemFree`) is what
+/// matches the "available memory" semantics users expect.
+@visibleForTesting
+({int totalBytes, int availableBytes}) parseLinuxMeminfo(String meminfo) {
+  int kbOf(String key) {
+    final match = RegExp(
+      '^$key:\\s+(\\d+) kB',
+      multiLine: true,
+    ).firstMatch(meminfo);
+    return int.tryParse(match?.group(1) ?? '') ?? 0;
+  }
+
+  return (
+    totalBytes: kbOf('MemTotal') * 1024,
+    availableBytes: kbOf('MemAvailable') * 1024,
+  );
+}
+
 /// Aggregated snapshot emitted every poll interval.
 class ResourceSnapshot {
   const ResourceSnapshot({
@@ -837,10 +894,13 @@ class ResourceMonitorService {
     if (Platform.isWindows) {
       return _collectHostWindows();
     }
-    return _collectHostPosix();
+    if (Platform.isMacOS) {
+      return _collectHostMacOS();
+    }
+    return _collectHostLinux();
   }
 
-  Future<HostMetrics> _collectHostPosix() async {
+  Future<HostMetrics> _collectHostMacOS() async {
     try {
       final results = await Future.wait([
         Process.run('vm_stat', []),
@@ -849,14 +909,14 @@ class ResourceMonitorService {
         Process.run('sysctl', ['-n', 'hw.logicalcpu']),
       ]);
 
-      final vmOut = results[0].stdout as String;
-      final freeMatch = RegExp(r'Pages free:\s+(\d+)').firstMatch(vmOut);
-      final freePages = int.tryParse(freeMatch?.group(1) ?? '0') ?? 0;
-      final freeBytes = math.max(0, freePages * 4096);
-
       final totalBytes = math.max(
         0,
         int.tryParse((results[1].stdout as String).trim()) ?? 0,
+      );
+
+      final memory = parseMacVmStatMemory(
+        results[0].stdout as String,
+        totalBytes,
       );
 
       final loadOut = results[2].stdout as String;
@@ -871,18 +931,50 @@ class ResourceMonitorService {
         int.tryParse((results[3].stdout as String).trim()) ?? 0,
       );
 
-      final usedBytes = math.max(0, totalBytes - freeBytes);
       final usedPercent =
           totalBytes > 0
-              ? (usedBytes / totalBytes * 100).clamp(0.0, 100.0)
+              ? (memory.usedBytes / totalBytes * 100).clamp(0.0, 100.0)
               : 0.0;
 
       return HostMetrics(
         totalBytes: totalBytes,
-        freeBytes: freeBytes,
-        usedBytes: usedBytes,
+        freeBytes: memory.freeBytes,
+        usedBytes: memory.usedBytes,
         usedPercent: usedPercent,
         cpuCoreCount: coreCount,
+        loadAverage1m: load1m,
+      );
+    } catch (_) {
+      return HostMetrics.empty;
+    }
+  }
+
+  Future<HostMetrics> _collectHostLinux() async {
+    try {
+      final meminfo = await File('/proc/meminfo').readAsString();
+      final memory = parseLinuxMeminfo(meminfo);
+      final usedBytes = math.max(
+        0,
+        memory.totalBytes - memory.availableBytes,
+      );
+
+      final loadOut = await File('/proc/loadavg').readAsString();
+      final load1m = math.max(
+        0.0,
+        double.tryParse(loadOut.split(' ').first) ?? 0.0,
+      );
+
+      final usedPercent =
+          memory.totalBytes > 0
+              ? (usedBytes / memory.totalBytes * 100).clamp(0.0, 100.0)
+              : 0.0;
+
+      return HostMetrics(
+        totalBytes: memory.totalBytes,
+        freeBytes: memory.availableBytes,
+        usedBytes: usedBytes,
+        usedPercent: usedPercent,
+        cpuCoreCount: Platform.numberOfProcessors,
         loadAverage1m: load1m,
       );
     } catch (_) {

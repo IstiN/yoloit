@@ -142,6 +142,80 @@ void main() {
     });
   });
 
+  group('parseMacVmStatMemory', () {
+    // Real `vm_stat` shape from Apple Silicon (16 KB pages).
+    const vmStat = '''
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                12345.
+Pages active:                             500000.
+Pages inactive:                           400000.
+Pages speculative:                         60000.
+Pages wired down:                         352228.
+Pages purgeable:                           30714.
+Anonymous pages:                          930714.
+Pages occupied by compressor:            1379441.
+File-backed pages:                        900000.
+''';
+
+    test('uses Activity Monitor formula, not total-minus-free', () {
+      const total = 48 * 1024 * 1024 * 1024;
+      final result = parseMacVmStatMemory(vmStat, total);
+      // (930714 - 30714 + 352228 + 1379441) pages * 16384
+      const expectedPages = 930714 - 30714 + 352228 + 1379441;
+      expect(result.usedBytes, expectedPages * 16384);
+      // ~40 GB used of 48 GB — NOT the ~100% the old formula produced.
+      expect(result.usedBytes / total, closeTo(0.837, 0.01));
+      expect(result.freeBytes, total - result.usedBytes);
+    });
+
+    test('honours the page size from the header', () {
+      final intel = vmStat.replaceAll('16384', '4096');
+      const total = 16 * 1024 * 1024 * 1024;
+      final result = parseMacVmStatMemory(intel, total);
+      const expectedPages = 930714 - 30714 + 352228 + 1379441;
+      expect(result.usedBytes, expectedPages * 4096);
+    });
+
+    test('clamps purgeable larger than anonymous to zero', () {
+      final weird = vmStat.replaceAll(
+        'Anonymous pages:                          930714.',
+        'Anonymous pages:                           10000.',
+      );
+      final result = parseMacVmStatMemory(weird, 48 * 1024 * 1024 * 1024);
+      const expectedPages = 352228 + 1379441;
+      expect(result.usedBytes, expectedPages * 16384);
+    });
+
+    test('missing fields fall back to zero', () {
+      final result = parseMacVmStatMemory(
+        'Mach Virtual Memory Statistics: (page size of 4096 bytes)\n',
+        1024,
+      );
+      expect(result.usedBytes, 0);
+      expect(result.freeBytes, 1024);
+    });
+  });
+
+  group('parseLinuxMeminfo', () {
+    test('uses MemAvailable, not MemFree', () {
+      const meminfo = '''
+MemTotal:       49152000 kB
+MemFree:          500000 kB
+MemAvailable:   20000000 kB
+Buffers:          100000 kB
+''';
+      final result = parseLinuxMeminfo(meminfo);
+      expect(result.totalBytes, 49152000 * 1024);
+      expect(result.availableBytes, 20000000 * 1024);
+    });
+
+    test('missing keys yield zero', () {
+      final result = parseLinuxMeminfo('Foo: 1 kB\n');
+      expect(result.totalBytes, 0);
+      expect(result.availableBytes, 0);
+    });
+  });
+
   group('ResourceSnapshot', () {
     test('empty has zero values and empty sessions', () {
       expect(ResourceSnapshot.empty.appMemoryBytes, 0);
