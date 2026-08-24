@@ -1840,7 +1840,7 @@ packages:
       path: "packages/xterm"
       relative: true
     source: path
-    version: "4.0.0"
+    version: "4.0.1"
   zmodem:
     dependency: transitive
     description:
