@@ -261,7 +261,7 @@ class _BoardTerminalFullViewState extends State<BoardTerminalFullView> {
     final fontSize = _termKey.currentState?.currentFontSize ?? 13.0;
     return Container(
       padding: EdgeInsets.only(
-        left: _hasMacOSTrafficLights ? 82 : 12,
+        left: _hasMacOSTrafficLights ? 100 : 16,
         right: 12,
         top: 10,
         bottom: 10,
