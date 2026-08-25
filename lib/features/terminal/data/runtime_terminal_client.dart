@@ -277,15 +277,36 @@ class RuntimeTerminalClient {
     });
   }
 
+  /// Resize responses during the spawn window. A resize can fire right
+  /// after the panel mounts (the 150ms panel debounce) but before the
+  /// spawn RPC has created the session on the daemon; the daemon then
+  /// answers 404. Retrying briefly closes the race — without it the PTY
+  /// keeps its spawn-time size and full-screen TUIs render misaligned
+  /// until the user manually resizes the panel. The budget spans a cold
+  /// daemon start (binary extraction can take a couple of seconds).
+  static const _resizeNotFoundRetries = 20;
+  static const _resizeRetryDelay = Duration(milliseconds: 250);
+
   Future<void> resize(String sessionId, int cols, int rows) async {
-    try {
-      await _post('/sessions/$sessionId/resize', {'cols': cols, 'rows': rows});
-    } on StateError catch (e) {
-      if (e.toString().contains('404')) {
-        // Session expired or runtime was restarted; ignore gracefully.
+    for (var attempt = 0;; attempt++) {
+      try {
+        await _post('/sessions/$sessionId/resize', {
+          'cols': cols,
+          'rows': rows,
+        });
         return;
+      } on StateError catch (e) {
+        if (e.toString().contains('404') &&
+            attempt < _resizeNotFoundRetries) {
+          await Future<void>.delayed(_resizeRetryDelay);
+          continue;
+        }
+        if (e.toString().contains('404')) {
+          // Session expired or runtime was restarted; ignore gracefully.
+          return;
+        }
+        rethrow;
       }
-      rethrow;
     }
   }
 

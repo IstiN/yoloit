@@ -254,13 +254,46 @@ void main() {
       expect(fixture.runtime.lastResizeBody?['rows'], 43);
     });
 
+    test('resize retries a 404 during the spawn window', () async {
+      final fixture = await _createFixture();
+      addTearDown(fixture.dispose);
+      // A resize can land right after the panel mounts but before the
+      // spawn RPC creates the session on the daemon (the 150ms panel
+      // debounce fires inside that window). The client must retry a 404
+      // briefly instead of dropping the PTY size forever.
+      fixture.runtime.resizeStatuses = [
+        HttpStatus.notFound,
+        HttpStatus.notFound,
+        HttpStatus.ok,
+      ];
+
+      await fixture.client.resize('s1', 132, 43);
+
+      expect(fixture.runtime.lastResizeBody?['cols'], 132);
+      expect(fixture.runtime.lastResizeBody?['rows'], 43);
+      expect(fixture.runtime.resizeCalls, 3);
+    }, timeout: const Timeout(Duration(seconds: 30)));
+
+    test('resize gives up after exhausting the spawn-window retries',
+        () async {
+      final fixture = await _createFixture();
+      addTearDown(fixture.dispose);
+      fixture.runtime.resizeStatuses = List.filled(6, HttpStatus.notFound);
+
+      // No throw: an expired session still swallows the resize.
+      await fixture.client.resize('s1', 80, 24);
+      // Retries are bounded (implementation retry budget + 1 safety).
+      expect(fixture.runtime.resizeCalls, lessThanOrEqualTo(21));
+    }, timeout: const Timeout(Duration(seconds: 30)));
+
     test('resize ignores an expired session (404)', () async {
       final fixture = await _createFixture();
       addTearDown(fixture.dispose);
-      fixture.runtime.resizeStatus = HttpStatus.notFound;
+      fixture.runtime.resizeStatuses = List.filled(20, HttpStatus.notFound);
 
       await fixture.client.resize('s1', 80, 24);
-    });
+    }, timeout: const Timeout(Duration(seconds: 30)));
+
 
     test('resize rethrows unexpected errors', () async {
       final fixture = await _createFixture();
@@ -492,7 +525,13 @@ class _FakeRuntime {
 
   String? lastInputData;
   Map<String, dynamic>? lastResizeBody;
+
+  /// Queued resize responses: each resize request pops the next status.
+  /// Once the queue is exhausted every further resize answers [ok] (unless
+  /// [resizeStatus] is also set to a non-ok value for the simple tests).
+  List<int> resizeStatuses = const [];
   int resizeStatus = HttpStatus.ok;
+  int resizeCalls = 0;
   int killCalls = 0;
 
   int streamRequests = 0;
@@ -545,10 +584,14 @@ class _FakeRuntime {
         case 'resize':
           final body = await utf8.decoder.bind(request).join();
           lastResizeBody = jsonDecode(body) as Map<String, dynamic>;
-          if (resizeStatus == HttpStatus.ok) {
+          final status = resizeCalls < resizeStatuses.length
+              ? resizeStatuses[resizeCalls]
+              : resizeStatus;
+          resizeCalls++;
+          if (status == HttpStatus.ok) {
             _respondJson(request, const {});
           } else {
-            _respond(request, resizeStatus);
+            _respond(request, status);
           }
           return;
         case 'kill':
