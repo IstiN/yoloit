@@ -333,3 +333,65 @@ func TestReadLoopInvalidUTF8DoesNotStall(t *testing.T) {
 		}
 	}
 }
+
+// Cross-session isolation: each session owns a dedicated PTY and event
+// stream. Output written by one session must never appear in another
+// session's subscriber stream or replay ring — agents run side by side in
+// separate panels and a leak here would cross-contaminate their tool
+// results. Pins the architectural invariant against regressions.
+func TestSessionsAreIsolated(t *testing.T) {
+	a, err := New(&CreateRequest{ID: "iso-a", Command: "sleep 1; printf A-MARKER-unique-$$.done; sleep 5"})
+	if err != nil {
+		t.Fatalf("failed to start session A: %v", err)
+	}
+	defer a.Kill()
+	b, err := New(&CreateRequest{ID: "iso-b", Command: "sleep 1; printf B-MARKER-other-$$.done; sleep 5"})
+	if err != nil {
+		t.Fatalf("failed to start session B: %v", err)
+	}
+	defer b.Kill()
+
+	chA := a.Subscribe()
+	defer a.Unsubscribe(chA)
+	chB := b.Subscribe()
+	defer b.Unsubscribe(chB)
+
+	waitFor := func(ch chan Event, marker string) string {
+		var collected string
+		deadline := time.After(10 * time.Second)
+		for {
+			select {
+			case ev, ok := <-ch:
+				if !ok {
+					return collected
+				}
+				collected += ev.Data
+				if strings.Contains(collected, marker) {
+					return collected
+				}
+			case <-deadline:
+				t.Fatalf("timeout waiting for %q in stream, got: %q", marker, collected)
+			}
+		}
+	}
+
+	outA := waitFor(chA, "A-MARKER")
+	outB := waitFor(chB, "B-MARKER")
+
+	if strings.Contains(outA, "B-MARKER") {
+		t.Fatalf("session A stream leaked session B output: %q", outA)
+	}
+	if strings.Contains(outB, "A-MARKER") {
+		t.Fatalf("session B stream leaked session A output: %q", outB)
+	}
+	for _, ev := range a.Ring() {
+		if strings.Contains(ev.Data, "B-MARKER") {
+			t.Fatalf("session A ring leaked session B output: %q", ev.Data)
+		}
+	}
+	for _, ev := range b.Ring() {
+		if strings.Contains(ev.Data, "A-MARKER") {
+			t.Fatalf("session B ring leaked session A output: %q", ev.Data)
+		}
+	}
+}
