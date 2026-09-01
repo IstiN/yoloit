@@ -4,8 +4,11 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:yoloit/core/remote/yoloit_remote_client.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/features/board/model/board_icon.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
+import 'package:yoloit/features/board/ui/board_icon.dart';
 import 'package:yoloit/features/board/ui/board_overview_preview.dart';
+import 'package:yoloit/features/board/ui/dialogs/board_icon_dialog.dart';
 
 class BoardSwitchPreviewOverlay extends StatelessWidget {
   const BoardSwitchPreviewOverlay({
@@ -192,6 +195,7 @@ class BoardOverviewCard extends StatelessWidget {
     required this.onTap,
     this.onDisconnect,
     this.onDeleteRemote,
+    this.onChangeIcon,
   });
 
   final BoardDocument board;
@@ -200,6 +204,9 @@ class BoardOverviewCard extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback? onDisconnect;
   final VoidCallback? onDeleteRemote;
+
+  /// Called with the picked icon (`null` = reset to auto-detect).
+  final void Function(BoardIconSpec? icon)? onChangeIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -233,6 +240,8 @@ class BoardOverviewCard extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     child: Row(
                       children: [
+                        _buildHeaderIcon(context),
+                        const SizedBox(width: 8),
                         if (active) ...[
                           Icon(
                             Icons.radio_button_checked,
@@ -314,18 +323,97 @@ class BoardOverviewCard extends StatelessWidget {
                 ),
               ),
               Expanded(
-                child:
-                    previewPng == null
-                        ? BoardOverviewPreview(board: board)
-                        : BoardOverviewPngPreview(
-                          bytes: previewPng!,
-                          fallback: BoardOverviewPreview(board: board),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final preview =
+                        previewPng == null
+                            ? BoardOverviewPreview(board: board)
+                            : BoardOverviewPngPreview(
+                              bytes: previewPng!,
+                              fallback: BoardOverviewPreview(board: board),
+                            );
+                    return Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        preview,
+                        Positioned(
+                          left: 12,
+                          bottom: 12,
+                          child: IgnorePointer(
+                            child: _BoardIconOverlay(
+                              board: board,
+                              maxWidth: constraints.maxWidth,
+                              maxHeight: constraints.maxHeight,
+                            ),
+                          ),
                         ),
+                      ],
+                    );
+                  },
+                ),
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildHeaderIcon(BuildContext context) {
+    final icon = BoardIcon(board: board, size: 20);
+    if (onChangeIcon == null) return icon;
+    return Tooltip(
+      message: 'Change board icon',
+      child: InkResponse(
+        key: Key('board-overview-icon-${board.id}'),
+        radius: 16,
+        onTap: () => _changeIcon(context),
+        child: icon,
+      ),
+    );
+  }
+
+  Future<void> _changeIcon(BuildContext context) async {
+    final result = await showBoardIconDialog(context, board: board);
+    if (result == null) return;
+    onChangeIcon?.call(result.icon);
+  }
+}
+
+/// Icon overlayed on the board card preview — bottom-left corner, roughly
+/// 10% of the preview area, with a soft drop shadow.
+class _BoardIconOverlay extends StatelessWidget {
+  const _BoardIconOverlay({
+    required this.board,
+    required this.maxWidth,
+    required this.maxHeight,
+  });
+
+  final BoardDocument board;
+  final double maxWidth;
+  final double maxHeight;
+
+  @override
+  Widget build(BuildContext context) {
+    if (maxWidth <= 0 || maxHeight <= 0) return const SizedBox.shrink();
+    // ~10% of the preview area => side = sqrt(0.10 * w * h).
+    final rawSide = math.sqrt(0.10 * maxWidth * maxHeight);
+    final side = rawSide.clamp(32.0, maxHeight * 0.5).toDouble();
+    final colors = context.appColors;
+    return Container(
+      width: side,
+      height: side,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(side * 0.28),
+        boxShadow: [
+          BoxShadow(
+            color: colors.background.withAlpha(170),
+            blurRadius: side * 0.18,
+            offset: Offset(0, side * 0.05),
+          ),
+        ],
+      ),
+      child: BoardIcon(board: board, size: side),
     );
   }
 }

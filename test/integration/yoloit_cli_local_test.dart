@@ -1,4 +1,4 @@
-// covers: remote:status, boards, board:create, board:rename, panel:create, panel:rename, panel:move, panel:resize, do, panel, group:create, groups, link:create, links, board:archive, board:unarchive, table:create, table:set, table:add-row, table:update-row, panel:delete, panels
+// covers: remote:status, boards, board:create, board:rename, board:icon, panel:create, panel:rename, panel:move, panel:resize, do, panel, group:create, groups, link:create, links, board:archive, board:unarchive, table:create, table:set, table:add-row, table:update-row, panel:delete, panels
 
 import 'dart:io';
 
@@ -241,6 +241,48 @@ void main() {
               .map((panel) => panel['title'])
               .toList();
       expect(panelTitles, isNot(contains('Notes v2')));
+    }, timeout: const Timeout(Duration(minutes: 5)));
+
+    test('board:icon sets, reads, and resets the board icon', () async {
+      final created = await cli.json(['board:create', 'Icon Board']);
+      expect(created['ok'], isTrue);
+
+      final setEmoji = await cli.json(['board:icon', 'Icon Board', 'emoji:🚀']);
+      expect(setEmoji['ok'], isTrue);
+
+      final details = await cli.json(['board', 'Icon Board']);
+      final metadata = details['metadata'] as Map<String, dynamic>;
+      expect(
+        metadata['icon'],
+        <String, dynamic>{'kind': 'emoji', 'value': '🚀'},
+      );
+
+      final boards = await cli.json(['boards']);
+      final summary = (boards['boards'] as List<dynamic>)
+          .whereType<Map<String, dynamic>>()
+          .firstWhere((board) => board['name'] == 'Icon Board');
+      expect(
+        summary['icon'],
+        <String, dynamic>{'kind': 'emoji', 'value': '🚀'},
+      );
+
+      final setBuiltin = await cli.json(
+        ['board:icon', 'Icon Board', 'builtin:yoloit'],
+      );
+      expect(setBuiltin['ok'], isTrue);
+      final detailsBuiltin = await cli.json(['board', 'Icon Board']);
+      expect(
+        (detailsBuiltin['metadata'] as Map<String, dynamic>)['icon'],
+        <String, dynamic>{'kind': 'builtin', 'value': 'yoloit'},
+      );
+
+      final reset = await cli.json(['board:icon', 'Icon Board', 'auto']);
+      expect(reset['ok'], isTrue);
+      final detailsReset = await cli.json(['board', 'Icon Board']);
+      expect(
+        (detailsReset['metadata'] as Map<String, dynamic>).containsKey('icon'),
+        isFalse,
+      );
     }, timeout: const Timeout(Duration(minutes: 5)));
   });
 }

@@ -60,6 +60,7 @@ class RemoteBoard {
     'panelCount': panels.length,
     'linkCount': links.length,
     'defaultFolder': (metadata['defaultFolder'] as String? ?? '').trim(),
+    'icon': metadata['icon'],
     'active': active,
   };
 

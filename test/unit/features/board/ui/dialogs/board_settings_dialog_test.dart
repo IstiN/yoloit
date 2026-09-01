@@ -110,5 +110,18 @@ void main() {
 
       expect(find.text('Board settings'), findsNothing);
     });
+
+    testWidgets('renders board icon row with change button', (tester) async {
+      await tester.pumpWidget(buildDialog());
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Board icon'), findsOneWidget);
+      expect(
+        find.text('Auto-detected from the default folder.'),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('board-settings-change-icon')), findsOneWidget);
+    });
   });
 }

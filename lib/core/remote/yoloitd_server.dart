@@ -10,6 +10,7 @@ import 'package:yoloit/core/remote/yoloitd_panel_actions.dart';
 import 'package:yoloit/core/remote/yoloitd_panel_catalog.dart';
 import 'package:yoloit/core/remote/yoloitd_store.dart';
 import 'package:yoloit/core/utils/directory_utils.dart';
+import 'package:yoloit/features/board/model/board_icon.dart';
 
 /// A single REST route entry: an optional [method] (null matches any), a
 /// [pattern] of path segments (a null element matches any single segment),
@@ -726,6 +727,20 @@ class YoloitdServer with ServerProcessMixin {
         ...metadata,
         'defaultFolder': body['defaultFolder'] as String? ?? '',
       };
+    }
+    if (body.containsKey('icon')) {
+      final raw = body['icon'];
+      final spec = switch (raw) {
+        null => null,
+        Map() => BoardIconSpec.fromJson(raw),
+        _ => BoardIconSpec.parse(raw.toString()),
+      };
+      metadata = <String, dynamic>{...metadata};
+      if (spec == null) {
+        metadata.remove('icon');
+      } else {
+        metadata['icon'] = spec.toJson();
+      }
     }
     return current.copyWith(
       name: body['name'] as String? ?? current.name,

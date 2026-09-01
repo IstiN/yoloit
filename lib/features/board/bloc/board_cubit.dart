@@ -15,6 +15,7 @@ import 'package:yoloit/features/board/events/board_event_bus.dart';
 import 'package:yoloit/features/board/history/board_history_event.dart';
 import 'package:yoloit/features/board/history/board_history_store.dart';
 import 'package:yoloit/features/board/history/board_redo_entry.dart';
+import 'package:yoloit/features/board/model/board_icon.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/board/model/terminal_panel_models.dart';
@@ -31,6 +32,7 @@ import 'package:yoloit/features/settings/data/provider_model_catalog_service.dar
 
 part 'board_cubit_panel_history.dart';
 part 'board_cubit_locks.dart';
+part 'board_cubit_icon.dart';
 
 class BoardCubit extends Cubit<BoardState> {
   BoardCubit({
@@ -453,34 +455,6 @@ class BoardCubit extends Cubit<BoardState> {
     );
   }
 
-  Future<void> updateBoardDefaultFolder(
-    String id,
-    String? defaultFolder,
-  ) async {
-    await _updateBoard(
-      id,
-      (board) {
-        final trimmed = defaultFolder?.trim() ?? '';
-        final metadata = Map<String, dynamic>.from(board.metadata);
-        if (trimmed.isEmpty) {
-          metadata.remove('defaultFolder');
-        } else {
-          metadata['defaultFolder'] = trimmed;
-        }
-        return board.copyWith(metadata: metadata);
-      },
-      historyEvent:
-          (before, after, revision) => _historyEvent(
-            boardId: id,
-            type: 'board.metadataUpdated',
-            entityType: 'board',
-            entityId: id,
-            revision: revision,
-            before: {'metadata': before.metadata},
-            after: {'metadata': after.metadata},
-          ),
-    );
-  }
 
   Future<BoardDocument?> replaceBoardSnapshotFromShare(
     BoardDocument snapshot,

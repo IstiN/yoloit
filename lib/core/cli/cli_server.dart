@@ -35,6 +35,7 @@ import 'package:yoloit/features/board/audio_recorder/audio_recording_manager.dar
 import 'package:yoloit/features/board/audio_recorder/system_audio_source.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/chat/yoloit_cli_tools.dart';
+import 'package:yoloit/features/board/model/board_icon.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
 import 'package:yoloit/features/board/plugins/builtin/audio_recorder_plugin.dart';
@@ -596,6 +597,7 @@ class CliServer {
       'panelCount': board.panels.length,
       'linkCount': board.links.length,
       'defaultFolder': board.defaultFolder,
+      'icon': board.icon?.toJson(),
       'gridMode': board.gridMode.toJson(),
       'archived': board.archived,
       if (activeId != null) 'active': board.id == activeId,
@@ -671,6 +673,7 @@ class CliServer {
       'panelCount': board.panels.length,
       'linkCount': board.links.length,
       'defaultFolder': board.defaultFolder,
+      'icon': board.icon?.toJson(),
       'gridMode': board.gridMode.toJson(),
       'panels': board.panels.map(_panelSummary).toList(),
     });
@@ -820,6 +823,16 @@ class CliServer {
         board.id,
         body['defaultFolder'] as String?,
       );
+      cliScheduleRebuild();
+    }
+    if (body.containsKey('icon')) {
+      final raw = body['icon'];
+      final spec = switch (raw) {
+        null => null,
+        Map() => BoardIconSpec.fromJson(raw),
+        _ => BoardIconSpec.parse(raw.toString()),
+      };
+      await cubit.updateBoardIcon(board.id, spec);
       cliScheduleRebuild();
     }
     if (body['focus'] == true) {

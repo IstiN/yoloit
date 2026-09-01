@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:yoloit/core/remote/yoloit_remote_client.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/features/board/model/board_icon.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/ui/board_overview_layout.dart';
 import 'package:yoloit/features/board/ui/board_overview_widgets.dart';
@@ -22,6 +23,7 @@ class BoardOverviewLayer extends StatefulWidget {
     required this.onDisconnectRemoteUrl,
     required this.onClose,
     required this.debugLog,
+    this.onChangeIcon,
   });
 
   final String activeBoardId;
@@ -36,6 +38,9 @@ class BoardOverviewLayer extends StatefulWidget {
   final ValueChanged<String> onDisconnectRemoteUrl;
   final VoidCallback onClose;
   final ValueChanged<String> debugLog;
+
+  /// Called with the picked board icon (`null` = reset to auto-detect).
+  final void Function(BoardDocument board, BoardIconSpec? icon)? onChangeIcon;
 
   @override
   State<BoardOverviewLayer> createState() => BoardOverviewLayerState();
@@ -378,6 +383,10 @@ class BoardOverviewLayerState extends State<BoardOverviewLayer>
                   active: board.id == highlightedBoardId && t >= 0.92,
                   previewPng: widget.previewPngs[board.id],
                   onTap: () => _selectBoard(board.id),
+                  onChangeIcon:
+                      widget.onChangeIcon == null
+                          ? null
+                          : (icon) => widget.onChangeIcon!(board, icon),
                   onDisconnect:
                       remoteInfoForBoard(board) == null
                           ? null

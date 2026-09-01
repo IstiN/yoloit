@@ -17,6 +17,7 @@ import 'package:yoloit/core/theme/theme_manager.dart';
 import 'package:yoloit/core/ui/adaptive_dialog.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/bloc/board_state.dart';
+import 'package:yoloit/features/board/model/board_icon.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/builtin/webpage_plugin.dart';
 import 'package:yoloit/features/board/services/board_offscreen_renderer.dart';
@@ -1642,13 +1643,21 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     final remote = remoteInfoForBoard(board);
     final result =
         await showAdaptiveYoloDialog<
-          ({String name, String defaultFolder, bool archived})
+          ({
+            String name,
+            String defaultFolder,
+            bool archived,
+            BoardIconSpec? icon,
+            bool iconChanged,
+          })
         >(
           context: context,
           builder: (_) => BoardSettingsDialog(
             initialName: board.name,
             initialDefaultFolder: board.defaultFolder,
             initialArchived: board.archived,
+            initialIcon: board.icon,
+            boardId: board.id,
             remoteInfo: remote,
             onPickFolder: kIsWeb
                 ? null
@@ -1666,6 +1675,9 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     final cubit = context.read<BoardCubit>();
     await cubit.renameBoard(board.id, result.name);
     await cubit.updateBoardDefaultFolder(board.id, result.defaultFolder);
+    if (result.iconChanged) {
+      await cubit.updateBoardIcon(board.id, result.icon);
+    }
     if (result.archived && !board.archived) {
       await cubit.archiveBoard(board.id);
     } else if (!result.archived && board.archived) {

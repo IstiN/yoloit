@@ -96,6 +96,39 @@ final List<YoloitCliTool> boardTools = <YoloitCliTool>[
   ),
 
   YoloitCliTool(
+    command: 'board:icon',
+    alias: 'bico',
+    description:
+        'Set or reset the board icon shown in the boards overview and toolbar. '
+        'Use "auto" to re-detect from the default folder (e.g. a Flutter app '
+        'icon), "emoji:<char>" for an emoji, "builtin:<name>" for a bundled '
+        'preset (yoloit, yoloit_logo, yolo_assistant, copilot, voice), or a '
+        'path to a PNG/JPG/SVG image file.',
+    group: 'board',
+    humanVariants: const {
+      'ru': [
+        'поставь иконку борда {icon}',
+        'установи иконку доски {icon}',
+        'смени иконку борда на {icon}',
+      ],
+      'en': [
+        'set board icon {icon}',
+        'change board icon to {icon}',
+        'reset board icon to auto',
+      ],
+    },
+    params: <YoloitCliToolParam>[
+      boardParam('id_or_name'),
+      toolParam(
+        'icon',
+        "Icon: 'auto', 'emoji:<char>', 'builtin:<name>' or image path",
+        required: true,
+        shortKey: 'i',
+      ),
+    ],
+  ),
+
+  YoloitCliTool(
     command: 'board:delete',
     alias: 'bdl',
     description: 'Delete a board',

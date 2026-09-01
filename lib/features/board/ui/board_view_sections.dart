@@ -996,6 +996,10 @@ extension _BoardViewSections on _BoardViewState {
           if (!mounted) return;
           _runBoardSwitchPreview(board, previewPng);
         },
+        onChangeIcon: (board, icon) {
+          if (!mounted) return;
+          context.read<BoardCubit>().updateBoardIcon(board.id, icon);
+        },
       ),
     );
   }

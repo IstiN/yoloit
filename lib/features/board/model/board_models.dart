@@ -4,6 +4,7 @@ import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
 import 'package:json_annotation/json_annotation.dart';
 import 'package:yoloit/features/board/model/board_grid_mode.dart';
+import 'package:yoloit/features/board/model/board_icon.dart';
 import 'package:yoloit/features/board/model/board_json_converters.dart';
 
 part 'board_models.g.dart';
@@ -552,6 +553,22 @@ class BoardDocument extends Equatable {
 
   String get defaultFolder =>
       (metadata['defaultFolder'] as String? ?? '').trim();
+
+  /// Explicit board icon override stored in metadata.
+  ///
+  /// When `null`, the UI auto-detects an icon from [defaultFolder] (e.g. a
+  /// Flutter app icon) and falls back to a generated letter avatar.
+  BoardIconSpec? get icon => BoardIconSpec.fromJson(metadata['icon'] as Map?);
+
+  BoardDocument copyWithIcon(BoardIconSpec? icon) {
+    final next = Map<String, dynamic>.from(metadata);
+    if (icon == null) {
+      next.remove('icon');
+    } else {
+      next['icon'] = icon.toJson();
+    }
+    return copyWith(metadata: next);
+  }
 
   BoardGridMode get gridMode {
     final raw = metadata['gridView'];

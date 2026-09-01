@@ -7,6 +7,7 @@ import 'package:yoloit/core/platform/url_opener.dart';
 import 'package:yoloit/core/remote/yoloit_remote_client.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
+import 'package:yoloit/features/board/ui/board_icon.dart';
 import 'package:yoloit/ui/components/chip/toolbar_chip.dart';
 
 class BoardToolbar extends StatelessWidget {
@@ -461,11 +462,7 @@ class BoardSwitcherButton extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                Icons.dashboard_customize_outlined,
-                size: 16,
-                color: mutedColor,
-              ),
+              BoardIcon(board: board, size: 18),
               const SizedBox(width: 8),
               Flexible(
                 child: Text(
