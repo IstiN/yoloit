@@ -269,8 +269,14 @@ gitignored — **never commit or hand-edit them**.
   listings, or secrets/credentials.
 - One fact per note. Update/supersede instead of duplicating; delete
   outdated records (tombstone) instead of leaving stale notes behind.
-- Do not create files by hand in `memory/note/` — use the Fa memory tools
-  (`memory_add` / `memory_delete`), which keep ids and frontmatter consistent.
+- **Always use the Fa memory tools** (`memory_add`, `memory_search`,
+  `memory_list`, `memory_delete`) to read and write project memory — never
+  create or edit files in `memory/` by hand. The tools resolve the store
+  through `.fah/config.yaml` (`memory.projectPath` → `yoloit/memory/`) and
+  keep ids, frontmatter, and the `DELETIONS.md` tombstone log consistent.
+  When a durable fact is learned during a task, save it with `memory_add`
+  before finishing; when a stored fact becomes wrong, delete it with
+  `memory_delete` and add the corrected one.
 - Commit memory changes together with the work that produced them (or as a
   small follow-up `memory:` commit) and push, so the whole team shares the
   same memory.
