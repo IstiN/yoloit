@@ -51,4 +51,30 @@ extension BoardCubitIconMutations on BoardCubit {
           ),
     );
   }
+
+  /// Updates the board-level default env injected into every new terminal:
+  /// selected env group ids plus inline key/value variables.
+  Future<void> updateBoardDefaultEnv(
+    String id, {
+    required List<String> envGroupIds,
+    required Map<String, String> env,
+  }) async {
+    await _updateBoard(
+      id,
+      (board) => board.copyWithDefaultEnv(
+        envGroupIds: envGroupIds,
+        env: env,
+      ),
+      historyEvent:
+          (before, after, revision) => _historyEvent(
+            boardId: id,
+            type: 'board.metadataUpdated',
+            entityType: 'board',
+            entityId: id,
+            revision: revision,
+            before: {'metadata': before.metadata},
+            after: {'metadata': after.metadata},
+          ),
+    );
+  }
 }

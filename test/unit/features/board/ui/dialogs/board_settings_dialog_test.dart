@@ -4,7 +4,19 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:yoloit/core/platform/platform_capabilities.dart';
 import 'package:yoloit/core/platform/platform_capabilities_web.dart';
 import 'package:yoloit/core/theme/app_theme.dart';
+import 'package:yoloit/features/board/model/board_icon.dart';
 import 'package:yoloit/features/board/ui/dialogs/board_settings_dialog.dart';
+
+typedef _BoardSettingsResult =
+    ({
+      String name,
+      String defaultFolder,
+      bool archived,
+      BoardIconSpec? icon,
+      bool iconChanged,
+      List<String> envGroupIds,
+      Map<String, String> env,
+    });
 
 void main() {
   group('BoardSettingsDialog', () {
@@ -122,6 +134,134 @@ void main() {
         findsOneWidget,
       );
       expect(find.byKey(const Key('board-settings-change-icon')), findsOneWidget);
+    });
+  });
+
+  group('BoardSettingsDialog default env', () {
+    (Widget, Object? Function()) pumpCapturingDialog(
+      WidgetTester tester, {
+      List<String> initialEnvGroupIds = const <String>[],
+      Map<String, String> initialEnv = const <String, String>{},
+    }) {
+      Object? result;
+      final widget = MaterialApp(
+        theme: AppThemePreset.neonPurple.theme,
+        home: Builder(
+          builder: (context) {
+            return Scaffold(
+              body: Center(
+                child: ElevatedButton(
+                  onPressed: () async {
+                    result = await showDialog<Object?>(
+                      context: context,
+                      builder: (_) => BoardSettingsDialog(
+                        initialName: 'My Board',
+                        initialDefaultFolder: '/tmp',
+                        remoteInfo: null,
+                        initialEnvGroupIds: initialEnvGroupIds,
+                        initialEnv: initialEnv,
+                      ),
+                    );
+                  },
+                  child: const Text('Open'),
+                ),
+              ),
+            );
+          },
+        ),
+      );
+      return (widget, () => result);
+    }
+
+    testWidgets('renders default env section with seeded values', (
+      tester,
+    ) async {
+      final (widget, _) = pumpCapturingDialog(
+        tester,
+        initialEnvGroupIds: ['g1'],
+        initialEnv: {'API_KEY': 'abc'},
+      );
+      await tester.pumpWidget(widget);
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Default env variables'), findsOneWidget);
+      expect(find.text('Env groups'), findsOneWidget);
+      expect(find.text('API_KEY'), findsOneWidget);
+      expect(find.widgetWithText(TextField, 'abc'), findsOneWidget);
+    });
+
+    testWidgets('Save returns edited env groups and inline variables', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(900, 2200);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final (widget, getResult) = pumpCapturingDialog(
+        tester,
+        initialEnv: {'API_KEY': 'abc'},
+      );
+      await tester.pumpWidget(widget);
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+
+      // Add a variable row and fill it in.
+      await tester.tap(find.text('Add Variable'));
+      await tester.pump();
+      Finder fieldByHint(String hint) => find.byWidgetPredicate(
+        (widget) => widget is TextField && widget.decoration?.hintText == hint,
+      );
+      // The new row is the only one with an empty KEY / VALUE.
+      final emptyKeyField = find.byWidgetPredicate(
+        (widget) =>
+            widget is TextField &&
+            widget.decoration?.hintText == 'KEY' &&
+            (widget.controller?.text.isEmpty ?? false),
+      );
+      final emptyValueField = find.byWidgetPredicate(
+        (widget) =>
+            widget is TextField &&
+            widget.decoration?.hintText == 'VALUE' &&
+            (widget.controller?.text.isEmpty ?? false),
+      );
+      expect(emptyKeyField, findsOneWidget);
+      expect(emptyValueField, findsOneWidget);
+      await tester.enterText(emptyKeyField, 'NEW_KEY');
+      await tester.enterText(emptyValueField, 'new_value');
+      await tester.pump();
+
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+
+      final result = getResult()! as _BoardSettingsResult;
+      expect(result.env, {'API_KEY': 'abc', 'NEW_KEY': 'new_value'});
+      expect(result.envGroupIds, isEmpty);
+    });
+
+    testWidgets('deleting a row removes the variable from the result', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(900, 2200);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final (widget, getResult) = pumpCapturingDialog(
+        tester,
+        initialEnv: {'API_KEY': 'abc'},
+      );
+      await tester.pumpWidget(widget);
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.widgetWithIcon(IconButton, Icons.delete_outline),
+      );
+      await tester.pump();
+
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+
+      final result = getResult()! as _BoardSettingsResult;
+      expect(result.env, isEmpty);
     });
   });
 }

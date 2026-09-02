@@ -554,6 +554,45 @@ class BoardDocument extends Equatable {
   String get defaultFolder =>
       (metadata['defaultFolder'] as String? ?? '').trim();
 
+  /// Env group ids injected by default into every new terminal on this board.
+  List<String> get defaultEnvGroupIds =>
+      (metadata['defaultEnvGroupIds'] as List?)
+          ?.map((entry) => entry.toString())
+          .toList() ??
+      const <String>[];
+
+  /// Inline env variables injected by default into every new terminal on
+  /// this board (in addition to [defaultEnvGroupIds]).
+  Map<String, String> get defaultEnv =>
+      (metadata['defaultEnv'] as Map?)?.map(
+        (key, value) => MapEntry(key.toString(), value.toString()),
+      ) ??
+      const <String, String>{};
+
+  /// Updates the board-level default terminal env. Passing an empty list or
+  /// map removes the corresponding metadata key; `null` keeps it unchanged.
+  BoardDocument copyWithDefaultEnv({
+    List<String>? envGroupIds,
+    Map<String, String>? env,
+  }) {
+    final next = Map<String, dynamic>.from(metadata);
+    if (envGroupIds != null) {
+      if (envGroupIds.isEmpty) {
+        next.remove('defaultEnvGroupIds');
+      } else {
+        next['defaultEnvGroupIds'] = envGroupIds;
+      }
+    }
+    if (env != null) {
+      if (env.isEmpty) {
+        next.remove('defaultEnv');
+      } else {
+        next['defaultEnv'] = env;
+      }
+    }
+    return copyWith(metadata: next);
+  }
+
   /// Explicit board icon override stored in metadata.
   ///
   /// When `null`, the UI auto-detects an icon from [defaultFolder] (e.g. a

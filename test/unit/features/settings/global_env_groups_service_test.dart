@@ -383,6 +383,86 @@ void main() {
     });
   });
 
+  group('GlobalEnvGroupsService.encodeEnvContent', () {
+    Map<String, String> roundTrip(Map<String, String> values) {
+      final encoded = GlobalEnvGroupsService.instance.encodeEnvContent(values);
+      return GlobalEnvGroupsService.instance.parseEnvContent(encoded);
+    }
+
+    test('encodes plain key/value pairs, preserving order', () {
+      final encoded = GlobalEnvGroupsService.instance.encodeEnvContent({
+        'FIRST': '1',
+        'SECOND': 'two words',
+      });
+      expect(encoded, 'FIRST=1\nSECOND=two words\n');
+    });
+
+    test('round-trips simple values through parseEnvContent', () {
+      expect(
+        roundTrip({'API_KEY': 'abc', 'EMPTY': '', 'URL': 'https://x.dev'}),
+        {'API_KEY': 'abc', 'EMPTY': '', 'URL': 'https://x.dev'},
+      );
+    });
+
+    test('quotes multiline values so they survive the round trip', () {
+      const multiline = 'line1\nline2';
+      expect(
+        roundTrip({'CERT': multiline}),
+        {'CERT': multiline},
+      );
+      final encoded = GlobalEnvGroupsService.instance.encodeEnvContent({
+        'CERT': multiline,
+      });
+      expect(encoded, 'CERT="line1\\nline2"\n');
+    });
+
+    test('round-trips tabs, carriage returns and padded values', () {
+      expect(
+        roundTrip({
+          'TABBED': 'a\tb',
+          'CR': 'a\rb',
+          'PADDED': '  spaced  ',
+        }),
+        {'TABBED': 'a\tb', 'CR': 'a\rb', 'PADDED': '  spaced  '},
+      );
+    });
+
+    test('quotes values containing " #" so comments survive', () {
+      expect(
+        roundTrip({'HASH': 'a # b'}),
+        {'HASH': 'a # b'},
+      );
+    });
+
+    test('quotes values with outer quotes so they survive', () {
+      expect(
+        roundTrip({'QUOTED': '"double"', 'SINGLE': "'single'"}),
+        {'QUOTED': '"double"', 'SINGLE': "'single'"},
+      );
+    });
+
+    test('skips draft keys and blank keys', () {
+      final encoded = GlobalEnvGroupsService.instance.encodeEnvContent({
+        '__draft_123': '',
+        '  ': 'blank key',
+        'REAL': 'value',
+      });
+      expect(encoded, 'REAL=value\n');
+    });
+
+    test('never emits comment lines', () {
+      final encoded = GlobalEnvGroupsService.instance.encodeEnvContent({
+        'A': '1',
+        'B': 'two # words',
+        'C': '\n# looks like a comment',
+      });
+      for (final line in encoded.split('\n')) {
+        if (line.isEmpty) continue;
+        expect(line.startsWith('#'), isFalse, reason: 'line: $line');
+      }
+    });
+  });
+
   group('GlobalEnvGroup.fromJson', () {
     test('parses valid JSON', () {
       final group = GlobalEnvGroup.fromJson({

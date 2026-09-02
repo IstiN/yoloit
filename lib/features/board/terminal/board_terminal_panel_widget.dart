@@ -17,6 +17,8 @@ import 'package:yoloit/features/board/ui/board_file_picker.dart';
 import 'package:yoloit/features/mindmap/widgets/canvas_interaction_lock.dart';
 import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
 import 'package:yoloit/features/settings/ui/env_group_picker.dart';
+import 'package:yoloit/features/settings/ui/env_group_selection_field.dart';
+import 'package:yoloit/features/settings/ui/settings_page.dart';
 import 'package:yoloit/features/terminal/models/agent_session.dart';
 import 'package:yoloit/features/terminal/ui/terminal_panel.dart';
 import 'package:yoloit/ui/components/buttons/action_icon_button.dart';
@@ -115,10 +117,13 @@ class _BoardTerminalPanelWidgetState extends State<BoardTerminalPanelWidget> {
       return;
     }
     setState(() => _restoring = true);
+    final board = _boardForPanel(context.read<BoardCubit>());
     final restored = await _manager.ensureSession(
       _config,
       remoteInfo: widget.remoteInfo,
       metadata: _resourceMetadata(sessionName: _config.sessionName),
+      envGroupIds: _effectiveEnvGroupIds(board),
+      staticEnv: _boardStaticEnv(board),
     );
     if (!mounted) return;
     setState(() {
@@ -137,10 +142,12 @@ class _BoardTerminalPanelWidgetState extends State<BoardTerminalPanelWidget> {
     setState(() => _starting = true);
     late final AgentSession session;
     try {
+      final board = _boardForPanel(context.read<BoardCubit>());
       session = await _manager.createSession(
         sessionName: sessionName,
         workingDir: workingDir,
-        envGroupIds: _config.envGroupIds,
+        envGroupIds: _effectiveEnvGroupIds(board),
+        staticEnv: _boardStaticEnv(board),
         remoteInfo: widget.remoteInfo,
         metadata: _resourceMetadata(sessionName: sessionName),
       );
@@ -198,10 +205,12 @@ class _BoardTerminalPanelWidgetState extends State<BoardTerminalPanelWidget> {
     setState(() => _starting = true);
     late final AgentSession session;
     try {
+      final board = _boardForPanel(context.read<BoardCubit>());
       session = await _manager.createSession(
         sessionName: trimmedName,
         workingDir: trimmedDir,
-        envGroupIds: envGroupIds,
+        envGroupIds: _effectiveEnvGroupIds(board),
+        staticEnv: _boardStaticEnv(board),
         remoteInfo: widget.remoteInfo,
         metadata: _resourceMetadata(
           sessionName: trimmedName,
@@ -245,10 +254,13 @@ class _BoardTerminalPanelWidgetState extends State<BoardTerminalPanelWidget> {
       return;
     }
     setState(() => _restoring = true);
+    final board = _boardForPanel(context.read<BoardCubit>());
     final session = await _manager.ensureSession(
       _config,
       remoteInfo: widget.remoteInfo,
       metadata: _resourceMetadata(sessionName: _config.sessionName),
+      envGroupIds: _effectiveEnvGroupIds(board),
+      staticEnv: _boardStaticEnv(board),
     );
     if (!mounted) return;
     setState(() {
@@ -272,6 +284,17 @@ class _BoardTerminalPanelWidgetState extends State<BoardTerminalPanelWidget> {
     }
     return cubit.state.activeBoard;
   }
+
+  /// Board defaults (Board settings → Default env variables) merged with the
+  /// panel's own selection. Board groups come first so terminal-specific
+  /// groups win on duplicate keys — same last-wins rule the resolver uses.
+  List<String> _effectiveEnvGroupIds(BoardDocument? board) {
+    return [...?board?.defaultEnvGroupIds, ..._config.envGroupIds];
+  }
+
+  /// Inline board-level env variables for every new session.
+  Map<String, String> _boardStaticEnv(BoardDocument? board) =>
+      board?.defaultEnv ?? const {};
 
   ResourceSessionMetadata _resourceMetadata({
     required String sessionName,
@@ -385,10 +408,12 @@ class _BoardTerminalPanelWidgetState extends State<BoardTerminalPanelWidget> {
     if (_config.sessionId.isEmpty || _session == null) return;
     setState(() => _restoring = true);
     await _manager.killSession(_config.sessionId);
+    final board = _boardForPanel(context.read<BoardCubit>());
     final session = await _manager.createSession(
       sessionName: _config.sessionName,
       workingDir: _config.workingDir,
-      envGroupIds: envGroupIds,
+      envGroupIds: _effectiveEnvGroupIds(board),
+      staticEnv: _boardStaticEnv(board),
       remoteInfo: widget.remoteInfo,
       metadata: _resourceMetadata(sessionName: _config.sessionName),
     );
@@ -547,6 +572,8 @@ class _BoardTerminalInfoBarState extends State<_BoardTerminalInfoBar> {
     final selected = await showEnvGroupPickerDialog(
       context,
       initialSelected: widget.config.envGroupIds,
+      onOpenSettings:
+          () => SettingsPage.show(context, initialCategory: 'Environment'),
     );
     if (selected != null) {
       widget.onEnvGroupsChanged(selected);

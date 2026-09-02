@@ -307,6 +307,45 @@ void main() {
       expect(updated.panels.length, 1);
       expect(updated.name, 'B');
     });
+
+    test('default env getters default to empty', () {
+      const doc = BoardDocument(id: 'b1', name: 'B');
+      expect(doc.defaultEnvGroupIds, isEmpty);
+      expect(doc.defaultEnv, isEmpty);
+    });
+
+    test('default env getters read metadata values', () {
+      const doc = BoardDocument(
+        id: 'b1',
+        name: 'B',
+        metadata: {
+          'defaultEnvGroupIds': ['g1', 'g2'],
+          'defaultEnv': {'API_KEY': 'abc'},
+        },
+      );
+      expect(doc.defaultEnvGroupIds, ['g1', 'g2']);
+      expect(doc.defaultEnv, {'API_KEY': 'abc'});
+    });
+
+    test('copyWithDefaultEnv sets, keeps and removes values', () {
+      const doc = BoardDocument(id: 'b1', name: 'B');
+      final withEnv = doc.copyWithDefaultEnv(
+        envGroupIds: ['g1'],
+        env: {'A': '1'},
+      );
+      expect(withEnv.defaultEnvGroupIds, ['g1']);
+      expect(withEnv.defaultEnv, {'A': '1'});
+
+      // null keeps the existing values.
+      final kept = withEnv.copyWithDefaultEnv();
+      expect(kept.defaultEnvGroupIds, ['g1']);
+      expect(kept.defaultEnv, {'A': '1'});
+
+      // Empty values remove the metadata keys.
+      final cleared = kept.copyWithDefaultEnv(envGroupIds: [], env: {});
+      expect(cleared.metadata.containsKey('defaultEnvGroupIds'), isFalse);
+      expect(cleared.metadata.containsKey('defaultEnv'), isFalse);
+    });
   });
 
   group('Enums', () {

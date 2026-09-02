@@ -209,6 +209,92 @@ void main() {
       });
     });
   });
+
+  group('EnvGroupPickerDialog quick search & key preview', () {
+    Future<void> seedTwoGroups() => GlobalEnvGroupsService.instance.saveAll([
+      const GlobalEnvGroup(
+        id: 'g1',
+        name: 'Alpha',
+        values: {'OPENAI_KEY': 'v1', 'OTHER': 'v2'},
+      ),
+      const GlobalEnvGroup(id: 'g2', name: 'Beta', values: {'UNRELATED': 'v3'}),
+    ]);
+
+    testWidgets('quick search filters groups by key name', (tester) async {
+      await tester.runAsync(() async {
+        await seedTwoGroups();
+        await openPicker(tester);
+
+        await tester.enterText(
+          fieldByHint('Quick search: group or key name…'),
+          'openai',
+        );
+        await waitForGone(tester, find.text('Beta'));
+
+        expect(find.text('Beta'), findsNothing);
+        expect(find.text('Alpha'), findsOneWidget);
+      });
+    });
+
+    testWidgets('shows a no-match caption when nothing matches', (
+      tester,
+    ) async {
+      await tester.runAsync(() async {
+        await seedTwoGroups();
+        await openPicker(tester);
+
+        await tester.enterText(
+          fieldByHint('Quick search: group or key name…'),
+          'zzz_no_match',
+        );
+        await waitFor(tester, find.textContaining('No groups or keys match'));
+
+        expect(find.textContaining('No groups or keys match'), findsOneWidget);
+      });
+    });
+
+    testWidgets('expanding a row previews keys but not values', (tester) async {
+      await tester.runAsync(() async {
+        await seedTwoGroups();
+        await openPicker(tester);
+
+        expect(find.text('OPENAI_KEY'), findsNothing);
+        await tester.tap(find.byTooltip('Show keys').first);
+        await tester.pump();
+
+        expect(find.text('OPENAI_KEY'), findsOneWidget);
+        expect(find.text('OTHER'), findsOneWidget);
+        // Values are secrets and must never be previewed.
+        expect(find.text('v1'), findsNothing);
+        expect(find.text('v2'), findsNothing);
+
+        await tester.tap(find.byTooltip('Hide keys').first);
+        await tester.pump();
+        expect(find.text('OPENAI_KEY'), findsNothing);
+      });
+    });
+
+    testWidgets('searching highlights matching keys in the preview', (
+      tester,
+    ) async {
+      await tester.runAsync(() async {
+        await seedTwoGroups();
+        await openPicker(tester);
+
+        await tester.enterText(
+          fieldByHint('Quick search: group or key name…'),
+          'openai',
+        );
+        await waitForGone(tester, find.text('Beta'));
+
+        await tester.tap(find.byTooltip('Show keys'));
+        await tester.pump();
+
+        expect(find.text('OPENAI_KEY'), findsOneWidget);
+        expect(find.text('OTHER'), findsNothing);
+      });
+    });
+  });
 }
 
 class _BrokenPlatformDirs extends PlatformDirs {

@@ -334,6 +334,48 @@ class GlobalEnvGroupsService {
     return result;
   }
 
+  /// Serializes [values] into `.env` file content — the inverse of
+  /// [parseEnvContent].
+  ///
+  /// Draft keys (empty or `__draft_` prefixed) are skipped. Values that would
+  /// not survive the round trip (newlines, tabs, leading/trailing whitespace,
+  /// ` #` comment starts, or outer quote pairs) are wrapped in double quotes
+  /// with `\n` / `\r` / `\t` escape sequences, which [parseEnvContent]
+  /// understands.
+  String encodeEnvContent(Map<String, String> values) {
+    final buffer = StringBuffer();
+    for (final entry in values.entries) {
+      final key = entry.key.trim();
+      if (key.isEmpty || key.startsWith('__draft_')) continue;
+      buffer
+        ..write(key)
+        ..write('=')
+        ..writeln(_encodeEnvValue(entry.value));
+    }
+    return buffer.toString();
+  }
+
+  String _encodeEnvValue(String value) {
+    final hasOuterQuotes =
+        value.length >= 2 &&
+        ((value.startsWith('"') && value.endsWith('"')) ||
+            (value.startsWith("'") && value.endsWith("'")));
+    final needsQuotes =
+        hasOuterQuotes ||
+        value.contains('\n') ||
+        value.contains('\r') ||
+        value.contains('\t') ||
+        value.contains(' #') ||
+        value.trim() != value;
+    if (!needsQuotes) return value;
+    final escaped =
+        value
+            .replaceAll('\n', r'\n')
+            .replaceAll('\r', r'\r')
+            .replaceAll('\t', r'\t');
+    return '"$escaped"';
+  }
+
   MapEntry<String, String>? _parseEnvLine(String rawLine) {
     var line = rawLine.trim();
     if (line.isEmpty || line.startsWith('#')) return null;

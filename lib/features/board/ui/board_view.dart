@@ -1649,6 +1649,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
             bool archived,
             BoardIconSpec? icon,
             bool iconChanged,
+            List<String> envGroupIds,
+            Map<String, String> env,
           })
         >(
           context: context,
@@ -1657,6 +1659,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
             initialDefaultFolder: board.defaultFolder,
             initialArchived: board.archived,
             initialIcon: board.icon,
+            initialEnvGroupIds: board.defaultEnvGroupIds,
+            initialEnv: board.defaultEnv,
             boardId: board.id,
             remoteInfo: remote,
             onPickFolder: kIsWeb
@@ -1675,6 +1679,11 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     final cubit = context.read<BoardCubit>();
     await cubit.renameBoard(board.id, result.name);
     await cubit.updateBoardDefaultFolder(board.id, result.defaultFolder);
+    await cubit.updateBoardDefaultEnv(
+      board.id,
+      envGroupIds: result.envGroupIds,
+      env: result.env,
+    );
     if (result.iconChanged) {
       await cubit.updateBoardIcon(board.id, result.icon);
     }

@@ -8,6 +8,7 @@ import 'package:yoloit/features/board/model/board_icon.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/ui/board_icon.dart';
 import 'package:yoloit/features/board/ui/dialogs/board_icon_dialog.dart';
+import 'package:yoloit/features/settings/ui/env_group_selection_field.dart';
 import 'package:yoloit/ui/components/dialog/editor_dialog_actions.dart';
 
 /// Dialog for editing board name and default folder.
@@ -19,6 +20,8 @@ class BoardSettingsDialog extends StatefulWidget {
     required this.remoteInfo,
     this.initialArchived = false,
     this.initialIcon,
+    this.initialEnvGroupIds = const <String>[],
+    this.initialEnv = const <String, String>{},
     this.boardId = 'board-settings-preview',
     this.onPickFolder,
   });
@@ -26,6 +29,12 @@ class BoardSettingsDialog extends StatefulWidget {
   final String initialName;
   final String initialDefaultFolder;
   final bool initialArchived;
+
+  /// Board-level default env groups injected into every new terminal.
+  final List<String> initialEnvGroupIds;
+
+  /// Board-level inline env variables injected into every new terminal.
+  final Map<String, String> initialEnv;
 
   /// Current board icon override; `null` means auto-detect.
   final BoardIconSpec? initialIcon;
@@ -43,12 +52,24 @@ class BoardSettingsDialog extends StatefulWidget {
   State<BoardSettingsDialog> createState() => _BoardSettingsDialogState();
 }
 
+class _EnvRow {
+  final keyController = TextEditingController();
+  final valueController = TextEditingController();
+
+  void dispose() {
+    keyController.dispose();
+    valueController.dispose();
+  }
+}
+
 class _BoardSettingsDialogState extends State<BoardSettingsDialog> {
   late final TextEditingController _nameController;
   late final TextEditingController _folderController;
   late bool _archived;
   late BoardIconSpec? _icon;
   bool _iconChanged = false;
+  late List<String> _envGroupIds;
+  final List<_EnvRow> _envRows = [];
 
   @override
   void initState() {
@@ -59,14 +80,31 @@ class _BoardSettingsDialogState extends State<BoardSettingsDialog> {
     );
     _archived = widget.initialArchived;
     _icon = widget.initialIcon;
+    _envGroupIds = List<String>.from(widget.initialEnvGroupIds);
+    for (final entry in widget.initialEnv.entries) {
+      _envRows.add(
+        _EnvRow()
+          ..keyController.text = entry.key
+          ..valueController.text = entry.value,
+      );
+    }
   }
 
   @override
   void dispose() {
     _nameController.dispose();
     _folderController.dispose();
+    for (final row in _envRows) {
+      row.dispose();
+    }
     super.dispose();
   }
+
+  Map<String, String> _collectEnv() => {
+    for (final row in _envRows)
+      if (row.keyController.text.trim().isNotEmpty)
+        row.keyController.text.trim(): row.valueController.text,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -135,6 +173,8 @@ class _BoardSettingsDialogState extends State<BoardSettingsDialog> {
               value: _archived,
               onChanged: (value) => setState(() => _archived = value),
             ),
+            const Divider(height: 24),
+            _buildDefaultEnvSection(context),
           ],
         ),
       ),
@@ -146,6 +186,8 @@ class _BoardSettingsDialogState extends State<BoardSettingsDialog> {
             archived: _archived,
             icon: _icon,
             iconChanged: _iconChanged,
+            envGroupIds: _envGroupIds,
+            env: _collectEnv(),
           ),
           applyLabel: 'Save',
         ),
@@ -153,19 +195,107 @@ class _BoardSettingsDialogState extends State<BoardSettingsDialog> {
     );
   }
 
+  Widget _buildDefaultEnvSection(BuildContext context) {
+    final colors = context.appColors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Default env variables',
+          style: TextStyle(
+            color: colors.textPrimary,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Injected into every new terminal on this board. '
+          'Terminal-specific env groups are added on top.',
+          style: TextStyle(color: colors.textMuted, fontSize: 11),
+        ),
+        const SizedBox(height: 10),
+        EnvGroupSelectionField(
+          selectedGroupIds: _envGroupIds,
+          onChanged: (selected) => setState(() => _envGroupIds = selected),
+          label: 'Env groups',
+        ),
+        const SizedBox(height: 10),
+        ..._envRows.indexed.map(
+          (entry) {
+            final rowIndex = entry.$1;
+            final row = entry.$2;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: TextField(
+                      controller: row.keyController,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontFamily: 'monospace',
+                      ),
+                      decoration: const InputDecoration(
+                        isDense: true,
+                        hintText: 'KEY',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 3,
+                    child: TextField(
+                      controller: row.valueController,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontFamily: 'monospace',
+                      ),
+                      decoration: const InputDecoration(
+                        isDense: true,
+                        hintText: 'VALUE',
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () => setState(() {
+                      _envRows.removeAt(rowIndex).dispose();
+                    }),
+                    icon: const Icon(Icons.delete_outline, size: 16),
+                    color: colors.accentRed,
+                    splashRadius: 14,
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+        TextButton.icon(
+          onPressed: () => setState(() => _envRows.add(_EnvRow())),
+          icon: const Icon(Icons.add, size: 14),
+          label: const Text('Add Variable'),
+          style: TextButton.styleFrom(foregroundColor: colors.primary),
+        ),
+      ],
+    );
+  }
+
+  BoardDocument get _previewBoard => BoardDocument(
+    id: widget.boardId,
+    name: _nameController.text.trim(),
+    metadata: {
+      'defaultFolder': _folderController.text.trim(),
+      if (_icon != null) 'icon': _icon!.toJson(),
+    },
+  );
+
   Widget _buildIconRow(BuildContext context) {
     final colors = context.appColors;
-    final previewBoard = BoardDocument(
-      id: widget.boardId,
-      name: _nameController.text.trim(),
-      metadata: {
-        'defaultFolder': _folderController.text.trim(),
-        if (_icon != null) 'icon': _icon!.toJson(),
-      },
-    );
     return Row(
       children: [
-        BoardIcon(board: previewBoard, size: 36),
+        BoardIcon(board: _previewBoard, size: 36),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
@@ -200,15 +330,7 @@ class _BoardSettingsDialogState extends State<BoardSettingsDialog> {
   }
 
   Future<void> _changeIcon(BuildContext context) async {
-    final previewBoard = BoardDocument(
-      id: widget.boardId,
-      name: _nameController.text.trim(),
-      metadata: {
-        'defaultFolder': _folderController.text.trim(),
-        if (_icon != null) 'icon': _icon!.toJson(),
-      },
-    );
-    final result = await showBoardIconDialog(context, board: previewBoard);
+    final result = await showBoardIconDialog(context, board: _previewBoard);
     if (!mounted || result == null) return;
     setState(() {
       _icon = result.icon;

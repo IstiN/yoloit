@@ -66,6 +66,8 @@ class BoardTerminalSessionManager extends ChangeNotifier {
     BoardTerminalConfig config, {
     RemoteBoardInfo? remoteInfo,
     ResourceSessionMetadata? metadata,
+    List<String>? envGroupIds,
+    Map<String, String> staticEnv = const {},
   }) {
     final existing = _sessions[config.sessionId];
     if (existing != null) return Future.value(existing);
@@ -79,7 +81,8 @@ class BoardTerminalSessionManager extends ChangeNotifier {
       sessionId: config.sessionId,
       sessionName: config.sessionName,
       workingDir: config.workingDir,
-      envGroupIds: config.envGroupIds,
+      envGroupIds: envGroupIds ?? config.envGroupIds,
+      staticEnv: staticEnv,
       remoteInfo: remoteInfo,
       metadata: metadata,
     );
@@ -93,6 +96,7 @@ class BoardTerminalSessionManager extends ChangeNotifier {
     required String sessionName,
     required String workingDir,
     List<String> envGroupIds = const [],
+    Map<String, String> staticEnv = const {},
     RemoteBoardInfo? remoteInfo,
     ResourceSessionMetadata? metadata,
   }) async {
@@ -102,6 +106,7 @@ class BoardTerminalSessionManager extends ChangeNotifier {
       sessionName: sessionName,
       workingDir: workingDir,
       envGroupIds: envGroupIds,
+      staticEnv: staticEnv,
       remoteInfo: remoteInfo,
       metadata: metadata,
     );
@@ -170,6 +175,7 @@ class BoardTerminalSessionManager extends ChangeNotifier {
     required String sessionName,
     required String workingDir,
     required List<String> envGroupIds,
+    Map<String, String> staticEnv = const {},
     RemoteBoardInfo? remoteInfo,
     ResourceSessionMetadata? metadata,
   }) async {
@@ -185,8 +191,14 @@ class BoardTerminalSessionManager extends ChangeNotifier {
       status: AgentStatus.live,
       customName: sessionName,
     );
-    final extraEnv = await GlobalEnvGroupsService.instance
-        .resolveSelectedGroups(envGroupIds);
+    // Static (board-level) env fills the base; selected env groups are
+    // resolved on top so group values win on duplicate keys.
+    final extraEnv = {
+      ...staticEnv,
+      ...await GlobalEnvGroupsService.instance.resolveSelectedGroups(
+        envGroupIds,
+      ),
+    };
     final process = await _backendService.launch(
       sessionId: sessionId,
       workspacePath: workingDir,

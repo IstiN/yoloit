@@ -151,3 +151,4 @@ calendar_events/
 # crap4dart profiling
 profile-reports/
 .crap_profile_temp/
+.fah/

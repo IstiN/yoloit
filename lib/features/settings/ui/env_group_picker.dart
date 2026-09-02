@@ -1,139 +1,41 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
-import 'package:yoloit/ui/components/input/labeled_text_field.dart';
 import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
-import 'package:yoloit/features/settings/ui/settings_page.dart';
+import 'package:yoloit/features/settings/ui/env_group_search.dart';
 import 'package:yoloit/ui/components/input/labeled_text_field.dart';
 import 'package:yoloit/ui/components/typography/caption.dart';
 
-class EnvGroupSelectionField extends StatefulWidget {
-  const EnvGroupSelectionField({
-    super.key,
-    required this.selectedGroupIds,
-    required this.onChanged,
-    this.label = 'Env Groups',
-  });
-
-  final List<String> selectedGroupIds;
-  final ValueChanged<List<String>> onChanged;
-  final String label;
-
-  @override
-  State<EnvGroupSelectionField> createState() => _EnvGroupSelectionFieldState();
-}
-
-class _EnvGroupSelectionFieldState extends State<EnvGroupSelectionField> {
-  late Future<List<String>> _namesFuture;
-
-  @override
-  void initState() {
-    super.initState();
-    _namesFuture = GlobalEnvGroupsService.instance.resolveSelectedGroupNames(
-      widget.selectedGroupIds,
-    );
-  }
-
-  @override
-  void didUpdateWidget(covariant EnvGroupSelectionField oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.selectedGroupIds.join('\u0000') !=
-        widget.selectedGroupIds.join('\u0000')) {
-      _namesFuture = GlobalEnvGroupsService.instance.resolveSelectedGroupNames(
-        widget.selectedGroupIds,
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.appColors;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Caption(widget.label),
-        const SizedBox(height: 4),
-        FutureBuilder<List<String>>(
-          future: _namesFuture,
-          builder: (context, snapshot) {
-            final names = snapshot.data ?? const <String>[];
-            return InkWell(
-              onTap: () async {
-                final selected = await showEnvGroupPickerDialog(
-                  context,
-                  initialSelected: widget.selectedGroupIds,
-                );
-                if (selected != null) {
-                  widget.onChanged(selected);
-                }
-              },
-              borderRadius: BorderRadius.circular(10),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(10),
-                  color: colors.surfaceElevated,
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.key_outlined,
-                      size: 16,
-                      color: colors.accentGreen,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        names.isEmpty
-                            ? 'No groups selected'
-                            : names.join('  •  '),
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color:
-                              names.isEmpty
-                                  ? (context.appColors.textMuted)
-                                  : Theme.of(context).colorScheme.onSurface,
-                        ),
-                      ),
-                    ),
-                    Text(
-                      '${widget.selectedGroupIds.length}',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: context.appColors.textMuted,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Icon(Icons.tune, size: 14, color: context.appColors.textMuted),
-                  ],
-                ),
-              ),
-            );
-          },
-        ),
-      ],
-    );
-  }
-}
+export 'env_group_selection_field.dart';
 
 Future<List<String>?> showEnvGroupPickerDialog(
   BuildContext context, {
   required List<String> initialSelected,
+  VoidCallback? onOpenSettings,
 }) {
   return showDialog<List<String>>(
     context: context,
-    builder: (_) => _EnvGroupPickerDialog(initialSelected: initialSelected),
+    builder:
+        (_) => _EnvGroupPickerDialog(
+          initialSelected: initialSelected,
+          onOpenSettings: onOpenSettings,
+        ),
   );
 }
 
 class _EnvGroupPickerDialog extends StatefulWidget {
-  const _EnvGroupPickerDialog({required this.initialSelected});
+  const _EnvGroupPickerDialog({
+    required this.initialSelected,
+    this.onOpenSettings,
+  });
 
   final List<String> initialSelected;
+
+  /// When provided, the empty state shows an "Open Settings" button. Kept as
+  /// a callback so this file does not depend on the settings page (and its
+  /// heavy import graph).
+  final VoidCallback? onOpenSettings;
 
   @override
   State<_EnvGroupPickerDialog> createState() => _EnvGroupPickerDialogState();
@@ -148,6 +50,10 @@ class _EnvGroupPickerDialogState extends State<_EnvGroupPickerDialog> {
   final _newGroupNameCtrl = TextEditingController(text: 'New Group');
   final List<_KvEntry> _newKvEntries = [_KvEntry()];
   bool _saving = false;
+  final _searchCtrl = TextEditingController();
+  Timer? _searchDebounce;
+  String _searchQuery = '';
+  final Set<String> _expandedPreviewIds = {};
 
   @override
   void initState() {
@@ -162,7 +68,24 @@ class _EnvGroupPickerDialogState extends State<_EnvGroupPickerDialog> {
     for (final e in _newKvEntries) {
       e.dispose();
     }
+    _searchDebounce?.cancel();
+    _searchCtrl.dispose();
     super.dispose();
+  }
+
+  void _onSearchChanged(String value) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 150), () {
+      if (!mounted) return;
+      setState(() => _searchQuery = value);
+    });
+  }
+
+  void _togglePreview(String id) {
+    setState(() {
+      if (_expandedPreviewIds.remove(id)) return;
+      _expandedPreviewIds.add(id);
+    });
   }
 
   Future<void> _load() async {
@@ -354,6 +277,44 @@ class _EnvGroupPickerDialogState extends State<_EnvGroupPickerDialog> {
                   style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 11),
                 ),
                 const SizedBox(height: 6),
+                TextField(
+                  controller: _searchCtrl,
+                  onChanged: _onSearchChanged,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: colors.textPrimary,
+                  ),
+                  decoration: outlineInputDecoration(
+                    colors: colors,
+                    hintText: 'Quick search: group or key name…',
+                    prefixIcon: const Icon(Icons.search, size: 16),
+                    prefixIconConstraints: const BoxConstraints(
+                      maxWidth: 32,
+                      maxHeight: 32,
+                    ),
+                    suffixIcon: ValueListenableBuilder<TextEditingValue>(
+                      valueListenable: _searchCtrl,
+                      builder: (context, value, _) {
+                        if (value.text.isEmpty) return const SizedBox.shrink();
+                        return IconButton(
+                          onPressed: () {
+                            _searchDebounce?.cancel();
+                            _searchCtrl.clear();
+                            setState(() => _searchQuery = '');
+                          },
+                          icon: const Icon(Icons.close, size: 14),
+                          splashRadius: 14,
+                          color: colors.textMuted,
+                        );
+                      },
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 6,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
                 // Inline add form
                 if (_showInlineAdd) ...[
                   _buildInlineAddForm(colors),
@@ -389,53 +350,24 @@ class _EnvGroupPickerDialogState extends State<_EnvGroupPickerDialog> {
                                  ),
                                ),
                                const SizedBox(height: 14),
-                               FilledButton.icon(
-                                 onPressed: () {
-                                   Navigator.pop(context);
-                                   SettingsPage.show(context, initialCategory: 'Environment');
-                                 },
-                                 icon: const Icon(Icons.settings, size: 16),
-                                 label: const Text('Open Settings'),
-                                 style: FilledButton.styleFrom(
-                                   backgroundColor: colors.accentGreen,
-                                   foregroundColor: colors.background,
-                                   textStyle: const TextStyle(fontSize: 12),
+                               if (widget.onOpenSettings != null)
+                                 FilledButton.icon(
+                                   onPressed: () {
+                                     Navigator.pop(context);
+                                     widget.onOpenSettings!();
+                                   },
+                                   icon: const Icon(Icons.settings, size: 16),
+                                   label: const Text('Open Settings'),
+                                   style: FilledButton.styleFrom(
+                                     backgroundColor: colors.accentGreen,
+                                     foregroundColor: colors.background,
+                                     textStyle: const TextStyle(fontSize: 12),
+                                   ),
                                  ),
-                               ),
                              ],
                            ),
                           )
-                          : ListView.builder(
-                            itemCount: _groups.length,
-                            itemBuilder: (context, index) {
-                              final group = _groups[index];
-                              final selected = _selectedIds.contains(group.id);
-                              return CheckboxListTile(
-                                value: selected,
-                                onChanged:
-                                    (value) =>
-                                        _toggle(group.id, value ?? false),
-                                activeColor: colors.accentGreen,
-                                contentPadding: EdgeInsets.zero,
-                                title: Text(
-                                  group.name,
-                                  style: TextStyle(
-                                    color: Theme.of(context).colorScheme.onSurface,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                                subtitle: Text(
-                                  '${group.values.length} variables',
-                                  style: TextStyle(
-                                    color: context.appColors.textMuted,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                                controlAffinity:
-                                    ListTileControlAffinity.leading,
-                              );
-                            },
-                          ),
+                          : _buildAvailableGroupsList(colors, context),
                 ),
               ],
               const SizedBox(height: 14),
@@ -468,6 +400,117 @@ class _EnvGroupPickerDialogState extends State<_EnvGroupPickerDialog> {
           ),
         ),
       ),
+    );
+  }
+
+  /// Filtered, expandable list of available groups. While a quick search is
+  /// active only groups whose name or keys match are shown, with the
+  /// matching keys highlighted; rows can be expanded to preview keys
+  /// (values are never shown in the picker).
+  Widget _buildAvailableGroupsList(AppColorScheme colors, BuildContext context) {
+    final results = EnvGroupSearch.filter(_groups, _searchQuery);
+    if (results.isEmpty) {
+      return Center(
+        child: Caption(
+          'No groups or keys match "$_searchQuery".',
+          fontSize: 12,
+        ),
+      );
+    }
+    final searching = _searchQuery.trim().isNotEmpty;
+    return ListView.builder(
+      itemCount: results.length,
+      itemBuilder: (context, index) {
+        final result = results[index];
+        final group = result.group;
+        final selected = _selectedIds.contains(group.id);
+        final expanded = _expandedPreviewIds.contains(group.id);
+        final searching = _searchQuery.trim().isNotEmpty;
+        final needle = _searchQuery.trim().toLowerCase();
+        final subtitle = searching
+            ? '${result.entries.length}/${group.values.length} keys shown'
+            : '${group.values.length} variables';
+        return Column(
+          children: [
+            CheckboxListTile(
+              value: selected,
+              onChanged: (value) => _toggle(group.id, value ?? false),
+              activeColor: colors.accentGreen,
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              title: Text(
+                group.name,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
+                  fontSize: 13,
+                ),
+              ),
+              subtitle: Text(
+                subtitle,
+                style: TextStyle(
+                  color: context.appColors.textMuted,
+                  fontSize: 11,
+                ),
+              ),
+              controlAffinity: ListTileControlAffinity.leading,
+              secondary: IconButton(
+                onPressed: () => _togglePreview(group.id),
+                tooltip: expanded ? 'Hide keys' : 'Show keys',
+                icon: Icon(
+                  expanded ? Icons.expand_less : Icons.expand_more,
+                  size: 20,
+                ),
+                color: context.appColors.textMuted,
+                splashRadius: 14,
+              ),
+            ),
+            if (expanded)
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(bottom: 8, left: 32),
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: colors.surface,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: colors.border),
+                ),
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: [
+                    for (final entry in result.entries)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color:
+                              (searching &&
+                                  entry.key.toLowerCase().contains(needle))
+                              ? colors.accentGreen.withAlpha(32)
+                              : colors.background,
+                          borderRadius: BorderRadius.circular(99),
+                        ),
+                        child: Text(
+                          entry.key,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontFamily: 'monospace',
+                            color:
+                                (searching &&
+                                    entry.key.toLowerCase().contains(needle))
+                                ? colors.accentGreen
+                                : colors.textMuted,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 
