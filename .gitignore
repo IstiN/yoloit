@@ -151,4 +151,9 @@ calendar_events/
 # crap4dart profiling
 profile-reports/
 .crap_profile_temp/
-.fah/
+# Fa agent runtime: local junk (logs, sessions, bash_jobs, scratch) stays
+# untracked; the curated config is committed on purpose.
+.fah/*
+!.fah/config.yaml
+yoloit/.fah/*
+!yoloit/.fah/config.yaml

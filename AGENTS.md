@@ -244,3 +244,33 @@ A pre-configured `repomix.config.json` lives at the repo root. It excludes `thir
   - The pre-commit hook enforces `< 1%` code duplication. The baseline has been reduced to **~0.97%** (853 duplicated lines across ~88K lines) and should now pass.
   - If `git commit` fails with `Code duplication too high`, verify whether `jscpd` output shows new clones in files you modified before assuming it is pre-existing.
   - Remediation options: (1) refactor the duplicates reported by `jscpd`, or (2) use `--no-verify` with explicit user approval.
+
+## 🧠 Agent Memory (`yoloit/memory/`)
+
+Project memory lives in `yoloit/memory/` (Fa config: `.fah/config.yaml` →
+`memory.projectPath: ./memory`) and **is committed to git** — anyone cloning
+gets the accumulated knowledge out of the box.
+
+### Layout
+
+- `note/n_*.md` — one durable fact per file (YAML frontmatter + body). Source of truth.
+- `question/`, `answer/` — Q&A records (same frontmatter format).
+- `DELETIONS.md` — append-only tombstone log for deleted records (`merge=union` driver).
+
+Derived artifacts (`GRAPH.md`, `MEMORY.revision`, `INDEX.md`, `stats/`,
+`.last_maintenance`, `MEMORY.md`) are rebuilt from the notes automatically and
+gitignored — **never commit or hand-edit them**.
+
+### House rules — keep it clean, do not litter
+
+- Store only **durable, non-obvious facts**: conventions, decisions + their
+  rationale, environment gotchas, expensive-to-learn debugging knowledge.
+- **Never** store logs, transcripts, task progress, transient state, file
+  listings, or secrets/credentials.
+- One fact per note. Update/supersede instead of duplicating; delete
+  outdated records (tombstone) instead of leaving stale notes behind.
+- Do not create files by hand in `memory/note/` — use the Fa memory tools
+  (`memory_add` / `memory_delete`), which keep ids and frontmatter consistent.
+- Commit memory changes together with the work that produced them (or as a
+  small follow-up `memory:` commit) and push, so the whole team shares the
+  same memory.
