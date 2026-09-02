@@ -711,12 +711,16 @@ class _ConsoleHeader extends StatelessWidget {
         label: 'Hot Reload',
         icon: 'local_fire_department',
         command: 'r',
+        // flutter run reacts to line-based stdin commands (a bare keypress
+        // only works on a real TTY); send the newline like a user would.
+        appendNewline: true,
       ),
       RunQuickAction(
         id: 'flutter_hot_restart',
         label: 'Hot Restart',
         icon: 'restart_alt',
         command: 'R',
+        appendNewline: true,
       ),
     ];
   }
