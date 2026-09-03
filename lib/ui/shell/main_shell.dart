@@ -1417,6 +1417,12 @@ class _ResourcePanelState extends State<_ResourcePanel> {
     final mutedColor = context.appColors.textMuted;
     final host = _snap.host;
     final ramSharePercent = resourceRamSharePercent(_snap);
+    // CPU sums every process (100% = 1 core); show the share of the whole
+    // machine so 814% reads as "half the Mac", not "8x overloaded".
+    final coreCount = host.cpuCoreCount;
+    final cpuHint = coreCount > 0
+        ? '≈${(_snap.totalCpuPercent / (coreCount * 100) * 100).clamp(0.0, 100.0).toStringAsFixed(0)}% of $coreCount cores'
+        : null;
     final memBarColor = resourceMemoryBarColor(colors, host.usedPercent);
 
     // Separate registered sessions from agent-scanned ones.
@@ -1584,10 +1590,18 @@ class _ResourcePanelState extends State<_ResourcePanel> {
                             ),
                             child: Row(
                               children: [
-                                _StatCell(
-                                  label: 'CPU',
-                                  value:
-                                      '${_snap.totalCpuPercent.toStringAsFixed(1)}%',
+                                Tooltip(
+                                  message:
+                                      'Sum over the app and every process it '
+                                      'spawned (terminals, runs, agents). '
+                                      '100% = one CPU core, the same unit '
+                                      'Activity Monitor uses per process.',
+                                  child: _StatCell(
+                                    label: 'CPU',
+                                    value:
+                                        '${_snap.totalCpuPercent.toStringAsFixed(1)}%',
+                                    hint: cpuHint,
+                                  ),
                                 ),
                                 _StatCell(
                                   label: 'MEMORY',
@@ -1757,9 +1771,10 @@ class _ResourcePanelState extends State<_ResourcePanel> {
 }
 
 class _StatCell extends StatelessWidget {
-  const _StatCell({required this.label, required this.value});
+  const _StatCell({required this.label, required this.value, this.hint});
   final String label;
   final String value;
+  final String? hint;
 
   @override
   Widget build(BuildContext context) {
@@ -1786,6 +1801,15 @@ class _StatCell extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
           ),
+          if (hint != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              hint!,
+              style: TextStyle(color: mutedColor, fontSize: 8),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
         ],
       ),
     );
