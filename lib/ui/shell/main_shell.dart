@@ -71,7 +71,8 @@ class AutoUpdateTestHooks {
   static Future<String?> Function(
     UpdateInfo info, {
     required void Function(double? progress, String status) onProgress,
-  })? downloadAndPrepareOverride;
+  })?
+  downloadAndPrepareOverride;
 }
 
 enum _CanvasMode { panes, board }
@@ -117,8 +118,7 @@ class _MainShellState extends State<MainShell> with WindowListener {
   // Slow down the resource monitor (several `ps`/`sysctl` spawns per poll)
   // while the window is not focused.
   @override
-  void onWindowBlur() =>
-      ResourceMonitorService.instance.setInteractive(false);
+  void onWindowBlur() => ResourceMonitorService.instance.setInteractive(false);
 
   @override
   void onWindowFocus() => ResourceMonitorService.instance.setInteractive(true);
@@ -200,10 +200,7 @@ class _MainShellState extends State<MainShell> with WindowListener {
       final download =
           AutoUpdateTestHooks.downloadAndPrepareOverride ??
           UpdateService.downloadAndPrepare;
-      final token = await download(
-        info,
-        onProgress: _onUpdateDownloadProgress,
-      );
+      final token = await download(info, onProgress: _onUpdateDownloadProgress);
 
       if (!mounted) return;
       setState(() {
@@ -225,10 +222,9 @@ class _MainShellState extends State<MainShell> with WindowListener {
     setState(() {
       _updateProgress = progress;
       _updateStatus = status;
-      _updatePhase =
-          progress == null
-              ? AutoUpdatePhase.installing
-              : AutoUpdatePhase.downloading;
+      _updatePhase = progress == null
+          ? AutoUpdatePhase.installing
+          : AutoUpdatePhase.downloading;
     });
   }
 
@@ -284,40 +280,39 @@ class _MainShellState extends State<MainShell> with WindowListener {
     final colors = context.appColors;
     return ListenableBuilder(
       listenable: HotkeyRegistry.instance,
-      builder:
-          (context, _) => Shortcuts(
-            shortcuts: HotkeyRegistry.instance.shortcuts,
-            child: Actions(
-              actions: _buildActions(context),
-              child: BlocListener<TerminalCubit, TerminalState>(
-                listenWhen: (prev, curr) {
-                  if (curr is! TerminalLoaded) return false;
-                  return curr.requestOpenPanel;
-                },
-                listener: (context, state) {
-                  if (state is! TerminalLoaded || !state.requestOpenPanel) {
-                    return;
-                  }
-                  _setPanelVis('agents', PanelVisibility.open);
-                },
-                child: Focus(
-                  autofocus: true,
-                  child: Scaffold(
-                    backgroundColor: colors.background,
-                    body: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _buildTitleBar(),
-                        ..._updateBannerSection(),
-                        _buildRuntimeRestartBanner(),
-                        _buildCanvasArea(),
-                      ],
-                    ),
-                  ),
+      builder: (context, _) => Shortcuts(
+        shortcuts: HotkeyRegistry.instance.shortcuts,
+        child: Actions(
+          actions: _buildActions(context),
+          child: BlocListener<TerminalCubit, TerminalState>(
+            listenWhen: (prev, curr) {
+              if (curr is! TerminalLoaded) return false;
+              return curr.requestOpenPanel;
+            },
+            listener: (context, state) {
+              if (state is! TerminalLoaded || !state.requestOpenPanel) {
+                return;
+              }
+              _setPanelVis('agents', PanelVisibility.open);
+            },
+            child: Focus(
+              autofocus: true,
+              child: Scaffold(
+                backgroundColor: colors.background,
+                body: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildTitleBar(),
+                    ..._updateBannerSection(),
+                    _buildRuntimeRestartBanner(),
+                    _buildCanvasArea(),
+                  ],
                 ),
               ),
             ),
-          ), // Shortcuts
+          ),
+        ),
+      ), // Shortcuts
     ); // ListenableBuilder
   }
 
@@ -360,9 +355,7 @@ class _MainShellState extends State<MainShell> with WindowListener {
             final scope = FocusScope.of(context);
             if (scope.focusedChild == _terminalFocusNode ||
                 _terminalFocusNode.hasFocus) {
-              FocusTraversalGroup.maybeOf(
-                context,
-              )?.next(_terminalFocusNode);
+              FocusTraversalGroup.maybeOf(context)?.next(_terminalFocusNode);
             }
           });
           return null;
@@ -384,17 +377,16 @@ class _MainShellState extends State<MainShell> with WindowListener {
         onSettings: () => SettingsPage.show(context),
         onDragStart: () => windowManager.startDragging(),
         trailing: const _ResourceChip(),
-        onHistory:
-            () =>
-                boardHistoryVisibility.value = !boardHistoryVisibility.value,
+        onHistory: () =>
+            boardHistoryVisibility.value = !boardHistoryVisibility.value,
         historyActive: historyActive,
         onUndo: () => BoardUndoRedo.undo?.call(),
         onRedo: () => BoardUndoRedo.redo?.call(),
         afterSettings:
             defaultTargetPlatform == TargetPlatform.windows ||
-                    defaultTargetPlatform == TargetPlatform.linux
-                ? const _WindowControls()
-                : null,
+                defaultTargetPlatform == TargetPlatform.linux
+            ? const _WindowControls()
+            : null,
       ),
     );
   }
@@ -439,18 +431,17 @@ class _MainShellState extends State<MainShell> with WindowListener {
 
   Widget _buildCanvasArea() {
     return Expanded(
-      child:
-          _canvasMode == _CanvasMode.board
-              ? const BoardView()
-              : _FourPaneLayout(
-                workspacePanelKey: _workspacePanelKey,
-                terminalFocusNode: _terminalFocusNode,
-                workspaceVis: _workspaceVis,
-                agentsVis: _agentsVis,
-                fileTreeVis: _fileTreeVis,
-                initialSnapshot: _sessionSnapshot,
-                onSetPanelVis: _setPanelVis,
-              ),
+      child: _canvasMode == _CanvasMode.board
+          ? const BoardView()
+          : _FourPaneLayout(
+              workspacePanelKey: _workspacePanelKey,
+              terminalFocusNode: _terminalFocusNode,
+              workspaceVis: _workspaceVis,
+              agentsVis: _agentsVis,
+              fileTreeVis: _fileTreeVis,
+              initialSnapshot: _sessionSnapshot,
+              onSetPanelVis: _setPanelVis,
+            ),
     );
   }
 }
@@ -517,8 +508,7 @@ class _FourPaneLayoutState extends State<_FourPaneLayout> {
   Widget build(BuildContext context) {
     return BlocBuilder<FileEditorCubit, FileEditorState>(
       builder: (context, editorState) {
-        final mutedColor =
-            context.appColors.textMuted;
+        final mutedColor = context.appColors.textMuted;
         final showWorkspace = widget.workspaceVis == PanelVisibility.open;
         final workspaceCollapsed =
             widget.workspaceVis == PanelVisibility.collapsed;
@@ -598,40 +588,35 @@ class _FourPaneLayoutState extends State<_FourPaneLayout> {
       clipBehavior: Clip.hardEdge,
       child: SizedBox(
         width: leftRailVisible ? 32 : 0,
-        child:
-            leftRailVisible
-                ? ActivityRail(
-                  side: ActivityRailSide.left,
-                  items: [
-                    if (workspaceCollapsed)
-                      ActivityRailItem(
-                        iconWidget: SvgPicture.asset(
-                          'assets/images/yoloit_mark.svg',
-                          colorFilter: ColorFilter.mode(
-                            mutedColor,
-                            BlendMode.srcIn,
-                          ),
+        child: leftRailVisible
+            ? ActivityRail(
+                side: ActivityRailSide.left,
+                items: [
+                  if (workspaceCollapsed)
+                    ActivityRailItem(
+                      iconWidget: SvgPicture.asset(
+                        'assets/images/yoloit_mark.svg',
+                        colorFilter: ColorFilter.mode(
+                          mutedColor,
+                          BlendMode.srcIn,
                         ),
-                        tooltip: 'Expand Workspaces',
-                        onTap:
-                            () => widget.onSetPanelVis(
-                              'workspace',
-                              PanelVisibility.open,
-                            ),
                       ),
-                    if (agentsCollapsed)
-                      ActivityRailItem(
-                        icon: Icons.terminal,
-                        tooltip: 'Expand Agents',
-                        onTap:
-                            () => widget.onSetPanelVis(
-                              'agents',
-                              PanelVisibility.open,
-                            ),
+                      tooltip: 'Expand Workspaces',
+                      onTap: () => widget.onSetPanelVis(
+                        'workspace',
+                        PanelVisibility.open,
                       ),
-                  ],
-                )
-                : const SizedBox.shrink(),
+                    ),
+                  if (agentsCollapsed)
+                    ActivityRailItem(
+                      icon: Icons.terminal,
+                      tooltip: 'Expand Agents',
+                      onTap: () =>
+                          widget.onSetPanelVis('agents', PanelVisibility.open),
+                    ),
+                ],
+              )
+            : const SizedBox.shrink(),
       ),
     );
   }
@@ -643,46 +628,34 @@ class _FourPaneLayoutState extends State<_FourPaneLayout> {
       clipBehavior: Clip.hardEdge,
       child: SizedBox(
         width: showWorkspace ? _workspaceWidth : 0,
-        child:
-            showWorkspace
-                ? SizedBox(
-                  width: _workspaceWidth,
-                  child: PanelShell(
-                    title: 'WORKSPACES',
-                    iconWidget: SvgPicture.asset(
-                      'assets/images/yoloit_mark.svg',
-                      colorFilter: ColorFilter.mode(
-                        mutedColor,
-                        BlendMode.srcIn,
-                      ),
-                    ),
-                    actions: [
-                      PanelActionBtn(
-                        icon: Icons.add,
-                        tooltip: 'Add workspace',
-                        onTap:
-                            () =>
-                                widget.workspacePanelKey.currentState
-                                    ?.addWorkspace(),
-                      ),
-                    ],
-                    onCollapse:
-                        () => widget.onSetPanelVis(
-                          'workspace',
-                          PanelVisibility.collapsed,
-                        ),
-                    collapseIcon: Icons.keyboard_arrow_left,
-                    onClose:
-                        () => widget.onSetPanelVis(
-                          'workspace',
-                          PanelVisibility.closed,
-                        ),
-                    child: WorkspacePanel(
-                      key: widget.workspacePanelKey,
-                    ),
+        child: showWorkspace
+            ? SizedBox(
+                width: _workspaceWidth,
+                child: PanelShell(
+                  title: 'WORKSPACES',
+                  iconWidget: SvgPicture.asset(
+                    'assets/images/yoloit_mark.svg',
+                    colorFilter: ColorFilter.mode(mutedColor, BlendMode.srcIn),
                   ),
-                )
-                : const SizedBox.shrink(),
+                  actions: [
+                    PanelActionBtn(
+                      icon: Icons.add,
+                      tooltip: 'Add workspace',
+                      onTap: () =>
+                          widget.workspacePanelKey.currentState?.addWorkspace(),
+                    ),
+                  ],
+                  onCollapse: () => widget.onSetPanelVis(
+                    'workspace',
+                    PanelVisibility.collapsed,
+                  ),
+                  collapseIcon: Icons.keyboard_arrow_left,
+                  onClose: () =>
+                      widget.onSetPanelVis('workspace', PanelVisibility.closed),
+                  child: WorkspacePanel(key: widget.workspacePanelKey),
+                ),
+              )
+            : const SizedBox.shrink(),
       ),
     );
   }
@@ -694,21 +667,19 @@ class _FourPaneLayoutState extends State<_FourPaneLayout> {
       clipBehavior: Clip.hardEdge,
       child: SizedBox(
         width: showWorkspace ? 4 : 0,
-        child:
-            showWorkspace
-                ? _Divider(
-                  onDrag: (dx) {
-                    setState(
-                      () =>
-                          _workspaceWidth = (_workspaceWidth + dx).clamp(
-                            _minWidth,
-                            totalWidth / 3,
-                          ),
-                    );
-                    SessionPrefs.saveWorkspaceWidth(_workspaceWidth);
-                  },
-                )
-                : const SizedBox.shrink(),
+        child: showWorkspace
+            ? _Divider(
+                onDrag: (dx) {
+                  setState(
+                    () => _workspaceWidth = (_workspaceWidth + dx).clamp(
+                      _minWidth,
+                      totalWidth / 3,
+                    ),
+                  );
+                  SessionPrefs.saveWorkspaceWidth(_workspaceWidth);
+                },
+              )
+            : const SizedBox.shrink(),
       ),
     );
   }
@@ -736,17 +707,13 @@ class _FourPaneLayoutState extends State<_FourPaneLayout> {
                   child: PanelShell(
                     title: 'AGENTS',
                     icon: Icons.terminal,
-                    onCollapse:
-                        () => widget.onSetPanelVis(
-                          'agents',
-                          PanelVisibility.collapsed,
-                        ),
+                    onCollapse: () => widget.onSetPanelVis(
+                      'agents',
+                      PanelVisibility.collapsed,
+                    ),
                     collapseIcon: Icons.keyboard_arrow_left,
-                    onClose:
-                        () => widget.onSetPanelVis(
-                          'agents',
-                          PanelVisibility.closed,
-                        ),
+                    onClose: () =>
+                        widget.onSetPanelVis('agents', PanelVisibility.closed),
                     child: const _AgentsContent(),
                   ),
                 ),
@@ -780,24 +747,18 @@ class _FourPaneLayoutState extends State<_FourPaneLayout> {
         _Divider(
           onDrag: (dx) {
             setState(
-              () =>
-                  _editorWidth = (_editorWidth - dx).clamp(
-                    _minWidth,
-                    totalWidth / 2,
-                  ),
+              () => _editorWidth = (_editorWidth - dx).clamp(
+                _minWidth,
+                totalWidth / 2,
+              ),
             );
             SessionPrefs.saveEditorWidth(_editorWidth);
           },
         ),
-        SizedBox(
-          width: _editorWidth,
-          child: _buildEditorContent(totalHeight),
-        ),
+        SizedBox(width: _editorWidth, child: _buildEditorContent(totalHeight)),
       ];
     }
-    return [
-      Expanded(child: _buildEditorContent(totalHeight)),
-    ];
+    return [Expanded(child: _buildEditorContent(totalHeight))];
   }
 
   Widget _buildEditorContent(double totalHeight) {
@@ -815,11 +776,10 @@ class _FourPaneLayoutState extends State<_FourPaneLayout> {
         _HorizontalDivider(
           onDrag: (dy) {
             setState(
-              () =>
-                  _editorHeight = ((_editorHeight ?? totalHeight) + dy).clamp(
-                    _minHeight,
-                    totalHeight - 40,
-                  ),
+              () => _editorHeight = ((_editorHeight ?? totalHeight) + dy).clamp(
+                _minHeight,
+                totalHeight - 40,
+              ),
             );
             SessionPrefs.saveEditorHeight(_editorHeight);
           },
@@ -835,21 +795,19 @@ class _FourPaneLayoutState extends State<_FourPaneLayout> {
       clipBehavior: Clip.hardEdge,
       child: SizedBox(
         width: showFileTree ? 4 : 0,
-        child:
-            showFileTree
-                ? _Divider(
-                  onDrag: (dx) {
-                    setState(
-                      () =>
-                          _reviewWidth = (_reviewWidth - dx).clamp(
-                            _minWidth,
-                            totalWidth / 2,
-                          ),
-                    );
-                    SessionPrefs.saveReviewWidth(_reviewWidth);
-                  },
-                )
-                : const SizedBox.shrink(),
+        child: showFileTree
+            ? _Divider(
+                onDrag: (dx) {
+                  setState(
+                    () => _reviewWidth = (_reviewWidth - dx).clamp(
+                      _minWidth,
+                      totalWidth / 2,
+                    ),
+                  );
+                  SessionPrefs.saveReviewWidth(_reviewWidth);
+                },
+              )
+            : const SizedBox.shrink(),
       ),
     );
   }
@@ -861,47 +819,44 @@ class _FourPaneLayoutState extends State<_FourPaneLayout> {
       clipBehavior: Clip.hardEdge,
       child: SizedBox(
         width: showFileTree ? _reviewWidth : 0,
-        child:
-            showFileTree
-                ? SizedBox(
-                  width: _reviewWidth,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Expanded(
-                        child: PanelShell(
-                          title: 'FILE TREE',
-                          icon: Icons.account_tree,
-                          onCollapse:
-                              () => widget.onSetPanelVis(
-                                'filetree',
-                                PanelVisibility.collapsed,
-                              ),
-                          collapseIcon: Icons.keyboard_arrow_right,
-                          onClose:
-                              () => widget.onSetPanelVis(
-                                'filetree',
-                                PanelVisibility.closed,
-                              ),
-                          child: const ReviewPanel(),
+        child: showFileTree
+            ? SizedBox(
+                width: _reviewWidth,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: PanelShell(
+                        title: 'FILE TREE',
+                        icon: Icons.account_tree,
+                        onCollapse: () => widget.onSetPanelVis(
+                          'filetree',
+                          PanelVisibility.collapsed,
                         ),
+                        collapseIcon: Icons.keyboard_arrow_right,
+                        onClose: () => widget.onSetPanelVis(
+                          'filetree',
+                          PanelVisibility.closed,
+                        ),
+                        child: const ReviewPanel(),
                       ),
-                      _HorizontalDivider(
-                        onDrag: (dy) {
-                          setState(
-                            () =>
-                                _reviewHeight = ((_reviewHeight ??
-                                            totalHeight) +
-                                        dy)
-                                    .clamp(_minHeight, totalHeight - 40),
-                          );
-                          SessionPrefs.saveReviewHeight(_reviewHeight);
-                        },
-                      ),
-                    ],
-                  ),
-                )
-                : const SizedBox.shrink(),
+                    ),
+                    _HorizontalDivider(
+                      onDrag: (dy) {
+                        setState(
+                          () => _reviewHeight =
+                              ((_reviewHeight ?? totalHeight) + dy).clamp(
+                                _minHeight,
+                                totalHeight - 40,
+                              ),
+                        );
+                        SessionPrefs.saveReviewHeight(_reviewHeight);
+                      },
+                    ),
+                  ],
+                ),
+              )
+            : const SizedBox.shrink(),
       ),
     );
   }
@@ -913,23 +868,19 @@ class _FourPaneLayoutState extends State<_FourPaneLayout> {
       clipBehavior: Clip.hardEdge,
       child: SizedBox(
         width: rightRailVisible ? 32 : 0,
-        child:
-            rightRailVisible
-                ? ActivityRail(
-                  side: ActivityRailSide.right,
-                  items: [
-                    ActivityRailItem(
-                      icon: Icons.account_tree,
-                      tooltip: 'Expand File Tree',
-                      onTap:
-                          () => widget.onSetPanelVis(
-                            'filetree',
-                            PanelVisibility.open,
-                          ),
-                    ),
-                  ],
-                )
-                : const SizedBox.shrink(),
+        child: rightRailVisible
+            ? ActivityRail(
+                side: ActivityRailSide.right,
+                items: [
+                  ActivityRailItem(
+                    icon: Icons.account_tree,
+                    tooltip: 'Expand File Tree',
+                    onTap: () =>
+                        widget.onSetPanelVis('filetree', PanelVisibility.open),
+                  ),
+                ],
+              )
+            : const SizedBox.shrink(),
       ),
     );
   }
@@ -1131,7 +1082,6 @@ class _HorizontalDividerState extends State<_HorizontalDivider> {
   }
 }
 
-
 /// Custom minimize / maximize / close buttons for platforms where
 /// [TitleBarStyle.hidden] removes the native window chrome (Windows, Linux).
 class _WindowControls extends StatefulWidget {
@@ -1234,10 +1184,9 @@ class _WinBtnState extends State<_WinBtn> {
           child: Container(
             width: 46,
             height: 44,
-            color:
-                _hovered
-                    ? winBtnHoverColor(isClose: widget.isClose, colors: colors)
-                    : Colors.transparent,
+            color: _hovered
+                ? winBtnHoverColor(isClose: widget.isClose, colors: colors)
+                : Colors.transparent,
             child: Icon(
               widget.icon,
               size: 14,
@@ -1258,7 +1207,10 @@ class _WinBtnState extends State<_WinBtn> {
 /// Hover background for a window control button: red for close, subtle
 /// muted wash otherwise.
 @visibleForTesting
-Color winBtnHoverColor({required bool isClose, required AppColorScheme colors}) {
+Color winBtnHoverColor({
+  required bool isClose,
+  required AppColorScheme colors,
+}) {
   return isClose ? colors.statusError : colors.textMuted.withAlpha(40);
 }
 
@@ -1315,23 +1267,22 @@ class _ResourceChipState extends State<_ResourceChip> {
     final box = context.findRenderObject()! as RenderBox;
     final offset = box.localToGlobal(Offset.zero);
     _overlay = OverlayEntry(
-      builder:
-          (_) => BlocProvider.value(
-            value: boardCubit,
-            child: _ResourcePanel(
-              boardCubit: boardCubit,
-              snapshot: _snap,
-              messengerContext: context,
-              position: Offset(
-                offset.dx - 260 + box.size.width,
-                offset.dy + box.size.height + 4,
-              ),
-              onClose: () {
-                _overlay?.remove();
-                _overlay = null;
-              },
-            ),
+      builder: (_) => BlocProvider.value(
+        value: boardCubit,
+        child: _ResourcePanel(
+          boardCubit: boardCubit,
+          snapshot: _snap,
+          messengerContext: context,
+          position: Offset(
+            offset.dx - 260 + box.size.width,
+            offset.dy + box.size.height + 4,
           ),
+          onClose: () {
+            _overlay?.remove();
+            _overlay = null;
+          },
+        ),
+      ),
     );
     Overlay.of(context).insert(_overlay!);
   }
@@ -1341,8 +1292,7 @@ class _ResourceChipState extends State<_ResourceChip> {
     final mem = formatBytes(_snap.totalMemoryBytes);
     final cpu = _snap.totalCpuPercent;
     final colors = context.appColors;
-    final textColor =
-        context.appColors.textMuted;
+    final textColor = context.appColors.textMuted;
     return GestureDetector(
       onTap: () => _toggle(context),
       child: Container(
@@ -1416,14 +1366,14 @@ class _ResourcePanelState extends State<_ResourcePanel> {
     final activeBoard = boards.activeBoard;
     final scope = monitorService.scope;
     final registeredPids = monitorService.registeredPids;
-    final registeredSessions =
-        _snap.sessions
-            .where((s) => registeredPids.contains(s.pid))
-            .map((s) => enrichResourceSessionFromBoards(s, boards.boards))
-            .where((s) => shouldShowYoloitResourceSession(s, scope))
-            .toList();
-    final agentSessions =
-        _snap.sessions.where((s) => !registeredPids.contains(s.pid)).toList();
+    final registeredSessions = _snap.sessions
+        .where((s) => registeredPids.contains(s.pid))
+        .map((s) => enrichResourceSessionFromBoards(s, boards.boards))
+        .where((s) => shouldShowYoloitResourceSession(s, scope))
+        .toList();
+    final agentSessions = _snap.sessions
+        .where((s) => !registeredPids.contains(s.pid))
+        .toList();
 
     final typeCounts = resourcePanelTypeCounts(activeBoard?.panels ?? const []);
     final labeledTypes = <String, int>{
@@ -1464,8 +1414,7 @@ class _ResourcePanelState extends State<_ResourcePanel> {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final onSurface = Theme.of(context).colorScheme.onSurface;
-    final mutedColor =
-        context.appColors.textMuted;
+    final mutedColor = context.appColors.textMuted;
     final host = _snap.host;
     final ramSharePercent = resourceRamSharePercent(_snap);
     final memBarColor = resourceMemoryBarColor(colors, host.usedPercent);
@@ -1475,14 +1424,14 @@ class _ResourcePanelState extends State<_ResourcePanel> {
     final registeredPids = monitorService.registeredPids;
     final boards = widget.boardCubit.state.boards;
     final scope = monitorService.scope;
-    final registeredSessions =
-        _snap.sessions
-            .where((s) => registeredPids.contains(s.pid))
-            .map((s) => enrichResourceSessionFromBoards(s, boards))
-            .where((s) => shouldShowYoloitResourceSession(s, scope))
-            .toList();
-    final agentSessions =
-        _snap.sessions.where((s) => !registeredPids.contains(s.pid)).toList();
+    final registeredSessions = _snap.sessions
+        .where((s) => registeredPids.contains(s.pid))
+        .map((s) => enrichResourceSessionFromBoards(s, boards))
+        .where((s) => shouldShowYoloitResourceSession(s, scope))
+        .toList();
+    final agentSessions = _snap.sessions
+        .where((s) => !registeredPids.contains(s.pid))
+        .toList();
 
     return Stack(
       children: [
@@ -1538,8 +1487,8 @@ class _ResourcePanelState extends State<_ResourcePanel> {
                           ),
                         ),
                         GestureDetector(
-                          onTap:
-                              () => ResourceMonitorService.instance.pollNow(),
+                          onTap: () =>
+                              ResourceMonitorService.instance.pollNow(),
                           child: Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 4),
                             child: Icon(
@@ -1554,7 +1503,9 @@ class _ResourcePanelState extends State<_ResourcePanel> {
                           child: GestureDetector(
                             onTap: () => unawaited(_copyDiagnosticReport()),
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                              ),
                               child: Icon(
                                 Icons.content_copy_outlined,
                                 size: 13,
@@ -1572,204 +1523,229 @@ class _ResourcePanelState extends State<_ResourcePanel> {
                   ),
                   Divider(height: 1, color: colors.border),
 
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
-                    child: ValueListenableBuilder<ResourceMonitorScope>(
-                      valueListenable:
-                          ResourceMonitorService.instance.scopeNotifier,
-                      builder: (context, scope, _) {
-                        return SegmentedButton<ResourceMonitorScope>(
-                          segments: ResourceMonitorScope.values
-                              .map(
-                                (value) => ButtonSegment(
-                                  value: value,
-                                  label: Text(
-                                    value.label,
-                                    style: const TextStyle(fontSize: 10),
+                  // Scrollable content — the process list easily outgrows
+                  // the screen, so it must scroll instead of overflowing.
+                  Flexible(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
+                            child: ValueListenableBuilder<ResourceMonitorScope>(
+                              valueListenable:
+                                  ResourceMonitorService.instance.scopeNotifier,
+                              builder: (context, scope, _) {
+                                return SegmentedButton<ResourceMonitorScope>(
+                                  segments: ResourceMonitorScope.values
+                                      .map(
+                                        (value) => ButtonSegment(
+                                          value: value,
+                                          label: Text(
+                                            value.label,
+                                            style: const TextStyle(
+                                              fontSize: 10,
+                                            ),
+                                          ),
+                                        ),
+                                      )
+                                      .toList(),
+                                  selected: {scope},
+                                  onSelectionChanged: (selection) {
+                                    if (selection.isEmpty) return;
+                                    unawaited(
+                                      ResourceMonitorService.instance.setScope(
+                                        selection.first,
+                                      ),
+                                    );
+                                  },
+                                  style: ButtonStyle(
+                                    visualDensity: VisualDensity.compact,
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                    padding: WidgetStatePropertyAll(
+                                      EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 4,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+
+                          // 3-column metric grid: CPU total%, Memory total, RAM share%
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 10,
+                            ),
+                            child: Row(
+                              children: [
+                                _StatCell(
+                                  label: 'CPU',
+                                  value:
+                                      '${_snap.totalCpuPercent.toStringAsFixed(1)}%',
+                                ),
+                                _StatCell(
+                                  label: 'MEMORY',
+                                  value: formatBytes(_snap.totalMemoryBytes),
+                                ),
+                                _StatCell(
+                                  label: 'RAM SHARE',
+                                  value:
+                                      '${ramSharePercent.toStringAsFixed(1)}%',
+                                ),
+                              ],
+                            ),
+                          ),
+                          Divider(height: 1, color: colors.border),
+
+                          // HOST section
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Tooltip(
+                                  message:
+                                      'Total RAM of your Mac (all processes combined)',
+                                  child: Text(
+                                    'SYSTEM RAM',
+                                    style: TextStyle(
+                                      color: mutedColor,
+                                      fontSize: 9,
+                                      letterSpacing: 0.8,
+                                    ),
                                   ),
                                 ),
-                              )
-                              .toList(),
-                          selected: {scope},
-                          onSelectionChanged: (selection) {
-                            if (selection.isEmpty) return;
-                            unawaited(
-                              ResourceMonitorService.instance.setScope(
-                                selection.first,
-                              ),
-                            );
-                          },
-                          style: ButtonStyle(
-                            visualDensity: VisualDensity.compact,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            padding: WidgetStatePropertyAll(
-                              EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                const SizedBox(height: 5),
+                                Row(
+                                  children: [
+                                    Text(
+                                      '${formatBytes(host.usedBytes)} used / ${formatBytes(host.totalBytes)} total',
+                                      style: TextStyle(
+                                        color: onSurface,
+                                        fontSize: 10,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 5),
+                                // Progress bar
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(2),
+                                  child: SizedBox(
+                                    height: 4,
+                                    child: LinearProgressIndicator(
+                                      value: (host.usedPercent / 100).clamp(
+                                        0.0,
+                                        1.0,
+                                      ),
+                                      backgroundColor: colors.surfaceElevated,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        memBarColor,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                // Load avg row
+                                Row(
+                                  children: [
+                                    Text(
+                                      'LOAD AVG',
+                                      style: TextStyle(
+                                        color: mutedColor,
+                                        fontSize: 9,
+                                        letterSpacing: 0.8,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      host.loadAverage1m.toStringAsFixed(2),
+                                      style: TextStyle(
+                                        color: onSurface,
+                                        fontSize: 10,
+                                        fontFamily: 'monospace',
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                              ],
                             ),
                           ),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 8),
 
-                  // 3-column metric grid: CPU total%, Memory total, RAM share%
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 10,
-                    ),
-                    child: Row(
-                      children: [
-                        _StatCell(
-                          label: 'CPU',
-                          value: '${_snap.totalCpuPercent.toStringAsFixed(1)}%',
-                        ),
-                        _StatCell(
-                          label: 'MEMORY',
-                          value: formatBytes(_snap.totalMemoryBytes),
-                        ),
-                        _StatCell(
-                          label: 'RAM SHARE',
-                          value: '${ramSharePercent.toStringAsFixed(1)}%',
-                        ),
-                      ],
-                    ),
-                  ),
-                  Divider(height: 1, color: colors.border),
+                          BlocBuilder<BoardCubit, BoardState>(
+                            builder: (context, boardState) {
+                              final activeBoard = boardState.activeBoard;
+                              if (!boardState.isLoaded && activeBoard == null) {
+                                return const SizedBox.shrink();
+                              }
+                              return _BoardResourceSection(
+                                boards: boardState.boards,
+                                activeBoard: activeBoard,
+                              );
+                            },
+                          ),
 
-                  // HOST section
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Tooltip(
-                          message:
-                              'Total RAM of your Mac (all processes combined)',
-                          child: Text(
-                            'SYSTEM RAM',
-                            style: TextStyle(
-                              color: mutedColor,
-                              fontSize: 9,
-                              letterSpacing: 0.8,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 5),
-                        Row(
-                          children: [
-                            Text(
-                              '${formatBytes(host.usedBytes)} used / ${formatBytes(host.totalBytes)} total',
-                              style: TextStyle(color: onSurface, fontSize: 10),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 5),
-                        // Progress bar
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(2),
-                          child: SizedBox(
-                            height: 4,
-                            child: LinearProgressIndicator(
-                              value: (host.usedPercent / 100).clamp(0.0, 1.0),
-                              backgroundColor: colors.surfaceElevated,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                memBarColor,
+                          // SESSIONS section (registered PTYs + yoloitd board terminals)
+                          if (registeredSessions.isNotEmpty) ...[
+                            Divider(height: 1, color: colors.border),
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
+                              child: Text(
+                                ResourceMonitorService.instance.scope ==
+                                        ResourceMonitorScope.yoloitOnly
+                                    ? 'YOLOIT PROCESSES'
+                                    : 'SESSIONS',
+                                style: TextStyle(
+                                  color: mutedColor,
+                                  fontSize: 9,
+                                  letterSpacing: 0.8,
+                                ),
                               ),
                             ),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        // Load avg row
-                        Row(
-                          children: [
-                            Text(
-                              'LOAD AVG',
-                              style: TextStyle(
-                                color: mutedColor,
-                                fontSize: 9,
-                                letterSpacing: 0.8,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              host.loadAverage1m.toStringAsFixed(2),
-                              style: TextStyle(
-                                color: onSurface,
-                                fontSize: 10,
-                                fontFamily: 'monospace',
+                            ...registeredSessions.map(
+                              (s) => _SessionRow(
+                                session: s,
+                                boardCubit: widget.boardCubit,
+                                onClose: widget.onClose,
                               ),
                             ),
                           ],
-                        ),
-                        const SizedBox(height: 10),
-                      ],
+
+                          // AGENTS section (ps-scanned unregistered agents)
+                          if (agentSessions.isNotEmpty) ...[
+                            Divider(height: 1, color: colors.border),
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
+                              child: Text(
+                                'AGENTS & TOOLS',
+                                style: TextStyle(
+                                  color: mutedColor,
+                                  fontSize: 9,
+                                  letterSpacing: 0.8,
+                                ),
+                              ),
+                            ),
+                            ...agentSessions.map(
+                              (s) => _SessionRow(
+                                session: s,
+                                boardCubit: widget.boardCubit,
+                                onClose: widget.onClose,
+                              ),
+                            ),
+                          ],
+
+                          const SizedBox(height: 8),
+                        ],
+                      ),
                     ),
                   ),
-
-                  BlocBuilder<BoardCubit, BoardState>(
-                    builder: (context, boardState) {
-                      final activeBoard = boardState.activeBoard;
-                      if (!boardState.isLoaded && activeBoard == null) {
-                        return const SizedBox.shrink();
-                      }
-                      return _BoardResourceSection(
-                        boards: boardState.boards,
-                        activeBoard: activeBoard,
-                      );
-                    },
-                  ),
-
-                  // SESSIONS section (registered PTYs + yoloitd board terminals)
-                  if (registeredSessions.isNotEmpty) ...[
-                    Divider(height: 1, color: colors.border),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
-                      child: Text(
-                        ResourceMonitorService.instance.scope ==
-                                ResourceMonitorScope.yoloitOnly
-                            ? 'YOLOIT PROCESSES'
-                            : 'SESSIONS',
-                        style: TextStyle(
-                          color: mutedColor,
-                          fontSize: 9,
-                          letterSpacing: 0.8,
-                        ),
-                      ),
-                    ),
-                    ...registeredSessions.map(
-                      (s) => _SessionRow(
-                        session: s,
-                        boardCubit: widget.boardCubit,
-                        onClose: widget.onClose,
-                      ),
-                    ),
-                  ],
-
-                  // AGENTS section (ps-scanned unregistered agents)
-                  if (agentSessions.isNotEmpty) ...[
-                    Divider(height: 1, color: colors.border),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
-                      child: Text(
-                        'AGENTS & TOOLS',
-                        style: TextStyle(
-                          color: mutedColor,
-                          fontSize: 9,
-                          letterSpacing: 0.8,
-                        ),
-                      ),
-                    ),
-                    ...agentSessions.map(
-                      (s) => _SessionRow(
-                        session: s,
-                        boardCubit: widget.boardCubit,
-                        onClose: widget.onClose,
-                      ),
-                    ),
-                  ],
-
-                  const SizedBox(height: 8),
                 ],
               ),
             ),
@@ -1788,8 +1764,7 @@ class _StatCell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final onSurface = Theme.of(context).colorScheme.onSurface;
-    final mutedColor =
-        context.appColors.textMuted;
+    final mutedColor = context.appColors.textMuted;
     return Expanded(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1830,8 +1805,7 @@ class _BoardResourceSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final onSurface = Theme.of(context).colorScheme.onSurface;
-    final mutedColor =
-        context.appColors.textMuted;
+    final mutedColor = context.appColors.textMuted;
     final totalPanels = boards.fold<int>(
       0,
       (sum, board) => sum + board.panels.length,
@@ -1922,8 +1896,7 @@ class _PanelTypeRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    final mutedColor =
-        context.appColors.textMuted;
+    final mutedColor = context.appColors.textMuted;
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 2, 14, 2),
       child: Row(
@@ -1973,14 +1946,14 @@ Map<String, int> resourcePanelTypeCounts(List<BoardPanelInstance> panels) {
   for (final panel in panels) {
     counts.update(panel.type, (count) => count + 1, ifAbsent: () => 1);
   }
-  final entries =
-      counts.entries.toList()..sort((a, b) {
-        final byCount = b.value.compareTo(a.value);
-        if (byCount != 0) return byCount;
-        return resourcePanelTypeLabel(
-          a.key,
-        ).compareTo(resourcePanelTypeLabel(b.key));
-      });
+  final entries = counts.entries.toList()
+    ..sort((a, b) {
+      final byCount = b.value.compareTo(a.value);
+      if (byCount != 0) return byCount;
+      return resourcePanelTypeLabel(
+        a.key,
+      ).compareTo(resourcePanelTypeLabel(b.key));
+    });
   return Map.fromEntries(entries);
 }
 
@@ -2049,10 +2022,9 @@ ResourceSessionMetadata? _terminalPanelMetadata(
   );
   if (config.sessionId != sessionKey) return null;
   final sessionName = config.sessionName.trim();
-  final panelTitle =
-      panel.title.trim().isEmpty
-          ? (sessionName.isEmpty ? 'Terminal' : sessionName)
-          : panel.title.trim();
+  final panelTitle = panel.title.trim().isEmpty
+      ? (sessionName.isEmpty ? 'Terminal' : sessionName)
+      : panel.title.trim();
   return ResourceSessionMetadata(
     kind: 'terminal',
     boardId: board.id,
@@ -2111,10 +2083,9 @@ class _SessionRow extends StatelessWidget {
     final canFocus = metadata?.panelId?.isNotEmpty ?? false;
     final details = _sessionDetails(session);
     return Tooltip(
-      message:
-          canFocus
-              ? 'Open on board\n$details'
-              : 'Terminal panel not linked',
+      message: canFocus
+          ? 'Open on board\n$details'
+          : 'Terminal panel not linked',
       waitDuration: const Duration(milliseconds: 350),
       child: InkWell(
         onTap: () => _open(context),
@@ -2123,9 +2094,7 @@ class _SessionRow extends StatelessWidget {
           child: Row(
             children: [
               Icon(
-                canFocus
-                    ? Icons.center_focus_strong_outlined
-                    : Icons.circle,
+                canFocus ? Icons.center_focus_strong_outlined : Icons.circle,
                 size: canFocus ? 9 : 5,
                 color: colors.primary,
               ),
@@ -2144,7 +2113,8 @@ class _SessionRow extends StatelessWidget {
                         [
                           if (metadata.boardName?.trim().isNotEmpty ?? false)
                             metadata.boardName!.trim(),
-                          if (metadata.workspacePath?.trim().isNotEmpty ?? false)
+                          if (metadata.workspacePath?.trim().isNotEmpty ??
+                              false)
                             metadata.workspacePath!.trim(),
                           'pid ${session.pid}',
                         ].where((part) => part.isNotEmpty).join(' · '),
@@ -2186,6 +2156,7 @@ class _SessionRow extends StatelessWidget {
       ),
     );
   }
+
   static String _sessionDisplayLabel(SessionStat session) {
     final metadata = session.metadata;
     return metadata?.displayLabel ?? formatSessionLabel(session.label);
@@ -2202,6 +2173,7 @@ class _SessionRow extends StatelessWidget {
     ].join(' · ');
   }
 }
+
 /// it in isolation (without the full resource monitor polling loop).
 @visibleForTesting
 class SessionRowTestWrapper extends StatelessWidget {
@@ -2293,22 +2265,21 @@ Future<void> confirmStopResourceSession(
       session.metadata?.displayLabel ?? formatSessionLabel(session.label);
   final shouldStop = await showDialog<bool>(
     context: context,
-    builder:
-        (dialogContext) => AlertDialog(
-          title: const Text('Stop session?'),
-          content: Text('Stop $label (pid ${session.pid})?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton.icon(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              icon: const Icon(Icons.stop_circle_outlined),
-              label: const Text('Stop'),
-            ),
-          ],
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Stop session?'),
+      content: Text('Stop $label (pid ${session.pid})?'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(false),
+          child: const Text('Cancel'),
         ),
+        FilledButton.icon(
+          onPressed: () => Navigator.of(dialogContext).pop(true),
+          icon: const Icon(Icons.stop_circle_outlined),
+          label: const Text('Stop'),
+        ),
+      ],
+    ),
   );
   if (shouldStop != true || !context.mounted) return;
   final stopped = ResourceMonitorService.instance.stopProcess(session.pid);
