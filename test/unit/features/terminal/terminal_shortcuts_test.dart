@@ -216,7 +216,7 @@ void main() {
       expect(_ke(LogicalKeyboardKey.keyC, ctrl: true, cmd: true), isNull);
     });
 
-    test('Shift+Enter → ESC+CR (Kitty-style newline-in-input)', () {
+    test('Shift+Enter → ESC+CR (newline-in-input wire)', () {
       final result = _ke(LogicalKeyboardKey.enter, shift: true);
       expect((result! as TerminalPtyShortcut).sequence, '\x1b\r');
     });

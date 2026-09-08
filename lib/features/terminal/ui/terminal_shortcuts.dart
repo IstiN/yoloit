@@ -240,9 +240,11 @@ TerminalShortcut? _cmdSelectCopyShortcuts(
 /// Maps key events seen by xterm's `onKeyEvent` (before [TerminalView]
 /// processes the raw key event) to PTY control sequences or local actions.
 ///
-/// xterm onKeyEvent — intercepts Shift+Enter to send the Kitty keyboard
-/// protocol escape sequence (\x1b[13;2u) so modern CLIs (Copilot, Claude
-/// Code) treat it as a newline in the input buffer instead of submitting.
+/// Shift+Enter — intercepts the key to send ESC CR (\x1b\r) so modern CLIs
+/// (Copilot, Claude Code) treat it as a newline in the input buffer instead
+/// of submitting. NOTE: this is deliberately NOT the Kitty keyboard protocol
+/// (CSI 13;2u) — see [_shiftEnterRule] for the two-wire contract, pinned by
+/// `test/unit/features/terminal/pty_shift_enter_wire_test.dart`.
 TerminalShortcut? terminalKeyEventShortcut(
   LogicalKeyboardKey key, {
   required bool isShift,
@@ -283,7 +285,16 @@ TerminalShortcut? _ctrlCRule(
   return null;
 }
 
-/// Shift+Enter → ESC+CR (newline-in-input for Copilot/Claude Code)
+/// Shift+Enter → ESC CR (\x1b\r — newline-in-input for Copilot/Claude Code).
+///
+/// Two-wire contract (yoloit side of flutter_agent_harness#77, pinned by
+/// `test/unit/features/terminal/pty_shift_enter_wire_test.dart`): yoloit
+/// writes ESC CR into a PTY started with DEFAULT termios; with ICRNL on (the
+/// POSIX default) the kernel line discipline rewrites it to ESC LF before the
+/// child reads it. So the CLI at the other end may observe either wire —
+/// ESC CR (raw/ICRNL-off) or ESC LF (default termios) — and decoding BOTH is
+/// the terminal client's duty. Do NOT "fix" this by switching to the Kitty
+/// protocol (CSI 13;2u): clients key their Shift+Enter decoding on ESC.
 TerminalShortcut? _shiftEnterRule(
   LogicalKeyboardKey key, {
   required bool isShift,

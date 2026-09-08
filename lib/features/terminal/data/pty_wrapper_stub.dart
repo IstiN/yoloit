@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
+
 /// Stub Pty for web builds where dart:ffi is unavailable.
 class Pty {
   Pty.start(
@@ -17,7 +19,15 @@ class Pty {
   final String executable;
   final List<String> arguments;
 
-  Stream<String> get output => Stream<String>.empty();
+  /// Web stub: no backend switch exists (mirrors pty_wrapper_io.dart's
+  /// surface so both branches of the conditional export type-check).
+  @visibleForTesting
+  static bool? debugUsePty2Override;
+
+  /// Web stub: never uses pty2 (mirrors pty_wrapper_io.dart).
+  static bool get usePty2 => false;
+
+  Stream<String> get output => const Stream<String>.empty();
 
   /// No byte channel on the web stub (no PTY at all) — mirrors the io
   /// facade's default.
