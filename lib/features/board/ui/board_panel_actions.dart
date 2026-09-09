@@ -6,7 +6,6 @@ import 'package:yoloit/core/ui/adaptive_dialog.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
-import 'package:yoloit/features/board/plugins/builtin/markdown_note_plugin.dart';
 import 'package:yoloit/features/board/ui/widgets/text_editing_utils.dart';
 import 'package:yoloit/ui/components/buttons/markdown_tool_button.dart';
 
@@ -238,6 +237,9 @@ class BoardPanelActions {
                               hintText: 'Write markdown here...',
                               border: OutlineInputBorder(),
                             ),
+                            // With `expands: true` the content otherwise
+                            // centres vertically — typing must start at top.
+                            textAlignVertical: TextAlignVertical.top,
                             maxLines: null,
                             expands: true,
                           ),
@@ -294,18 +296,13 @@ class BoardPanelActions {
     if (!context.mounted || result == null) return;
     final cubit = context.read<BoardCubit>();
     if (panel == null) {
-      await cubit.addPanel(
-        BoardPanelInstance(
-          id: 'panel-${DateTime.now().millisecondsSinceEpoch}',
-          type: MarkdownNotePlugin.kTypeId,
-          title: result.title,
-          bounds: const BoardPanelBounds(x: 0, y: 0, width: 320, height: 220),
-          state: {
-            'markdown': result.markdown,
-            'color': result.color?.toARGB32(),
-          },
-          color: result.color,
-        ),
+      // Create through the cubit so the note lands in a free spot (grid or
+      // freeform aware) and gets focused/centred — a fixed (0,0) position
+      // often lands outside the current viewport and looks "lost".
+      await cubit.createMarkdownNote(
+        title: result.title,
+        markdown: result.markdown,
+        color: result.color,
       );
       return;
     }

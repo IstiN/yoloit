@@ -1596,6 +1596,7 @@ class BoardCubit extends Cubit<BoardState> {
   Future<void> createMarkdownNote({
     required String title,
     required String markdown,
+    Color? color,
   }) async {
     final board = state.activeBoard;
     if (board == null) return;
@@ -1610,6 +1611,7 @@ class BoardCubit extends Cubit<BoardState> {
       title: title.trim().isEmpty ? 'Note' : title.trim(),
       bounds: bounds,
       state: {'markdown': markdown},
+      color: color,
       zIndex:
           board.panels.fold<int>(
             0,

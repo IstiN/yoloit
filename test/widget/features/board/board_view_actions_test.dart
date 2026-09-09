@@ -6,6 +6,7 @@ import 'package:yoloit/core/ui/adaptive_dialog.dart';
 import 'package:yoloit/features/board/bloc/board_state.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/tools/board_tool.dart';
+import 'package:yoloit/features/board/ui/board_panel_actions.dart';
 import 'package:yoloit/features/board/ui/board_view.dart';
 
 import 'board_view_test_harness.dart';
@@ -40,6 +41,55 @@ void main() {
       panels.any((p) => p.type == 'board.shape' && p.title == 'Frame'),
       isTrue,
     );
+  });
+
+  testWidgets('add-note dialog types at top and creates a placed note', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    setBoardViewSurface(tester);
+
+    final cubit = TestBoardViewCubit(
+      BoardState(
+        boards: [boardTestBoard(panels: [boardTestNote('p1', 'Existing')])],
+        activeBoardId: 'board',
+        isLoaded: true,
+      ),
+    );
+    addTearDown(cubit.close);
+    await pumpBoardView(tester, cubit);
+
+    final context = tester.element(find.byType(BoardView));
+    final dialogFuture = BoardPanelActions.showAddNoteDialog(context);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(find.text('Add markdown note'), findsOneWidget);
+
+    // The markdown field expands to fill the dialog; typing must start at
+    // the top, not the vertical centre.
+    final markdownField = tester.widget<TextField>(
+      find.byType(TextField).last,
+    );
+    expect(markdownField.textAlignVertical, TextAlignVertical.top);
+
+    await tester.enterText(find.byType(TextField).last, 'hello **note**');
+    await tester.pump();
+    await tester.tap(find.text('Save'));
+    await dialogFuture;
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+
+    // The note is created through the cubit: placed by the placement engine
+    // (not hard-coded at (0,0), which usually lands outside the viewport)
+    // and focused so the view scrolls to it.
+    final note = cubit.state.activeBoard!.panels.singleWhere(
+      (p) => p.id != 'p1',
+    );
+    expect(note.type, 'board.note.markdown');
+    expect(note.state['markdown'], 'hello **note**');
+    expect(note.bounds.x, isNot(0.0));
+    expect(note.bounds.y, isNot(0.0));
+    expect(cubit.state.activeBoard!.viewport.focusedPanelId, note.id);
   });
 
   testWidgets('plugin catalog entry falls through to generic panel creation', (

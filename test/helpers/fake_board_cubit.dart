@@ -57,8 +57,9 @@ class FakeBoardCubit extends BoardCubit {
   Future<void> createMarkdownNote({
     required String title,
     required String markdown,
+    Color? color,
   }) async {
-    createdNotes.add({'title': title, 'markdown': markdown});
+    createdNotes.add({'title': title, 'markdown': markdown, 'color': color});
   }
 
   @override
