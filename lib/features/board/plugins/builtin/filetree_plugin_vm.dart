@@ -238,16 +238,14 @@ class _FileTreeContentState extends State<_FileTreeContent> {
 
   // ── Context menu ──────────────────────────────────────────────────────────
 
-  Future<void> _showContextMenu(
+  /// Shared popup menu shell (same look for entry and background menus).
+  Future<String?> _showMenuAt(
     BuildContext context,
     Offset globalPos,
-    FileSystemEntity entity,
-  ) async {
-    final isDir = entity is Directory;
+    List<PopupMenuEntry<String>> items,
+  ) {
     final colors = context.appColors;
-    final name = p.basename(entity.path);
-
-    final result = await showMenu<String>(
+    return showMenu<String>(
       context: context,
       position: RelativeRect.fromLTRB(
         globalPos.dx,
@@ -260,61 +258,50 @@ class _FileTreeContentState extends State<_FileTreeContent> {
         borderRadius: BorderRadius.circular(8),
         side: BorderSide(color: colors.border),
       ),
-      items: [
-        if (isDir)
-          PopupMenuItem(
-            value: 'new_folder',
-            child: Text(
-              '📁 New Folder',
-              style: TextStyle(fontSize: 12, color: colors.textPrimary),
-            ),
-          ),
-        if (isDir)
-          PopupMenuItem(
-            value: 'new_file',
-            child: Text(
-              '📄 New File',
-              style: TextStyle(fontSize: 12, color: colors.textPrimary),
-            ),
-          ),
-        PopupMenuItem(
-          value: 'rename',
-          child: Text(
-            '✏️ Rename',
-            style: TextStyle(fontSize: 12, color: colors.textPrimary),
-          ),
-        ),
-        PopupMenuItem(
-          value: 'copy_path',
-          child: Text(
-            '📋 Copy path',
-            style: TextStyle(fontSize: 12, color: colors.textPrimary),
-          ),
-        ),
-        PopupMenuItem(
-          value: 'copy_name',
-          child: Text(
-            '📄 Copy filename',
-            style: TextStyle(fontSize: 12, color: colors.textPrimary),
-          ),
-        ),
-        PopupMenuItem(
-          value: 'show_finder',
-          child: Text(
-            '📂 Show in Finder',
-            style: TextStyle(fontSize: 12, color: colors.textPrimary),
-          ),
-        ),
-        const PopupMenuDivider(),
-        PopupMenuItem(
-          value: 'delete',
-          child: Text(
-            '🗑️ Delete',
-            style: TextStyle(fontSize: 12, color: colors.accentRed),
-          ),
-        ),
-      ],
+      items: items,
     );
+  }
+
+  PopupMenuItem<String> _menuItem(
+    BuildContext context, {
+    required String value,
+    required String label,
+    bool danger = false,
+  }) {
+    final colors = context.appColors;
+    return PopupMenuItem(
+      value: value,
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          color: danger ? colors.accentRed : colors.textPrimary,
+        ),
+      ),
+    );
+  }
+
+  /// Context menu for a tree entry (folder or file).
+  Future<void> _showContextMenu(
+    BuildContext context,
+    Offset globalPos,
+    FileSystemEntity entity,
+  ) async {
+    final isDir = entity is Directory;
+    final name = p.basename(entity.path);
+
+    final result = await _showMenuAt(context, globalPos, [
+      if (isDir) ...[
+        _menuItem(context, value: 'new_folder', label: '📁 New Folder'),
+        _menuItem(context, value: 'new_file', label: '📄 New File'),
+      ],
+      _menuItem(context, value: 'rename', label: '✏️ Rename'),
+      _menuItem(context, value: 'copy_path', label: '📋 Copy path'),
+      _menuItem(context, value: 'copy_name', label: '📄 Copy filename'),
+      _menuItem(context, value: 'show_finder', label: '📂 Show in Finder'),
+      const PopupMenuDivider(),
+      _menuItem(context, value: 'delete', label: '🗑️ Delete', danger: true),
+    ]);
     if (result == null || !mounted) return;
     switch (result) {
       case 'new_folder':
@@ -331,6 +318,33 @@ class _FileTreeContentState extends State<_FileTreeContent> {
         await PlatformLauncher.instance.revealInFinder(entity.path);
       case 'delete':
         await _confirmDelete(entity, name);
+    }
+  }
+
+  /// Context menu for right-clicks on the tree background / top level —
+  /// creation actions target the root folder itself (entries have their own
+  /// menu via [_showContextMenu]).
+  Future<void> _showRootContextMenu(
+    BuildContext context,
+    Offset globalPos,
+    String rootPath,
+  ) async {
+    final result = await _showMenuAt(context, globalPos, [
+      _menuItem(context, value: 'new_folder', label: '📁 New Folder'),
+      _menuItem(context, value: 'new_file', label: '📄 New File'),
+      _menuItem(context, value: 'refresh', label: '🔄 Refresh'),
+      _menuItem(context, value: 'show_finder', label: '📂 Show in Finder'),
+    ]);
+    if (result == null || !mounted) return;
+    switch (result) {
+      case 'new_folder':
+        await _promptNewFolder(rootPath);
+      case 'new_file':
+        await _promptNewFile(rootPath);
+      case 'refresh':
+        _refresh();
+      case 'show_finder':
+        await PlatformLauncher.instance.revealInFinder(rootPath);
     }
   }
 
@@ -351,7 +365,15 @@ class _FileTreeContentState extends State<_FileTreeContent> {
     if (!file.existsSync()) {
       await file.create(recursive: true);
     }
+    // Dotfiles (e.g. .env) stay invisible unless "Show dotfiles" is on —
+    // reveal them so a freshly created file does not look lost.
+    if (!_showHidden && p.basename(file.path).startsWith('.')) {
+      _setShowHidden(true);
+    }
     _refresh();
+    // Open the freshly created file like any other so values (e.g. .env)
+    // can be pasted right away.
+    _selectFile(file.path, p.basename(file.path));
   }
 
   Future<void> _promptRename(String entityPath, String currentName) async {
@@ -662,9 +684,17 @@ class _FileTreeContentState extends State<_FileTreeContent> {
       return _buildSearchResults(rootDir);
     }
 
-    return ListView(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      children: _buildTreeEntries(rootDir, 0),
+    return GestureDetector(
+      // Right-click on the tree background / top level → root actions
+      // (New File / New Folder land in the root folder). Entries handle
+      // their own secondary taps and win the gesture arena.
+      behavior: HitTestBehavior.translucent,
+      onSecondaryTapDown:
+          (d) => _showRootContextMenu(context, d.globalPosition, rootPath),
+      child: ListView(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        children: _buildTreeEntries(rootDir, 0),
+      ),
     );
   }
 

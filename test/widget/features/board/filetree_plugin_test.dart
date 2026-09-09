@@ -306,6 +306,10 @@ void main() {
         File(p.join(fixture.path, 'sub', 'notes.txt')).existsSync(),
         isTrue,
       );
+      // The fresh file opens like any other file click would.
+      expect(harness.linkedPanels, isNotEmpty);
+      expect(harness.linkedPanels.last.state['path'],
+          p.join(fixture.path, 'sub', 'notes.txt'));
     });
 
     testWidgets('context menu new file cancelled creates nothing', (
@@ -341,6 +345,69 @@ void main() {
               .map((e) => p.basename(e.path))
               .toList();
       expect(names, ['nested.dart']);
+    });
+
+    testWidgets('right-click on empty tree area offers root-level actions', (
+      tester,
+    ) async {
+      final harness = _PanelHarness(_stateFor(fixture));
+      await tester.pumpWidget(_fileTreeApp(harness));
+      await _pumpOut(tester);
+
+      await _runRealIo(tester, () async {
+        // Empty background below the rendered rows — the top level.
+        final listBottom = tester.getBottomRight(find.byType(ListView).first);
+        await tester.tapAt(
+          listBottom - const Offset(100, 40),
+          buttons: kSecondaryButton,
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+
+        // Creation targets the root folder; no entity actions here.
+        expect(find.text('📁 New Folder'), findsOneWidget);
+        expect(find.text('📄 New File'), findsOneWidget);
+        expect(find.text('🔄 Refresh'), findsOneWidget);
+        expect(find.text('✏️ Rename'), findsNothing);
+        expect(find.text('🗑️ Delete'), findsNothing);
+      });
+    });
+
+    testWidgets('new file from empty-area menu lands in root and opens', (
+      tester,
+    ) async {
+      final harness = _PanelHarness(_stateFor(fixture));
+      await tester.pumpWidget(_fileTreeApp(harness));
+      await _pumpOut(tester);
+
+      await _runRealIo(tester, () async {
+        final listBottom = tester.getBottomRight(find.byType(ListView).first);
+        await tester.tapAt(
+          listBottom - const Offset(100, 40),
+          buttons: kSecondaryButton,
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+        await tester.tap(find.text('📄 New File'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+        await tester.enterText(find.byType(TextField).last, '.env');
+        await tester.tap(find.widgetWithText(TextButton, 'OK'));
+        await tester.pump();
+        await Future<void>.delayed(const Duration(milliseconds: 500));
+      });
+
+      // Created at the root, not inside any folder.
+      final created = File(p.join(fixture.path, '.env'));
+      expect(created.existsSync(), isTrue);
+      // The fresh file opens like any other (linked file preview panel).
+      expect(harness.linkedPanels, isNotEmpty);
+      final opened = harness.linkedPanels.last;
+      expect(opened.typeId, 'board.file.preview');
+      expect(opened.state['path'], created.path);
+      expect(opened.title, '.env');
+      // Dotfiles are revealed so the new file does not look lost.
+      expect(find.text('.env'), findsOneWidget);
     });
 
     testWidgets('context menu deletes a file after confirmation', (
