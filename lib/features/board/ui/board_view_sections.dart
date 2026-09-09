@@ -15,6 +15,12 @@ extension _BoardViewSections on _BoardViewState {
     if (event is KeyDownEvent) {
       final escapeResult = _handleEscapeKey(event);
       if (escapeResult != null) return escapeResult;
+      // While an editable text field owns the keyboard focus (sticky note,
+      // note, kanban card, …) the text-editing shortcuts must win: the
+      // board-level copy/paste/duplicate and delete-selection shortcuts
+      // would otherwise swallow Cmd/Ctrl+C/V/D and Backspace/Delete before
+      // DefaultTextEditingShortcuts can deliver them to the field.
+      if (_isFocusInEditableText) return KeyEventResult.ignored;
       final isMeta =
           HardwareKeyboard.instance.isMetaPressed ||
           HardwareKeyboard.instance.isControlPressed;
@@ -27,6 +33,15 @@ extension _BoardViewSections on _BoardViewState {
       }
     }
     return KeyEventResult.ignored;
+  }
+
+  /// Whether the keyboard focus currently sits inside an editable text
+  /// field. When true, keys are typed text, not canvas shortcuts.
+  bool get _isFocusInEditableText {
+    final focusContext = FocusManager.instance.primaryFocus?.context;
+    if (focusContext == null) return false;
+    return focusContext.widget is EditableText ||
+        focusContext.findAncestorStateOfType<EditableTextState>() != null;
   }
 
   KeyEventResult? _handleEscapeKey(KeyEvent event) {

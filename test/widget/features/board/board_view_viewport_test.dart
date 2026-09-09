@@ -6,6 +6,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yoloit/core/utils/clipboard_utils.dart';
 import 'package:yoloit/features/board/bloc/board_state.dart';
+import 'package:yoloit/features/board/model/board_models.dart';
+import 'package:yoloit/features/board/plugins/builtin/sticky_note_plugin.dart';
 import 'package:yoloit/features/board/ui/board_view.dart';
 import 'package:yoloit/features/mindmap/widgets/canvas_interaction_lock.dart';
 
@@ -25,6 +27,47 @@ class _FakeClipboard implements ClipboardInterface {
   Future<String?> getText() async => text;
 }
 
+/// Mock for `SystemChannels.platform` so text-editing shortcuts (Ctrl/Cmd+V
+/// paste inside a focused TextField) reach an in-memory clipboard in the
+/// fake-async test zone — the real platform channel never replies there.
+String? _platformClipboardText;
+
+void _installPlatformClipboardMock() {
+  TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+      .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+        switch (call.method) {
+          case 'Clipboard.setData':
+            _platformClipboardText =
+                (call.arguments as Map<String, dynamic>)['text'] as String?;
+            return null;
+          case 'Clipboard.getData':
+            return {'text': _platformClipboardText};
+          default:
+            return null;
+        }
+      });
+}
+
+void _removePlatformClipboardMock() {
+  _platformClipboardText = null;
+  TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+      .setMockMethodCallHandler(SystemChannels.platform, null);
+}
+
+/// A sticky note panel with an inline text field (the paste-bug repro).
+BoardPanelInstance _stickyNote(String id, String text) => BoardPanelInstance(
+  id: id,
+  type: StickyNotePlugin.kTypeId,
+  title: text,
+  bounds: const BoardPanelBounds(x: 56, y: 74, width: 260, height: 220),
+  state: {
+    'text': text,
+    'color': '#FEF08A',
+    'textColor': '#1F2937',
+    'fontSize': 18.0,
+  },
+);
+
 dynamic _viewState(WidgetTester tester) =>
     // ignore: avoid_dynamic_calls
     tester.state(find.byType(BoardView)) as dynamic;
@@ -42,6 +85,9 @@ void main() {
 
   setUpAll(installBoardViewChannelMocks);
   tearDownAll(removeBoardViewChannelMocks);
+
+  setUp(_installPlatformClipboardMock);
+  tearDown(_removePlatformClipboardMock);
 
   setUp(CanvasInteractionLock.instance.resetForTesting);
   tearDown(CanvasInteractionLock.instance.resetForTesting);
@@ -192,6 +238,102 @@ void main() {
 
     await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
   });
+
+  testWidgets('ctrl+V pastes clipboard text into a focused sticky note', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    setBoardViewSurface(tester);
+
+    final cubit = TestBoardViewCubit(
+      BoardState(
+        boards: [boardTestBoard(panels: [_stickyNote('p1', 'Source')])],
+        activeBoardId: 'board',
+        isLoaded: true,
+      ),
+    );
+    addTearDown(cubit.close);
+    await pumpBoardView(tester, cubit);
+
+    // Model the user clicking into the sticky note text field.
+    // Focus the sticky text field directly (a real click also triggers the
+    // panel selection pipeline, which needs real-IO pumping).
+    tester
+        .state<EditableTextState>(find.byType(EditableText).first)
+        .requestKeyboard();
+    await tester.pump();
+    expect(
+      FocusManager.instance.primaryFocus?.context
+          ?.findAncestorStateOfType<EditableTextState>(),
+      isNotNull,
+      reason: 'the sticky text field must hold keyboard focus',
+    );
+
+    await Clipboard.setData(const ClipboardData(text: 'pasted text'));
+
+    // The board shortcut handler treats Ctrl like Meta; without the
+    // editable-focus guard it swallows the key for panel pasting.
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    addTearDown(() async {
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    });
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyV);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pump();
+    await tester.pump();
+
+    // The text reached the field; no panel was pasted.
+    expect(find.textContaining('pasted text'), findsOneWidget);
+    expect(cubit.state.activeBoard!.panels, hasLength(1));
+  });
+
+  testWidgets(
+    'backspace with selected panels does not delete them while a text field '
+    'has focus',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      setBoardViewSurface(tester);
+
+      final cubit = TestBoardViewCubit(
+        BoardState(
+          boards: [
+            boardTestBoard(
+              panels: [
+                _stickyNote('p1', 'Source'),
+                boardTestNote('p2', 'Keep'),
+              ],
+            ),
+          ],
+          activeBoardId: 'board',
+          isLoaded: true,
+        ),
+      );
+      addTearDown(cubit.close);
+      await pumpBoardView(tester, cubit);
+
+      // Focus the sticky text field (models clicking into it), then select
+      // both panels programmatically — the real-world hazard combo.
+      tester
+          .state<EditableTextState>(find.byType(EditableText).first)
+          .requestKeyboard();
+      await tester.pump();
+      cubit.selectPanels({'p1', 'p2'});
+      await tester.pump();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.backspace);
+      await tester.pump();
+
+      // The key edited the note text instead of deleting the panels.
+      expect(cubit.state.activeBoard!.panels, hasLength(2));
+      final text =
+          tester
+              .widget<TextField>(find.byType(TextField).first)
+              .controller
+              ?.text;
+      expect(text?.length, 'Source'.length - 1);
+    },
+  );
+
 
   testWidgets('viewer interaction start/update detects viewport zoom', (
     tester,
