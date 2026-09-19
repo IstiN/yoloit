@@ -179,20 +179,18 @@ jobs:
             mv "$BUILD_CACHE_DIR/macos" build/
           fi
 
-      - name: Setup Flutter environment
+      - name: Setup Flutter 3.47.4
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.4'
+          channel: 'stable'
+          cache: true
+
+      - name: Configure build PATH
         run: |
-          for candidate in "$HOME/development/flutter/bin" "$HOME/.local/flutter/bin" "/Users/Uladzimir_Klyshevich/development/flutter/bin"; do
-            if [ -x "$candidate/flutter" ]; then
-              echo "$candidate" >> $GITHUB_PATH
-              export PATH="$candidate:$PATH"
-              echo "Found Flutter at: $candidate"
-              break
-            fi
-          done
           echo "/opt/homebrew/bin" >> $GITHUB_PATH
           export PATH="/opt/homebrew/bin:$PATH"
           flutter --version
-          dart --version
 
       - name: Install Rust toolchain
         run: |
