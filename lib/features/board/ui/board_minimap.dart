@@ -155,18 +155,16 @@ class BoardMiniMapPainter extends CustomPainter {
         );
       }
 
-      canvas.drawRRect(
-        rrect,
-        Paint()
-          ..color =
-              isProcessing
-                  ? colors.accentGreen
-                  : panelTypeColor(
-                    panel.type,
-                    colors,
-                    override: panel.color,
-                  ).withAlpha(0xCC),
-      );
+      final fill =
+          isProcessing
+              ? colors.accentGreen
+              : panelTypeColor(
+                panel.type,
+                colors,
+                override: panel.color,
+              ).withAlpha(0xCC);
+      canvas.drawRRect(rrect, Paint()..color = fill);
+      _paintPanelTitle(canvas, rrect, panel.title, fill);
     }
 
     final vx = (viewportRect.left - bounds.left) * scaleX;
@@ -188,6 +186,88 @@ class BoardMiniMapPainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.4,
     );
+  }
+
+  /// Minimum scaled rect size for the title to stay legible on the map.
+  static const double _minTitleHeight = 9.0;
+  static const double _minTitleWidth = 16.0;
+
+  static final Map<String, TextPainter> _titlePainters = {};
+
+  /// Draws the panel title inside its minimap rect, wrapping to the next
+  /// line when it does not fit; clipped to the rect so overflow never spills
+  /// onto neighbouring panels.
+  void _paintPanelTitle(Canvas canvas, RRect rrect, String title, Color fill) {
+    final trimmed = title.trim();
+    final rect = rrect.outerRect;
+    if (trimmed.isEmpty ||
+        rect.height < _minTitleHeight ||
+        rect.width < _minTitleWidth) {
+      return;
+    }
+    final fontSize = math.min(8.5, math.max(6.0, rect.height - 3.0));
+    final maxWidth = rect.width - 5.0;
+    final maxLines = math.max(1, ((rect.height - 3.0) / fontSize).floor());
+    final tp = _laidOutTitlePainter(
+      trimmed,
+      fontSize,
+      maxWidth,
+      maxLines,
+      fill,
+    );
+    canvas.save();
+    canvas.clipRRect(rrect);
+    tp.paint(canvas, Offset(rect.left + 2.5, rect.center.dy - tp.height / 2));
+    canvas.restore();
+  }
+
+  /// Returns a laid-out [TextPainter] for the title, cached by its inputs so
+  /// panning/zooming does not re-run text layout on every frame. Width is
+  /// quantized to whole pixels to keep the cache hit-rate high while zooming.
+  static TextPainter _laidOutTitlePainter(
+    String title,
+    double fontSize,
+    double maxWidth,
+    int maxLines,
+    Color fill,
+  ) {
+    final textColor = readableTextColor(fill);
+    final key = '$title\x1F$fontSize\x1F${maxWidth.round()}'
+        '\x1F$maxLines\x1F${textColor.toARGB32()}';
+    var tp = _titlePainters[key];
+    if (tp == null) {
+      if (_titlePainters.length > 512) _titlePainters.clear();
+      tp =
+          TextPainter(
+              text: TextSpan(
+                text: title,
+                style: TextStyle(
+                  color: textColor,
+                  fontSize: fontSize,
+                  height: 1.0,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              maxLines: maxLines,
+              ellipsis: '…',
+              textDirection: TextDirection.ltr,
+            )
+            ..layout(maxWidth: maxWidth);
+      _titlePainters[key] = tp;
+    }
+    return tp;
+  }
+
+  /// Contrast-safe text color that stays readable on ANY panel fill:
+  /// dark ink on light fills, near-white on dark fills. Derived from the
+  /// fill's own hue (desaturated) so the ink harmonizes with the panel.
+  static Color readableTextColor(Color background) {
+    final hsl = HSLColor.fromColor(background);
+    final darkInk = background.computeLuminance() > 0.55;
+    return hsl
+        .withSaturation(math.min(hsl.saturation, 0.25))
+        .withLightness(darkInk ? 0.10 : 0.94)
+        .toColor();
   }
 
   @override

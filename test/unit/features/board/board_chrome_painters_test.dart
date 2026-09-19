@@ -185,6 +185,49 @@ void main() {
         ),
       );
     });
+
+    test('paint draws panel titles and skips them for tiny rects', () {
+      // Wide enough panels get a title; a 6x6 panel is below the legibility
+      // threshold and must be skipped without errors.
+      _paint(
+        painter(
+          panels: [
+            panelA.copyWith(color: Colors.amber), // light fill
+            panelB.copyWith(color: const Color(0xFF141822)), // dark fill
+            panelB.copyWith(
+              id: 'tiny',
+              title: 'Tiny',
+              bounds: const BoardPanelBounds(x: 300, y: 200, width: 6, height: 6),
+            ),
+          ],
+        ),
+      );
+    });
+
+    group('readableTextColor', () {
+      test('picks dark ink on light panel fills', () {
+        final color = BoardMiniMapPainter.readableTextColor(Colors.amber);
+        expect(color.computeLuminance(), lessThan(0.2));
+      });
+
+      test('picks light text on dark panel fills', () {
+        final color = BoardMiniMapPainter.readableTextColor(
+          const Color(0xFF141822),
+        );
+        expect(color.computeLuminance(), greaterThan(0.8));
+      });
+
+      test('contrast holds for white and black panels', () {
+        expect(
+          BoardMiniMapPainter.readableTextColor(Colors.white).computeLuminance(),
+          lessThan(0.2),
+        );
+        expect(
+          BoardMiniMapPainter.readableTextColor(Colors.black).computeLuminance(),
+          greaterThan(0.8),
+        );
+      });
+    });
   });
 
   group('BoardOverviewLinksPainter', () {
