@@ -77,7 +77,7 @@ dependencies:
   media_kit_video: ^2.0.1
   media_kit_libs_video: ^1.0.5
   record: ^7.1.1
-  js_widget_runtime: ^0.4.44
+  js_widget_runtime: ^0.4.121
   local_models_sdk:
     path: third_party/flutter_local_models/packages/local_models_sdk
   local_models_flutter:
@@ -91,7 +91,6 @@ dependencies:
   web: ^1.1.1
   flutter_cube: ^0.1.1
   flame: ^1.38.0
-  flame_3d: ^0.3.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

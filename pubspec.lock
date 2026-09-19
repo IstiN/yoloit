@@ -352,14 +352,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.38.0"
-  flame_3d:
-    dependency: "direct main"
-    description:
-      name: flame_3d
-      sha256: "45310da41e63a690d79514b24f890b28251c3066aa0986db29ef48283541af0a"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.3.0"
   flutter:
     dependency: "direct main"
     description: flutter
@@ -678,10 +670,10 @@ packages:
     dependency: "direct main"
     description:
       name: js_widget_runtime
-      sha256: f18d8c9ec7110215e0711e1c681282355491dab5921b4c053f4625603a7fc784
+      sha256: b2cf9b40006ab314b029ad29880c1128d53a6e662fd68ae76efebfc1540a4606
       url: "https://pub.dev"
     source: hosted
-    version: "0.4.79"
+    version: "0.4.121"
   json_annotation:
     dependency: "direct main"
     description:
@@ -1851,4 +1843,4 @@ packages:
     version: "0.0.6"
 sdks:
   dart: ">=3.12.0 <4.0.0"
-  flutter: ">=3.44.0"
+  flutter: ">=3.47.0"
