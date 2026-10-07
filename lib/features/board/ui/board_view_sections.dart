@@ -37,12 +37,7 @@ extension _BoardViewSections on _BoardViewState {
 
   /// Whether the keyboard focus currently sits inside an editable text
   /// field. When true, keys are typed text, not canvas shortcuts.
-  bool get _isFocusInEditableText {
-    final focusContext = FocusManager.instance.primaryFocus?.context;
-    if (focusContext == null) return false;
-    return focusContext.widget is EditableText ||
-        focusContext.findAncestorStateOfType<EditableTextState>() != null;
-  }
+  bool get _isFocusInEditableText => isFocusInEditableText();
 
   KeyEventResult? _handleEscapeKey(KeyEvent event) {
     if (event.logicalKey != LogicalKeyboardKey.escape) return null;

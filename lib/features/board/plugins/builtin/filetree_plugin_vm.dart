@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/gestures.dart' show kSecondaryButton;
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/core/ui/app_svg_icons.dart';
 import 'package:yoloit/core/utils/clipboard_utils.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
@@ -262,21 +264,46 @@ class _FileTreeContentState extends State<_FileTreeContent> {
     );
   }
 
+  /// Pointer ids whose secondary pointer-down already opened an entry
+  /// context menu. The root listener's pointer-down handler removes the id
+  /// and skips its own menu when present — pointer-down callbacks fire for
+  /// every nested Listener along the hit path, so gesture disambiguation
+  /// cannot be relied on here.
+  final Set<int> _consumedSecondaryPointers = <int>{};
+
+  /// Opens the entity (file/folder) context menu and marks the pointer as
+  /// consumed so the wrapping root listener does not stack its own menu.
+  void _openEntryMenu(PointerDownEvent event, FileSystemEntity entity) {
+    _consumedSecondaryPointers.add(event.pointer);
+    _showContextMenu(context, event.position, entity);
+  }
+
+  /// Right-button pointer-down anywhere in the file tree.
+  bool _isSecondary(PointerDownEvent event) =>
+      event.buttons == kSecondaryButton;
+
   PopupMenuItem<String> _menuItem(
     BuildContext context, {
     required String value,
     required String label,
+    String? icon,
     bool danger = false,
   }) {
     final colors = context.appColors;
+    final color = danger ? colors.accentRed : colors.textPrimary;
     return PopupMenuItem(
       value: value,
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 12,
-          color: danger ? colors.accentRed : colors.textPrimary,
-        ),
+      child: Row(
+        children: [
+          if (icon != null) ...[
+            SvgIcon(icon, size: 14, color: color),
+            const SizedBox(width: 8),
+          ],
+          Text(
+            label,
+            style: TextStyle(fontSize: 12, color: color),
+          ),
+        ],
       ),
     );
   }
@@ -292,15 +319,15 @@ class _FileTreeContentState extends State<_FileTreeContent> {
 
     final result = await _showMenuAt(context, globalPos, [
       if (isDir) ...[
-        _menuItem(context, value: 'new_folder', label: '📁 New Folder'),
-        _menuItem(context, value: 'new_file', label: '📄 New File'),
+        _menuItem(context, value: 'new_folder', label: 'New Folder', icon: AppSvgIcons.folderPlus),
+        _menuItem(context, value: 'new_file', label: 'New File', icon: AppSvgIcons.filePlus),
       ],
-      _menuItem(context, value: 'rename', label: '✏️ Rename'),
-      _menuItem(context, value: 'copy_path', label: '📋 Copy path'),
-      _menuItem(context, value: 'copy_name', label: '📄 Copy filename'),
-      _menuItem(context, value: 'show_finder', label: '📂 Show in Finder'),
+      _menuItem(context, value: 'rename', label: 'Rename', icon: AppSvgIcons.pencil),
+      _menuItem(context, value: 'copy_path', label: 'Copy path', icon: AppSvgIcons.clipboardCopy),
+      _menuItem(context, value: 'copy_name', label: 'Copy filename', icon: AppSvgIcons.copy),
+      _menuItem(context, value: 'show_finder', label: 'Show in Finder', icon: AppSvgIcons.folderOpen),
       const PopupMenuDivider(),
-      _menuItem(context, value: 'delete', label: '🗑️ Delete', danger: true),
+      _menuItem(context, value: 'delete', label: 'Delete', icon: AppSvgIcons.trash, danger: true),
     ]);
     if (result == null || !mounted) return;
     switch (result) {
@@ -330,10 +357,11 @@ class _FileTreeContentState extends State<_FileTreeContent> {
     String rootPath,
   ) async {
     final result = await _showMenuAt(context, globalPos, [
-      _menuItem(context, value: 'new_folder', label: '📁 New Folder'),
-      _menuItem(context, value: 'new_file', label: '📄 New File'),
-      _menuItem(context, value: 'refresh', label: '🔄 Refresh'),
-      _menuItem(context, value: 'show_finder', label: '📂 Show in Finder'),
+      _menuItem(context, value: 'new_folder', label: 'New Folder', icon: AppSvgIcons.folderPlus),
+      _menuItem(context, value: 'new_file', label: 'New File', icon: AppSvgIcons.filePlus),
+      _menuItem(context, value: 'refresh', label: 'Refresh', icon: AppSvgIcons.refresh),
+      _menuItem(context, value: 'copy_path', label: 'Copy path', icon: AppSvgIcons.clipboardCopy),
+      _menuItem(context, value: 'show_finder', label: 'Show in Finder', icon: AppSvgIcons.folderOpen),
     ]);
     if (result == null || !mounted) return;
     switch (result) {
@@ -343,6 +371,8 @@ class _FileTreeContentState extends State<_FileTreeContent> {
         await _promptNewFile(rootPath);
       case 'refresh':
         _refresh();
+      case 'copy_path':
+        await copyToClipboard(rootPath);
       case 'show_finder':
         await PlatformLauncher.instance.revealInFinder(rootPath);
     }
@@ -684,13 +714,23 @@ class _FileTreeContentState extends State<_FileTreeContent> {
       return _buildSearchResults(rootDir);
     }
 
-    return GestureDetector(
+    return Listener(
       // Right-click on the tree background / top level → root actions
       // (New File / New Folder land in the root folder). Entries handle
-      // their own secondary taps and win the gesture arena.
+      // their own secondary pointer-down and mark the pointer in
+      // [_consumedSecondaryPointers], which this handler checks to tell a
+      // background right-click apart from one that already opened an entry
+      // menu. Listener (not GestureDetector) is used deliberately:
+      // tap-up disambiguation proved unreliable here because the surrounding
+      // InteractiveViewer's scale recognizer tracks all mouse buttons, and
+      // tap-down callbacks fire for every nested detector, which used to
+      // stack two menus.
       behavior: HitTestBehavior.translucent,
-      onSecondaryTapDown:
-          (d) => _showRootContextMenu(context, d.globalPosition, rootPath),
+      onPointerDown: (event) {
+        if (!_isSecondary(event)) return;
+        if (_consumedSecondaryPointers.remove(event.pointer)) return;
+        _showRootContextMenu(context, event.position, rootPath);
+      },
       child: ListView(
         padding: const EdgeInsets.symmetric(vertical: 4),
         children: _buildTreeEntries(rootDir, 0),
@@ -745,9 +785,11 @@ class _FileTreeContentState extends State<_FileTreeContent> {
         final name = p.basename(entity.path);
         final relPath = p.relative(entity.path, from: _rootPath);
         final isDir = entity is Directory;
-        return GestureDetector(
-          onSecondaryTapDown:
-              (d) => _showContextMenu(context, d.globalPosition, entity),
+        return Listener(
+          onPointerDown: (event) {
+            if (!_isSecondary(event)) return;
+            _openEntryMenu(event, entity);
+          },
           child: InkWell(
             onTap:
                 isDir
@@ -944,9 +986,11 @@ class _FileTreeContentState extends State<_FileTreeContent> {
 
   Widget _buildDirTile(Directory dir, String name, int depth, bool isExpanded) {
     final colors = context.appColors;
-    return GestureDetector(
-      onSecondaryTapDown:
-          (d) => _showContextMenu(context, d.globalPosition, dir),
+    return Listener(
+      onPointerDown: (event) {
+        if (!_isSecondary(event)) return;
+        _openEntryMenu(event, dir);
+      },
       child: InkWell(
         onTap: () => _toggleDir(dir.path),
         child: Padding(
@@ -987,9 +1031,11 @@ class _FileTreeContentState extends State<_FileTreeContent> {
   Widget _buildFileTile(File file, String name, int depth) {
     final colors = context.appColors;
     final isSelected = _selectedFile == file.path;
-    return GestureDetector(
-      onSecondaryTapDown:
-          (d) => _showContextMenu(context, d.globalPosition, file),
+    return Listener(
+      onPointerDown: (event) {
+        if (!_isSecondary(event)) return;
+        _openEntryMenu(event, file);
+      },
       child: InkWell(
         onTap: () => _selectFile(file.path, name),
         child: Container(

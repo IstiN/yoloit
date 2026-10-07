@@ -1,12 +1,8 @@
 import 'dart:io';
-
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:super_clipboard/super_clipboard.dart';
 import 'package:yoloit/core/platform/platform_dirs.dart';
 import 'package:yoloit/features/terminal/data/clipboard_file_service.dart';
-
-import 'fake_clipboard_reader.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -213,12 +209,24 @@ void main() {
       });
     }
 
+    void mockPasteboardImage(Uint8List? image) {
+      messenger.setMockMethodCallHandler(
+        const MethodChannel('pasteboard'),
+        (call) async {
+          if (call.method == 'image') return image;
+          return null;
+        },
+      );
+    }
+
     tearDown(() {
       messenger.setMockMethodCallHandler(SystemChannels.platform, null);
+      messenger.setMockMethodCallHandler(const MethodChannel('pasteboard'), null);
     });
 
     test('saves clipboard text to a temp .txt file', () async {
       mockClipboardText('hello from clipboard');
+      mockPasteboardImage(null);
 
       final path = await ClipboardFileService.instance.saveClipboardToFile();
       expect(path, isNotNull);
@@ -271,21 +279,36 @@ void main() {
     });
   });
 
-  group('ClipboardFileService.tryReadImageForTesting', () {
-    final pngBytes = Uint8List.fromList([0x89, 0x50, 0x4E, 0x47, 1, 2, 3]);
+  group('ClipboardFileService image paste via pasteboard channel', () {
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+
+    void mockPasteboardImage(Object? image) {
+      messenger.setMockMethodCallHandler(
+        const MethodChannel('pasteboard'),
+        (call) async {
+          if (call.method == 'image') return image;
+          return null;
+        },
+      );
+    }
+
+    tearDown(() {
+      messenger.setMockMethodCallHandler(const MethodChannel('pasteboard'), null);
+    });
 
     Future<void> deleteIfExists(String path) async {
       final file = File(path);
       if (await file.exists()) await file.delete();
     }
 
-    test('saves provided png bytes to a temp .png file', () async {
-      final reader = ClipboardReader([
-        FakeClipboardDataReader(files: {Formats.png: pngBytes}),
+    test('saves png image bytes to a temp .png file', () async {
+      final pngBytes = Uint8List.fromList([
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3,
       ]);
+      mockPasteboardImage(pngBytes);
 
-      final path = await ClipboardFileService.instance
-          .tryReadImageForTesting(reader);
+      final path = await ClipboardFileService.instance.saveClipboardToFile();
       expect(path, isNotNull);
       expect(path, endsWith('.png'));
       addTearDown(() => deleteIfExists(path!));
@@ -293,45 +316,32 @@ void main() {
       expect(await File(path!).readAsBytes(), pngBytes);
     });
 
-    test('skips formats the reader cannot provide and saves jpeg', () async {
-      final reader = ClipboardReader([
-        FakeClipboardDataReader(files: {Formats.jpeg: pngBytes}),
-      ]);
+    test('sniffs jpeg magic bytes and uses the .jpg extension', () async {
+      final jpegBytes = Uint8List.fromList([0xFF, 0xD8, 0xFF, 0xE0, 1, 2, 3]);
+      mockPasteboardImage(jpegBytes);
 
-      final path = await ClipboardFileService.instance
-          .tryReadImageForTesting(reader);
+      final path = await ClipboardFileService.instance.saveClipboardToFile();
       expect(path, isNotNull);
       expect(path, endsWith('.jpg'));
       addTearDown(() => deleteIfExists(path!));
+
+      expect(await File(path!).readAsBytes(), jpegBytes);
     });
 
-    test('returns null when reading the image fails', () async {
-      final reader = ClipboardReader([
-        FakeClipboardDataReader(throwingFormats: {Formats.png}),
-      ]);
+    test('returns null when there is no image on the pasteboard', () async {
+      mockPasteboardImage(null);
 
-      final path = await ClipboardFileService.instance
-          .tryReadImageForTesting(reader);
+      final path = await ClipboardFileService.instance.saveClipboardToFile();
       expect(path, isNull);
     });
 
-    test('returns null when the image payload is empty', () async {
-      final reader = ClipboardReader([
-        FakeClipboardDataReader(files: {Formats.png: Uint8List(0)}),
-      ]);
+    test('returns null when the pasteboard channel throws', () async {
+      messenger.setMockMethodCallHandler(
+        const MethodChannel('pasteboard'),
+        (call) => Future<Uint8List>.error(PlatformException(code: 'fail')),
+      );
 
-      final path = await ClipboardFileService.instance
-          .tryReadImageForTesting(reader);
-      expect(path, isNull);
-    });
-
-    test('returns null when the reader has no image formats', () async {
-      final reader = ClipboardReader([
-        FakeClipboardDataReader(plainText: 'just text'),
-      ]);
-
-      final path = await ClipboardFileService.instance
-          .tryReadImageForTesting(reader);
+      final path = await ClipboardFileService.instance.saveClipboardToFile();
       expect(path, isNull);
     });
   });

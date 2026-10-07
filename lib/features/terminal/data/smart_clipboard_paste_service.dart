@@ -1,6 +1,4 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:super_clipboard/super_clipboard.dart';
 import 'package:yoloit/core/cli/cli_text_argument_resolver.dart';
 import 'package:yoloit/features/terminal/data/clipboard_file_service.dart';
 
@@ -11,53 +9,30 @@ class SmartClipboardPasteService {
 
   static final instance = SmartClipboardPasteService._();
 
-  /// Test seam: super_clipboard has no mockable platform channel in unit
-  /// tests, so tests inject a fake [ClipboardReader] through this override.
-  @visibleForTesting
-  static Future<ClipboardReader?> Function()? clipboardReaderOverride;
-
   Future<String?> readInlineTextOrSavedFilePath({bool allowInlineText = false}) async {
-    String? text;
-
-    // Try super_clipboard first.
-    try {
-      final reader = await _readClipboard();
-      if (reader != null) {
-        // Images always become temp files so terminals/chats can reference them.
-        if (reader.canProvide(Formats.png) ||
-            reader.canProvide(Formats.jpeg)) {
-          return ClipboardFileService.instance.saveClipboardToFile();
-        }
-
-        if (reader.canProvide(Formats.plainText)) {
-          text = await reader.readValue(Formats.plainText);
-        }
-      }
-    } catch (_) {
-      // ignore super_clipboard failures
-    }
-
-    // Fallback to Flutter's standard clipboard API.
+    // Read plain text through Flutter's built-in clipboard FIRST. This avoids
+    // third-party native clipboard code for the common text paste entirely
+    // (the old super_clipboard Rust path could abort the whole process on a
+    // native panic). Only when there is no plain text do we ask the
+    // [ClipboardFileService] to probe for an image and save it to a file.
+    // Trade-off: a clipboard holding BOTH an image and text now pastes the
+    // text instead of saving the image to a file.
+    final text = await _readFlutterText();
     if (text == null || text.isEmpty) {
-      try {
-        final data = await Clipboard.getData('text/plain');
-        text = data?.text;
-      } catch (_) {
-        // ignore fallback failures
-      }
+      // Images always become temp files so terminals/chats can reference them.
+      return ClipboardFileService.instance.saveClipboardToFile();
     }
-
-    if (text == null || text.isEmpty) return null;
 
     return resolveText(text, allowInlineText: allowInlineText);
   }
 
-  Future<ClipboardReader?> _readClipboard() {
-    final override = clipboardReaderOverride;
-    if (override != null) return override();
-    final clipboard = SystemClipboard.instance;
-    if (clipboard == null) return Future.value();
-    return clipboard.read();
+  Future<String?> _readFlutterText() async {
+    try {
+      final data = await Clipboard.getData('text/plain');
+      return data?.text;
+    } catch (_) {
+      return null;
+    }
   }
 
   /// Decides whether [text] should be pasted inline or saved to a temp file.

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/core/utils/focus_utils.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/chat/chat_panel_plugin.dart';
 import 'package:yoloit/features/board/events/board_event_bus.dart';
@@ -391,6 +392,10 @@ class _KanbanContentState extends State<_KanbanContent> {
         if (isCtrl &&
             event is KeyDownEvent &&
             event.logicalKey == LogicalKeyboardKey.keyV) {
+          // While a text field inside the panel owns the focus (inline
+          // "Card title…" input, search box, …), Cmd/Ctrl+V must paste
+          // into the field — not create cards from the clipboard.
+          if (isFocusInEditableText()) return KeyEventResult.ignored;
           _pasteFromClipboard();
           return KeyEventResult.handled;
         }

@@ -1,9 +1,7 @@
 import 'dart:async';
 import 'dart:io';
-
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:super_clipboard/super_clipboard.dart';
+import 'package:pasteboard/pasteboard.dart';
 import 'package:yoloit/core/platform/platform_dirs.dart';
 import 'package:yoloit/core/utils/text_normalize.dart' as text_normalize;
 
@@ -22,34 +20,13 @@ class ClipboardFileService {
       unawaited(_cleanupOldFiles());
     }
 
-    String? text;
-
-    // Try super_clipboard first.
-    try {
-      final clipboard = SystemClipboard.instance;
-      if (clipboard != null) {
-        final reader = await clipboard.read();
-
-        // Prefer image formats — use getFile() API for FileFormat types.
-        final imageResult = await _tryReadImage(reader);
-        if (imageResult != null) return imageResult;
-
-        if (reader.canProvide(Formats.plainText)) {
-          text = await reader.readValue(Formats.plainText);
-        }
-      }
-    } catch (_) {
-      // ignore super_clipboard failures
-    }
-
-    // Fallback to Flutter's standard clipboard API for text.
+    // Read plain text through Flutter's built-in clipboard FIRST: it avoids
+    // any third-party native clipboard code entirely.
+    final text = await _readFlutterText();
     if (text == null || text.isEmpty) {
-      try {
-        final data = await Clipboard.getData('text/plain');
-        text = data?.text;
-      } catch (_) {
-        // ignore fallback failures
-      }
+      // No plain text — the clipboard may hold an image.
+      final imageResult = await _tryReadImage();
+      if (imageResult != null) return imageResult;
     }
 
     if (text != null && text.isNotEmpty) {
@@ -59,38 +36,55 @@ class ClipboardFileService {
     return null;
   }
 
-  /// Test seam: super_clipboard has no mockable platform channel in unit
-  /// tests, so tests drive the image branch through this wrapper.
-  @visibleForTesting
-  Future<String?> tryReadImageForTesting(ClipboardReader reader) =>
-      _tryReadImage(reader);
-
-  Future<String?> _tryReadImage(ClipboardReader reader) async {
-    final formats = [
-      (Formats.png, 'png'),
-      (Formats.jpeg, 'jpg'),
-      (Formats.gif, 'gif'),
-      (Formats.webp, 'webp'),
-    ];
-
-    for (final (format, ext) in formats) {
-      if (!reader.canProvide(format)) continue;
-
-      Uint8List? bytes;
-      final completer = Completer<Uint8List?>();
-
-      reader.getFile(format, (file) async {
-        try {
-          completer.complete(await file.readAll());
-        } catch (_) {
-          completer.complete(null);
-        }
-      });
-
-      bytes = await completer.future;
-      if (bytes != null && bytes.isNotEmpty) return _saveBytes(bytes, ext);
+  Future<String?> _readFlutterText() async {
+    try {
+      final data = await Clipboard.getData('text/plain');
+      return data?.text;
+    } catch (_) {
+      return null;
     }
-    return null;
+  }
+
+  /// Reads the image from the system pasteboard and saves it to a temp file.
+  /// Returns null when there is no image or reading fails.
+  Future<String?> _tryReadImage() async {
+    Uint8List? bytes;
+    try {
+      bytes = await Pasteboard.image;
+    } catch (_) {
+      // pasteboard uses a plain MethodChannel: failures arrive here as
+      // catchable PlatformExceptions (unlike the old Rust-based
+      // super_clipboard, which aborted the whole process on panic).
+      return null;
+    }
+    if (bytes == null || bytes.isEmpty) return null;
+    return _saveBytes(bytes, _sniffImageExtension(bytes));
+  }
+
+  /// Picks a file extension from magic bytes. macOS always hands us PNG
+  /// (the plugin converts NSImage via TIFF), but other platforms may put
+  /// the original encoding on the pasteboard.
+  String _sniffImageExtension(Uint8List bytes) {
+    if (bytes.length >= 4 && bytes[0] == 0x89 && bytes[1] == 0x50) {
+      return 'png'; // 0x89 'P'
+    }
+    if (bytes.length >= 3 && bytes[0] == 0xFF && bytes[1] == 0xD8) {
+      return 'jpg';
+    }
+    if (bytes.length >= 4 &&
+        bytes[0] == 0x47 &&
+        bytes[1] == 0x49 &&
+        bytes[2] == 0x46) {
+      return 'gif'; // 'GIF8'
+    }
+    if (bytes.length >= 12 &&
+        bytes[0] == 0x52 &&
+        bytes[1] == 0x49 &&
+        bytes[2] == 0x46 &&
+        bytes[3] == 0x46) {
+      return 'webp'; // 'RIFF'....'WEBP'
+    }
+    return 'png';
   }
 
   Future<String> _saveBytes(Uint8List bytes, String ext) async {

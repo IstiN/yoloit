@@ -49,7 +49,12 @@ dependencies:
   highlight: ^0.7.0
   re_highlight: ^0.0.1
   shared_preferences: ^2.5.3
-  super_clipboard: ^0.9.1
+  # Clipboard images via a tiny Swift/C++ plugin. Deliberately NOT
+  # super_clipboard: its Rust core is built with panic = "abort", so any
+  # internal panic aborts the whole app (SIGABRT, uncatchable from Dart).
+  # pasteboard uses a plain MethodChannel (errors are catchable) and has no
+  # Rust/FFI dependency.
+  pasteboard: ^0.5.0
   flutter_svg: ^2.3.0
   flutter_secure_storage: ^10.3.1
   flutter_colorpicker: ^1.1.0

@@ -15,6 +15,7 @@ import 'package:yoloit/core/services/support_log_service.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/theme/theme_manager.dart';
 import 'package:yoloit/core/ui/adaptive_dialog.dart';
+import 'package:yoloit/core/utils/focus_utils.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/bloc/board_state.dart';
 import 'package:yoloit/features/board/model/board_icon.dart';

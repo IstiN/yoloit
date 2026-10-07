@@ -239,11 +239,17 @@ void main() {
 
       await _runRealIo(tester, () async {
         await _secondaryTap(tester, find.text('alpha.txt'));
-        expect(find.text('✏️ Rename'), findsOneWidget);
+        expect(find.text('Rename'), findsOneWidget);
         // File entries offer no folder-only actions.
-        expect(find.text('📁 New Folder'), findsNothing);
+        expect(find.text('New Folder'), findsNothing);
+        // Regression: nested GestureDetectors used to fire onSecondaryTapDown
+        // twice and stack the root menu on top of the entry menu.
+        expect(
+          find.byType(PopupMenuItem<String>),
+          findsNWidgets(5), // rename, copy path, copy filename, finder, delete
+        );
 
-        await tester.tap(find.text('✏️ Rename'));
+        await tester.tap(find.text('Rename'));
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 300));
         await tester.enterText(find.byType(TextField).last, 'renamed.txt');
@@ -266,10 +272,10 @@ void main() {
 
       await _runRealIo(tester, () async {
         await _secondaryTap(tester, find.text('sub'));
-        expect(find.text('📁 New Folder'), findsOneWidget);
-        expect(find.text('📄 New File'), findsOneWidget);
+        expect(find.text('New Folder'), findsOneWidget);
+        expect(find.text('New File'), findsOneWidget);
 
-        await tester.tap(find.text('📁 New Folder'));
+        await tester.tap(find.text('New Folder'));
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 300));
         await tester.enterText(find.byType(TextField).last, 'created');
@@ -293,7 +299,7 @@ void main() {
 
       await _runRealIo(tester, () async {
         await _secondaryTap(tester, find.text('sub'));
-        await tester.tap(find.text('📄 New File'));
+        await tester.tap(find.text('New File'));
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 300));
         await tester.enterText(find.byType(TextField).last, 'notes.txt');
@@ -321,7 +327,7 @@ void main() {
 
       await _runRealIo(tester, () async {
         await _secondaryTap(tester, find.text('sub'));
-        await tester.tap(find.text('📄 New File'));
+        await tester.tap(find.text('New File'));
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 300));
         // Cancelling (null) and confirming an empty name both bail out.
@@ -330,7 +336,7 @@ void main() {
         await tester.pump(const Duration(milliseconds: 300));
 
         await _secondaryTap(tester, find.text('sub'));
-        await tester.tap(find.text('📄 New File'));
+        await tester.tap(find.text('New File'));
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 300));
         await tester.tap(find.widgetWithText(TextButton, 'OK'));
@@ -365,11 +371,11 @@ void main() {
         await tester.pump(const Duration(milliseconds: 300));
 
         // Creation targets the root folder; no entity actions here.
-        expect(find.text('📁 New Folder'), findsOneWidget);
-        expect(find.text('📄 New File'), findsOneWidget);
-        expect(find.text('🔄 Refresh'), findsOneWidget);
-        expect(find.text('✏️ Rename'), findsNothing);
-        expect(find.text('🗑️ Delete'), findsNothing);
+        expect(find.text('New Folder'), findsOneWidget);
+        expect(find.text('New File'), findsOneWidget);
+        expect(find.text('Refresh'), findsOneWidget);
+        expect(find.text('Rename'), findsNothing);
+        expect(find.text('Delete'), findsNothing);
       });
     });
 
@@ -388,7 +394,7 @@ void main() {
         );
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 300));
-        await tester.tap(find.text('📄 New File'));
+        await tester.tap(find.text('New File'));
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 300));
         await tester.enterText(find.byType(TextField).last, '.env');
@@ -419,7 +425,7 @@ void main() {
 
       await _runRealIo(tester, () async {
         await _secondaryTap(tester, find.text('beta.md'));
-        await tester.tap(find.text('🗑️ Delete'));
+        await tester.tap(find.text('Delete'));
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 300));
         expect(

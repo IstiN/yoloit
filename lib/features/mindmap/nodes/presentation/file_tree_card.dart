@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/core/ui/app_svg_icons.dart';
 import 'package:yoloit/core/utils/clipboard_utils.dart';
 import 'package:yoloit/features/mindmap/nodes/presentation/card_props.dart';
 import 'package:yoloit/ui/components/cards/mindmap_card_shell.dart';
@@ -155,67 +156,41 @@ class _TreeRowState extends State<_TreeRow> {
   }
 
   List<PopupMenuEntry<String>> _menuItems(AppColorScheme colors, TreeEntry e) {
+    PopupMenuItem<String> item(
+      String value,
+      String label,
+      String icon, {
+      Color? color,
+    }) {
+      final effectiveColor = color ?? colors.terminalText;
+      return PopupMenuItem(
+        value: value,
+        child: Row(
+          children: [
+            SvgIcon(icon, size: 14, color: effectiveColor),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(fontSize: 12, color: effectiveColor),
+            ),
+          ],
+        ),
+      );
+    }
+
     return [
       if (e.isDir)
-        PopupMenuItem(
-          value: 'new_folder',
-          child: Text(
-            '📁 New Folder',
-            style: TextStyle(fontSize: 12, color: colors.terminalText),
-          ),
-        ),
+        item('new_folder', 'New Folder', AppSvgIcons.folderPlus),
       if (e.isDir && widget.onCreateFile != null)
-        PopupMenuItem(
-          value: 'create_file',
-          child: Text(
-            '📄 New File',
-            style: TextStyle(fontSize: 12, color: colors.terminalText),
-          ),
-        ),
-      PopupMenuItem(
-        value: 'rename',
-        child: Text(
-          '✏️ Rename',
-          style: TextStyle(fontSize: 12, color: colors.terminalText),
-        ),
-      ),
-      PopupMenuItem(
-        value: 'copy_path',
-        child: Text(
-          '📋 Copy path',
-          style: TextStyle(fontSize: 12, color: colors.terminalText),
-        ),
-      ),
-      PopupMenuItem(
-        value: 'copy_name',
-        child: Text(
-          '📄 Copy filename',
-          style: TextStyle(fontSize: 12, color: colors.terminalText),
-        ),
-      ),
-      PopupMenuItem(
-        value: 'show_finder',
-        child: Text(
-          '📂 Show in Finder',
-          style: TextStyle(fontSize: 12, color: colors.terminalText),
-        ),
-      ),
+        item('create_file', 'New File', AppSvgIcons.filePlus),
+      item('rename', 'Rename', AppSvgIcons.pencil),
+      item('copy_path', 'Copy path', AppSvgIcons.clipboardCopy),
+      item('copy_name', 'Copy filename', AppSvgIcons.copy),
+      item('show_finder', 'Show in Finder', AppSvgIcons.folderOpen),
       if (!e.isDir && widget.onOpenInPanel != null)
-        PopupMenuItem(
-          value: 'open_panel',
-          child: Text(
-            '⬡ Open in panel',
-            style: TextStyle(fontSize: 12, color: colors.terminalText),
-          ),
-        ),
+        item('open_panel', 'Open in panel', AppSvgIcons.appWindow),
       const PopupMenuDivider(),
-      PopupMenuItem(
-        value: 'delete',
-        child: Text(
-          '🗑️ Delete',
-          style: TextStyle(fontSize: 12, color: colors.accentRed),
-        ),
-      ),
+      item('delete', 'Delete', AppSvgIcons.trash, color: colors.accentRed),
     ];
   }
 
