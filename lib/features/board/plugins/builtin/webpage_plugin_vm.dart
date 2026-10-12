@@ -175,13 +175,13 @@ class _WebpageContentState extends State<_WebpageContent> {
         ),
       );
 
-    unawaited(() async {
-      try {
-        await controller.removeJavaScriptChannel('YoloNewTab');
-      } catch (_) {}
-      await controller.addJavaScriptChannel(
-        'YoloNewTab',
-        onMessageReceived: (message) {
+    // Serialized per panel inside WebViewManager so concurrent configure /
+    // detach / remove calls cannot interleave add/remove and trigger WebKit's
+    // duplicate script-message-handler NSException (SIGABRT).
+    unawaited(
+      WebViewManager.instance.ensureYoloNewTabChannel(
+        widget.panel.id,
+        (message) {
           final tabUrl = message.message;
           if (tabUrl.isEmpty) return;
           final createLinked = widget.renderContext.onCreateLinkedPanel;
@@ -193,8 +193,8 @@ class _WebpageContentState extends State<_WebpageContent> {
             }, _hostname(tabUrl));
           }
         },
-      );
-    }());
+      ),
+    );
   }
 
   void _syncControllerState(WebViewController controller) {

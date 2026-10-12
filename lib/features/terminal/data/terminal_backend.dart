@@ -16,6 +16,7 @@ class TerminalProcess {
     required this.exitCode,
     this.outputBytes,
     this.attachedExisting = false,
+    this.attachedModes = const [],
   });
 
   final Stream<String> output;
@@ -28,6 +29,10 @@ class TerminalProcess {
 
   final Future<int> exitCode;
   final bool attachedExisting;
+
+  /// DEC private modes enabled inside a re-attached session's TUI before the
+  /// client terminal was recreated (app restart). Empty for fresh sessions.
+  final List<int> attachedModes;
 
   factory TerminalProcess.fromPty(Pty pty) {
     // The facade output is already UTF-8-decoded and ack-flow-controlled
@@ -53,6 +58,21 @@ class TerminalProcess {
   @visibleForTesting
   static StreamTransformer<List<int>, String> utf8DecoderForTesting() =>
       const BufferedUtf8Decoder();
+}
+
+/// Builds one CSI sequence per mode that re-applies the DEC private modes
+/// [modes] recorded by the runtime. Feeding it into a freshly created
+/// [Terminal] before replaying output makes the new emulator match the state
+/// of the application still running inside a re-attached session — most
+/// importantly alternate buffer and mouse reporting, without which wheel
+/// gestures scroll the local scrollback instead of reaching the TUI.
+String buildTerminalModeRestoreSequence(List<int> modes) {
+  final buf = StringBuffer();
+  for (final mode in modes) {
+    buf.write('\x1b[?$mode'
+        'h');
+  }
+  return buf.toString();
 }
 
 abstract class TerminalBackend {
@@ -202,6 +222,7 @@ class RuntimeTerminalBackend implements TerminalBackend {
       output: _client.streamSession(sessionId),
       exitCode: Completer<int>().future,
       attachedExisting: attachedExisting,
+      attachedModes: createResult.modes,
     );
   }
 

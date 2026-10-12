@@ -1590,27 +1590,33 @@ class _ResourcePanelState extends State<_ResourcePanel> {
                             ),
                             child: Row(
                               children: [
-                                Tooltip(
-                                  message:
-                                      'Sum over the app and every process it '
-                                      'spawned (terminals, runs, agents). '
-                                      '100% = one CPU core, the same unit '
-                                      'Activity Monitor uses per process.',
-                                  child: _StatCell(
-                                    label: 'CPU',
-                                    value:
-                                        '${_snap.totalCpuPercent.toStringAsFixed(1)}%',
-                                    hint: cpuHint,
+                                Expanded(
+                                  child: Tooltip(
+                                    message:
+                                        'Sum over the app and every process it '
+                                        'spawned (terminals, runs, agents). '
+                                        '100% = one CPU core, the same unit '
+                                        'Activity Monitor uses per process.',
+                                    child: _StatCell(
+                                      label: 'CPU',
+                                      value:
+                                          '${_snap.totalCpuPercent.toStringAsFixed(1)}%',
+                                      hint: cpuHint,
+                                    ),
                                   ),
                                 ),
-                                _StatCell(
-                                  label: 'MEMORY',
-                                  value: formatBytes(_snap.totalMemoryBytes),
+                                Expanded(
+                                  child: _StatCell(
+                                    label: 'MEMORY',
+                                    value: formatBytes(_snap.totalMemoryBytes),
+                                  ),
                                 ),
-                                _StatCell(
-                                  label: 'RAM SHARE',
-                                  value:
-                                      '${ramSharePercent.toStringAsFixed(1)}%',
+                                Expanded(
+                                  child: _StatCell(
+                                    label: 'RAM SHARE',
+                                    value:
+                                        '${ramSharePercent.toStringAsFixed(1)}%',
+                                  ),
                                 ),
                               ],
                             ),
@@ -1780,38 +1786,37 @@ class _StatCell extends StatelessWidget {
   Widget build(BuildContext context) {
     final onSurface = Theme.of(context).colorScheme.onSurface;
     final mutedColor = context.appColors.textMuted;
-    return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              color: mutedColor,
-              fontSize: 9,
-              letterSpacing: 0.6,
-            ),
+    // NOTE: this cell must stay free of ParentDataWidgets (no Expanded) —
+    // callers wrap it in Expanded, and one call site nests it inside a
+    // Tooltip, whose MouseRegion ancestor breaks Flex ParentData if the
+    // Expanded lives here.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label,
+          style: TextStyle(color: mutedColor, fontSize: 9, letterSpacing: 0.6),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: TextStyle(
+            color: onSurface,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
           ),
+        ),
+        if (hint != null) ...[
           const SizedBox(height: 2),
           Text(
-            value,
-            style: TextStyle(
-              color: onSurface,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
+            hint!,
+            style: TextStyle(color: mutedColor, fontSize: 8),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-          if (hint != null) ...[
-            const SizedBox(height: 2),
-            Text(
-              hint!,
-              style: TextStyle(color: mutedColor, fontSize: 8),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
         ],
-      ),
+      ],
     );
   }
 }

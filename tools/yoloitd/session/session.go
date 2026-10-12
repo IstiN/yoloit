@@ -5,6 +5,9 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"regexp"
+	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -67,6 +70,14 @@ type Session struct {
 	alive        bool
 	exitCode     int
 	mu           sync.RWMutex
+	// modes tracks the terminal's DEC private-mode state (alt buffer, mouse
+	// reporting, ...) parsed from the output stream. The UI-side emulator is
+	// recreated on every app restart and replays only the recent ring, so
+	// mode-setting sequences sent long ago never reach it — clients request
+	// the last known state on attach to restore scroll/mouse behavior.
+	modes        map[int]bool
+	modeMu       sync.Mutex
+	modeScanTail string
 }
 
 // New starts a new PTY session.
@@ -141,6 +152,7 @@ func New(req *CreateRequest) (*Session, error) {
 		ring:         make([]Event, 0),
 		maxRingBytes: 512 * 1024,
 		alive:        true,
+		modes:        make(map[int]bool),
 	}
 
 	log.Printf("[session] created id=%s command=%s cwd=%s cols=%d rows=%d pid=%d", s.id, s.command, s.cwd, req.Cols, req.Rows, s.PID())
@@ -287,9 +299,69 @@ func (s *Session) waitLoop() {
 // emitOutput assigns the next sequence number, appends the event to the
 // replay ring and publishes it to subscribers.
 func (s *Session) emitOutput(data string) {
+	s.trackModes(data)
 	ev := Event{Type: "output", SessionID: s.id, Data: data, Seq: s.seq.Add(1)}
 	s.appendRing(ev)
 	s.publish(ev)
+}
+
+// decModeRe matches DEC private-mode set/reset sequences: CSI ? Pm ; ... h/l.
+var decModeRe = regexp.MustCompile(`\x1b\[\?([0-9;]+)([hl])`)
+
+// trackableMode filters which private modes are worth remembering. Modes
+// with disruptive replay semantics (2026 sync output) are excluded.
+func trackableMode(mode int) bool {
+	switch mode {
+	case 1, 3, 5, 6, 7, 9, 25, 47, 66,
+		1000, 1001, 1002, 1003, 1004, 1005, 1006, 1007, 1015,
+		1047, 1048, 1049, 2004:
+		return true
+	}
+	return false
+}
+
+// trackModes updates the remembered private-mode state from an output chunk.
+// A sequence may be split across chunks at the PTY-read boundary, so an
+// incomplete trailing escape is carried over to the next chunk.
+func (s *Session) trackModes(data string) {
+	s.modeMu.Lock()
+	defer s.modeMu.Unlock()
+
+	buf := s.modeScanTail + data
+	s.modeScanTail = ""
+
+	lastComplete := 0
+	for _, idx := range decModeRe.FindAllStringSubmatchIndex(buf, -1) {
+		params := buf[idx[2]:idx[3]]
+		final := buf[idx[4]:idx[5]]
+		for _, p := range strings.Split(params, ";") {
+			mode, err := strconv.Atoi(p)
+			if err != nil || !trackableMode(mode) {
+				continue
+			}
+			s.modes[mode] = final == "h"
+		}
+		lastComplete = idx[1]
+	}
+
+	// Carry a potentially incomplete trailing CSI sequence.
+	if tail := buf[lastComplete:]; strings.Contains(tail, "\x1b[") {
+		s.modeScanTail = tail[strings.LastIndex(tail, "\x1b["):]
+	}
+}
+
+// Modes returns the sorted list of currently enabled DEC private modes.
+func (s *Session) Modes() []int {
+	s.modeMu.Lock()
+	defer s.modeMu.Unlock()
+	out := make([]int, 0, len(s.modes))
+	for mode, enabled := range s.modes {
+		if enabled {
+			out = append(out, mode)
+		}
+	}
+	sort.Ints(out)
+	return out
 }
 
 func (s *Session) appendRing(ev Event) {

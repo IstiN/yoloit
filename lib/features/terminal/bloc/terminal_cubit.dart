@@ -701,6 +701,12 @@ class TerminalCubit extends Cubit<TerminalState> {
     // otherwise double-deliver every PTY chunk to the terminal (the same
     // bug class as the board session manager).
     _outputSubs.remove(sessionId)?.cancel();
+    // Re-attached session: re-apply the DEC private modes the TUI enabled
+    // before this (recreated) emulator existed — without this, wheel
+    // gestures scroll the local scrollback instead of reaching the TUI.
+    if (process.attachedModes.isNotEmpty) {
+      session.terminal.write(buildTerminalModeRestoreSequence(process.attachedModes));
+    }
     // Byte-level output is preferred when the backend offers it (see
     // Pty.outputBytes): chunks skip the per-KB UTF-8 decode on the UI
     // isolate and are flushed through Terminal.writeBytes, which decodes

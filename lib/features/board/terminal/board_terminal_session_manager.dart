@@ -211,6 +211,12 @@ class BoardTerminalSessionManager extends ChangeNotifier {
               : RemoteYoloitTerminalBackend(remoteInfo: remoteInfo),
     );
     _sessions[sessionId] = session;
+    // Re-attached session: the runtime recorded which DEC private modes the
+    // TUI enabled before this (recreated) emulator existed — apply them so
+    // wheel gestures forward to the TUI instead of scrolling local history.
+    if (process.attachedModes.isNotEmpty) {
+      session.terminal.write(buildTerminalModeRestoreSequence(process.attachedModes));
+    }
     _attachProcess(process, session);
     SupportLogService.instance.add(
       'terminal-session-manager',

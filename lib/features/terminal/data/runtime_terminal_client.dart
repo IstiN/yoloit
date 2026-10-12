@@ -16,10 +16,16 @@ class RuntimeSessionCreateResult {
   const RuntimeSessionCreateResult({
     required this.existing,
     required this.shellPid,
+    this.modes = const [],
   });
 
   final bool existing;
   final int shellPid;
+
+  /// DEC private modes the runtime observed in the session's output stream
+  /// (alt buffer, mouse reporting, ...). Non-empty for re-attached sessions
+  /// whose TUI enabled modes before the client was recreated (app restart).
+  final List<int> modes;
 }
 
 class RuntimeTerminalClient {
@@ -169,9 +175,14 @@ class RuntimeTerminalClient {
       shellPid =
           rawPid is int ? rawPid : int.tryParse(rawPid?.toString() ?? '') ?? 0;
     }
+    final rawModes = response['modes'];
     return RuntimeSessionCreateResult(
       existing: response['existing'] == true,
       shellPid: shellPid,
+      modes:
+          rawModes is List
+              ? rawModes.whereType<num>().map((m) => m.toInt()).toList()
+              : const [],
     );
   }
 

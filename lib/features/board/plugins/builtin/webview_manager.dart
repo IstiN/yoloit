@@ -11,6 +11,94 @@ class WebViewManager {
 
   final Map<String, WebViewEntry> _entries = {};
 
+  /// FIFO queue of pending script-channel mutations per panel.
+  ///
+  /// WKUserContentController throws an NSException (process-killing SIGABRT)
+  /// when a script message handler is added while one with the same name is
+  /// still registered. All add/remove operations on the YoloNewTab channel
+  /// must therefore be serialized per panel so remove→add pairs can never
+  /// interleave with another add.
+  final Map<String, Future<void>> _channelQueues = {};
+
+  static const String kNewTabChannel = 'YoloNewTab';
+
+  Future<void> _enqueueChannelOp(
+    String panelId,
+    Future<void> Function() op,
+  ) {
+    final prev = _channelQueues[panelId] ?? Future<void>.value();
+    final next = prev.then((_) => op()).catchError((Object _) {});
+    _channelQueues[panelId] = next;
+    // Drop the entry once drained so stale (completed) futures are never
+    // chained upon later — a listener registered on a future that completed
+    // in a defunct async zone may never fire.
+    next.whenComplete(() {
+      if (identical(_channelQueues[panelId], next)) {
+        _channelQueues.remove(panelId);
+      }
+    });
+    return next;
+  }
+
+  Future<void> _enqueueControllerChannelOp(
+    String panelId,
+    WebViewController? controller,
+    Future<void> Function(WebViewController controller) op,
+  ) {
+    if (controller == null) return Future<void>.value();
+    return _enqueueChannelOp(panelId, () => op(controller));
+  }
+
+  /// Register the YoloNewTab JS channel on the panel's controller.
+  ///
+  /// Serialized per panel and idempotent: any previously registered handler
+  /// is removed first, so concurrent callers cannot trigger WebKit's
+  /// duplicate-handler NSException.
+  Future<void> ensureYoloNewTabChannel(
+    String panelId,
+    void Function(JavaScriptMessage message) onMessageReceived,
+  ) {
+    return _enqueueControllerChannelOp(
+      panelId,
+      _entries[panelId]?.controller,
+      (controller) async {
+        try {
+          await controller.removeJavaScriptChannel(kNewTabChannel);
+        } catch (_) {}
+        await controller.addJavaScriptChannel(
+          kNewTabChannel,
+          onMessageReceived: onMessageReceived,
+        );
+      },
+    );
+  }
+
+  /// Remove the YoloNewTab JS channel (serialized with other channel ops).
+  Future<void> removeYoloNewTabChannel(String panelId) {
+    return _enqueueControllerChannelOp(
+      panelId,
+      _entries[panelId]?.controller,
+      (controller) async {
+        try {
+          await controller.removeJavaScriptChannel(kNewTabChannel);
+        } catch (_) {}
+      },
+    );
+  }
+
+  /// Serialized channel removal for an entry already evicted from [_entries]
+  /// (used by [remove] so the removal is still ordered after pending adds).
+  Future<void> _removeYoloNewTabChannelFor(
+    String panelId,
+    WebViewController? controller,
+  ) {
+    return _enqueueControllerChannelOp(panelId, controller, (controller) async {
+      try {
+        await controller.removeJavaScriptChannel(kNewTabChannel);
+      } catch (_) {}
+    });
+  }
+
   /// Get an existing controller or null.
   WebViewController? controller(String panelId) =>
       _entries[panelId]?.controller;
@@ -33,9 +121,7 @@ class WebViewManager {
     final controller = entry.controller;
     if (controller == null) return;
     unawaited(controller.setNavigationDelegate(NavigationDelegate()));
-    unawaited(
-      controller.removeJavaScriptChannel('YoloNewTab').catchError((_) {}),
-    );
+    unawaited(removeYoloNewTabChannel(panelId));
   }
 
   /// Check if a controller exists for this panel.
@@ -77,9 +163,7 @@ class WebViewManager {
     final controller = entry?.controller;
     if (controller == null) return;
     unawaited(controller.setNavigationDelegate(NavigationDelegate()));
-    unawaited(
-      controller.removeJavaScriptChannel('YoloNewTab').catchError((_) {}),
-    );
+    unawaited(_removeYoloNewTabChannelFor(panelId, controller));
   }
 
   /// Dispose all.

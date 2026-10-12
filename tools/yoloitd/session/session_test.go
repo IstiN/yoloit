@@ -1,6 +1,7 @@
 package session
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -393,5 +394,48 @@ func TestSessionsAreIsolated(t *testing.T) {
 		if strings.Contains(ev.Data, "A-MARKER") {
 			t.Fatalf("session B ring leaked session A output: %q", ev.Data)
 		}
+	}
+}
+
+func TestTrackModesSetResetAndSplitSequences(t *testing.T) {
+	s := &Session{modes: make(map[int]bool)}
+
+	s.trackModes("\x1b[?1049h\x1b[?1000h\x1b[?1006h")
+	if got := s.Modes(); fmt.Sprint(got) != "[1000 1006 1049]" {
+		t.Fatalf("expected [1000 1006 1049], got %v", got)
+	}
+
+	// Reset one mode, enable alt-buffer scroll (1007).
+	s.trackModes("\x1b[?1000l\x1b[?1007h")
+	got := fmt.Sprint(s.Modes())
+	if got != "[1006 1007 1049]" {
+		t.Fatalf("expected [1006 1007 1049], got %v", got)
+	}
+
+	// A sequence split across chunks must still be recognised.
+	s.trackModes("\x1b[?200")
+	s.trackModes("4h")
+	if got := s.Modes(); fmt.Sprint(got) != "[1006 1007 1049 2004]" {
+		t.Fatalf("split sequence not tracked, got %v", got)
+	}
+
+	// Combined params: both modes applied. Untracked modes are ignored.
+	s.trackModes("\x1b[?1002;2026;1006h")
+	got = fmt.Sprint(s.Modes())
+	if got != "[1002 1006 1007 1049 2004]" {
+		t.Fatalf("combined params not tracked, got %v", got)
+	}
+
+	// Non-mode CSI sequences must not corrupt the carry buffer.
+	s.trackModes("\x1b[1;31mred\x1b[0m")
+	if got := s.Modes(); fmt.Sprint(got) != "[1002 1006 1007 1049 2004]" {
+		t.Fatalf("SGR sequences corrupted modes, got %v", got)
+	}
+
+	// Leaving alt buffer is tracked too.
+	s.trackModes("\x1b[?1049l")
+	got = fmt.Sprint(s.Modes())
+	if got != "[1002 1006 1007 2004]" {
+		t.Fatalf("alt buffer exit not tracked, got %v", got)
 	}
 }

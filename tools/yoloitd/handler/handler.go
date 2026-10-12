@@ -295,5 +295,6 @@ func sessionToJSON(s *session.Session) map[string]any {
 		"createdAt": s.CreatedAt().Format("2006-01-02T15:04:05Z"),
 		"alive":     s.Alive(),
 		"pid":       s.PID(),
+		"modes":     s.Modes(),
 	}
 }
