@@ -302,6 +302,21 @@ void main() {
       if (await file.exists()) await file.delete();
     }
 
+    Future<void> expectImageExtension(
+      List<int> bytes,
+      String extension, {
+      required String reason,
+    }) async {
+      final image = Uint8List.fromList(bytes);
+      mockPasteboardImage(image);
+
+      final path = await ClipboardFileService.instance.saveClipboardToFile();
+      expect(path, isNotNull, reason: reason);
+      expect(path, endsWith('.$extension'), reason: reason);
+      addTearDown(() => deleteIfExists(path!));
+      expect(await File(path!).readAsBytes(), image, reason: reason);
+    }
+
     test('saves png image bytes to a temp .png file', () async {
       final pngBytes = Uint8List.fromList([
         0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3,
@@ -326,6 +341,49 @@ void main() {
       addTearDown(() => deleteIfExists(path!));
 
       expect(await File(path!).readAsBytes(), jpegBytes);
+    });
+
+    test('sniffs GIF and WebP magic bytes', () async {
+      await expectImageExtension(
+        [0x47, 0x49, 0x46, 0x38, 0x39, 0x61],
+        'gif',
+        reason: 'GIF signature',
+      );
+      await expectImageExtension(
+        [
+          0x52, 0x49, 0x46, 0x46,
+          0x04, 0x00, 0x00, 0x00,
+          0x57, 0x45, 0x42, 0x50,
+        ],
+        'webp',
+        reason: 'WebP RIFF signature',
+      );
+    });
+
+    test('uses png fallback for unknown, BMP, and truncated data', () async {
+      final cases = <String, List<int>>{
+        'unknown signature': [0x00, 0x01, 0x02, 0x03, 0x04, 0x05],
+        // BMP is not specially encoded today; preserve the PNG fallback.
+        'BMP signature': [
+          0x42, 0x4D, 0x0E, 0x00, 0x00, 0x00, 0x00,
+          0x00, 0x00, 0x00, 0x0A, 0x00, 0x00, 0x00,
+        ],
+        'truncated PNG': [0x89, 0x50, 0x4E],
+        'truncated JPEG': [0xFF, 0xD8],
+        'truncated GIF': [0x47, 0x49, 0x46],
+        'truncated WebP': [
+          0x52, 0x49, 0x46, 0x46, 0x00, 0x00,
+          0x00, 0x00, 0x57, 0x45, 0x42,
+        ],
+      };
+
+      for (final entry in cases.entries) {
+        await expectImageExtension(
+          entry.value,
+          'png',
+          reason: entry.key,
+        );
+      }
     });
 
     test('returns null when there is no image on the pasteboard', () async {

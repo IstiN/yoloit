@@ -28,41 +28,58 @@ class FilesPlugin extends FilesPluginBase {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-IconData _iconForExtension(String ext) => switch (ext.toLowerCase()) {
-  'png' ||
-  'jpg' ||
-  'jpeg' ||
-  'gif' ||
-  'bmp' ||
-  'svg' ||
-  'webp' => Icons.image_outlined,
-  'mp4' || 'mov' || 'avi' || 'mkv' => Icons.videocam_outlined,
-  'mp3' || 'wav' || 'flac' || 'aac' => Icons.audiotrack_outlined,
-  'pdf' => Icons.picture_as_pdf_outlined,
-  'dart' ||
-  'py' ||
-  'js' ||
-  'ts' ||
-  'java' ||
-  'kt' ||
-  'swift' ||
-  'go' ||
-  'rs' ||
-  'c' ||
-  'cpp' ||
-  'h' ||
-  'cs' => Icons.code_outlined,
-  'json' ||
-  'yaml' ||
-  'yml' ||
-  'xml' ||
-  'toml' ||
-  'ini' => Icons.data_object_outlined,
-  'md' || 'txt' || 'rtf' => Icons.article_outlined,
-  'zip' || 'tar' || 'gz' || 'rar' || '7z' => Icons.folder_zip_outlined,
-  '' => Icons.folder_outlined,
-  _ => Icons.insert_drive_file_outlined,
+const _filesIcons = <String, IconData>{
+  'png': Icons.image_outlined,
+  'jpg': Icons.image_outlined,
+  'jpeg': Icons.image_outlined,
+  'gif': Icons.image_outlined,
+  'bmp': Icons.image_outlined,
+  'svg': Icons.image_outlined,
+  'webp': Icons.image_outlined,
+  'mp4': Icons.videocam_outlined,
+  'mov': Icons.videocam_outlined,
+  'avi': Icons.videocam_outlined,
+  'mkv': Icons.videocam_outlined,
+  'mp3': Icons.audiotrack_outlined,
+  'wav': Icons.audiotrack_outlined,
+  'flac': Icons.audiotrack_outlined,
+  'aac': Icons.audiotrack_outlined,
+  'pdf': Icons.picture_as_pdf_outlined,
+  'dart': Icons.code_outlined,
+  'py': Icons.code_outlined,
+  'js': Icons.code_outlined,
+  'ts': Icons.code_outlined,
+  'java': Icons.code_outlined,
+  'kt': Icons.code_outlined,
+  'swift': Icons.code_outlined,
+  'go': Icons.code_outlined,
+  'rs': Icons.code_outlined,
+  'c': Icons.code_outlined,
+  'cpp': Icons.code_outlined,
+  'h': Icons.code_outlined,
+  'cs': Icons.code_outlined,
+  'json': Icons.data_object_outlined,
+  'yaml': Icons.data_object_outlined,
+  'yml': Icons.data_object_outlined,
+  'xml': Icons.data_object_outlined,
+  'toml': Icons.data_object_outlined,
+  'ini': Icons.data_object_outlined,
+  'md': Icons.article_outlined,
+  'txt': Icons.article_outlined,
+  'rtf': Icons.article_outlined,
+  'zip': Icons.folder_zip_outlined,
+  'tar': Icons.folder_zip_outlined,
+  'gz': Icons.folder_zip_outlined,
+  'rar': Icons.folder_zip_outlined,
+  '7z': Icons.folder_zip_outlined,
+  '': Icons.folder_outlined,
 };
+
+IconData _iconForExtension(String ext) =>
+    _filesIcons[ext.toLowerCase()] ?? Icons.insert_drive_file_outlined;
+
+@visibleForTesting
+IconData debugFilesIconForExtension(String ext) => _iconForExtension(ext);
 
 bool _isPreviewable(String ext) => const {
   'png',

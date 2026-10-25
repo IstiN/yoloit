@@ -12,10 +12,9 @@ class _FakeProcess implements Process {
   _FakeProcess({
     required List<String> stdoutLines,
     List<String> stderrLines = const [],
-    required int exitCode,
-  })  : _stdout = StreamController<List<int>>(),
-        _stderr = StreamController<List<int>>(),
-        _exitCode = exitCode {
+    required this._exitCode,
+  }) : _stdout = StreamController<List<int>>(),
+       _stderr = StreamController<List<int>>() {
     _emit(stdoutLines, _stdout);
     _emit(stderrLines, _stderr);
   }
@@ -28,7 +27,7 @@ class _FakeProcess implements Process {
     Future.microtask(() async {
       for (final line in lines) {
         c.add(utf8.encode('$line\n'));
-        await Future.delayed(const Duration(milliseconds: 5));
+        await Future<void>.delayed(const Duration(milliseconds: 5));
       }
       await c.close();
     });
@@ -52,7 +51,7 @@ class _FakeProcess implements Process {
 
 class _FakeIOSink implements IOSink {
   @override
-  Future close() async {}
+  Future<void> close() async {}
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
@@ -204,8 +203,9 @@ void main() {
 
       expect(events, hasLength(1));
       expect(events.first.type, ChatEventType.result);
-      expect(events.first.data['usage']['outputTokens'], 42);
-      expect(events.first.data['usage']['totalApiDurationMs'], 1500);
+      final usage = events.single.data['usage'] as Map<String, dynamic>;
+      expect(usage['outputTokens'], 42);
+      expect(usage['totalApiDurationMs'], 1500);
     });
 
     test('resumes with stored session id', () async {
@@ -223,6 +223,7 @@ void main() {
       );
 
       p.setSessionId('s1', 'cursor-sess-123');
+      // ignore: invalid_use_of_protected_member
       p.sessionModels['s1'] = 'gpt-4';
 
       await p
@@ -255,6 +256,7 @@ void main() {
       );
 
       p.setSessionId('s1', 'cursor-sess-123');
+      // ignore: invalid_use_of_protected_member
       p.sessionModels['s1'] = 'gpt-4';
 
       await p
@@ -300,6 +302,40 @@ void main() {
           ),
         ),
       );
+    });
+  });
+
+  group('CursorAgentProvider tool labels', () {
+    test('maps every known tool key and preserves unknown keys', () {
+      final provider = CursorAgentProvider();
+      final expectedLabels = <String, String>{
+        'shellToolCall': 'Shell',
+        'readFile': 'Read File',
+        'editFile': 'Edit File',
+        'listDir': 'List Dir',
+        'searchFiles': 'Search Files',
+        'createFile': 'Create File',
+        'deleteFile': 'Delete File',
+        'moveFile': 'Move File',
+        'customTool': 'customTool',
+      };
+
+      for (final entry in expectedLabels.entries) {
+        final events = provider.parseLine(
+          jsonEncode({
+            'type': 'tool_call',
+            'subtype': 'started',
+            'call_id': 'call-1',
+            'tool_call': {
+              entry.key: <String, dynamic>{},
+            },
+          }),
+          'tool-labels',
+        );
+
+        expect(events, hasLength(1), reason: entry.key);
+        expect(events.single.data['toolName'], entry.value, reason: entry.key);
+      }
     });
   });
 

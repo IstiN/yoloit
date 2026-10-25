@@ -226,11 +226,16 @@ A pre-configured `repomix.config.json` lives at the repo root. It excludes `thir
   `dart pub global activate crap4dart`
 - Regenerate the badge (uses the existing `coverage/lcov.info`):
   `crap4dart analyze --badge badges/crap.svg`
-- Current mode is **observe-only**: the threshold is the default 8.0 (the
-  legacy max is far above it, so `analyze` exits 2 — expected, do not "fix"
-  by raising the threshold), and all quality gates are `enabled: false` in
-  `crap4dart.yaml`. Enable gates / ratchet via `--diff` only when the team
-  starts actually reducing the score.
+- Current mode is **ratchet**: the threshold is 24.0 (the codebase max was
+  reduced from 156 to <=24 via lookup-map refactors and focused tests), so
+  `analyze` exits 0 while the score stays at or below 24. `check` fails any
+  method scoring above 24 — do not raise the threshold; lower it as the score
+  improves. All other quality gates remain `enabled: false` in
+  `crap4dart.yaml`. The badge regenerates automatically on every push to
+  `main` via `.github/workflows/crap-badge.yml` (full coverage run + commit
+  of `badges/crap.svg` when it changes). Note: a monolithic
+  `flutter test --coverage` can wedge after ~2k tests on some macOS setups —
+  if it stalls, run the suite in shards and merge with `lcov -a ...`.
 
 ## 🚨 Critical Agent Gotchas
 

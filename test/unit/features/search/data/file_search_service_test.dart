@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yoloit/features/search/data/file_search_service.dart';
 
+import '../../../../helpers/fake_process_runner.dart';
+
 void main() {
   group('SearchResult', () {
     test('relativePath computes path relative to workspace', () {
@@ -21,6 +23,98 @@ void main() {
         workspacePath: '/home/user/project',
       );
       expect(result.fileName, 'main.dart');
+    });
+  });
+
+  group('FileSearchService ripgrep lookup', () {
+    late FakeProcessRunner runner;
+
+    setUp(() {
+      runner = FakeProcessRunner();
+    });
+
+    FileSearchService createService({
+      Set<String> existingPaths = const <String>{},
+      bool isWindows = false,
+    }) {
+      return FileSearchService.forTesting(
+        processRunner: runner.run,
+        fileExists: (path) async => existingPaths.contains(path),
+        isWindows: isWindows,
+      );
+    }
+
+    test('finds ripgrep at each standard install path', () async {
+      const candidates = [
+        '/opt/homebrew/bin/rg',
+        '/usr/local/bin/rg',
+        '/usr/bin/rg',
+      ];
+
+      for (final candidate in candidates) {
+        final service = createService(existingPaths: {candidate});
+        expect(await service.findRgForTesting(), candidate);
+      }
+      expect(runner.calls, isEmpty);
+    });
+
+    test('uses which when no standard install path exists and caches it', () async {
+      runner.mockResult('which', stdout: '  /Users/test/.cargo/bin/rg\n');
+      final service = createService();
+
+      expect(
+        await service.findRgForTesting(),
+        '/Users/test/.cargo/bin/rg',
+      );
+      expect(
+        await service.findRgForTesting(),
+        '/Users/test/.cargo/bin/rg',
+      );
+      expect(runner.calls, hasLength(1));
+      expect(runner.calls.single.executable, 'which');
+      expect(runner.calls.single.arguments, ['rg']);
+    });
+
+    test('returns null and caches the result when which finds nothing', () async {
+      final service = createService();
+
+      expect(await service.findRgForTesting(), isNull);
+      expect(await service.findRgForTesting(), isNull);
+      expect(runner.calls, hasLength(1));
+    });
+
+    test('returns null when which fails', () async {
+      runner.mockResult('which', exitCode: 1, stdout: '/ignored/rg');
+      final service = createService();
+
+      expect(await service.findRgForTesting(), isNull);
+      expect(runner.calls.single.executable, 'which');
+    });
+
+    test('uses where on Windows and selects the first path', () async {
+      runner.mockResult(
+        'where',
+        stdout: 'C:\\tools\\rg.exe\r\nC:\\other\\rg.exe\n',
+      );
+      final service = createService(isWindows: true);
+
+      expect(await service.findRgForTesting(), 'C:\\tools\\rg.exe');
+      expect(runner.calls.single.executable, 'where');
+      expect(runner.calls.single.arguments, ['rg']);
+    });
+
+    test('returns null for empty or failed Windows lookup', () async {
+      final emptyResult = await createService(
+        isWindows: true,
+      ).findRgForTesting();
+      expect(emptyResult, isNull);
+
+      runner.mockResult('where', exitCode: 1, stdout: 'C:\\ignored\\rg.exe');
+      final failedResult = await createService(
+        isWindows: true,
+      ).findRgForTesting();
+      expect(failedResult, isNull);
+      expect(runner.calls, hasLength(2));
     });
   });
 

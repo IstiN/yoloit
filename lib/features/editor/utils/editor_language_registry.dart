@@ -19,6 +19,147 @@ import 'package:highlight/languages/yaml.dart';
 class EditorLanguageRegistry {
   const EditorLanguageRegistry._();
 
+  static final _languageFactories = <String, EditorLanguageSpec Function()>{
+    'dart': () => EditorLanguageSpec(id: 'dart', label: 'Dart', mode: dart),
+    'js': () => EditorLanguageSpec(
+      id: 'javascript',
+      label: 'JavaScript',
+      mode: javascript,
+    ),
+    'mjs': () => EditorLanguageSpec(
+      id: 'javascript',
+      label: 'JavaScript',
+      mode: javascript,
+    ),
+    'cjs': () => EditorLanguageSpec(
+      id: 'javascript',
+      label: 'JavaScript',
+      mode: javascript,
+    ),
+    'ts': () => EditorLanguageSpec(
+      id: 'typescript',
+      label: 'TypeScript',
+      mode: typescript,
+    ),
+    'jsx': () => EditorLanguageSpec(id: 'react', label: 'React', mode: xml),
+    'tsx': () => EditorLanguageSpec(id: 'react', label: 'React', mode: xml),
+    'py': () => EditorLanguageSpec(
+      id: 'python',
+      label: 'Python',
+      mode: python,
+      commentPrefix: '# ',
+    ),
+    'pyi': () => EditorLanguageSpec(
+      id: 'python',
+      label: 'Python',
+      mode: python,
+      commentPrefix: '# ',
+    ),
+    'pyw': () => EditorLanguageSpec(
+      id: 'python',
+      label: 'Python',
+      mode: python,
+      commentPrefix: '# ',
+    ),
+    'java': () => EditorLanguageSpec(id: 'java', label: 'Java', mode: java),
+    'kt': () => EditorLanguageSpec(id: 'kotlin', label: 'Kotlin', mode: kotlin),
+    'kts': () =>
+        EditorLanguageSpec(id: 'kotlin', label: 'Kotlin', mode: kotlin),
+    'go': () => EditorLanguageSpec(id: 'go', label: 'Go', mode: go),
+    'rs': () => EditorLanguageSpec(id: 'rust', label: 'Rust', mode: rust),
+    'sh': () => EditorLanguageSpec(
+      id: 'shell',
+      label: 'Shell',
+      mode: bash,
+      commentPrefix: '# ',
+    ),
+    'bash': () => EditorLanguageSpec(
+      id: 'shell',
+      label: 'Shell',
+      mode: bash,
+      commentPrefix: '# ',
+    ),
+    'zsh': () => EditorLanguageSpec(
+      id: 'shell',
+      label: 'Shell',
+      mode: bash,
+      commentPrefix: '# ',
+    ),
+    'fish': () => EditorLanguageSpec(
+      id: 'shell',
+      label: 'Shell',
+      mode: bash,
+      commentPrefix: '# ',
+    ),
+    'c': () => EditorLanguageSpec(id: 'c', label: 'C', mode: cpp),
+    'h': () => EditorLanguageSpec(id: 'c', label: 'C', mode: cpp),
+    'cpp': () => EditorLanguageSpec(id: 'cpp', label: 'C++', mode: cpp),
+    'cc': () => EditorLanguageSpec(id: 'cpp', label: 'C++', mode: cpp),
+    'cxx': () => EditorLanguageSpec(id: 'cpp', label: 'C++', mode: cpp),
+    'hpp': () => EditorLanguageSpec(id: 'cpp', label: 'C++', mode: cpp),
+    'css': () => EditorLanguageSpec(id: 'css', label: 'CSS', mode: css),
+    'json': () => EditorLanguageSpec(id: 'json', label: 'JSON', mode: json),
+    'jsonc': () => EditorLanguageSpec(id: 'json', label: 'JSON', mode: json),
+    'yaml': () => EditorLanguageSpec(
+      id: 'yaml',
+      label: 'YAML',
+      mode: yaml,
+      commentPrefix: '# ',
+    ),
+    'yml': () => EditorLanguageSpec(
+      id: 'yaml',
+      label: 'YAML',
+      mode: yaml,
+      commentPrefix: '# ',
+    ),
+    'toml': () => const EditorLanguageSpec(
+      id: 'config',
+      label: 'Config',
+      commentPrefix: '# ',
+    ),
+    'ini': () => const EditorLanguageSpec(
+      id: 'config',
+      label: 'Config',
+      commentPrefix: '# ',
+    ),
+    'cfg': () => const EditorLanguageSpec(
+      id: 'config',
+      label: 'Config',
+      commentPrefix: '# ',
+    ),
+    'conf': () => const EditorLanguageSpec(
+      id: 'config',
+      label: 'Config',
+      commentPrefix: '# ',
+    ),
+    'properties': () => const EditorLanguageSpec(
+      id: 'config',
+      label: 'Config',
+      commentPrefix: '# ',
+    ),
+    'xml': () => EditorLanguageSpec(id: 'xml', label: 'XML', mode: xml),
+    'svg': () => EditorLanguageSpec(id: 'xml', label: 'SVG', mode: xml),
+    'html': () => EditorLanguageSpec(id: 'xml', label: 'HTML', mode: xml),
+    'htm': () => EditorLanguageSpec(id: 'xml', label: 'HTML', mode: xml),
+    'sql': () => EditorLanguageSpec(id: 'sql', label: 'SQL', mode: sql),
+    'md': () => const EditorLanguageSpec(
+      id: 'markdown',
+      label: 'Markdown',
+      commentPrefix: '<!-- ',
+    ),
+    'mdx': () => const EditorLanguageSpec(
+      id: 'markdown',
+      label: 'Markdown',
+      commentPrefix: '<!-- ',
+    ),
+    'markdown': () => const EditorLanguageSpec(
+      id: 'markdown',
+      label: 'Markdown',
+      commentPrefix: '<!-- ',
+    ),
+    'swift': () => EditorLanguageSpec(id: 'swift', label: 'Swift', mode: swift),
+  };
+
   static EditorLanguageSpec forPath(String path) {
     final name = _fileName(path).toLowerCase();
     final ext = _extension(name);
@@ -42,82 +183,12 @@ class EditorLanguageRegistry {
       );
     }
 
-    return switch (ext) {
-      'dart' => EditorLanguageSpec(id: 'dart', label: 'Dart', mode: dart),
-      'js' || 'mjs' || 'cjs' => EditorLanguageSpec(
-        id: 'javascript',
-        label: 'JavaScript',
-        mode: javascript,
-      ),
-      'ts' => EditorLanguageSpec(
-        id: 'typescript',
-        label: 'TypeScript',
-        mode: typescript,
-      ),
-      'jsx' ||
-      'tsx' => EditorLanguageSpec(id: 'react', label: 'React', mode: xml),
-      'py' || 'pyi' || 'pyw' => EditorLanguageSpec(
-        id: 'python',
-        label: 'Python',
-        mode: python,
-        commentPrefix: '# ',
-      ),
-      'java' => EditorLanguageSpec(id: 'java', label: 'Java', mode: java),
-      'kt' ||
-      'kts' => EditorLanguageSpec(id: 'kotlin', label: 'Kotlin', mode: kotlin),
-      'go' => EditorLanguageSpec(id: 'go', label: 'Go', mode: go),
-      'rs' => EditorLanguageSpec(id: 'rust', label: 'Rust', mode: rust),
-      'sh' || 'bash' || 'zsh' || 'fish' => EditorLanguageSpec(
-        id: 'shell',
-        label: 'Shell',
-        mode: bash,
-        commentPrefix: '# ',
-      ),
-      'c' || 'h' => EditorLanguageSpec(id: 'c', label: 'C', mode: cpp),
-      'cpp' ||
-      'cc' ||
-      'cxx' ||
-      'hpp' => EditorLanguageSpec(id: 'cpp', label: 'C++', mode: cpp),
-      'css' => EditorLanguageSpec(id: 'css', label: 'CSS', mode: css),
-      'json' ||
-      'jsonc' => EditorLanguageSpec(id: 'json', label: 'JSON', mode: json),
-      'yaml' || 'yml' => EditorLanguageSpec(
-        id: 'yaml',
-        label: 'YAML',
-        mode: yaml,
-        commentPrefix: '# ',
-      ),
-      'toml' ||
-      'ini' ||
-      'cfg' ||
-      'conf' ||
-      'properties' => const EditorLanguageSpec(
-        id: 'config',
-        label: 'Config',
-        commentPrefix: '# ',
-      ),
-      'xml' || 'svg' || 'html' || 'htm' => EditorLanguageSpec(
-        id: 'xml',
-        label:
-            ext == 'svg'
-                ? 'SVG'
-                : ext == 'xml'
-                ? 'XML'
-                : 'HTML',
-        mode: xml,
-      ),
-      'sql' => EditorLanguageSpec(id: 'sql', label: 'SQL', mode: sql),
-      'md' || 'mdx' || 'markdown' => const EditorLanguageSpec(
-        id: 'markdown',
-        label: 'Markdown',
-        commentPrefix: '<!-- ',
-      ),
-      'swift' => EditorLanguageSpec(id: 'swift', label: 'Swift', mode: swift),
-      _ => EditorLanguageSpec(
-        id: ext.isEmpty ? 'plaintext' : ext,
-        label: ext.isEmpty ? 'Plain Text' : ext.toUpperCase(),
-      ),
-    };
+    final factory = _languageFactories[ext];
+    if (factory != null) return factory();
+    return EditorLanguageSpec(
+      id: ext.isEmpty ? 'plaintext' : ext,
+      label: ext.isEmpty ? 'Plain Text' : ext.toUpperCase(),
+    );
   }
 
   static String _fileName(String path) {

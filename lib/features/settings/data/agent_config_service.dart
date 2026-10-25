@@ -97,6 +97,10 @@ const _sentinel = Object();
 
 class AgentConfigService {
   AgentConfigService._();
+
+  @visibleForTesting
+  factory AgentConfigService.forTesting() = AgentConfigService._;
+
   static final instance = AgentConfigService._();
 
   // In-memory cache so cubit can read without async on every spawn.
@@ -186,67 +190,85 @@ class AgentConfigService {
     if (_hasLoaded && _loadedFromConfigDir == _configPath) return configs;
     _hasLoaded = true;
     _loadedFromConfigDir = _configPath;
-    final storage = FileStorageAdapter.instance;
-    try {
-      if (!await storage.exists(_configPath)) {
-        _cached = _defaults;
-      } else {
-        final raw = await storage.readString(_configPath);
-        final data = jsonDecode(raw ?? '[]') as List;
-        final saved = data
-            .map((e) => AgentConfig.fromJson(e as Map<String, dynamic>))
-            .toList();
-        // Merge: ensure all built-ins are present and have default stream adapters if null
-        final updatedSaved = <AgentConfig>[];
-        for (final s in saved) {
-          final def = _defaults.where((d) => d.id == s.id).firstOrNull;
-          if (def != null) {
-            var next = s;
-            if (next.streamAdapter == null && def.streamAdapter != null) {
-              next = next.copyWith(streamAdapter: def.streamAdapter);
-            }
-            if (next.id == 'codex' && next.disableModel) {
-              next = next.copyWith(disableModel: false);
-            }
-            updatedSaved.add(next);
-          } else {
-            updatedSaved.add(s);
-          }
-        }
-        final savedIds = updatedSaved.map((c) => c.id).toSet();
-        for (final d in _defaults) {
-          if (!savedIds.contains(d.id)) updatedSaved.add(d);
-        }
-        _cached = _dedupeById(updatedSaved);
-      }
-    } catch (_) {
-      _cached = _dedupeById(_defaults);
-    }
 
-    try {
-      if (await storage.exists(_prefsPath)) {
-        final raw = await storage.readString(_prefsPath);
-        final prefs = jsonDecode(raw ?? '{}') as Map<String, dynamic>;
-        _defaultAgentId = prefs['defaultAgentId'] as String?;
-        final savedAsrMode = prefs['defaultAsrMode'] as String?;
-        _defaultAsrMode = savedAsrMode == 'local'
-            ? 'cloud'
-            : (savedAsrMode ?? 'cloud');
-        _defaultAsrCloudConfigId = prefs['defaultAsrCloudConfigId'] as String?;
-        _defaultAsrCloudModel = prefs['defaultAsrCloudModel'] as String?;
-        if (_defaultAsrMode == 'cloud') {
-          await _savePrefs();
-        }
-        _terminalRenderEngine = TerminalRenderEngine.xterm;
-        _terminalBackendMode = TerminalBackendModeX.fromId(
-          prefs['terminalBackendMode'] as String?,
-        );
-      }
-    } catch (_) {}
+    await _loadConfigs();
+    await _loadPrefs();
     terminalBackendModeNotifier.value = _terminalBackendMode;
     terminalRenderEngineNotifier.value = _terminalRenderEngine;
 
     return _cached;
+  }
+
+  Future<void> _loadConfigs() async {
+    final storage = FileStorageAdapter.instance;
+    try {
+      if (!await storage.exists(_configPath)) {
+        _cached = _defaults;
+        return;
+      }
+      final saved = _parseConfigs(await storage.readString(_configPath));
+      _cached = _dedupeById(_mergeWithDefaults(saved));
+    } catch (_) {
+      _cached = _dedupeById(_defaults);
+    }
+  }
+
+  static List<AgentConfig> _parseConfigs(String? raw) {
+    final data = jsonDecode(raw ?? '[]') as List;
+    return data
+        .map((e) => AgentConfig.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  static List<AgentConfig> _mergeWithDefaults(List<AgentConfig> saved) {
+    // Ensure all built-ins are present and have default stream adapters.
+    final updatedSaved = saved.map(_mergeBuiltInDefaults).toList();
+    final savedIds = updatedSaved.map((c) => c.id).toSet();
+    for (final defaultConfig in _defaults) {
+      if (!savedIds.contains(defaultConfig.id)) {
+        updatedSaved.add(defaultConfig);
+      }
+    }
+    return updatedSaved;
+  }
+
+  static AgentConfig _mergeBuiltInDefaults(AgentConfig saved) {
+    final defaultConfig = _defaults
+        .where((candidate) => candidate.id == saved.id)
+        .firstOrNull;
+    if (defaultConfig == null) return saved;
+
+    var merged = saved;
+    if (merged.streamAdapter == null && defaultConfig.streamAdapter != null) {
+      merged = merged.copyWith(streamAdapter: defaultConfig.streamAdapter);
+    }
+    if (merged.id == 'codex' && merged.disableModel) {
+      merged = merged.copyWith(disableModel: false);
+    }
+    return merged;
+  }
+
+  Future<void> _loadPrefs() async {
+    final storage = FileStorageAdapter.instance;
+    try {
+      if (!await storage.exists(_prefsPath)) return;
+      final raw = await storage.readString(_prefsPath);
+      final prefs = jsonDecode(raw ?? '{}') as Map<String, dynamic>;
+      _defaultAgentId = prefs['defaultAgentId'] as String?;
+      final savedAsrMode = prefs['defaultAsrMode'] as String?;
+      _defaultAsrMode = savedAsrMode == 'local'
+          ? 'cloud'
+          : (savedAsrMode ?? 'cloud');
+      _defaultAsrCloudConfigId = prefs['defaultAsrCloudConfigId'] as String?;
+      _defaultAsrCloudModel = prefs['defaultAsrCloudModel'] as String?;
+      if (_defaultAsrMode == 'cloud') {
+        await _savePrefs();
+      }
+      _terminalRenderEngine = TerminalRenderEngine.xterm;
+      _terminalBackendMode = TerminalBackendModeX.fromId(
+        prefs['terminalBackendMode'] as String?,
+      );
+    } catch (_) {}
   }
 
   Future<void> save(List<AgentConfig> configs) async {

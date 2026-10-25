@@ -287,52 +287,52 @@ class ThemeManager extends ChangeNotifier {
     return _slotFromScheme(baseScheme, slot);
   }
 
-  static Color _slotFromScheme(AppColorScheme s, String slot) {
-    return switch (slot) {
-      'primary' => s.primary,
-      'primaryLight' => s.primaryLight,
-      'primaryDark' => s.primaryDark,
-      'primaryGlow' => s.primaryGlow,
-      'background' => s.background,
-      'surface' => s.surface,
-      'surfaceElevated' => s.surfaceElevated,
-      'surfaceHighlight' => s.surfaceHighlight,
-      'border' => s.border,
-      'divider' => s.divider,
-      'terminalBackground' => s.terminalBackground,
-      'sidebar' => s.sidebar,
-      'sidebarGlow' => s.sidebarGlow,
-      'terminalPrompt' => s.terminalPrompt,
-      'tabBorder' => s.tabBorder,
-      'tabActiveBg' => s.tabActiveBg,
-      'tabInactiveBg' => s.tabInactiveBg,
-      'textPrimary' => s.textPrimary,
-      'textSecondary' => s.textSecondary,
-      'textMuted' => s.textMuted,
-      'textHighlight' => s.textHighlight,
-      'terminalText' => s.terminalText,
-      'accentGreen' => s.accentGreen,
-      'accentGreenDim' => s.accentGreenDim,
-      'accentGreenGlow' => s.accentGreenGlow,
-      'accentRed' => s.accentRed,
-      'accentRedDim' => s.accentRedDim,
-      'accentBlue' => s.accentBlue,
-      'accentOrange' => s.accentOrange,
-      'diffAddBg' => s.diffAddBg,
-      'diffAddText' => s.diffAddText,
-      'diffRemoveBg' => s.diffRemoveBg,
-      'diffRemoveText' => s.diffRemoveText,
-      'diffContextBg' => s.diffContextBg,
-      'statusActive' => s.statusActive,
-      'statusIdle' => s.statusIdle,
-      'statusError' => s.statusError,
-      'statusWarning' => s.statusWarning,
-      'orbCyan' => s.orbCyan,
-      'orbPurple' => s.orbPurple,
-      'orbPink' => s.orbPink,
-      _ => s.primary,
-    };
-  }
+  static final _slotGetters = <String, Color Function(AppColorScheme)>{
+    'primary': (s) => s.primary,
+    'primaryLight': (s) => s.primaryLight,
+    'primaryDark': (s) => s.primaryDark,
+    'primaryGlow': (s) => s.primaryGlow,
+    'background': (s) => s.background,
+    'surface': (s) => s.surface,
+    'surfaceElevated': (s) => s.surfaceElevated,
+    'surfaceHighlight': (s) => s.surfaceHighlight,
+    'border': (s) => s.border,
+    'divider': (s) => s.divider,
+    'terminalBackground': (s) => s.terminalBackground,
+    'sidebar': (s) => s.sidebar,
+    'sidebarGlow': (s) => s.sidebarGlow,
+    'terminalPrompt': (s) => s.terminalPrompt,
+    'tabBorder': (s) => s.tabBorder,
+    'tabActiveBg': (s) => s.tabActiveBg,
+    'tabInactiveBg': (s) => s.tabInactiveBg,
+    'textPrimary': (s) => s.textPrimary,
+    'textSecondary': (s) => s.textSecondary,
+    'textMuted': (s) => s.textMuted,
+    'textHighlight': (s) => s.textHighlight,
+    'terminalText': (s) => s.terminalText,
+    'accentGreen': (s) => s.accentGreen,
+    'accentGreenDim': (s) => s.accentGreenDim,
+    'accentGreenGlow': (s) => s.accentGreenGlow,
+    'accentRed': (s) => s.accentRed,
+    'accentRedDim': (s) => s.accentRedDim,
+    'accentBlue': (s) => s.accentBlue,
+    'accentOrange': (s) => s.accentOrange,
+    'diffAddBg': (s) => s.diffAddBg,
+    'diffAddText': (s) => s.diffAddText,
+    'diffRemoveBg': (s) => s.diffRemoveBg,
+    'diffRemoveText': (s) => s.diffRemoveText,
+    'diffContextBg': (s) => s.diffContextBg,
+    'statusActive': (s) => s.statusActive,
+    'statusIdle': (s) => s.statusIdle,
+    'statusError': (s) => s.statusError,
+    'statusWarning': (s) => s.statusWarning,
+    'orbCyan': (s) => s.orbCyan,
+    'orbPurple': (s) => s.orbPurple,
+    'orbPink': (s) => s.orbPink,
+  };
+
+  static Color _slotFromScheme(AppColorScheme s, String slot) =>
+      _slotGetters[slot]?.call(s) ?? s.primary;
 
   void _loadColorOverrides(SharedPreferences prefs) {
     _colorOverrides = {};
@@ -366,7 +366,7 @@ class ThemeManager extends ChangeNotifier {
     }
     final map = <String, String>{};
     for (final entry in _colorOverrides.entries) {
-      map[entry.key] = entry.value.value.toRadixString(16).padLeft(8, '0');
+      map[entry.key] = entry.value.toARGB32().toRadixString(16).padLeft(8, '0');
     }
     await prefs.setString('color_overrides', jsonEncode(map));
   }

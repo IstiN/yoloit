@@ -12,6 +12,22 @@ class ClipboardFileService {
   static final ClipboardFileService instance = ClipboardFileService._();
 
   static String get _dir => '${PlatformDirs.instance.tempDir}/yoloit_clip';
+
+  static const _imageSignatures = <({
+    List<int> bytes,
+    String extension,
+    int minLength,
+  })>[
+    (bytes: <int>[0x89, 0x50], extension: 'png', minLength: 4),
+    (bytes: <int>[0xFF, 0xD8], extension: 'jpg', minLength: 3),
+    (bytes: <int>[0x47, 0x49, 0x46], extension: 'gif', minLength: 4),
+    (
+      bytes: <int>[0x52, 0x49, 0x46, 0x46],
+      extension: 'webp',
+      minLength: 12,
+    ),
+  ];
+
   bool _hasCleanedUp = false;
 
   Future<String?> saveClipboardToFile() async {
@@ -65,26 +81,23 @@ class ClipboardFileService {
   /// (the plugin converts NSImage via TIFF), but other platforms may put
   /// the original encoding on the pasteboard.
   String _sniffImageExtension(Uint8List bytes) {
-    if (bytes.length >= 4 && bytes[0] == 0x89 && bytes[1] == 0x50) {
-      return 'png'; // 0x89 'P'
-    }
-    if (bytes.length >= 3 && bytes[0] == 0xFF && bytes[1] == 0xD8) {
-      return 'jpg';
-    }
-    if (bytes.length >= 4 &&
-        bytes[0] == 0x47 &&
-        bytes[1] == 0x49 &&
-        bytes[2] == 0x46) {
-      return 'gif'; // 'GIF8'
-    }
-    if (bytes.length >= 12 &&
-        bytes[0] == 0x52 &&
-        bytes[1] == 0x49 &&
-        bytes[2] == 0x46 &&
-        bytes[3] == 0x46) {
-      return 'webp'; // 'RIFF'....'WEBP'
+    for (final signature in _imageSignatures) {
+      if (_matchesImageSignature(bytes, signature)) {
+        return signature.extension;
+      }
     }
     return 'png';
+  }
+
+  static bool _matchesImageSignature(
+    Uint8List bytes,
+    ({List<int> bytes, String extension, int minLength}) signature,
+  ) {
+    if (bytes.length < signature.minLength) return false;
+    for (var i = 0; i < signature.bytes.length; i++) {
+      if (bytes[i] != signature.bytes[i]) return false;
+    }
+    return true;
   }
 
   Future<String> _saveBytes(Uint8List bytes, String ext) async {

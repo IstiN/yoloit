@@ -34,6 +34,90 @@ void main() {
       expect(result.error, contains('not found'));
     });
 
+    test('preserves every extension language classification', () async {
+      // Characterization of the original `_detectLanguage` switch in this
+      // file (git show HEAD). Every key it supported must keep mapping to
+      // the same language id after delegating to EditorLanguageRegistry.
+      const legacyMapping = <String, String>{
+        'dart': 'dart',
+        'js': 'javascript',
+        'jsx': 'javascript',
+        'ts': 'typescript',
+        'tsx': 'typescript',
+        'py': 'python',
+        'rs': 'rust',
+        'go': 'go',
+        'java': 'java',
+        'kt': 'kotlin',
+        'swift': 'swift',
+        'c': 'c',
+        'h': 'c',
+        'cpp': 'cpp',
+        'cc': 'cpp',
+        'cxx': 'cpp',
+        'hpp': 'cpp',
+        'cs': 'csharp',
+        'rb': 'ruby',
+        'php': 'php',
+        'html': 'html',
+        'htm': 'html',
+        'css': 'css',
+        'scss': 'scss',
+        'sass': 'scss',
+        'json': 'json',
+        'yaml': 'yaml',
+        'yml': 'yaml',
+        'xml': 'xml',
+        'md': 'markdown',
+        'markdown': 'markdown',
+        'sh': 'bash',
+        'bash': 'bash',
+        'zsh': 'bash',
+        'sql': 'sql',
+        'toml': 'toml',
+      };
+
+      for (final entry in legacyMapping.entries) {
+        final file = File('${tempDir.path}/sample.${entry.key}');
+        await file.writeAsString('content');
+        final result = await service.readFile(file.path);
+        expect(result.language, entry.value, reason: 'for .${entry.key}');
+      }
+
+      // Extensions the legacy switch did not support stay plaintext, even
+      // when the editor registry knows them.
+      const legacyUnknown = [
+        'txt',
+        'mjs',
+        'cjs',
+        'pyi',
+        'pyw',
+        'kts',
+        'fish',
+        'jsonc',
+        'ini',
+        'cfg',
+        'conf',
+        'properties',
+        'svg',
+        'mdx',
+        'env',
+      ];
+      for (final ext in legacyUnknown) {
+        final file = File('${tempDir.path}/sample.$ext');
+        await file.writeAsString('content');
+        final result = await service.readFile(file.path);
+        expect(result.language, 'plaintext', reason: 'for .$ext');
+      }
+
+      for (final name in ['README', '.gitignore', '.env', '.env.local']) {
+        final file = File('${tempDir.path}/$name');
+        await file.writeAsString('content');
+        final result = await service.readFile(file.path);
+        expect(result.language, 'plaintext', reason: 'for $name');
+      }
+    });
+
     test('detects language from extension correctly', () async {
       final cases = {
         'file.dart': 'dart',

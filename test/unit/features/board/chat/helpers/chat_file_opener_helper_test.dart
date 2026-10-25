@@ -55,5 +55,52 @@ void main() {
       // Completes without throwing even though the file does not exist.
       await ChatFileOpener.open('/nonexistent-yoloit-dir/photo.png');
     });
+
+    group('with an injected file opener', () {
+      final openedPaths = <String>[];
+
+      setUp(() {
+        openedPaths.clear();
+        ChatFileOpener.debugFileOpener = (path) async {
+          openedPaths.add(path);
+        };
+      });
+
+      tearDown(() {
+        ChatFileOpener.debugFileOpener = null;
+      });
+
+      CreatePreviewPanel unexpectedPreviewPanel(
+        [String marker = 'preview panel',
+      ]) =>
+          (typeId, state, title) async {
+            throw StateError('$marker must not be called');
+          };
+
+      test('routes non-previewable files to the file opener', () async {
+        await ChatFileOpener.open(
+          '/tmp/report.pdf',
+          createPreviewPanel: unexpectedPreviewPanel(),
+        );
+        expect(openedPaths, ['/tmp/report.pdf']);
+      });
+
+      test('routes previewable files to the opener when no preview '
+          'callback is given', () async {
+        await ChatFileOpener.open('/tmp/clip.mp4');
+        expect(openedPaths, ['/tmp/clip.mp4']);
+      });
+
+      test('ignores file opener failures', () async {
+        ChatFileOpener.debugFileOpener = (path) async {
+          throw StateError('open failed');
+        };
+        await ChatFileOpener.open(
+          '/tmp/report.pdf',
+          createPreviewPanel: unexpectedPreviewPanel(),
+        );
+        expect(openedPaths, isEmpty);
+      });
+    });
   });
 }

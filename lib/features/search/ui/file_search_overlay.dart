@@ -62,6 +62,9 @@ Future<void> showFileSearch(
 
 enum _QuickResultKind { board, panel, file }
 
+typedef _ExtensionIconStyle =
+    ({IconData icon, Color Function(AppColorScheme) color});
+
 class _QuickResult {
   const _QuickResult({
     required this.kind,
@@ -183,6 +186,7 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
 
     // 0. If the query looks like an existing file path, surface it first.
     await _collectPathResult(results, rawQuery, appColors);
+    if (!mounted) return;
 
     final boardState = context.read<BoardCubit>().state;
 
@@ -438,6 +442,7 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
       // Fallback: if the typed text is an existing file path, open it directly.
       if (PlatformCapabilities.current.platform != RuntimePlatform.web) {
         final pathInfo = await file_search.tryResolveExistingPath(rawQuery);
+        if (!mounted) return;
         if (pathInfo != null) {
           Navigator.of(context).pop();
           await _openFilePath(pathInfo.filePath);
@@ -757,82 +762,118 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
 
   // ── Icon helpers ──────────────────────────────────────────────────────────
 
-  static IconData _panelTypeIcon(String type) {
-    return switch (type) {
-      'board.chat' => Icons.chat_outlined,
-      'board.terminal' => Icons.terminal,
-      'board.filetree' => Icons.account_tree_outlined,
-      'board.file.preview' => Icons.description_outlined,
-      'board.diff.preview' => Icons.difference_outlined,
-      'board.note.markdown' => Icons.article_outlined,
-      'board.code.snippet' => Icons.code,
-      'board.run.configs' => Icons.play_circle_outline,
-      'board.webpage' => Icons.language,
-      'board.checklist' => Icons.checklist,
-      'board.kanban' => Icons.view_kanban_outlined,
-      'board.timer' => Icons.timer_outlined,
-      'board.custom.widget' => Icons.widgets_outlined,
-      'board.playlist' => Icons.queue_music,
-      'board.yolo.assistant' => Icons.assistant_outlined,
-      _ => Icons.dashboard_outlined,
-    };
-  }
+  static const _panelTypeIcons = <String, IconData>{
+    'board.chat': Icons.chat_outlined,
+    'board.terminal': Icons.terminal,
+    'board.filetree': Icons.account_tree_outlined,
+    'board.file.preview': Icons.description_outlined,
+    'board.diff.preview': Icons.difference_outlined,
+    'board.note.markdown': Icons.article_outlined,
+    'board.code.snippet': Icons.code,
+    'board.run.configs': Icons.play_circle_outline,
+    'board.webpage': Icons.language,
+    'board.checklist': Icons.checklist,
+    'board.kanban': Icons.view_kanban_outlined,
+    'board.timer': Icons.timer_outlined,
+    'board.custom.widget': Icons.widgets_outlined,
+    'board.playlist': Icons.queue_music,
+    'board.yolo.assistant': Icons.assistant_outlined,
+  };
+
+  static IconData _panelTypeIcon(String type) =>
+      _panelTypeIcons[type] ?? Icons.dashboard_outlined;
 
   static Color _panelTypeColor(String type, AppColorScheme colors) {
     return panelTypeColor(type, colors);
   }
 
-  static String _panelTypeLabel(String type) {
-    return switch (type) {
-      'board.chat' => 'Chat Panel',
-      'board.terminal' => 'Terminal',
-      'board.filetree' => 'File Tree',
-      'board.file.preview' => 'File Preview',
-      'board.diff.preview' => 'Diff Preview',
-      'board.note.markdown' => 'Markdown Note',
-      'board.code.snippet' => 'Code Snippet',
-      'board.run.configs' => 'Run Configs',
-      'board.webpage' => 'Web Page',
-      'board.checklist' => 'Checklist',
-      'board.kanban' => 'Kanban Board',
-      'board.timer' => 'Timer',
-      'board.custom.widget' => 'Custom Widget',
-      'board.playlist' => 'Playlist',
-      'board.yolo.assistant' => 'Yolo Assistant',
-      _ => type,
-    };
-  }
+  static const _panelTypeLabels = <String, String>{
+    'board.chat': 'Chat Panel',
+    'board.terminal': 'Terminal',
+    'board.filetree': 'File Tree',
+    'board.file.preview': 'File Preview',
+    'board.diff.preview': 'Diff Preview',
+    'board.note.markdown': 'Markdown Note',
+    'board.code.snippet': 'Code Snippet',
+    'board.run.configs': 'Run Configs',
+    'board.webpage': 'Web Page',
+    'board.checklist': 'Checklist',
+    'board.kanban': 'Kanban Board',
+    'board.timer': 'Timer',
+    'board.custom.widget': 'Custom Widget',
+    'board.playlist': 'Playlist',
+    'board.yolo.assistant': 'Yolo Assistant',
+  };
+
+  static String _panelTypeLabel(String type) =>
+      _panelTypeLabels[type] ?? type;
+
+  static Color _accentBlue(AppColorScheme colors) => colors.accentBlue;
+  static Color _accentOrange(AppColorScheme colors) => colors.accentOrange;
+  static Color _accentRed(AppColorScheme colors) => colors.accentRed;
+  static Color _accentGreen(AppColorScheme colors) => colors.accentGreen;
+  static Color _primaryLight(AppColorScheme colors) => colors.primaryLight;
+  static Color _textMuted(AppColorScheme colors) => colors.textMuted;
+
+  static const _extensionIconStyles = <String, _ExtensionIconStyle>{
+    'dart': (icon: Icons.flutter_dash, color: _accentBlue),
+    'py': (icon: Icons.code, color: _accentOrange),
+    'js': (icon: Icons.javascript, color: _primaryLight),
+    'ts': (icon: Icons.javascript, color: _primaryLight),
+    'jsx': (icon: Icons.javascript, color: _primaryLight),
+    'tsx': (icon: Icons.javascript, color: _primaryLight),
+    'swift': (icon: Icons.apple, color: _accentRed),
+    'kt': (icon: Icons.code, color: _accentOrange),
+    'java': (icon: Icons.code, color: _accentOrange),
+    'go': (icon: Icons.code, color: _accentBlue),
+    'rs': (icon: Icons.code, color: _accentOrange),
+    'html': (icon: Icons.html, color: _accentRed),
+    'htm': (icon: Icons.html, color: _accentRed),
+    'css': (icon: Icons.style, color: _accentBlue),
+    'scss': (icon: Icons.style, color: _accentBlue),
+    'sass': (icon: Icons.style, color: _accentBlue),
+    'json': (icon: Icons.data_object, color: _accentOrange),
+    'yaml': (icon: Icons.data_object, color: _accentOrange),
+    'yml': (icon: Icons.data_object, color: _accentOrange),
+    'toml': (icon: Icons.data_object, color: _accentOrange),
+    'md': (icon: Icons.article, color: _textMuted),
+    'mdx': (icon: Icons.article, color: _textMuted),
+    'sh': (icon: Icons.terminal, color: _accentGreen),
+    'bash': (icon: Icons.terminal, color: _accentGreen),
+    'zsh': (icon: Icons.terminal, color: _accentGreen),
+    'png': (icon: Icons.image, color: _primaryLight),
+    'jpg': (icon: Icons.image, color: _primaryLight),
+    'jpeg': (icon: Icons.image, color: _primaryLight),
+    'gif': (icon: Icons.image, color: _primaryLight),
+    'svg': (icon: Icons.image, color: _primaryLight),
+    'webp': (icon: Icons.image, color: _primaryLight),
+  };
 
   static (IconData, Color) _iconForExtension(
     String ext,
     AppColorScheme colors,
   ) {
-    return switch (ext) {
-      'dart' => (Icons.flutter_dash, colors.accentBlue),
-      'py' => (Icons.code, colors.accentOrange),
-      'js' || 'ts' || 'jsx' || 'tsx' => (Icons.javascript, colors.primaryLight),
-      'swift' => (Icons.apple, colors.accentRed),
-      'kt' || 'java' => (Icons.code, colors.accentOrange),
-      'go' => (Icons.code, colors.accentBlue),
-      'rs' => (Icons.code, colors.accentOrange),
-      'html' || 'htm' => (Icons.html, colors.accentRed),
-      'css' || 'scss' || 'sass' => (Icons.style, colors.accentBlue),
-      'json' ||
-      'yaml' ||
-      'yml' ||
-      'toml' => (Icons.data_object, colors.accentOrange),
-      'md' || 'mdx' => (Icons.article, colors.textMuted),
-      'sh' || 'bash' || 'zsh' => (Icons.terminal, colors.accentGreen),
-      'png' ||
-      'jpg' ||
-      'jpeg' ||
-      'gif' ||
-      'svg' ||
-      'webp' => (Icons.image, colors.primaryLight),
-      _ => (Icons.insert_drive_file_outlined, colors.textMuted),
-    };
+    final style = _extensionIconStyles[ext];
+    if (style == null) {
+      return (Icons.insert_drive_file_outlined, colors.textMuted);
+    }
+    return (style.icon, style.color(colors));
   }
 }
+
+@visibleForTesting
+IconData debugFileSearchPanelTypeIcon(String type) =>
+    _FileSearchOverlayState._panelTypeIcon(type);
+
+@visibleForTesting
+String debugFileSearchPanelTypeLabel(String type) =>
+    _FileSearchOverlayState._panelTypeLabel(type);
+
+@visibleForTesting
+(IconData, Color) debugFileSearchIconForExtension(
+  String ext,
+  AppColorScheme colors,
+) => _FileSearchOverlayState._iconForExtension(ext, colors);
 
 // ─── Result tile ─────────────────────────────────────────────────────────────
 

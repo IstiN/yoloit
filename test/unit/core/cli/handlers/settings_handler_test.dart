@@ -27,6 +27,25 @@ shelf.Response _notFound(String msg) => shelf.Response.notFound(
   headers: {'content-type': 'application/json'},
 );
 
+shelf.Request _rawPostRequest(String path, String rawBody) => shelf.Request(
+  'POST',
+  Uri.parse('http://localhost:8080$path'),
+  body: rawBody,
+);
+
+Future<Map<String, dynamic>> _importSettings(
+  Map<String, dynamic> body,
+) async {
+  final response = await handleSettings(
+    'POST',
+    ['import'],
+    _postRequest('/api/settings/import', body),
+    json: _json,
+    notFound: _notFound,
+  );
+  return jsonDecode(await response.readAsString()) as Map<String, dynamic>;
+}
+
 void main() {
   late Directory scratch;
 
@@ -150,6 +169,123 @@ void main() {
         notFound: _notFound,
       );
       expect(response.statusCode, 404);
+    });
+
+    group('POST /import branches', () {
+      Future<File> packArchive({String? passphrase}) async {
+        final src = File(p.join(scratch.path, 'src.tar'));
+        await UserDataArchive().pack(
+          outputPath: src.path,
+          passphrase: passphrase,
+        );
+        return src;
+      }
+
+      test('rejects a malformed JSON body', () async {
+        final response = await handleSettings(
+          'POST',
+          ['import'],
+          _rawPostRequest('/api/settings/import', '{not-json'),
+          json: _json,
+          notFound: _notFound,
+        );
+        final body =
+            jsonDecode(await response.readAsString()) as Map<String, dynamic>;
+        expect(body['ok'], isFalse);
+        expect(body['message'], contains('Invalid JSON'));
+      });
+
+      test('rejects an empty path', () async {
+        final body = await _importSettings({'path': '   '});
+        expect(body['ok'], isFalse);
+        expect(body['message'], contains('Provide "path"'));
+      });
+
+      test('accepts mode replace with a dry-run report', () async {
+        final src = await packArchive(passphrase: 'pw');
+        final body = await _importSettings({
+          'path': src.path,
+          'passphrase': 'pw',
+          'mode': 'replace',
+        });
+        expect(body['ok'], isTrue);
+        final report = body['report'] as Map<String, dynamic>;
+        expect(report['dryRun'], isTrue);
+      });
+
+      test('accepts pathRewrite ask and keep', () async {
+        final src = await packArchive(passphrase: 'pw');
+        for (final rewrite in ['ask', 'keep']) {
+          final body = await _importSettings({
+            'path': src.path,
+            'passphrase': 'pw',
+            'pathRewrite': rewrite,
+          });
+          expect(body['ok'], isTrue, reason: 'pathRewrite=$rewrite');
+        }
+      });
+
+      test('rejects an unknown pathRewrite', () async {
+        final src = await packArchive(passphrase: 'pw');
+        final body = await _importSettings({
+          'path': src.path,
+          'passphrase': 'pw',
+          'pathRewrite': 'bogus',
+        });
+        expect(body['ok'], isFalse);
+        expect(body['message'], contains('pathRewrite'));
+      });
+
+      test('accepts every onConflict choice', () async {
+        final src = await packArchive(passphrase: 'pw');
+        for (final choice in ['keep', 'overwrite', 'rename', 'skip']) {
+          final body = await _importSettings({
+            'path': src.path,
+            'passphrase': 'pw',
+            'onConflict': choice,
+          });
+          expect(body['ok'], isTrue, reason: 'onConflict=$choice');
+        }
+      });
+
+      test('rejects an unknown onConflict', () async {
+        final src = await packArchive(passphrase: 'pw');
+        final body = await _importSettings({
+          'path': src.path,
+          'passphrase': 'pw',
+          'onConflict': 'bogus',
+        });
+        expect(body['ok'], isFalse);
+        expect(body['message'], contains('onConflict'));
+      });
+
+      test('accepts a partial overrides map', () async {
+        final src = await packArchive(passphrase: 'pw');
+        final body = await _importSettings({
+          'path': src.path,
+          'passphrase': 'pw',
+          'overrides': {'prefs': false, 'config': false},
+        });
+        expect(body['ok'], isTrue);
+      });
+
+      test('reports FormatException messages for encrypted archives '
+          'without a passphrase', () async {
+        final src = await packArchive(passphrase: 'pw');
+        final body = await _importSettings({'path': src.path});
+        expect(body['ok'], isFalse);
+        expect(body['message'], contains('passphrase'));
+      });
+
+      test('wraps wrong-passphrase failures as Import failed', () async {
+        final src = await packArchive(passphrase: 'pw');
+        final body = await _importSettings({
+          'path': src.path,
+          'passphrase': 'wrong',
+        });
+        expect(body['ok'], isFalse);
+        expect(body['message'], contains('Import failed'));
+      });
     });
   });
 }

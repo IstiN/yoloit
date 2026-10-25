@@ -1,8 +1,15 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
+
 import 'package:yoloit/features/board/chat/helpers/chat_file_opener_helper.dart';
 
 abstract class ChatFileOpener {
+  /// Test seam: overrides the OS-level "open file" command so unit tests
+  /// can intercept it without spawning real processes.
+  @visibleForTesting
+  static Future<void> Function(String path)? debugFileOpener;
+
   static Future<void> open(
     String path, {
     CreatePreviewPanel? createPreviewPanel,
@@ -26,10 +33,14 @@ abstract class ChatFileOpener {
       );
     } else {
       try {
-        await Process.run('open', [path]);
+        await (debugFileOpener ?? _openWithSystemHandler)(path);
       } catch (_) {
         // ignore open failures
       }
     }
+  }
+
+  static Future<void> _openWithSystemHandler(String path) async {
+    await Process.run('open', [path]);
   }
 }

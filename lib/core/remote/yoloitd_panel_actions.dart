@@ -29,6 +29,41 @@ class RemotePanelActionResult {
   };
 }
 
+typedef _PanelTypeHandler =
+    RemotePanelActionResult Function(
+      RemotePanel panel,
+      String action,
+      Map<String, dynamic> args,
+    );
+
+const Map<String, _PanelTypeHandler> _panelTypeHandlers =
+    <String, _PanelTypeHandler>{
+      'board.note.markdown': _note,
+      'board.sticky': _sticky,
+      'board.shape': _shape,
+      'board.kanban': _kanban,
+      'board.checklist': _checklist,
+      'board.code.snippet': _code,
+      'board.webpage': _webpage,
+      'board.playlist': _playlist,
+      'board.files': _files,
+      'board.file.preview': _filePreview,
+      'board.filetree': _fileTree,
+      'board.terminal': _terminal,
+      'board.timer': _timer,
+      'board.chat': _chat,
+      'board.setup_guide': _setupGuide,
+      'board.run': _run,
+      'board.run_configs': _run,
+      'board.table': _table,
+      'board.calendar': _calendar,
+      'board.chart': _chart,
+      'board.ui': _uiView,
+      'board.diff.preview': _diffPreview,
+      'board.yolo_assistant': _yoloAssistant,
+      'board.widget.custom': _customWidget,
+    };
+
 RemotePanelActionResult handleRemotePanelAction(
   RemotePanel panel,
   String action,
@@ -38,32 +73,8 @@ RemotePanelActionResult handleRemotePanelAction(
     return RemotePanelActionResult(data: _content(panel));
   }
 
-  return switch (panel.type) {
-    'board.note.markdown' => _note(panel, action, args),
-    'board.sticky' => _sticky(panel, action, args),
-    'board.shape' => _shape(panel, action, args),
-    'board.kanban' => _kanban(panel, action, args),
-    'board.checklist' => _checklist(panel, action, args),
-    'board.code.snippet' => _code(panel, action, args),
-    'board.webpage' => _webpage(panel, action, args),
-    'board.playlist' => _playlist(panel, action, args),
-    'board.files' => _files(panel, action, args),
-    'board.file.preview' => _filePreview(panel, action, args),
-    'board.filetree' => _fileTree(panel, action, args),
-    'board.terminal' => _terminal(panel, action, args),
-    'board.timer' => _timer(panel, action, args),
-    'board.chat' => _chat(panel, action, args),
-    'board.setup_guide' => _setupGuide(panel, action, args),
-    'board.run' || 'board.run_configs' => _run(panel, action, args),
-    'board.table' => _table(panel, action, args),
-    'board.calendar' => _calendar(panel, action, args),
-    'board.chart' => _chart(panel, action, args),
-    'board.ui' => _uiView(panel, action, args),
-    'board.diff.preview' => _diffPreview(panel, action, args),
-    'board.yolo_assistant' => _yoloAssistant(panel, action, args),
-    'board.widget.custom' => _customWidget(panel, action, args),
-    _ => _generic(panel, action, args),
-  };
+  final handler = _panelTypeHandlers[panel.type];
+  return handler?.call(panel, action, args) ?? _generic(panel, action, args);
 }
 
 Map<String, dynamic> remotePanelActionHelp(RemotePanel panel) {

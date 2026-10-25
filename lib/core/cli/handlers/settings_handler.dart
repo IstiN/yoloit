@@ -121,6 +121,95 @@ Future<shelf.Response> _exportSettings(_SettingsContext ctx) async {
 
 // POST /api/settings/import { path, dryRun, mode, pathRewrite, passphrase,
 // overrides: { prefs, config, data, workspaces } }
+
+const Map<String, ImportMode> _importModes = {
+  'replace': ImportMode.replace,
+  'merge': ImportMode.merge,
+};
+
+const Map<String, PathRewriteStrategy> _rewriteStrategies = {
+  'ask': PathRewriteStrategy.ask,
+  'keep': PathRewriteStrategy.keep,
+  'auto': PathRewriteStrategy.auto,
+};
+
+const Map<String, BoardConflictChoice> _conflictChoices = {
+  'overwrite': BoardConflictChoice.overwrite,
+  'rename': BoardConflictChoice.renameIncoming,
+  'skip': BoardConflictChoice.skipIncoming,
+  'keep': BoardConflictChoice.keepBoth,
+};
+
+ImportConflictResolver _resolveImportConflict(BoardConflictChoice choice) =>
+    (c) async => choice;
+
+/// Validated import options parsed from the request body.
+///
+/// The parser preserves the original validation order — mode, then
+/// pathRewrite, then onConflict — returning the first error encountered.
+class _ImportOptions {
+  const _ImportOptions({
+    required this.mode,
+    required this.rewrite,
+    required this.overrides,
+    required this.passphrase,
+    required this.onConflict,
+  }) : error = null;
+
+  const _ImportOptions.error(String message)
+      : mode = ImportMode.merge,
+        rewrite = PathRewriteStrategy.auto,
+        overrides = ImportOverrides.defaults,
+        passphrase = null,
+        onConflict = BoardConflictChoice.keepBoth,
+        error = message;
+
+  final ImportMode mode;
+  final PathRewriteStrategy rewrite;
+  final ImportOverrides overrides;
+  final String? passphrase;
+  final BoardConflictChoice onConflict;
+
+  /// Validation error message, or null when every option is valid.
+  final String? error;
+
+  factory _ImportOptions.parse(Map<String, dynamic> body) {
+    final mode = _importModes[body['mode'] ?? 'merge'];
+    if (mode == null) {
+      return const _ImportOptions.error('mode must be "merge" or "replace"');
+    }
+    final rewrite = _rewriteStrategies[body['pathRewrite'] ?? 'auto'];
+    if (rewrite == null) {
+      return const _ImportOptions.error('pathRewrite must be auto|ask|keep');
+    }
+    final onConflict = _conflictChoices[body['onConflict'] ?? 'keep'];
+    if (onConflict == null) {
+      return const _ImportOptions.error(
+        'onConflict must be keep|overwrite|rename|skip',
+      );
+    }
+
+    ImportOverrides overrides = ImportOverrides.defaults;
+    final raw = body['overrides'];
+    if (raw is Map) {
+      overrides = ImportOverrides(
+        prefs: raw['prefs'] != false,
+        config: raw['config'] != false,
+        data: raw['data'] != false,
+        workspaces: raw['workspaces'] != false,
+      );
+    }
+
+    return _ImportOptions(
+      mode: mode,
+      rewrite: rewrite,
+      overrides: overrides,
+      passphrase: body['passphrase'] as String?,
+      onConflict: onConflict,
+    );
+  }
+}
+
 Future<shelf.Response> _importSettings(_SettingsContext ctx) async {
   final json = ctx.json;
   final Map<String, dynamic> body;
@@ -138,68 +227,21 @@ Future<shelf.Response> _importSettings(_SettingsContext ctx) async {
     return json(errorJson('Archive not found: ${p.normalize(src)}'));
   }
 
-  ImportMode mode;
-  switch (body['mode']) {
-    case 'replace':
-      mode = ImportMode.replace;
-    case 'merge':
-    case null:
-      mode = ImportMode.merge;
-    default:
-      return json(errorJson('mode must be "merge" or "replace"'));
-  }
-
-  PathRewriteStrategy rewrite;
-  switch (body['pathRewrite']) {
-    case 'ask':
-      rewrite = PathRewriteStrategy.ask;
-    case 'keep':
-      rewrite = PathRewriteStrategy.keep;
-    case 'auto':
-    case null:
-      rewrite = PathRewriteStrategy.auto;
-    default:
-      return json(errorJson('pathRewrite must be auto|ask|keep'));
-  }
-
-  ImportOverrides overrides = ImportOverrides.defaults;
-  final raw = body['overrides'];
-  if (raw is Map) {
-    overrides = ImportOverrides(
-      prefs: raw['prefs'] != false,
-      config: raw['config'] != false,
-      data: raw['data'] != false,
-      workspaces: raw['workspaces'] != false,
-    );
-  }
-
-  final passphrase = body['passphrase'] as String?;
-
-  BoardConflictChoice? onConflict;
-  switch (body['onConflict']) {
-    case 'overwrite':
-      onConflict = BoardConflictChoice.overwrite;
-    case 'rename':
-      onConflict = BoardConflictChoice.renameIncoming;
-    case 'skip':
-      onConflict = BoardConflictChoice.skipIncoming;
-    case 'keep':
-    case null:
-      onConflict = BoardConflictChoice.keepBoth;
-    default:
-      return json(errorJson('onConflict must be keep|overwrite|rename|skip'));
+  final options = _ImportOptions.parse(body);
+  if (options.error != null) {
+    return json(errorJson(options.error!));
   }
 
   try {
     final svc = UserDataArchive();
     final report = await svc.restore(
       archivePath: src,
-      mode: mode,
-      pathRewrite: rewrite,
-      passphrase: passphrase,
+      mode: options.mode,
+      pathRewrite: options.rewrite,
+      passphrase: options.passphrase,
       dryRun: body['dryRun'] != false,
-      overrides: overrides,
-      onConflict: (c) async => onConflict!,
+      overrides: options.overrides,
+      onConflict: _resolveImportConflict(options.onConflict),
     );
     return json(okJson({'report': report.toJson()}));
   } on FormatException catch (e) {

@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:yoloit/core/utils/clipboard_utils.dart';
 import 'package:flutter_code_editor/flutter_code_editor.dart';
 import 'package:flutter_highlight/themes/atom-one-dark.dart';
 import 'package:highlight/highlight_core.dart';
@@ -15,6 +13,7 @@ import 'package:highlight/languages/swift.dart';
 import 'package:highlight/languages/typescript.dart';
 import 'package:highlight/languages/yaml.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/core/utils/clipboard_utils.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 
@@ -68,19 +67,23 @@ const _kLanguages = [
   'swift',
 ];
 
-Mode _modeFor(String lang) => switch (lang) {
-  'dart' => dart,
-  'python' => python,
-  'javascript' => javascript,
-  'typescript' => typescript,
-  'bash' => bash,
-  'json' => json,
-  'yaml' => yaml,
-  'sql' => sql,
-  'kotlin' => kotlin,
-  'swift' => swift,
-  _ => dart,
+final _modesByLanguage = <String, Mode>{
+  'dart': dart,
+  'python': python,
+  'javascript': javascript,
+  'typescript': typescript,
+  'bash': bash,
+  'json': json,
+  'yaml': yaml,
+  'sql': sql,
+  'kotlin': kotlin,
+  'swift': swift,
 };
+
+Mode _modeFor(String lang) => _modesByLanguage[lang] ?? dart;
+
+@visibleForTesting
+Mode debugCodeSnippetModeFor(String lang) => _modeFor(lang);
 
 class _CodeSnippetPanelContent extends StatefulWidget {
   const _CodeSnippetPanelContent({

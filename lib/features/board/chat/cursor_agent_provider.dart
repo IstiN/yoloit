@@ -420,18 +420,19 @@ class CursorAgentProvider extends CliProviderBase {
     return (true, '');
   }
 
-  /// Convert camelCase cursor tool key to a human-readable label.
-  String _toolKeyToName(String key) => switch (key) {
-    'shellToolCall' => 'Shell',
-    'readFile' => 'Read File',
-    'editFile' => 'Edit File',
-    'listDir' => 'List Dir',
-    'searchFiles' => 'Search Files',
-    'createFile' => 'Create File',
-    'deleteFile' => 'Delete File',
-    'moveFile' => 'Move File',
-    _ => key,
+  static const _toolNames = <String, String>{
+    'shellToolCall': 'Shell',
+    'readFile': 'Read File',
+    'editFile': 'Edit File',
+    'listDir': 'List Dir',
+    'searchFiles': 'Search Files',
+    'createFile': 'Create File',
+    'deleteFile': 'Delete File',
+    'moveFile': 'Move File',
   };
+
+  /// Convert camelCase cursor tool key to a human-readable label.
+  String _toolKeyToName(String key) => _toolNames[key] ?? key;
 
   /// Cursor call_ids can contain newline characters — sanitize for use as keys.
   String _sanitizeCallId(String id) => id.replaceAll('\n', '_');

@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:yoloit/features/editor/utils/editor_language_registry.dart';
+
 class FileViewerService {
   const FileViewerService._();
   static const FileViewerService instance = FileViewerService._();
@@ -24,35 +26,71 @@ class FileViewerService {
     }
   }
 
+  /// Extensions the viewer recognizes; anything else is plaintext.
+  ///
+  /// Characterization of the original switch in this file: extensions the
+  /// viewer never mapped must keep returning 'plaintext' even when the
+  /// editor registry knows them.
+  static const _knownExtensions = <String>{
+    'dart',
+    'js',
+    'jsx',
+    'ts',
+    'tsx',
+    'py',
+    'rs',
+    'go',
+    'java',
+    'kt',
+    'swift',
+    'c',
+    'h',
+    'cpp',
+    'cc',
+    'cxx',
+    'hpp',
+    'cs',
+    'rb',
+    'php',
+    'html',
+    'htm',
+    'css',
+    'scss',
+    'sass',
+    'json',
+    'yaml',
+    'yml',
+    'xml',
+    'md',
+    'markdown',
+    'sh',
+    'bash',
+    'zsh',
+    'sql',
+    'toml',
+  };
+
+  /// Registry language ids that intentionally differ from viewer ids.
+  static const _languageIdOverrides = <String, String>{
+    'jsx': 'javascript',
+    'tsx': 'typescript',
+    'html': 'html',
+    'htm': 'html',
+    'sh': 'bash',
+    'bash': 'bash',
+    'zsh': 'bash',
+    'cs': 'csharp',
+    'rb': 'ruby',
+    'php': 'php',
+    'scss': 'scss',
+    'sass': 'scss',
+    'toml': 'toml',
+  };
+
   String _detectLanguage(String path) {
     final ext = path.split('.').last.toLowerCase();
-    return switch (ext) {
-      'dart' => 'dart',
-      'js' || 'jsx' => 'javascript',
-      'ts' || 'tsx' => 'typescript',
-      'py' => 'python',
-      'rs' => 'rust',
-      'go' => 'go',
-      'java' => 'java',
-      'kt' => 'kotlin',
-      'swift' => 'swift',
-      'c' || 'h' => 'c',
-      'cpp' || 'cc' || 'cxx' || 'hpp' => 'cpp',
-      'cs' => 'csharp',
-      'rb' => 'ruby',
-      'php' => 'php',
-      'html' || 'htm' => 'html',
-      'css' => 'css',
-      'scss' || 'sass' => 'scss',
-      'json' => 'json',
-      'yaml' || 'yml' => 'yaml',
-      'xml' => 'xml',
-      'md' || 'markdown' => 'markdown',
-      'sh' || 'bash' || 'zsh' => 'bash',
-      'sql' => 'sql',
-      'toml' => 'toml',
-      _ => 'plaintext',
-    };
+    if (!_knownExtensions.contains(ext)) return 'plaintext';
+    return _languageIdOverrides[ext] ?? EditorLanguageRegistry.forPath(path).id;
   }
 }
 

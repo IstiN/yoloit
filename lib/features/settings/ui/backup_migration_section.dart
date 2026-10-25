@@ -123,7 +123,7 @@ class _BackupMigrationSectionState extends State<BackupMigrationSection> {
     }
   }
 
-  Future<void> _onImport() async {
+  Future<String?> _pickArchive() {
     final picker = widget.pickArchivePath ??
         () async {
           final picked = await FilePicker.pickFiles(
@@ -132,7 +132,24 @@ class _BackupMigrationSectionState extends State<BackupMigrationSection> {
           );
           return picked?.files.single.path;
         };
-    final src = await picker();
+    return picker();
+  }
+
+  Future<ImportResult> _restoreArchive(
+    String archivePath, {
+    required bool dryRun,
+  }) {
+    final passphrase = _passphraseCtrl.text;
+    return _service.restore(
+      archivePath: archivePath,
+      passphrase: passphrase.isEmpty ? null : passphrase,
+      dryRun: dryRun,
+      onConflict: BoardConflictChoice.keepBoth,
+    );
+  }
+
+  Future<void> _onImport() async {
+    final src = await _pickArchive();
     if (src == null || !mounted) return;
 
     setState(() {
@@ -140,31 +157,7 @@ class _BackupMigrationSectionState extends State<BackupMigrationSection> {
       _importError = null;
     });
     try {
-      // Always preview first.
-      final preview = await _service.restore(
-        archivePath: src,
-        passphrase: _passphraseCtrl.text.isEmpty ? null : _passphraseCtrl.text,
-        dryRun: true,
-      );
-      if (!mounted) return;
-
-      final shouldApply = await _showImportPreview(preview.report);
-      if (shouldApply != true || !mounted) {
-        setState(() => _importBusy = false);
-        return;
-      }
-
-      final applied = await _service.restore(
-        archivePath: src,
-        passphrase: _passphraseCtrl.text.isEmpty ? null : _passphraseCtrl.text,
-        dryRun: false,
-        onConflict: BoardConflictChoice.keepBoth,
-      );
-      if (!mounted) return;
-      setState(() => _lastImportReport = applied.report);
-      _snack(
-        'Restored ${applied.report.totalChanges} files (${applied.report.totalConflicts} board conflicts resolved).',
-      );
+      await _previewAndRestore(src);
     } on BackupMigrationUnavailableError catch (e) {
       setState(() => _importError = e.message);
     } on Object catch (e) {
@@ -172,6 +165,25 @@ class _BackupMigrationSectionState extends State<BackupMigrationSection> {
     } finally {
       if (mounted) setState(() => _importBusy = false);
     }
+  }
+
+  Future<void> _previewAndRestore(String src) async {
+    // Always preview first.
+    final preview = await _restoreArchive(src, dryRun: true);
+    if (!mounted) return;
+
+    final shouldApply = await _showImportPreview(preview.report);
+    if (shouldApply != true || !mounted) {
+      setState(() => _importBusy = false);
+      return;
+    }
+
+    final applied = await _restoreArchive(src, dryRun: false);
+    if (!mounted) return;
+    setState(() => _lastImportReport = applied.report);
+    _snack(
+      'Restored ${applied.report.totalChanges} files (${applied.report.totalConflicts} board conflicts resolved).',
+    );
   }
 
   Future<bool?> _showImportPreview(ImportReport report) {

@@ -1,6 +1,8 @@
 import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
+import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/features/search/utils/fuzzy_matcher.dart';
 
 enum SearchMode { files, content }
@@ -25,8 +27,24 @@ class SearchResult {
 }
 
 class FileSearchService {
-  FileSearchService._();
+  FileSearchService._()
+    : _processRunner = Process.run,
+      _fileExists = _defaultFileExists,
+      isWindows = Platform.isWindows;
+
+  @visibleForTesting
+  FileSearchService.forTesting({
+    ProcessRunner? processRunner,
+    Future<bool> Function(String path)? fileExists,
+    this.isWindows = false,
+  }) : _processRunner = processRunner ?? Process.run,
+       _fileExists = fileExists ?? _defaultFileExists;
+
   static final instance = FileSearchService._();
+
+  final ProcessRunner _processRunner;
+  final Future<bool> Function(String path) _fileExists;
+  final bool isWindows;
 
   static const _maxResults = 50;
 
@@ -36,23 +54,36 @@ class FileSearchService {
   };
 
   /// Cached ripgrep binary path, or null if not available.
-  static String? _rgBin;
-  static bool _rgChecked = false;
+  String? _rgBin;
+  bool _rgChecked = false;
+
+  static Future<bool> _defaultFileExists(String path) => File(path).exists();
+
+  @visibleForTesting
+  Future<String?> findRgForTesting() => _findRg();
 
   /// Returns the ripgrep (`rg`) binary if available, null otherwise.
-  static Future<String?> _findRg() async {
+  Future<String?> _findRg() async {
     if (_rgChecked) return _rgBin;
     _rgChecked = true;
 
-    if (Platform.isWindows) {
+    if (isWindows) {
       // On Windows use where.exe to find rg in PATH.
       // Install via: winget install BurntSushi.ripgrep.MSVC
       try {
-        final result = await Process.run('where', ['rg'], runInShell: true);
+        final result = await _processRunner(
+          'where',
+          ['rg'],
+          runInShell: true,
+        );
         if (result.exitCode == 0) {
-          final p = (result.stdout as String).trim().split('\n').first.trim();
-          if (p.isNotEmpty) {
-            _rgBin = p;
+          final path = (result.stdout as String)
+              .trim()
+              .split('\n')
+              .first
+              .trim();
+          if (path.isNotEmpty) {
+            _rgBin = path;
             return _rgBin;
           }
         }
@@ -60,18 +91,22 @@ class FileSearchService {
       return null;
     }
 
-    for (final candidate in ['/opt/homebrew/bin/rg', '/usr/local/bin/rg', '/usr/bin/rg']) {
-      if (await File(candidate).exists()) {
+    for (final candidate in [
+      '/opt/homebrew/bin/rg',
+      '/usr/local/bin/rg',
+      '/usr/bin/rg',
+    ]) {
+      if (await _fileExists(candidate)) {
         _rgBin = candidate;
         return _rgBin;
       }
     }
     try {
-      final result = await Process.run('which', ['rg']);
+      final result = await _processRunner('which', ['rg']);
       if (result.exitCode == 0) {
-        final p = (result.stdout as String).trim();
-        if (p.isNotEmpty) {
-          _rgBin = p;
+        final path = (result.stdout as String).trim();
+        if (path.isNotEmpty) {
+          _rgBin = path;
           return _rgBin;
         }
       }
@@ -167,8 +202,11 @@ class FileSearchService {
     try {
       final rg = await _findRg();
       if (rg != null) {
+        // Keep the existing error boundary: only lookup errors are caught.
+        // ignore: unawaited_return_in_try_block
         return _rgContent(rg, dirPath, wsName, query);
       }
+      // ignore: unawaited_return_in_try_block
       return _grepFallback(dirPath, wsName, query);
     } catch (_) {
       return [];
@@ -281,6 +319,7 @@ class FileSearchService {
       if (result.exitCode > 1) return [];
 
       final files = _topFilesFromStdout(result.stdout as String);
+      // ignore: unawaited_return_in_try_block
       return _collectLineResults(files, wsName, dirPath, (file) async {
         final lineResult = await Process.run('grep', [
           '-n',

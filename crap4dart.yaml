@@ -19,12 +19,11 @@ exclude:
 # CRAP metric analysis settings ("analyze" command).
 crap:
   enabled: true
-  # Maximum allowed CRAP score; higher scores fail the run.
-  # NOTE: the current codebase max is far above the default 8.0 (see
-  # badges/crap.svg). The threshold stays at the default so the badge and
-  # the report reflect the real state; enforcement comes later (either
-  # ratchet via --diff or by lowering the max first).
-  threshold: 8.0
+  # Ratchet: the codebase max CRAP was brought down to <=24 (from 156) via
+  # lookup-map refactors and focused tests. The threshold now ENFORCES that
+  # ceiling: any method scoring above 24 fails `crap4dart check`/analyze exit
+  # code. Keep it at the measured max; lower it as the score improves.
+  threshold: 24.0
   # Run the test suite to generate coverage before analyzing.
   run_tests: false
 

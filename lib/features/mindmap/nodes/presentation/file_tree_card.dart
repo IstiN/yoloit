@@ -284,17 +284,31 @@ class _TreeRowState extends State<_TreeRow> {
     );
   }
 
-  IconData _fileIcon(String name) {
-    final ext = name.contains('.') ? name.split('.').last.toLowerCase() : '';
-    return switch (ext) {
-      'dart' => Icons.code,
-      'yaml' || 'yml' => Icons.settings,
-      'json' => Icons.data_object,
-      'md' => Icons.description,
-      'py' => Icons.code,
-      'ts' || 'tsx' || 'js' || 'jsx' => Icons.javascript,
-      'png' || 'jpg' || 'jpeg' || 'gif' || 'svg' => Icons.image,
-      _ => Icons.insert_drive_file_outlined,
-    };
-  }
+  IconData _fileIcon(String name) => _treeRowIconForFile(name);
 }
+
+const _treeRowFileIcons = <String, IconData>{
+  'dart': Icons.code,
+  'yaml': Icons.settings,
+  'yml': Icons.settings,
+  'json': Icons.data_object,
+  'md': Icons.description,
+  'py': Icons.code,
+  'ts': Icons.javascript,
+  'tsx': Icons.javascript,
+  'js': Icons.javascript,
+  'jsx': Icons.javascript,
+  'png': Icons.image,
+  'jpg': Icons.image,
+  'jpeg': Icons.image,
+  'gif': Icons.image,
+  'svg': Icons.image,
+};
+
+IconData _treeRowIconForFile(String name) {
+  final ext = name.contains('.') ? name.split('.').last.toLowerCase() : '';
+  return _treeRowFileIcons[ext] ?? Icons.insert_drive_file_outlined;
+}
+
+@visibleForTesting
+IconData debugTreeRowIconForFile(String name) => _treeRowIconForFile(name);
