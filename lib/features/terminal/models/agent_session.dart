@@ -84,6 +84,13 @@ class AgentSession extends Equatable {
   /// NOT included in [props] — persisted across widget rebuilds.
   double scrollOffset = 0.0;
 
+  /// Whether the user has ever scrolled this session's viewport. Unlike a
+  /// zero [scrollOffset] — which is ambiguous between "fresh session" and
+  /// "user scrolled to the very top" — this flag lets a remounting terminal
+  /// view distinguish the two and restore the top-of-scrollback position
+  /// instead of snapping to the bottom.
+  bool hasUserScrolled = false;
+
   /// Rolling buffer of RAW PTY bytes (with ANSI) — replayed to new remote
   /// guests so they see the full current terminal state, not just new data.
   /// Capped at [_maxRawBytes] to bound memory.

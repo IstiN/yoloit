@@ -975,6 +975,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
   void _persistScrollOffset() {
     if (_scrollController.hasClients) {
       widget.session.scrollOffset = _scrollController.offset;
+      widget.session.hasUserScrolled = true;
     }
   }
 
@@ -995,27 +996,12 @@ class TerminalWidgetState extends State<TerminalWidget> {
     SessionPrefs.loadTerminalFontSize().then((size) {
       if (mounted) setState(() => _fontSize = size);
     });
-    // Restore scroll position after the first frame because xterm's
-    // RenderTerminal defaults _stickToBottom=true and snaps to maxExtent
-    // during initial layout, ignoring initialScrollOffset.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        final position = _scrollController.position;
-        final liveMax = _liveMaxScrollExtent;
-        final maxExtent = liveMax == null
-            ? position.maxScrollExtent
-            : math.max(position.maxScrollExtent, liveMax);
-        final stored = widget.session.scrollOffset;
-        final isDefault = stored <= position.minScrollExtent + 1;
-        final target = isDefault
-            ? maxExtent
-            : stored.clamp(
-                position.minScrollExtent,
-                maxExtent,
-              );
-        _scrollController.jumpTo(target);
-      }
-    });
+    // Scroll restore: the scroll controller is seeded with the persisted
+    // offset above and TerminalView gets snapToBottomOnAttach=false when
+    // the user has scrolled before (see _buildTerminalView), so xterm
+    // honors the offset on the very first layout — no post-frame jump, no
+    // one-frame flash of the scrollback bottom. A fresh session keeps the
+    // default snap-to-bottom and simply follows output.
   }
 
   @override
@@ -2248,6 +2234,11 @@ class TerminalWidgetState extends State<TerminalWidget> {
       hardwareKeyboardOnly: _hardwareKeyboardOnly,
       scrollController: _scrollController,
       simulateScroll: false,
+      // A session the user has scrolled keeps its viewport: the persisted
+      // offset is restored by the scroll controller's initial offset on the
+      // first frame. A fresh/unscrolled session snaps to the bottom and
+      // follows output.
+      snapToBottomOnAttach: !widget.session.hasUserScrolled,
       onKeyEvent: _onTerminalKeyEvent,
       textStyle: TerminalStyle(
         fontSize: _fontSize,

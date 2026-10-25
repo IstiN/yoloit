@@ -1090,7 +1090,9 @@ void main() {
       }
 
       // Pre-seed scroll offset so the widget restores it on creation.
+      // A persisted offset only exists when the user has scrolled.
       session.scrollOffset = 150.0;
+      session.hasUserScrolled = true;
 
       await tester.pumpWidget(
         MaterialApp(
