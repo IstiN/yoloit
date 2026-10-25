@@ -1106,10 +1106,10 @@ packages:
     dependency: transitive
     description:
       name: quickjs_runtime
-      sha256: "4ea408c7f2f278d95979c92a8c217c78dd8161d046d15858995450a2cb5a0398"
+      sha256: e89dc1a1827a3aae687f8305d6ab9f3d565e582d1324a07889458ea1b3f7e670
       url: "https://pub.dev"
     source: hosted
-    version: "0.4.2"
+    version: "0.4.3"
   quiver:
     dependency: transitive
     description:
