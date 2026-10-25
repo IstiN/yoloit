@@ -59,6 +59,20 @@ class BoardOffscreenRenderer {
   static Future<ByteData?> Function(ui.Image image, ui.ImageByteFormat format)
   imageEncoder = (image, format) => image.toByteData(format: format);
 
+  /// Sleeps between capture-loop polls. Indirection seam so tests can drive
+  /// the loop with a fake clock (see [pollElapsedMsOverride]) without real
+  /// wall-time delays.
+  @visibleForTesting
+  static Future<void> Function(Duration duration) pollSleeper =
+      (duration) => Future<void>.delayed(duration);
+
+  /// Overrides the capture loop's elapsed-time source (milliseconds). When
+  /// null the loop uses a real [Stopwatch]. Tests inject a fake clock that
+  /// advances together with [pollSleeper] so 15s-timeout scenarios run
+  /// instantly.
+  @visibleForTesting
+  static int Function()? pollElapsedMsOverride;
+
   /// Returns a (size, pixelRatio) pair whose physical pixel count never
   /// exceeds [maxCapturePhysicalPixels].
   ///
@@ -363,33 +377,45 @@ class BoardOffscreenRenderer {
 
     ui.Image? image;
     try {
-      // Smart Adaptive Polling with 200ms Debounce: flushes dirty layouts and
-      // processes build scopes every 50ms until the active task registry remains
-      // completely empty for 4 consecutive event-loop turns (200ms). This prevents
-      // sequential asynchronous tasks from being skipped during phase transitions.
+      // Smart Adaptive Polling with 200ms Debounce and exponential backoff.
+      //
+      // Flushes dirty layouts and processes build scopes until the tasks that
+      // belong to THIS capture have been quiet for 4 consecutive turns
+      // (200ms). The poll interval doubles (50 -> 100 -> 200 -> 400ms cap)
+      // whenever the active-task set is unchanged since the previous poll and
+      // resets to 50ms on any change; a hard 15s timeout bounds the total
+      // wait regardless.
+      //
+      // Tasks already running when the capture began belong to earlier work
+      // (e.g. a task stuck from a previous capture): the start snapshot is
+      // subtracted before evaluating the quiet condition, so such a task no
+      // longer forces every later capture to burn the full 15s window. Tasks
+      // registered DURING this capture (JS engine / Mermaid loads, including
+      // sequential chains) are still waited on exactly as before.
+      final tracker = CapturePollTracker(
+        Set.of(HeadlessRenderRegistry.activeTasks),
+      );
       final watch = Stopwatch()..start();
-      var emptyTurns = 0;
+      int elapsedMs() =>
+          pollElapsedMsOverride?.call() ?? watch.elapsedMilliseconds;
 
-      while (watch.elapsedMilliseconds < 15000) {
+      while (elapsedMs() < CapturePollTracker.timeoutMs) {
         if (cancelToken?.isCancelled ?? false) {
           break;
         }
         buildOwner.buildScope(rootElement);
         pipelineOwner.flushLayout();
 
-        await Future<void>.delayed(const Duration(milliseconds: 50));
+        await pollSleeper(tracker.interval);
 
         if (cancelToken?.isCancelled ?? false) {
           break;
         }
 
-        if (HeadlessRenderRegistry.activeTasks.isEmpty) {
-          emptyTurns++;
-          if (emptyTurns >= 4) {
-            break;
-          }
-        } else {
-          emptyTurns = 0;
+        if (tracker.recordObservation(
+          Set.of(HeadlessRenderRegistry.activeTasks),
+        )) {
+          break;
         }
       }
 
@@ -468,4 +494,77 @@ class _OffscreenSinglePanel extends StatelessWidget {
 class HeadlessRenderRegistry {
   HeadlessRenderRegistry._();
   static final Set<String> activeTasks = {};
+}
+
+/// Next poll interval for the offscreen capture loop: resets to
+/// [CapturePollTracker.intervalStart] when the active-task set changed since
+/// the previous poll, otherwise doubles up to
+/// [CapturePollTracker.intervalCap].
+@visibleForTesting
+Duration nextPollInterval(Duration current, {required bool taskSetChanged}) {
+  if (taskSetChanged) {
+    return CapturePollTracker.intervalStart;
+  }
+  final doubled = current * 2;
+  return doubled > CapturePollTracker.intervalCap
+      ? CapturePollTracker.intervalCap
+      : doubled;
+}
+
+/// Pure decision logic for the offscreen capture polling loop.
+///
+/// The loop polls [HeadlessRenderRegistry.activeTasks] until tasks that
+/// belong to THIS capture (registered after [startSnapshot] was taken) have
+/// been quiet for [quietTurnsRequired] consecutive turns, or the hard
+/// [timeoutMs] fires. A task already running when the capture began belongs
+/// to earlier work: it is part of [startSnapshot] and is subtracted before
+/// evaluating the quiet condition, so it does not by itself keep this
+/// capture waiting — mirroring how the loop already treats its own
+/// completion.
+@visibleForTesting
+class CapturePollTracker {
+  /// Initial poll interval on capture start and after any task-set change.
+  static const Duration intervalStart = Duration(milliseconds: 50);
+
+  /// Maximum poll interval while the active-task set stays unchanged.
+  static const Duration intervalCap = Duration(milliseconds: 400);
+
+  /// Consecutive quiet turns required before the capture proceeds (4 x 50ms
+  /// start interval = 200ms debounce).
+  static const int quietTurnsRequired = 4;
+
+  /// Hard cap on total polling time, in milliseconds.
+  static const int timeoutMs = 15000;
+
+  /// Tasks active when this capture began — earlier work, not gating.
+  final Set<String> startSnapshot;
+
+  Duration _interval = intervalStart;
+  int _quietTurns = 0;
+  Set<String>? _previousTasks;
+
+  CapturePollTracker(Set<String> startTasks)
+      : startSnapshot = Set.unmodifiable(startTasks);
+
+  /// Current poll interval for the next sleep.
+  Duration get interval => _interval;
+
+  /// Consecutive turns with no active task belonging to this capture.
+  int get quietTurns => _quietTurns;
+
+  /// The quiet window has been filled and the capture may proceed.
+  bool get isQuietComplete => _quietTurns >= quietTurnsRequired;
+
+  /// Records one poll observation of the current [activeTasks] set and
+  /// advances the quiet-window and backoff bookkeeping. Returns
+  /// [isQuietComplete] for the caller's exit check.
+  bool recordObservation(Set<String> activeTasks) {
+    final quiet = activeTasks.difference(startSnapshot).isEmpty;
+    _quietTurns = quiet ? _quietTurns + 1 : 0;
+    final changed =
+        _previousTasks == null || !setEquals(activeTasks, _previousTasks);
+    _interval = nextPollInterval(_interval, taskSetChanged: changed);
+    _previousTasks = Set.of(activeTasks);
+    return isQuietComplete;
+  }
 }

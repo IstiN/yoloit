@@ -322,6 +322,255 @@ void main() {
     image.dispose();
     codec.dispose();
   });
+
+  group('capture polling', () {
+    final originalSleeper = BoardOffscreenRenderer.pollSleeper;
+    final originalElapsedOverride = BoardOffscreenRenderer.pollElapsedMsOverride;
+
+    setUp(() {
+      BoardOffscreenRenderer.pollSleeper = originalSleeper;
+      BoardOffscreenRenderer.pollElapsedMsOverride = originalElapsedOverride;
+      HeadlessRenderRegistry.activeTasks.clear();
+    });
+
+    tearDown(() {
+      BoardOffscreenRenderer.pollSleeper = originalSleeper;
+      BoardOffscreenRenderer.pollElapsedMsOverride = originalElapsedOverride;
+      HeadlessRenderRegistry.activeTasks.clear();
+    });
+
+    /// Installs a fake clock: the sleeper advances the clock by the slept
+    /// interval, so 15s-timeout scenarios run instantly while the loop sees
+    /// a realistic elapsed time.
+    void installFakeClock(List<Duration> intervals) {
+      var elapsed = 0;
+      BoardOffscreenRenderer.pollElapsedMsOverride = () => elapsed;
+      BoardOffscreenRenderer.pollSleeper = (duration) async {
+        intervals.add(duration);
+        elapsed += duration.inMilliseconds;
+      };
+    }
+
+    int totalMs(List<Duration> intervals) =>
+        intervals.fold<int>(0, (sum, d) => sum + d.inMilliseconds);
+
+    test(
+      'a task stuck from earlier work does not extend the capture',
+      () async {
+        HeadlessRenderRegistry.activeTasks.add('stuck:earlier');
+        final intervals = <Duration>[];
+        installFakeClock(intervals);
+
+        final png = await BoardOffscreenRenderer.instance.renderBoard(
+          _boardWithPanels([_panel('board.playlist')]),
+          size: const Size(320, 240),
+          pixelRatio: 1.0,
+        );
+
+        expect(png, isNotNull);
+        // The 15s timeout is not hit: the preexisting task is subtracted via
+        // the start snapshot. Only the 4-turn quiet debounce elapses; its
+        // sleeps back off as the (static, task-free) set stays unchanged.
+        expect(totalMs(intervals), 400);
+        expect(intervals, [
+          const Duration(milliseconds: 50),
+          const Duration(milliseconds: 50),
+          const Duration(milliseconds: 100),
+          const Duration(milliseconds: 200),
+        ]);
+      },
+    );
+
+    test(
+      'a task registered during the capture still gates completion',
+      () async {
+        final intervals = <Duration>[];
+        var elapsed = 0;
+        var registered = false;
+        BoardOffscreenRenderer.pollElapsedMsOverride = () => elapsed;
+        BoardOffscreenRenderer.pollSleeper = (duration) async {
+          intervals.add(duration);
+          elapsed += duration.inMilliseconds;
+          if (!registered) {
+            // First poll: the snapshot is already taken, so this task belongs
+            // to THIS capture and must gate completion.
+            registered = true;
+            HeadlessRenderRegistry.activeTasks.add('during:js-engine');
+          } else if (elapsed >= 600) {
+            HeadlessRenderRegistry.activeTasks.remove('during:js-engine');
+          }
+        };
+
+        final png = await BoardOffscreenRenderer.instance.renderBoard(
+          _boardWithPanels([_panel('board.playlist')]),
+          size: const Size(320, 240),
+          pixelRatio: 1.0,
+        );
+
+        expect(png, isNotNull);
+        // The capture kept polling until the task finished at 600ms, then
+        // debounced 4 quiet turns — well under the 15s timeout.
+        expect(totalMs(intervals), greaterThan(600));
+        expect(totalMs(intervals), lessThan(15000));
+      },
+    );
+
+    test('sequential task chains are still awaited', () async {
+      var elapsed = 0;
+      var phase = 0;
+      BoardOffscreenRenderer.pollElapsedMsOverride = () => elapsed;
+      BoardOffscreenRenderer.pollSleeper = (duration) async {
+        elapsed += duration.inMilliseconds;
+        if (phase == 0) {
+          phase = 1;
+          HeadlessRenderRegistry.activeTasks.add('during:A');
+        } else if (phase == 1 && elapsed >= 500) {
+          // Task A finishes and registers task B before completing.
+          phase = 2;
+          HeadlessRenderRegistry.activeTasks
+            ..remove('during:A')
+            ..add('during:B');
+        } else if (phase == 2 && elapsed >= 120) {
+          phase = 3;
+          HeadlessRenderRegistry.activeTasks.remove('during:B');
+        }
+      };
+
+      final png = await BoardOffscreenRenderer.instance.renderBoard(
+        _boardWithPanels([_panel('board.playlist')]),
+        size: const Size(320, 240),
+        pixelRatio: 1.0,
+      );
+
+      expect(png, isNotNull);
+      // Completion waited for task B (gated beyond its 120ms lifetime).
+      expect(elapsed, greaterThan(120));
+      expect(elapsed, lessThan(15000));
+      expect(HeadlessRenderRegistry.activeTasks, isEmpty);
+    });
+
+    test(
+      'poll interval backs off while the task set is static and resets on '
+      'change',
+      () async {
+        final intervals = <Duration>[];
+        var polls = 0;
+        var elapsed = 0;
+        BoardOffscreenRenderer.pollElapsedMsOverride = () => elapsed;
+        BoardOffscreenRenderer.pollSleeper = (duration) async {
+          intervals.add(duration);
+          elapsed += duration.inMilliseconds;
+          polls++;
+          if (polls == 1) {
+            HeadlessRenderRegistry.activeTasks.add('during:task');
+          } else if (polls == 2) {
+            HeadlessRenderRegistry.activeTasks.remove('during:task');
+          }
+        };
+
+        await BoardOffscreenRenderer.instance.renderBoard(
+          _boardWithPanels([_panel('board.playlist')]),
+          size: const Size(320, 240),
+          pixelRatio: 1.0,
+        );
+
+        // 50ms until the first change is observed, reset to 50ms by the
+        // register/remove changes, then 50 -> 100 -> 200 growth over the
+        // final quiet turns.
+        expect(intervals, [
+          const Duration(milliseconds: 50),
+          const Duration(milliseconds: 50),
+          const Duration(milliseconds: 50),
+          const Duration(milliseconds: 100),
+          const Duration(milliseconds: 200),
+        ]);
+      },
+    );
+
+    test(
+      '15s timeout still fires for a permanently stuck task from this '
+      'capture',
+      () async {
+        final intervals = <Duration>[];
+        var elapsed = 0;
+        BoardOffscreenRenderer.pollElapsedMsOverride = () => elapsed;
+        BoardOffscreenRenderer.pollSleeper = (duration) async {
+          intervals.add(duration);
+          elapsed += duration.inMilliseconds;
+          // Re-add on every poll: the task never completes.
+          HeadlessRenderRegistry.activeTasks.add('during:stuck');
+        };
+
+        final png = await BoardOffscreenRenderer.instance.renderBoard(
+          _boardWithPanels([_panel('board.playlist')]),
+          size: const Size(320, 240),
+          pixelRatio: 1.0,
+        );
+
+        // The timeout does not fail the capture; it proceeds to paint.
+        expect(png, isNotNull);
+        expect(elapsed, greaterThanOrEqualTo(15000));
+        expect(elapsed, lessThan(16000));
+        // Backoff caps the interval at 400ms: ~40 polls instead of the
+        // previous fixed-50ms ~300 polls for the same 15s window.
+        expect(intervals.last, CapturePollTracker.intervalCap);
+        expect(intervals.length, lessThan(60));
+      },
+    );
+
+    group('CapturePollTracker', () {
+      test('nextPollInterval doubles up to the cap and resets on change', () {
+        var interval = CapturePollTracker.intervalStart;
+        interval = nextPollInterval(interval, taskSetChanged: false);
+        expect(interval, const Duration(milliseconds: 100));
+        interval = nextPollInterval(interval, taskSetChanged: false);
+        expect(interval, const Duration(milliseconds: 200));
+        interval = nextPollInterval(interval, taskSetChanged: false);
+        expect(interval, const Duration(milliseconds: 400));
+        expect(
+          nextPollInterval(interval, taskSetChanged: false),
+          CapturePollTracker.intervalCap,
+        );
+        expect(
+          nextPollInterval(interval, taskSetChanged: true),
+          CapturePollTracker.intervalStart,
+        );
+      });
+
+      test('subtracts the start snapshot from the quiet condition', () {
+        final tracker = CapturePollTracker({'stuck:old'});
+        expect(tracker.recordObservation({'stuck:old'}), isFalse);
+        expect(tracker.recordObservation({'stuck:old'}), isFalse);
+        expect(tracker.recordObservation({'stuck:old'}), isFalse);
+        expect(tracker.recordObservation({'stuck:old'}), isTrue);
+
+        final gating = CapturePollTracker({'stuck:old'});
+        expect(
+          gating.recordObservation({'stuck:old', 'during:new'}),
+          isFalse,
+        );
+        // A task appearing mid-capture keeps the window from advancing...
+        expect(gating.quietTurns, 0);
+        // ...and the window refills only after it disappears.
+        expect(gating.recordObservation({'stuck:old'}), isFalse);
+        expect(gating.recordObservation({'stuck:old'}), isFalse);
+        expect(gating.recordObservation({'stuck:old'}), isFalse);
+        expect(gating.recordObservation({'stuck:old'}), isTrue);
+      });
+
+      test('backs off while the task set is static and resets on change', () {
+        final tracker = CapturePollTracker({});
+        tracker.recordObservation({'a'});
+        expect(tracker.interval, CapturePollTracker.intervalStart);
+        tracker.recordObservation({'a'});
+        expect(tracker.interval, const Duration(milliseconds: 100));
+        tracker.recordObservation({'a', 'b'});
+        expect(tracker.interval, CapturePollTracker.intervalStart);
+        tracker.recordObservation({'a', 'b'});
+        expect(tracker.interval, const Duration(milliseconds: 100));
+      });
+    });
+  });
 }
 
 Future<int> _countRedPixels(Uint8List png) async {
