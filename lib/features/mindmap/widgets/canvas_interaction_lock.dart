@@ -19,6 +19,8 @@ class CanvasInteractionLock {
   final ValueNotifier<int> _canvasGestureCount = ValueNotifier<int>(0);
   final ValueNotifier<int> _lockStateVersion = ValueNotifier<int>(0);
   Timer? _canvasSignalTimer;
+  int _lockStateVersionCounter = 0;
+  bool _versionNotifyScheduled = false;
 
   ValueListenable<int> get activeCount => _count;
   ValueListenable<int> get canvasGestureCount => _canvasGestureCount;
@@ -28,7 +30,20 @@ class CanvasInteractionLock {
   bool get isCanvasGestureActive => _canvasGestureCount.value > 0;
 
   void _notifyLockStateChanged() {
-    _lockStateVersion.value = _lockStateVersion.value + 1;
+    // Coalesce bursts, but never notify synchronously: lock changes fire
+    // from pointer-event handlers AND from widget dispose (a hovered
+    // scrollable region unmounts on board switch), where the tree is
+    // locked and a synchronous notify would trip "setState() called when
+    // widget tree was locked" in listeners such as the board canvas
+    // ValueListenableBuilder. Listeners only rebuild UI, so landing the
+    // notification on the next microtask is indistinguishable in practice.
+    _lockStateVersionCounter++;
+    if (_versionNotifyScheduled) return;
+    _versionNotifyScheduled = true;
+    scheduleMicrotask(() {
+      _versionNotifyScheduled = false;
+      _lockStateVersion.value = _lockStateVersionCounter;
+    });
   }
 
   void enter() {
