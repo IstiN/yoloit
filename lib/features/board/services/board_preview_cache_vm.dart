@@ -75,6 +75,51 @@ class BoardPreviewCache {
     }
   }
 
+  /// Deletes the cached PNG and sidecar for [boardId], if present.
+  ///
+  /// Called when a board is deleted so previews do not linger on disk.
+  void deleteForBoard(String boardId) {
+    try {
+      pngFile(boardId).deleteSync();
+      metaFile(boardId).deleteSync();
+    } catch (_) {
+      // Best-effort — overview previews must not crash the app.
+    }
+  }
+
+  /// Board ids that currently have a cached PNG on disk.
+  ///
+  /// Returns an empty list when the preview directory cannot be enumerated.
+  List<String> cachedBoardIds() {
+    final previewDir = Directory(_previewDir);
+    if (!previewDir.existsSync()) return const [];
+    try {
+      return previewDir
+          .listSync()
+          .whereType<File>()
+          .map((file) => p.basename(file.path))
+          .where((name) => name.endsWith('.png'))
+          .map((name) => name.substring(0, name.length - '.png'.length))
+          .toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  /// Deletes cached previews whose board id is not in [validBoardIds].
+  ///
+  /// Defensive: never throws and never deletes anything when the cache
+  /// directory cannot be enumerated.
+  void sweepOrphans(Set<String> validBoardIds) {
+    final cached = cachedBoardIds();
+    if (cached.isEmpty) return;
+    for (final id in cached) {
+      if (!validBoardIds.contains(id)) {
+        deleteForBoard(id);
+      }
+    }
+  }
+
   Map<String, dynamic>? _readMeta(String boardId) {
     final file = metaFile(boardId);
     if (!file.existsSync()) return null;

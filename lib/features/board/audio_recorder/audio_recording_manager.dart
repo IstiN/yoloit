@@ -21,7 +21,10 @@ typedef Now = DateTime Function();
 /// It captures the microphone (and, when provided, a system-audio source),
 /// mixes the sources into a single 48 kHz / stereo / 16-bit WAV file, and
 /// mirrors progress + the resulting recording entry back into the panel state
-/// through [BoardCubit], exactly like [TimerManager] does for timers.
+/// through [BoardCubit], exactly like [TimerManager] does for timers. The
+/// periodic progress writes are skipped while the panel's board is not the
+/// active visible board; elapsed accumulation and the completion write are
+/// unaffected.
 ///
 /// v1 buffers each source in memory (bounded by [maxSourceBufferBytes] per
 /// source — chunks past the cap are truncated and dropped) and mixes once on
@@ -295,10 +298,22 @@ class AudioRecordingManager {
     return '${Directory.systemTemp.path}${sep}yoloit_recordings';
   }
 
+  /// Whether [boardId] is the active visible board. The 4x/sec progress
+  /// writes are skipped while hidden (nothing consumes them); elapsed time
+  /// keeps accumulating and the next visible tick self-corrects. A null
+  /// active board id (cubit not loaded) is treated as visible.
+  bool _isBoardVisible(String boardId) {
+    final cubit = _cubit;
+    if (cubit == null) return true;
+    final activeId = cubit.state.activeBoardId;
+    return activeId == null || activeId == boardId;
+  }
+
   void _writeProgress(String panelId) {
     final cubit = _cubit;
     final entry = _entries[panelId];
     if (cubit == null || entry == null) return;
+    if (!_isBoardVisible(entry.boardId)) return;
     final elapsed = _now().millisecondsSinceEpoch - entry.startedAt;
     cubit.updatePanel(
       panelId,

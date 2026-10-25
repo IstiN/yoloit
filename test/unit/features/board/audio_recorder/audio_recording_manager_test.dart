@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yoloit/features/board/audio_recorder/audio_recording_manager.dart';
@@ -434,6 +435,124 @@ void main() {
         () async {
       final path = await recordIntoDefaultFolder();
       expect(path, contains('yoloit_recordings'));
+    });
+  });
+
+  group('board visibility gating', () {
+    BoardPanelInstance panel() => const BoardPanelInstance(
+      id: 'p1',
+      type: 'board.audio_recorder',
+      title: 'Recorder',
+      bounds: BoardPanelBounds(x: 0, y: 0, width: 100, height: 100),
+    );
+
+    BoardDocument board(String id, {List<BoardPanelInstance> panels = const []}) =>
+        BoardDocument(id: id, name: id, panels: panels);
+
+    BoardPanelInstance panelOn(BoardCubit cubit, String boardId) => cubit
+        .state
+        .boards
+        .firstWhere((b) => b.id == boardId)
+        .panels
+        .singleWhere((p) => p.id == 'p1');
+
+    test('skips progress writes while hidden and self-corrects on return',
+        () async {
+      final mic = FakeAudioSource();
+      final sink = FakeSink();
+      final cubit = BoardCubit();
+      addTearDown(cubit.close);
+      cubit.emit(
+        BoardState(
+          boards: [board('b1', panels: [panel()]), board('b2')],
+          activeBoardId: 'b2',
+          isLoaded: true,
+        ),
+      );
+      late final AudioRecordingManager manager;
+
+      fakeAsync((async) {
+        // fakeAsync fakes timers, not the wall clock — drive the manager's
+        // clock from the fake zone.
+        final clock = async.getClock(DateTime(2024));
+        manager = AudioRecordingManager.testInstance(
+          micFactory: () => mic,
+          openSink: (_, {format = const PcmWavFormat()}) async => sink,
+          now: clock.now,
+        );
+        manager.setCubit(cubit);
+
+        manager.start(panelId: 'p1', boardId: 'b1');
+        async.flushMicrotasks();
+
+        // ~8 hidden ticks (4/sec): none of them may touch the panel state.
+        async.elapse(const Duration(seconds: 2));
+        final hiddenPanel = panelOn(cubit, 'b1');
+        expect(hiddenPanel.state['isRecording'], isNot(true));
+        expect(hiddenPanel.state.containsKey('elapsedMs'), isFalse);
+
+        // Board becomes visible: the next tick writes exactly once and the
+        // elapsed time covers the hidden period too.
+        cubit.emit(cubit.state.copyWith(activeBoardId: 'b1'));
+        async.elapse(const Duration(milliseconds: 300));
+
+        final visiblePanel = panelOn(cubit, 'b1');
+        expect(visiblePanel.state['isRecording'], isTrue);
+        final elapsedMs = visiblePanel.state['elapsedMs'];
+        expect(elapsedMs, isA<int>());
+        // ~2.25s of recording: accumulated while hidden + one visible tick.
+        expect(elapsedMs as int, greaterThanOrEqualTo(2000));
+        expect(elapsedMs, lessThan(2300));
+      });
+
+      await manager.stop('p1');
+
+      expect(manager.isRecording('p1'), isFalse);
+      expect(mic.stopped, isTrue);
+      expect(sink.closed, isTrue);
+    });
+
+    test('stop while hidden still lands the finished recording entry',
+        () async {
+      final mic = FakeAudioSource();
+      final sink = FakeSink();
+      final cubit = BoardCubit();
+      addTearDown(cubit.close);
+      cubit.emit(
+        BoardState(
+          boards: [board('b1', panels: [panel()]), board('b2')],
+          activeBoardId: 'b2',
+          isLoaded: true,
+        ),
+      );
+      final manager = AudioRecordingManager.testInstance(
+        micFactory: () => mic,
+        openSink: (_, {format = const PcmWavFormat()}) async => sink,
+      );
+      manager.setCubit(cubit);
+
+      fakeAsync((async) {
+        manager.start(panelId: 'p1', boardId: 'b1');
+        async.flushMicrotasks();
+        async.elapse(const Duration(seconds: 1));
+
+        mic.controller.add(pcm16Samples(<int>[7, 8]));
+      });
+
+      // Stop from a hidden board: the completion write must still land so
+      // the recording appears once the board returns.
+      await manager.stop('p1');
+
+      final finished = panelOn(cubit, 'b1');
+      expect(finished.state['isRecording'], isFalse);
+      expect(finished.state['elapsedMs'], 0);
+      final recordings =
+          (finished.state['recordings'] as List<dynamic>?) ?? const [];
+      expect(recordings, hasLength(1));
+      expect(recordings.single, isA<Map<String, dynamic>>());
+      expect((recordings.single as Map<String, dynamic>)['format'], 'wav');
+      expect(sink.closed, isTrue);
+      expect(manager.isRecording('p1'), isFalse);
     });
   });
 }

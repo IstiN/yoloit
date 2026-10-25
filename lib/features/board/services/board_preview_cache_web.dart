@@ -79,6 +79,32 @@ class BoardPreviewCache {
       ]),
     );
   }
+
+  /// Deletes the cached PNG and sidecar for [boardId].
+  ///
+  /// Called when a board is deleted so previews do not linger in storage.
+  void deleteForBoard(String boardId) {
+    _memoryPng.remove(boardId);
+    _memoryMeta.remove(boardId);
+    unawaited(
+      Future.wait([
+        FileStorageAdapter.instance.delete(_pngPath(boardId)),
+        FileStorageAdapter.instance.delete(_metaPath(boardId)),
+      ]),
+    );
+  }
+
+  /// Board ids that currently have a cached PNG in this session.
+  List<String> cachedBoardIds() => _memoryPng.keys.toList();
+
+  /// Deletes cached previews whose board id is not in [validBoardIds].
+  void sweepOrphans(Set<String> validBoardIds) {
+    for (final id in cachedBoardIds()) {
+      if (!validBoardIds.contains(id)) {
+        deleteForBoard(id);
+      }
+    }
+  }
 }
 
 /// Best-effort web stand-in for the VM [File] return type.

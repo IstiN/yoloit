@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:yoloit/features/board/bloc/board_state.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/builtin/timer_manager.dart';
 
@@ -70,6 +71,13 @@ void main() {
       when(
         () => cubit.updatePanel(any(), any(), boardId: any(named: 'boardId')),
       ).thenAnswer((_) async {});
+      when(() => cubit.state).thenAnswer(
+        (_) => const BoardState(
+          boards: [],
+          activeBoardId: 'b1',
+          isLoaded: true,
+        ),
+      );
     });
 
     BoardPanelInstance Function(BoardPanelInstance) capturedUpdater(
@@ -136,6 +144,99 @@ void main() {
         async.elapse(const Duration(seconds: 1));
 
         final updated = capturedUpdater('p1')(sourcePanel);
+        expect(updated.state['remaining'], 0);
+        expect(updated.state['isRunning'], isFalse);
+        expect(updated.state['completed'], isTrue);
+        expect(manager.isRunning('p1'), isFalse);
+      });
+    });
+
+    void stubActiveBoard(String? activeBoardId) {
+      when(() => cubit.state).thenAnswer(
+        (_) => BoardState(
+          boards: const [],
+          activeBoardId: activeBoardId,
+          isLoaded: true,
+        ),
+      );
+    }
+
+    test('no panel writes while the board is hidden; one on becoming visible',
+        () {
+      fakeAsync((async) {
+        // fakeAsync fakes timers, not the wall clock — drive the manager's
+        // clock from the fake zone.
+        final clock = async.getClock(DateTime(2024));
+        manager = TimerManager.testInstance(now: clock.now);
+
+        // p1 lives on b1, but b2 is the active visible board.
+        stubActiveBoard('b2');
+        manager.setCubit(cubit);
+        manager.start(panelId: 'p1', boardId: 'b1', remaining: 300);
+
+        // 3 hidden seconds: ~3 ticks, none of which may touch the panel.
+        async.elapse(const Duration(seconds: 3));
+        verifyNever(
+          () => cubit.updatePanel(any(), any(), boardId: any(named: 'boardId')),
+        );
+
+        // The countdown itself kept accumulating while hidden.
+        expect(manager.remaining('p1'), 297);
+
+        // Board becomes visible: the next tick writes exactly once and the
+        // remaining time has self-corrected to the accumulated elapsed time.
+        stubActiveBoard('b1');
+        async.elapse(const Duration(seconds: 1));
+
+        final captured =
+            verify(
+              () => cubit.updatePanel('p1', captureAny(), boardId: 'b1'),
+            ).captured;
+        expect(captured, hasLength(1));
+        final updated = (captured.single
+            as BoardPanelInstance Function(BoardPanelInstance))(sourcePanel);
+        expect(updated.state['remaining'], 296);
+        expect(updated.state['isRunning'], isTrue);
+        expect(updated.state['completed'], isFalse);
+
+        // And it keeps ticking normally afterwards (2 more writes, one per
+        // second).
+        async.elapse(const Duration(seconds: 2));
+        final captured2 =
+            verify(
+              () => cubit.updatePanel('p1', captureAny(), boardId: 'b1'),
+            ).captured;
+        expect(captured2, hasLength(2));
+        expect(manager.remaining('p1'), 294);
+
+        manager.stop('p1');
+      });
+    });
+
+    test('timer completes correctly while the board is hidden', () {
+      // The completion path plays an alarm through `afplay`; only macOS
+      // guarantees the binary exists, elsewhere the spawned process would
+      // surface an unhandled async error.
+      if (!Platform.isMacOS) return;
+      fakeAsync((async) {
+        final clock = async.getClock(DateTime(2024));
+        manager = TimerManager.testInstance(now: clock.now);
+
+        stubActiveBoard('b2');
+        manager.setCubit(cubit);
+        manager.start(panelId: 'p1', boardId: 'b1', remaining: 2);
+
+        async.elapse(const Duration(seconds: 3));
+
+        // Hidden ticks were skipped, but the completion write always lands
+        // so the UI sees the finished state once the board returns.
+        final captured =
+            verify(
+              () => cubit.updatePanel('p1', captureAny(), boardId: 'b1'),
+            ).captured;
+        expect(captured, hasLength(1));
+        final updated = (captured.single
+            as BoardPanelInstance Function(BoardPanelInstance))(sourcePanel);
         expect(updated.state['remaining'], 0);
         expect(updated.state['isRunning'], isFalse);
         expect(updated.state['completed'], isTrue);

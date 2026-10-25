@@ -4,17 +4,28 @@ import 'dart:math' as math;
 
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 
+/// Injectable clock, same pattern as [AudioRecordingManager]: tests can
+/// substitute a fake time source (fakeAsync does not fake `DateTime.now`).
+typedef Now = DateTime Function();
+
 /// Singleton that keeps Timer countdowns running independently of the UI widget.
 ///
 /// When the timer widget is disposed (board switch), the manager keeps ticking.
 /// When the widget re-mounts, it reads the updated remaining time from
 /// panel.state (which the manager keeps writing to via BoardCubit).
+///
+/// Intermediate per-second panel writes are skipped while the timer's board
+/// is not the active visible board (a hidden board has no consumers); the
+/// accumulated remaining time self-corrects on the first visible tick and the
+/// completion write always lands, even while hidden.
 class TimerManager {
   static final instance = TimerManager._();
-  TimerManager._();
+  TimerManager._({Now? now}) : _now = now ?? DateTime.now;
 
   /// Creates an isolated instance for unit testing.
-  factory TimerManager.testInstance() => TimerManager._();
+  factory TimerManager.testInstance({Now? now}) => TimerManager._(now: now);
+
+  final Now _now;
 
   BoardCubit? _cubit;
   final Map<String, _TimerEntry> _timers = {};
@@ -34,7 +45,7 @@ class TimerManager {
       panelId: panelId,
       boardId: boardId,
       remaining: remaining,
-      lastTick: DateTime.now().millisecondsSinceEpoch,
+      lastTick: _now().millisecondsSinceEpoch,
     );
     entry.timer = Timer.periodic(const Duration(seconds: 1), (_) {
       _tick(panelId);
@@ -68,7 +79,7 @@ class TimerManager {
     final entry = _timers[panelId];
     if (entry == null) return;
 
-    final now = DateTime.now().millisecondsSinceEpoch;
+    final now = _now().millisecondsSinceEpoch;
     final elapsed = now - entry.lastTick;
     final secondsElapsed = (elapsed / 1000).round();
     final newRemaining = math.max(0, entry.remaining - secondsElapsed);
@@ -77,9 +88,12 @@ class TimerManager {
     entry.remaining = done ? 0 : newRemaining;
     entry.lastTick = now;
 
-    // Write back to panel state via BoardCubit
+    // Write back to panel state via BoardCubit. While the board is hidden
+    // the write is skipped (nothing consumes it); the completion write
+    // always lands and the first visible tick carries the self-corrected
+    // accumulated remaining time.
     final cubit = _cubit;
-    if (cubit != null) {
+    if (cubit != null && (_isBoardVisible(entry.boardId) || done)) {
       cubit.updatePanel(
         entry.panelId,
         (p) => p.copyWith(state: {
@@ -98,6 +112,16 @@ class TimerManager {
       stop(panelId);
       _playAlarm();
     }
+  }
+
+  /// Whether the timer's board is the active visible board. A null active
+  /// board id (cubit not loaded) is treated as visible so behavior is
+  /// unchanged when no board has been resolved yet.
+  bool _isBoardVisible(String boardId) {
+    final cubit = _cubit;
+    if (cubit == null) return true;
+    final activeId = cubit.state.activeBoardId;
+    return activeId == null || activeId == boardId;
   }
 
   void _playAlarm() {

@@ -25,6 +25,7 @@ import 'package:yoloit/features/board/plugins/builtin/playlist_player_registry.d
 import 'package:yoloit/features/board/plugins/builtin/webview_manager.dart';
 import 'package:yoloit/features/board/services/board_operation_applier.dart';
 import 'package:yoloit/features/board/services/board_panel_placement_utils.dart';
+import 'package:yoloit/features/board/services/board_preview_cache.dart';
 import 'package:yoloit/features/board/utils/board_grid_layout.dart';
 import 'package:yoloit/features/calendar/data/calendar_event_storage.dart';
 import 'package:yoloit/features/settings/data/agent_config_service.dart';
@@ -183,6 +184,7 @@ class BoardCubit extends Cubit<BoardState> {
     emit(
       BoardState(boards: boards, activeBoardId: activeBoardId, isLoaded: true),
     );
+    unawaited(_sweepStalePreviews(boards));
   }
 
   Future<BoardDocument?> createBoard({String? name}) async {
@@ -497,6 +499,7 @@ class BoardCubit extends Cubit<BoardState> {
       }
     }
     final updated = state.boards.where((board) => board.id != id).toList();
+    unawaited(_deleteStalePreview(id));
     if (updated.isEmpty) {
       final replacement = _buildDefaultBoard(name: 'Board 1');
       await _setBoards([replacement], activeBoardId: replacement.id);
@@ -505,6 +508,27 @@ class BoardCubit extends Cubit<BoardState> {
     final nextActive =
         state.activeBoardId == id ? updated.first.id : state.activeBoardId;
     await _setBoards(updated, activeBoardId: nextActive);
+  }
+
+  /// Best-effort cleanup of the disk preview for a deleted board.
+  Future<void> _deleteStalePreview(String boardId) async {
+    try {
+      BoardPreviewCache.instance.deleteForBoard(boardId);
+    } catch (_) {
+      // Preview cleanup must never break board deletion.
+    }
+  }
+
+  /// Best-effort startup sweep of preview files for boards that no longer
+  /// exist (e.g. deleted while the app was closed).
+  Future<void> _sweepStalePreviews(List<BoardDocument> boards) async {
+    try {
+      BoardPreviewCache.instance.sweepOrphans(
+        boards.map((board) => board.id).toSet(),
+      );
+    } catch (_) {
+      // Never delete anything when board enumeration fails.
+    }
   }
 
   Future<void> archiveBoard(String id) async {
