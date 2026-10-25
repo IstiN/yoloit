@@ -27,6 +27,10 @@ class ChatSession extends ChangeNotifier {
   late ChatProvider _provider;
   ChatSessionConfig _config;
   final List<ChatMessage> _messages = [];
+
+  /// Cached snapshot returned by [messages]; nulled on every mutation of
+  /// [_messages] so the next access rebuilds it once.
+  List<ChatMessage>? _messagesView;
   bool _isProcessing = false;
   bool _isFirstMessage = true;
   String _streamingContent = '';
@@ -83,7 +87,13 @@ class ChatSession extends ChangeNotifier {
 
   ChatProvider get provider => _provider;
   ChatSessionConfig get config => _config;
-  List<ChatMessage> get messages => List.unmodifiable(_messages);
+
+  /// Cached unmodifiable view of [_messages]. Rebuilt only when the list
+  /// mutates — the previous `List.unmodifiable(_messages)` copied the whole
+  /// list on every access, which is O(n) CPU+GC per access and hot during
+  /// streaming when the UI rebuilds per flush. The public type is unchanged
+  /// (`List<ChatMessage>`), so callers are unaffected.
+  List<ChatMessage> get messages => _messagesView ??= List.unmodifiable(_messages);
   bool get isProcessing => _isProcessing;
   bool get isFirstMessage => _isFirstMessage;
   String get streamingContent => _streamingContent;
@@ -134,6 +144,8 @@ class ChatSession extends ChangeNotifier {
         }
       } catch (_) {}
     }
+    _invalidateMessagesView();
+    _trimMessagesIfNeeded();
     if (_messages.isNotEmpty) {
       _isFirstMessage = false;
     }
@@ -191,6 +203,8 @@ class ChatSession extends ChangeNotifier {
     _messages
       ..clear()
       ..addAll(messages);
+    _invalidateMessagesView();
+    _trimMessagesIfNeeded();
     _isFirstMessage = isFirstMessage;
     _isProcessing = isProcessing;
     _streamingContent = streamingContent;
@@ -214,6 +228,7 @@ class ChatSession extends ChangeNotifier {
 
   void clearMessages() {
     _messages.clear();
+    _invalidateMessagesView();
     _totalOutputTokens = 0;
     _lastUsage = null;
     _isFirstMessage = true;
@@ -357,6 +372,7 @@ class ChatSession extends ChangeNotifier {
         timestamp: DateTime.now(),
       ),
     );
+    _trimMessagesIfNeeded();
     _streamingContent = '';
     _streamingMessageId = null;
     _assistantInsertIndex = _messages.length;
@@ -451,6 +467,7 @@ class ChatSession extends ChangeNotifier {
         timestamp: DateTime.now(),
       ),
     );
+    _trimMessagesIfNeeded();
     notifyListeners();
     _persistToHistory();
     _uiErrorCallback?.call(error);
@@ -630,6 +647,7 @@ class ChatSession extends ChangeNotifier {
     _messages.removeWhere(
       (m) => m.id == _streamingMessageId && m.isStreaming,
     );
+    _invalidateMessagesView();
 
     final toolCalls =
         toolReqs.map((tr) {
@@ -668,6 +686,7 @@ class ChatSession extends ChangeNotifier {
     } else {
       _messages.add(assistantMessage);
     }
+    _trimMessagesIfNeeded();
     _streamingMessageId = null;
     _streamingContent = '';
     _assistantInsertIndex = null;
@@ -695,6 +714,7 @@ class ChatSession extends ChangeNotifier {
         },
       ),
     );
+    _trimMessagesIfNeeded();
     notifyListeners();
   }
 
@@ -724,6 +744,7 @@ class ChatSession extends ChangeNotifier {
     if (_streamingContent.isEmpty) return;
     // Remove existing streaming placeholder
     _messages.removeWhere((m) => m.id == _streamingMessageId && m.isStreaming);
+    _invalidateMessagesView();
     _messages.add(
       ChatMessage(
         id:
@@ -734,12 +755,50 @@ class ChatSession extends ChangeNotifier {
         timestamp: DateTime.now(),
       ),
     );
+    _trimMessagesIfNeeded();
     _streamingMessageId = null;
     _streamingContent = '';
     _assistantInsertIndex = null;
   }
 
   static const _maxSavedMessages = 100;
+
+  /// Maximum number of messages retained in memory for a single session.
+  ///
+  /// Rationale: the persisted history is trimmed to [_maxSavedMessages]
+  /// (100), but the in-memory list was previously unbounded, so a panel kept
+  /// alive for days accumulated thousands of messages — every [messages]
+  /// snapshot, list rebuild, and serialization then cost O(n). 500 is 5× the
+  /// serialization window: enough to keep the full visible context of any
+  /// recent conversation while bounding memory. The cap is enforced on
+  /// append with the SAME policy as the serialization trim (see
+  /// [serializeMessages]): keep the most recent N messages, drop the oldest
+  /// ones — no role is exempt. Memory-only; nothing new is persisted.
+  static const _maxInMemoryMessages = 500;
+
+  void _invalidateMessagesView() {
+    _messagesView = null;
+  }
+
+  /// Enforce [_maxInMemoryMessages] after an append, mirroring the
+  /// serialization trim: drop the oldest messages, keep the most recent N.
+  /// Trimming from the front preserves relative order, so tool-call/tool-
+  /// result pairing is unaffected. [_assistantInsertIndex] is shifted to
+  /// stay aligned with the tool message it marks.
+  void _trimMessagesIfNeeded() {
+    // Always invalidate the cached view: every caller mutates [_messages]
+    // right before invoking this, so the snapshot must be rebuilt even when
+    // no trimming happens.
+    _invalidateMessagesView();
+    if (_messages.length <= _maxInMemoryMessages) return;
+    final removed = _messages.length - _maxInMemoryMessages;
+    _messages.removeRange(0, removed);
+    final insertIndex = _assistantInsertIndex;
+    if (insertIndex != null) {
+      _assistantInsertIndex =
+          (insertIndex - removed).clamp(0, _messages.length);
+    }
+  }
 
   void _persistToHistory() {
     final trimmed =

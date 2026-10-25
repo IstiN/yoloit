@@ -200,6 +200,22 @@ Future<void> _pumpContent(
   );
 }
 
+/// Like [testWidgets], but disposes the mounted panel content inside the
+/// test body. The content's `dispose()` schedules a detached-controller
+/// eviction timer; cancelling it here keeps the binding's pending-timer
+/// invariant (checked before tearDown) happy.
+void webpageTestWidgets(
+  String description,
+  Future<void> Function(WidgetTester tester) callback,
+) {
+  testWidgets(description, (tester) async {
+    await callback(tester);
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump();
+    WebViewManager.instance.disposeAll();
+  });
+}
+
 _FakeWebViewPlatform get _platform =>
     WebViewPlatform.instance! as _FakeWebViewPlatform;
 
@@ -254,6 +270,7 @@ void main() {
   tearDown(() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(zoomChannel, null);
+    WebViewManager.instance.debugClock = DateTime.now;
     WebViewManager.instance.disposeAll();
     WebpagePluginBase.controllers.clear();
     WebpagePluginBase.pendingCssZoom.clear();
@@ -265,7 +282,7 @@ void main() {
   });
 
   group('WebpagePlugin url bar', () {
-    testWidgets('shows placeholder when no url is set', (tester) async {
+    webpageTestWidgets('shows placeholder when no url is set', (tester) async {
       final rec = _Recorder();
       await _pumpContent(tester, _panel(), rec);
       await tester.pump();
@@ -275,7 +292,7 @@ void main() {
       expect(find.byIcon(Icons.refresh), findsNothing);
     });
 
-    testWidgets('commit normalizes url, updates state and loads page', (
+    webpageTestWidgets('commit normalizes url, updates state and loads page', (
       tester,
     ) async {
       final rec = _Recorder();
@@ -305,7 +322,7 @@ void main() {
       expect(rec.stateUpdates.last['title'], 'other.dev');
     });
 
-    testWidgets('panel url change initializes then reloads controller', (
+    webpageTestWidgets('panel url change initializes then reloads controller', (
       tester,
     ) async {
       final rec = _Recorder();
@@ -334,7 +351,7 @@ void main() {
       ]);
     });
 
-    testWidgets('nav buttons call through to the controller', (tester) async {
+    webpageTestWidgets('nav buttons call through to the controller', (tester) async {
       final fake = _FakePlatformWebViewController();
       final rec = _Recorder();
       await _pumpWithExisting(tester, fake, rec);
@@ -351,7 +368,7 @@ void main() {
   });
 
   group('WebpagePlugin controller lifecycle', () {
-    testWidgets('reuses registered controller and syncs live url and title', (
+    webpageTestWidgets('reuses registered controller and syncs live url and title', (
       tester,
     ) async {
       final fake =
@@ -372,7 +389,7 @@ void main() {
       );
     });
 
-    testWidgets('falls back to hostname when live title is empty', (
+    webpageTestWidgets('falls back to hostname when live title is empty', (
       tester,
     ) async {
       final fake =
@@ -385,7 +402,7 @@ void main() {
       expect(rec.stateUpdates.last['title'], 'live.example');
     });
 
-    testWidgets('no state sync when live url is unavailable', (tester) async {
+    webpageTestWidgets('no state sync when live url is unavailable', (tester) async {
       final fake = _FakePlatformWebViewController();
       final rec = _Recorder();
       await _pumpWithExisting(tester, fake, rec);
@@ -393,7 +410,7 @@ void main() {
       expect(rec.stateUpdates, isEmpty);
     });
 
-    testWidgets('navigation callbacks drive loading state and url updates', (
+    webpageTestWidgets('navigation callbacks drive loading state and url updates', (
       tester,
     ) async {
       final fake = _FakePlatformWebViewController();
@@ -431,7 +448,7 @@ void main() {
       expect(rec.stateUpdates.length, updateCount);
     });
 
-    testWidgets('YoloNewTab channel creates a linked panel', (tester) async {
+    webpageTestWidgets('YoloNewTab channel creates a linked panel', (tester) async {
       final fake = _FakePlatformWebViewController();
       final rec = _Recorder();
       await _pumpWithExisting(tester, fake, rec);
@@ -450,8 +467,114 @@ void main() {
     });
   });
 
+  group('WebpagePlugin controller retention', () {
+    webpageTestWidgets('board switch within TTL reuses the same controller', (
+      tester,
+    ) async {
+      final rec = _Recorder();
+      await _pumpContent(
+        tester,
+        _panel(state: _urlState('https://a.example')),
+        rec,
+      );
+      await tester.pump();
+      await tester.pump();
+      expect(_platform.createdControllers, hasLength(1));
+      final first = _platform.createdControllers.single;
+      expect(first.loadRequests, <String>['https://a.example']);
+
+      // Board switch: the content widget is disposed (detach), the
+      // controller is kept for fast re-attachment.
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(minutes: 1));
+      expect(WebViewManager.instance.has('p1'), isTrue);
+
+      await _pumpContent(
+        tester,
+        _panel(state: _urlState('https://a.example')),
+        rec,
+      );
+      await tester.pump();
+      await tester.pump();
+
+      // Reused: no new controller, no fresh loadRequest.
+      expect(_platform.createdControllers, hasLength(1));
+      expect(first.loadRequests, <String>['https://a.example']);
+    });
+
+    webpageTestWidgets(
+      'board switch past TTL recreates controller from persisted url',
+      (tester) async {
+        final rec = _Recorder();
+        await _pumpContent(
+          tester,
+          _panel(state: _urlState('https://a.example')),
+          rec,
+        );
+        await tester.pump();
+        await tester.pump();
+        expect(_platform.createdControllers, hasLength(1));
+        final first = _platform.createdControllers.single;
+
+        // Board switch, then let the detached-retention TTL elapse so the
+        // eviction timer disposes the hidden controller and drops it from
+        // the shared overlay map. The manager clock is driven manually
+        // because flutter_test advances timers but not DateTime.now().
+        var fakeNow = DateTime(2024, 1, 1, 12);
+        WebViewManager.instance.debugClock = () => fakeNow;
+        await tester.pumpWidget(const SizedBox());
+        fakeNow = fakeNow.add(
+          WebViewManager.kDetachedRetentionTTL + const Duration(seconds: 1),
+        );
+        await tester.pump(
+          WebViewManager.kDetachedRetentionTTL + const Duration(seconds: 1),
+        );
+
+        expect(WebViewManager.instance.has('p1'), isFalse);
+        expect(WebpagePluginBase.controllers, isNot(contains('p1')));
+
+        // Re-attach: a brand new controller is created and loads the
+        // persisted URL, exactly like a fresh panel.
+        await _pumpContent(
+          tester,
+          _panel(state: _urlState('https://a.example')),
+          rec,
+        );
+        await tester.pump();
+        await tester.pump();
+
+        expect(_platform.createdControllers, hasLength(2));
+        final second = _platform.createdControllers.last;
+        expect(identical(second, first), isFalse);
+        expect(second.loadRequests, <String>['https://a.example']);
+        expect(WebViewManager.instance.has('p1'), isTrue);
+        expect(WebpagePluginBase.controllers, contains('p1'));
+      },
+    );
+
+    webpageTestWidgets('panel delete hook disposes the cached controller', (
+      tester,
+    ) async {
+      final rec = _Recorder();
+      await _pumpContent(
+        tester,
+        _panel(state: _urlState('https://a.example')),
+        rec,
+      );
+      await tester.pump();
+      await tester.pump();
+      expect(WebpagePluginBase.controllers, contains('p1'));
+
+      // Board cubit delete hook (removePanel / deleteBoard).
+      WebViewManager.instance.remove('p1');
+
+      expect(WebViewManager.instance.has('p1'), isFalse);
+      expect(WebpagePluginBase.controllers, isNot(contains('p1')));
+    });
+  });
+
   group('WebpagePlugin viewport presets', () {
-    testWidgets('mobile and fill presets resize panel and refresh page', (
+    webpageTestWidgets('mobile and fill presets resize panel and refresh page', (
       tester,
     ) async {
       final fake = _FakePlatformWebViewController();
@@ -487,7 +610,7 @@ void main() {
   });
 
   group('Viewport Lab', () {
-    testWidgets('apply injects combined css overrides with defaults', (
+    webpageTestWidgets('apply injects combined css overrides with defaults', (
       tester,
     ) async {
       _useBigSurface(tester);
@@ -512,7 +635,7 @@ void main() {
       expect(find.textContaining('"innerWidth":1280'), findsOneWidget);
     });
 
-    testWidgets('apply honors toggled options', (tester) async {
+    webpageTestWidgets('apply honors toggled options', (tester) async {
       _useBigSurface(tester);
       final fake = _FakePlatformWebViewController();
       final rec = _Recorder();
@@ -542,7 +665,7 @@ void main() {
       expect(js, contains('yoloit-yt-player-fix')); // removal snippet
     });
 
-    testWidgets('apply surfaces javascript errors', (tester) async {
+    webpageTestWidgets('apply surfaces javascript errors', (tester) async {
       _useBigSurface(tester);
       final fake =
           _FakePlatformWebViewController()
@@ -559,7 +682,7 @@ void main() {
       expect(find.textContaining('Error:'), findsOneWidget);
     });
 
-    testWidgets('apply and reload installs init script with defaults', (
+    webpageTestWidgets('apply and reload installs init script with defaults', (
       tester,
     ) async {
       _useBigSurface(tester);
@@ -586,7 +709,7 @@ void main() {
       expect(fake.runJavaScriptReturningCalls.last, contains('JSON.stringify'));
     });
 
-    testWidgets('apply and reload honors toggled options', (tester) async {
+    webpageTestWidgets('apply and reload honors toggled options', (tester) async {
       _useBigSurface(tester);
       final fake = _FakePlatformWebViewController();
       final rec = _Recorder();
@@ -615,7 +738,7 @@ void main() {
       expect(script, isNot(contains('installYtFix')));
     });
 
-    testWidgets('reset clears all overrides', (tester) async {
+    webpageTestWidgets('reset clears all overrides', (tester) async {
       _useBigSurface(tester);
       final fake = _FakePlatformWebViewController();
       final rec = _Recorder();

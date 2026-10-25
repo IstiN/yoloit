@@ -2,12 +2,31 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:yoloit/features/board/plugins/builtin/webpage_plugin_base.dart';
 
 class WebViewManager {
   static final instance = WebViewManager._();
-  WebViewManager._();
+  WebViewManager._({DateTime Function()? clock})
+    : _clock = clock ?? DateTime.now;
+  factory WebViewManager.testInstance({DateTime Function()? clock}) =>
+      WebViewManager._(clock: clock);
 
-  factory WebViewManager.testInstance() => WebViewManager._();
+  DateTime Function() _clock;
+
+  /// Test hook to override the clock used for retention bookkeeping
+  /// (flutter_test advances timers but not `DateTime.now()`).
+  @visibleForTesting
+  set debugClock(DateTime Function() clock) => _clock = clock;
+
+  /// Grace period a detached (hidden) controller is kept alive so board
+  /// switches can re-attach instantly. After this TTL the controller is
+  /// disposed and forgotten; a later re-attach recreates it from the panel's
+  /// persisted URL/state exactly like a fresh panel.
+  static const Duration kDetachedRetentionTTL = Duration(minutes: 4);
+
+  /// Single shared timer driving eviction of detached controllers
+  /// (never one timer per panel).
+  Timer? _evictionTimer;
 
   final Map<String, WebViewEntry> _entries = {};
 
@@ -104,24 +123,34 @@ class WebViewManager {
       _entries[panelId]?.controller;
 
   /// Register a controller (called by widget when creating one).
+  /// Re-registering a detached controller cancels its pending eviction.
   void register(String panelId, WebViewController controller) {
     final existing = _entries[panelId];
     if (identical(existing?.controller, controller)) {
-      existing!.attached = true;
+      existing!
+        ..attached = true
+        ..detachedAt = null;
+      _scheduleEviction();
       return;
     }
     _entries[panelId] = WebViewEntry(controller: controller);
+    _scheduleEviction();
   }
 
-  /// Detach UI — keep controller alive (called on widget dispose).
+  /// Detach UI — keep controller alive for [kDetachedRetentionTTL] so a
+  /// board switch can re-attach instantly, then dispose it via the shared
+  /// eviction timer (called on widget dispose).
   void detach(String panelId) {
     final entry = _entries[panelId];
     if (entry == null) return;
     entry.attached = false;
+    entry.detachedAt ??= _clock();
     final controller = entry.controller;
-    if (controller == null) return;
-    unawaited(controller.setNavigationDelegate(NavigationDelegate()));
-    unawaited(removeYoloNewTabChannel(panelId));
+    if (controller != null) {
+      unawaited(controller.setNavigationDelegate(NavigationDelegate()));
+      unawaited(removeYoloNewTabChannel(panelId));
+    }
+    _scheduleEviction();
   }
 
   /// Check if a controller exists for this panel.
@@ -157,22 +186,93 @@ class WebViewManager {
     return entry.pageTitle();
   }
 
-  /// Remove and forget controller (panel deleted).
+  /// Remove and forget controller immediately (panel deleted).
+  ///
+  /// Unlike [detach] there is no grace period: the controller is disposed
+  /// right away and the shared overlay reference in
+  /// [WebpagePluginBase.controllers] is dropped so the native view is
+  /// released.
   void remove(String panelId) {
     final entry = _entries.remove(panelId);
+    WebpagePluginBase.controllers.remove(panelId);
+    final controller = entry?.controller;
+    if (controller == null) {
+      _scheduleEviction();
+      return;
+    }
+    unawaited(controller.setNavigationDelegate(NavigationDelegate()));
+    unawaited(_removeYoloNewTabChannelFor(panelId, controller));
+    _scheduleEviction();
+  }
+
+  /// Dispose all.
+  void disposeAll() {
+    _evictionTimer?.cancel();
+    _evictionTimer = null;
+    final panelIds = _entries.keys.toList(growable: false);
+    for (final panelId in panelIds) {
+      remove(panelId);
+    }
+  }
+
+  /// Schedule the single shared eviction timer for the earliest expiring
+  /// detached entry; cancels the timer when nothing is pending eviction.
+  void _scheduleEviction() {
+    _evictionTimer?.cancel();
+    _evictionTimer = null;
+    final now = _clock();
+    var earliest = Duration.zero;
+    var found = false;
+    for (final entry in _entries.values) {
+      if (entry.attached) continue;
+      final detachedAt = entry.detachedAt;
+      if (detachedAt == null) continue;
+      final remaining = kDetachedRetentionTTL - now.difference(detachedAt);
+      final delay = remaining.isNegative ? Duration.zero : remaining;
+      if (!found || delay < earliest) {
+        earliest = delay;
+        found = true;
+      }
+    }
+    if (!found) return;
+    _evictionTimer = Timer(earliest, _evictExpired);
+  }
+
+  void _evictExpired() {
+    _evictionTimer = null;
+    final now = _clock();
+    final expired =
+        _entries.entries
+            .where(
+              (e) =>
+                  !e.value.attached &&
+                  e.value.detachedAt != null &&
+                  now.difference(e.value.detachedAt!) >= kDetachedRetentionTTL,
+            )
+            .map((e) => e.key)
+            .toList(growable: false);
+    for (final panelId in expired) {
+      _evict(panelId);
+    }
+    _scheduleEviction();
+  }
+
+  /// Dispose a controller evicted from [_entries]: clear its navigation
+  /// delegate and JS channel so timers/media/network stop, and drop the
+  /// shared overlay reference in [WebpagePluginBase.controllers].
+  void _evict(String panelId) {
+    final entry = _entries.remove(panelId);
+    WebpagePluginBase.controllers.remove(panelId);
     final controller = entry?.controller;
     if (controller == null) return;
     unawaited(controller.setNavigationDelegate(NavigationDelegate()));
     unawaited(_removeYoloNewTabChannelFor(panelId, controller));
   }
 
-  /// Dispose all.
-  void disposeAll() {
-    final panelIds = _entries.keys.toList(growable: false);
-    for (final panelId in panelIds) {
-      remove(panelId);
-    }
-  }
+  /// Manually run the detached-retention eviction pass (honors
+  /// [kDetachedRetentionTTL] against the manager clock).
+  @visibleForTesting
+  void evictExpiredDetachedNow() => _evictExpired();
 
   @visibleForTesting
   void registerEntry(String panelId, WebViewEntry entry) {
@@ -206,6 +306,10 @@ class WebViewEntry {
   final Future<String?> Function()? _currentUrl;
   final Future<String?> Function()? _pageTitle;
   bool attached;
+
+  /// When the widget was last detached; null while attached. Set by
+  /// [WebViewManager.detach], cleared by [WebViewManager.register].
+  DateTime? detachedAt;
 
   Future<void> runJavaScript(String js) async {
     final callback = _runJavaScript;

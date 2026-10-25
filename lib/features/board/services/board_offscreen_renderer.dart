@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
@@ -36,6 +37,54 @@ class BoardOffscreenRenderer {
 
   /// Logical size for boards-overview card thumbnails (matches ~1.55 card AR).
   static const Size overviewPreviewSize = Size(620, 400);
+
+  /// Hard cap on the physical pixel count of a captured image: 2^24 ≈ 16.7M
+  /// pixels ≈ 64 MiB at RGBA8888. Without this, a 4000x4000 logical panel at
+  /// pixelRatio 2.0 would allocate a single 8000x8000 ui.Image (~244 MiB).
+  static const int maxCapturePhysicalPixels = 16777216;
+
+  /// Captures a [RenderRepaintBoundary] to a [ui.Image]. Indirection seam so
+  /// tests can inject images and assert disposal on the success/error paths.
+  @visibleForTesting
+  static Future<ui.Image> Function(
+    RenderRepaintBoundary boundary, {
+    required double pixelRatio,
+  }) imageCapturer =
+      (boundary, {required pixelRatio}) =>
+          boundary.toImage(pixelRatio: pixelRatio);
+
+  /// Encodes a captured [ui.Image] to bytes. Indirection seam so tests can
+  /// force the error path between capture and disposal.
+  @visibleForTesting
+  static Future<ByteData?> Function(ui.Image image, ui.ImageByteFormat format)
+  imageEncoder = (image, format) => image.toByteData(format: format);
+
+  /// Returns a (size, pixelRatio) pair whose physical pixel count never
+  /// exceeds [maxCapturePhysicalPixels].
+  ///
+  /// Requests already within the cap are returned unchanged (small-size
+  /// behavior stays byte-identical). Oversized requests first reduce
+  /// [pixelRatio] (preferred, preserves logical layout); only when the ratio
+  /// would fall below 1.0 are the logical dimensions shrunk at a 1.0 ratio.
+  @visibleForTesting
+  static ({Size size, double pixelRatio}) capCaptureSize(
+    Size size,
+    double pixelRatio,
+  ) {
+    final wPx = (size.width * pixelRatio).ceil();
+    final hPx = (size.height * pixelRatio).ceil();
+    if (wPx <= 0 || hPx <= 0 || wPx * hPx <= maxCapturePhysicalPixels) {
+      return (size: size, pixelRatio: pixelRatio);
+    }
+    final scale = math.sqrt(maxCapturePhysicalPixels / (wPx * hPx));
+    final reducedRatio = pixelRatio * scale;
+    if (reducedRatio >= 1.0) {
+      return (size: size, pixelRatio: reducedRatio);
+    }
+    // Even a 1.0 pixel ratio on the full logical size exceeds the cap —
+    // clamp the logical dimensions instead (exactly hits the cap).
+    return (size: size * reducedRatio, pixelRatio: 1.0);
+  }
 
   /// Render a boards-overview thumbnail: always fits all panels, never viewport.
   Future<Uint8List?> renderBoardOverviewPreview(
@@ -277,6 +326,11 @@ class BoardOffscreenRenderer {
     double pixelRatio, {
     CancelToken? cancelToken,
   }) async {
+    // Never allocate a physical image beyond the memory cap.
+    final capped = capCaptureSize(size, pixelRatio);
+    size = capped.size;
+    pixelRatio = capped.pixelRatio;
+
     final repaintBoundary = RenderRepaintBoundary();
 
     // RenderView needs a FlutterView.
@@ -307,59 +361,61 @@ class BoardOffscreenRenderer {
       ),
     ).attachToRenderTree(buildOwner);
 
-    // Smart Adaptive Polling with 200ms Debounce: flushes dirty layouts and
-    // processes build scopes every 50ms until the active task registry remains
-    // completely empty for 4 consecutive event-loop turns (200ms). This prevents
-    // sequential asynchronous tasks from being skipped during phase transitions.
-    final watch = Stopwatch()..start();
-    var emptyTurns = 0;
+    ui.Image? image;
+    try {
+      // Smart Adaptive Polling with 200ms Debounce: flushes dirty layouts and
+      // processes build scopes every 50ms until the active task registry remains
+      // completely empty for 4 consecutive event-loop turns (200ms). This prevents
+      // sequential asynchronous tasks from being skipped during phase transitions.
+      final watch = Stopwatch()..start();
+      var emptyTurns = 0;
 
-    while (watch.elapsedMilliseconds < 15000) {
-      if (cancelToken?.isCancelled ?? false) {
-        break;
-      }
-      buildOwner.buildScope(rootElement);
-      pipelineOwner.flushLayout();
-
-      await Future<void>.delayed(const Duration(milliseconds: 50));
-
-      if (cancelToken?.isCancelled ?? false) {
-        break;
-      }
-
-      if (HeadlessRenderRegistry.activeTasks.isEmpty) {
-        emptyTurns++;
-        if (emptyTurns >= 4) {
+      while (watch.elapsedMilliseconds < 15000) {
+        if (cancelToken?.isCancelled ?? false) {
           break;
         }
-      } else {
-        emptyTurns = 0;
+        buildOwner.buildScope(rootElement);
+        pipelineOwner.flushLayout();
+
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+
+        if (cancelToken?.isCancelled ?? false) {
+          break;
+        }
+
+        if (HeadlessRenderRegistry.activeTasks.isEmpty) {
+          emptyTurns++;
+          if (emptyTurns >= 4) {
+            break;
+          }
+        } else {
+          emptyTurns = 0;
+        }
       }
-    }
 
-    if (cancelToken?.isCancelled ?? false) {
+      if (cancelToken?.isCancelled ?? false) {
+        return null;
+      }
+
+      // Final composite and paint pass immediately before capture. The adaptive
+      // polling above already debounced 200ms after the last active task, which
+      // is enough time for short fade-in transitions and image decoders to settle
+      // without an artificial fixed delay.
+      buildOwner.buildScope(rootElement);
+      pipelineOwner.flushLayout();
+      pipelineOwner.flushCompositingBits();
+      pipelineOwner.flushPaint();
+
+      // Capture.
+      image = await imageCapturer(repaintBoundary, pixelRatio: pixelRatio);
+      final byteData = await imageEncoder(image, ui.ImageByteFormat.png);
+      return byteData?.buffer.asUint8List();
+    } finally {
+      // Guarantee native-image disposal and tree finalization exactly once,
+      // on success, cancellation, and error alike.
+      image?.dispose();
       buildOwner.finalizeTree();
-      return null;
     }
-
-    // Final composite and paint pass immediately before capture. The adaptive
-    // polling above already debounced 200ms after the last active task, which
-    // is enough time for short fade-in transitions and image decoders to settle
-    // without an artificial fixed delay.
-    buildOwner.buildScope(rootElement);
-    pipelineOwner.flushLayout();
-    pipelineOwner.flushCompositingBits();
-    pipelineOwner.flushPaint();
-
-    // Capture.
-    final image = await repaintBoundary.toImage(pixelRatio: pixelRatio);
-    final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-    image.dispose();
-
-    // Clean up.
-    buildOwner.finalizeTree();
-
-    return byteData?.buffer.asUint8List();
   }
 }
 

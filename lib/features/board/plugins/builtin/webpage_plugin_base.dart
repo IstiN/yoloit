@@ -18,6 +18,10 @@ abstract class WebpagePluginBase extends BoardPanelPlugin {
   /// outside the InteractiveViewer transform to avoid coordinate offset.
   ///
   /// VM stores [WebViewController]; web stores no-op dynamic values.
+  /// Entries are removed by [WebViewManager] when a panel is deleted
+  /// (`remove`) or when a detached controller's retention TTL expires
+  /// (`kDetachedRetentionTTL` eviction), so stale native views are never
+  /// rendered after disposal.
   static final Map<String, dynamic> controllers = {};
 
   /// Last known CSS zoom per panel (= board scale at gesture-end).

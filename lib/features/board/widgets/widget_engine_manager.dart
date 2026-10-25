@@ -14,6 +14,9 @@ import 'package:yoloit/features/settings/data/widget_permissions_service.dart';
 
 typedef WidgetEngineFactory = JsWidgetEngine Function(JsRuntimeConfig config);
 
+/// Test seam for the [HttpClient] used by the widget fetch handler.
+typedef HttpClientFactory = HttpClient Function();
+
 typedef WidgetManifestFinder =
     Future<WidgetManifest?> Function(String widgetId);
 typedef WidgetJsLoader =
@@ -65,8 +68,17 @@ class WidgetEngineManager {
   @visibleForTesting
   static String? debugYoloitBinPath;
 
+  /// Test seam: overrides the [HttpClient] created by `_handleFetch`.
+  @visibleForTesting
+  static HttpClientFactory? debugHttpClientFactory;
+
   final Map<String, _WidgetEngineEntry> _engines = {};
   final Map<String, Map<String, String>> _envVars = {};
+
+  /// In-flight engine loads keyed by panelId. Concurrent [getOrCreate] calls
+  /// for the same panel share one creation+run instead of each creating an
+  /// engine (the loser would be overwritten in [_engines] and never disposed).
+  final Map<String, Future<JsWidgetEngine?>> _inflightLoads = {};
 
   Future<JsWidgetEngine?> getOrCreate({
     required String panelId,
@@ -97,6 +109,38 @@ class WidgetEngineManager {
       }
     }
 
+    final inflight = _inflightLoads[panelId];
+    if (inflight != null) {
+      debugPrint(
+        '[WidgetEvent] getOrCreate SHARE panelId=$panelId widgetId=$widgetId',
+      );
+      return inflight;
+    }
+
+    final load = _loadAndRun(
+      panelId: panelId,
+      widgetId: widgetId,
+      panel: panel,
+      initialTheme: initialTheme,
+      onRenderUI: onRenderUI,
+    );
+    _inflightLoads[panelId] = load;
+    try {
+      return await load;
+    } finally {
+      if (identical(_inflightLoads[panelId], load)) {
+        _inflightLoads.remove(panelId);
+      }
+    }
+  }
+
+  Future<JsWidgetEngine?> _loadAndRun({
+    required String panelId,
+    required String widgetId,
+    required BoardPanelInstance panel,
+    required Map<String, dynamic> initialTheme,
+    void Function(Map<String, dynamic> tree)? onRenderUI,
+  }) async {
     final manifest = await _findManifest(widgetId);
     if (manifest == null) {
       throw _WidgetEngineLoadError('Widget "$widgetId" not found');
@@ -385,18 +429,24 @@ class WidgetEngineManager {
     String method,
     Map<String, String> headers,
   ) async {
+    HttpClient? client;
     try {
-      final client = HttpClient();
+      client = debugHttpClientFactory?.call() ?? HttpClient();
       final dartReq = await client.openUrl(method, Uri.parse(url));
       dartReq.headers.set('User-Agent', 'YoLoIT-Widget/1.0');
       dartReq.headers.set('Accept', 'application/json');
       headers.forEach((k, v) => dartReq.headers.set(k, v));
-      final res = await dartReq.close().timeout(const Duration(seconds: 15));
+      final res = await dartReq
+          .close()
+          .timeout(const Duration(seconds: 15));
       final body = await res.transform(const Utf8Decoder()).join();
       client.close();
+      client = null;
       final result = jsonDecode(body);
       resolve?.call(id, result);
     } catch (e) {
+      // Failure path: abort the connection instead of leaking the client.
+      client?.close(force: true);
       resolve?.call(id, {'__error': e.toString()});
     }
   }

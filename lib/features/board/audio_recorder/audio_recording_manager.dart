@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:yoloit/features/board/audio_recorder/audio_source.dart';
 import 'package:yoloit/features/board/audio_recorder/pcm_wav.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
@@ -9,8 +10,7 @@ import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/builtin/audio_recorder_plugin.dart';
 
 typedef MicFactory = AudioSource Function();
-typedef SinkOpener =
-    Future<PcmWavSink> Function(File file, {PcmWavFormat format});
+typedef SinkOpener = Future<PcmSink> Function(File file, {PcmWavFormat format});
 typedef FolderResolver =
     Future<String> Function(AudioRecorderConfig config, String boardId);
 typedef Now = DateTime Function();
@@ -23,20 +23,29 @@ typedef Now = DateTime Function();
 /// mirrors progress + the resulting recording entry back into the panel state
 /// through [BoardCubit], exactly like [TimerManager] does for timers.
 ///
-/// v1 buffers each source in memory and mixes once on [stop]. This keeps the
-/// pipeline simple and exact; a chunked streaming mix is a known follow-up for
-/// very long (multi-hour) recordings.
+/// v1 buffers each source in memory (bounded by [maxSourceBufferBytes] per
+/// source — chunks past the cap are truncated and dropped) and mixes once on
+/// [stop]. This keeps the pipeline simple and exact; a chunked streaming mix
+/// is a known follow-up for very long (multi-hour) recordings.
 class AudioRecordingManager {
   AudioRecordingManager._({
     MicFactory? micFactory,
     SinkOpener? openSink,
     FolderResolver? folderResolver,
     Now? now,
+    int? maxSourceBufferBytes,
   }) : _micFactory = micFactory ?? (() => RecordMicSource()),
        _openSink = openSink ?? PcmWavSink.create,
-       _now = now ?? DateTime.now {
+       _now = now ?? DateTime.now,
+       _maxSourceBufferBytes =
+           maxSourceBufferBytes ?? _defaultMaxSourceBufferBytes {
     _resolveFolder = folderResolver ?? _defaultFolderResolver;
   }
+
+  /// Rough safety bound for the in-memory per-source buffer (48 kHz stereo
+  /// 16-bit ≈ 11 MiB/min per source). Past this the recording stays alive but
+  /// incoming chunks are truncated/dropped so memory stays bounded.
+  static const int _defaultMaxSourceBufferBytes = 256 * 1024 * 1024;
 
   static final AudioRecordingManager instance = AudioRecordingManager._();
 
@@ -46,17 +55,20 @@ class AudioRecordingManager {
     SinkOpener? openSink,
     FolderResolver? folderResolver,
     Now? now,
+    int? maxSourceBufferBytes,
   }) => AudioRecordingManager._(
     micFactory: micFactory,
     openSink: openSink,
     folderResolver: folderResolver,
     now: now,
+    maxSourceBufferBytes: maxSourceBufferBytes,
   );
 
   final MicFactory _micFactory;
   final SinkOpener _openSink;
   late final FolderResolver _resolveFolder;
   final Now _now;
+  final int _maxSourceBufferBytes;
 
   BoardCubit? _cubit;
   final Map<String, _Entry> _entries = {};
@@ -86,49 +98,69 @@ class AudioRecordingManager {
       file: file,
       sink: sink,
       startedAt: _now().millisecondsSinceEpoch,
+      maxBufferBytes: _maxSourceBufferBytes,
     );
 
-    if (config.captureMicrophone) {
-      final mic = _micFactory();
-      entry.micSource = mic;
-      final stream = await mic.start();
-      // Cancelled in [stop] — stored so recording survives widget dispose.
-      // ignore: cancel_subscriptions
-      entry.micSub = stream.listen(entry.micBuf.add);
-    }
-
-    if (config.captureSystemAudio && systemSource != null) {
-      entry.systemSource = systemSource;
-      final stream = await systemSource.start();
-      // ignore: cancel_subscriptions
-      entry.systemSub = stream.listen(entry.systemBuf.add);
-    }
-
-    entry.uiTick = Timer.periodic(const Duration(milliseconds: 250), (_) {
-      _writeProgress(panelId);
-    });
-
+    // Register the entry BEFORE starting any source so a throw below still
+    // leaves every opened resource reachable by the cleanup below.
     _entries[panelId] = entry;
+
+    try {
+      if (config.captureMicrophone) {
+        final mic = _micFactory();
+        entry.micSource = mic;
+        final stream = await mic.start();
+        // Cancelled in [stop] — stored so recording survives widget dispose.
+        // ignore: cancel_subscriptions
+        entry.micSub = stream.listen(
+          (chunk) => _appendCapped(entry, entry.micBuf, chunk, 'microphone'),
+        );
+      }
+
+      if (config.captureSystemAudio && systemSource != null) {
+        entry.systemSource = systemSource;
+        final stream = await systemSource.start();
+        // ignore: cancel_subscriptions
+        entry.systemSub = stream.listen(
+          (chunk) => _appendCapped(entry, entry.systemBuf, chunk, 'system'),
+        );
+      }
+
+      entry.uiTick = Timer.periodic(const Duration(milliseconds: 250), (_) {
+        _writeProgress(panelId);
+      });
+    } catch (_) {
+      // Roll back: release sources/subscriptions AND close the sink so no
+      // resource is stranded. Individual cleanup failures are swallowed so
+      // one broken resource cannot skip the rest.
+      await _cleanupEntry(entry);
+      await _swallow(entry.sink.close());
+      _entries.remove(panelId);
+      rethrow;
+    }
+
     _writeProgress(panelId);
   }
 
   /// Stops the recording for [panelId], finalizes the WAV file and appends a
   /// recording entry to the panel state.
   Future<void> stop(String panelId) async {
-    final entry = _entries.remove(panelId);
+    final entry = _entries[panelId];
     if (entry == null) return;
 
-    entry.uiTick?.cancel();
-    await entry.micSub?.cancel();
-    await entry.systemSub?.cancel();
-    await entry.micSource?.stop();
-    await entry.systemSource?.stop();
+    // Clean up every resource independently: a throwing source.stop() must
+    // not skip cancelling the other subscription or closing the sink.
+    await _cleanupEntry(entry);
+    _entries.remove(panelId);
 
     final micBytes = entry.micBuf.takeBytes();
     final systemBytes = entry.systemBuf.takeBytes();
     final mixed = mixPcm16(micBytes, systemBytes);
-    await entry.sink.add(mixed);
-    await entry.sink.close();
+    try {
+      await entry.sink.add(mixed);
+    } finally {
+      await entry.sink.close();
+    }
 
     _writeFinished(entry, mixed.length);
   }
@@ -157,6 +189,54 @@ class AudioRecordingManager {
   }
 
   // ── internals ────────────────────────────────────────────────────────────
+
+  /// Appends [chunk] to [buf] without ever letting the buffer grow past the
+  /// entry's cap. The recording stays alive; bytes past the cap are truncated
+  /// (to a whole 16-bit sample) or dropped, with a one-time debug log.
+  void _appendCapped(
+    _Entry entry,
+    BytesBuilder buf,
+    Uint8List chunk,
+    String label,
+  ) {
+    if (chunk.isEmpty) return;
+    final budget = entry.maxBufferBytes - buf.length;
+    if (budget <= 0) {
+      entry.noteTruncated(label);
+      return;
+    }
+    if (chunk.length <= budget) {
+      buf.add(chunk);
+      return;
+    }
+    final keep = budget - (budget % 2);
+    buf.add(Uint8List.sublistView(chunk, 0, keep));
+    entry.noteTruncated(label);
+  }
+
+  /// Releases every per-recording resource, each independently: one failing
+  /// cancellation/stop must not skip the others.
+  Future<void> _cleanupEntry(_Entry entry) async {
+    entry.uiTick?.cancel();
+    entry.uiTick = null;
+    await _swallow(entry.micSub?.cancel());
+    entry.micSub = null;
+    await _swallow(entry.systemSub?.cancel());
+    entry.systemSub = null;
+    await _swallow(entry.micSource?.stop());
+    entry.micSource = null;
+    await _swallow(entry.systemSource?.stop());
+    entry.systemSource = null;
+  }
+
+  Future<void> _swallow(Future<void>? operation) async {
+    if (operation == null) return;
+    try {
+      await operation;
+    } catch (_) {
+      // Best-effort cleanup: keep releasing the remaining resources.
+    }
+  }
 
   AudioRecorderConfig _readConfig(String panelId, String boardId) {
     final panel = _findPanel(panelId, boardId);
@@ -289,13 +369,30 @@ class _Entry {
     required this.file,
     required this.sink,
     required this.startedAt,
+    required this.maxBufferBytes,
   });
 
   final String panelId;
   final String boardId;
   final File file;
-  final PcmWavSink sink;
+  final PcmSink sink;
   final int startedAt;
+
+  /// Per-source in-memory cap in bytes; chunks past it are truncated/dropped.
+  final int maxBufferBytes;
+
+  final Set<String> _truncationLogged = {};
+
+  /// One-time debug log when a source first hits the buffer cap.
+  void noteTruncated(String label) {
+    if (_truncationLogged.add(label)) {
+      debugPrint(
+        'AudioRecordingManager: $label buffer reached the cap of '
+        '$maxBufferBytes bytes; truncating further audio to keep memory '
+        'bounded.',
+      );
+    }
+  }
 
   final BytesBuilder micBuf = BytesBuilder(copy: false);
   final BytesBuilder systemBuf = BytesBuilder(copy: false);

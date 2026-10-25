@@ -31,6 +31,56 @@ class FakeAudioSource implements AudioSource {
   }
 }
 
+/// Source whose [start] throws, to exercise start()-time rollback.
+class ThrowingStartSource implements AudioSource {
+  @override
+  Future<Stream<Uint8List>> start() async =>
+      throw StateError('start failed');
+
+  @override
+  Future<void> stop() async {}
+}
+
+/// Source whose [stop] throws, to exercise stop()-time cleanup.
+class ThrowingStopSource implements AudioSource {
+  ThrowingStopSource()
+    : controller = StreamController<Uint8List>(sync: true);
+
+  final StreamController<Uint8List> controller;
+  bool stopped = false;
+
+  @override
+  Future<Stream<Uint8List>> start() async => controller.stream;
+
+  @override
+  Future<void> stop() async {
+    stopped = true;
+    throw StateError('stop failed');
+  }
+}
+
+/// In-memory [PcmSink] that records chunks and whether it was closed.
+class FakeSink implements PcmSink {
+  final List<Uint8List> chunks = <Uint8List>[];
+  bool closed = false;
+
+  @override
+  int get dataSize => chunks.fold<int>(0, (sum, c) => sum + c.length);
+
+  @override
+  Duration get duration => Duration.zero;
+
+  @override
+  Future<void> add(Uint8List bytes) async {
+    chunks.add(bytes);
+  }
+
+  @override
+  Future<void> close() async {
+    closed = true;
+  }
+}
+
 File _findRecording(Directory dir) {
   final files =
       dir
@@ -124,6 +174,122 @@ void main() {
     expect(manager.activePanelIds, isEmpty);
     expect(mic.stopped, isTrue);
     expect(_findRecording(tempDir).existsSync(), isTrue);
+  });
+
+  group('bounded buffers', () {
+    test('truncates chunks at the cap and drops the rest', () async {
+      final mic = FakeAudioSource();
+      final sink = FakeSink();
+      final manager = AudioRecordingManager.testInstance(
+        micFactory: () => mic,
+        openSink: (_, {format = const PcmWavFormat()}) async => sink,
+        maxSourceBufferBytes: 8,
+      );
+
+      await manager.start(panelId: 'cap', boardId: 'b1');
+
+      // 12 bytes total, but the cap is 8: the first chunk is truncated to
+      // 8 bytes and the second is dropped entirely.
+      mic.controller.add(pcm16Samples(<int>[1, 2, 3, 4, 5, 6]));
+      mic.controller.add(pcm16Samples(<int>[7, 8, 9, 10]));
+      mic.controller.add(pcm16Samples(<int>[11, 12]));
+
+      await manager.stop('cap');
+
+      expect(sink.chunks, hasLength(1));
+      // Buffer never grew past the cap: only the truncated prefix survives.
+      expect(sink.chunks.single.length, 8);
+      expect(
+        List<int>.generate(4, (i) => readPcm16Sample(sink.chunks.single, i)),
+        <int>[1, 2, 3, 4],
+      );
+      expect(sink.closed, isTrue);
+    });
+
+    test('caps each source independently when mixing', () async {
+      final mic = FakeAudioSource();
+      final system = FakeAudioSource();
+      final sink = FakeSink();
+      final manager = AudioRecordingManager.testInstance(
+        micFactory: () => mic,
+        openSink: (_, {format = const PcmWavFormat()}) async => sink,
+        maxSourceBufferBytes: 4,
+      );
+
+      await manager.start(panelId: 'cap2', boardId: 'b1', systemSource: system);
+
+      mic.controller.add(pcm16Samples(<int>[10, 20, 30]));
+      system.controller.add(pcm16Samples(<int>[1, 2, 3]));
+
+      await manager.stop('cap2');
+
+      expect(sink.chunks.single.length, 4);
+      expect(readPcm16Sample(sink.chunks.single, 0), 11);
+      expect(readPcm16Sample(sink.chunks.single, 1), 22);
+      expect(sink.closed, isTrue);
+    });
+  });
+
+  group('exception paths release resources', () {
+    test('a throwing source.start rolls back and closes the sink', () async {
+      final sink = FakeSink();
+      final manager = AudioRecordingManager.testInstance(
+        micFactory: ThrowingStartSource.new,
+        openSink: (_, {format = const PcmWavFormat()}) async => sink,
+        folderResolver: (_, _) async => tempDir.path,
+      );
+
+      await expectLater(
+        manager.start(panelId: 'boom', boardId: 'b1'),
+        throwsA(isA<StateError>()),
+      );
+
+      // No stranded entry, no stranded sink.
+      expect(manager.isRecording('boom'), isFalse);
+      expect(manager.activePanelIds, isEmpty);
+      expect(sink.closed, isTrue);
+
+      // The manager is still usable afterwards.
+      final mic = FakeAudioSource();
+      final manager2 = AudioRecordingManager.testInstance(
+        micFactory: () => mic,
+        openSink: (_, {format = const PcmWavFormat()}) async => sink,
+        folderResolver: (_, _) async => tempDir.path,
+      );
+      await manager2.start(panelId: 'ok', boardId: 'b1');
+      mic.controller.add(pcm16Samples(<int>[5]));
+      await manager2.stop('ok');
+      expect(sink.closed, isTrue);
+    });
+
+    test('a throwing source.stop still closes the sink and removes the entry',
+        () async {
+      final mic = FakeAudioSource();
+      final system = ThrowingStopSource();
+      final sink = FakeSink();
+      final manager = AudioRecordingManager.testInstance(
+        micFactory: () => mic,
+        openSink: (_, {format = const PcmWavFormat()}) async => sink,
+        folderResolver: (_, _) async => tempDir.path,
+      );
+
+      await manager.start(panelId: 'p-throw', boardId: 'b1', systemSource: system);
+      mic.controller.add(pcm16Samples(<int>[100, 200]));
+      system.controller.add(pcm16Samples(<int>[1, 2]));
+
+      // Must not throw even though system.stop() fails.
+      await manager.stop('p-throw');
+
+      // Both sources were stopped (the healthy one too), entry removed,
+      // sink finalized with the mixed data.
+      expect(mic.stopped, isTrue);
+      expect(system.stopped, isTrue);
+      expect(manager.isRecording('p-throw'), isFalse);
+      expect(sink.closed, isTrue);
+      expect(sink.chunks, hasLength(1));
+      expect(readPcm16Sample(sink.chunks.single, 0), 101);
+      expect(readPcm16Sample(sink.chunks.single, 1), 202);
+    });
   });
 
   group('default folder resolver and panel lookup', () {

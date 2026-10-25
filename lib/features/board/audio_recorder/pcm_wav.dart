@@ -22,12 +22,30 @@ class PcmWavFormat {
   int get blockAlign => numChannels * bitsPerSample ~/ 8;
 }
 
+/// Minimal consumer of raw 16-bit little-endian PCM chunks.
+///
+/// [PcmWavSink] is the file-backed implementation; the recording manager
+/// (and unit tests) target this interface so sinks can be faked.
+abstract class PcmSink {
+  /// Number of payload bytes written so far.
+  int get dataSize;
+
+  /// Approximate duration of the audio written so far.
+  Duration get duration;
+
+  /// Appends one interleaved PCM chunk.
+  Future<void> add(Uint8List bytes);
+
+  /// Flushes and releases the underlying resource.
+  Future<void> close();
+}
+
 /// Writes a RIFF/WAVE file with a 16-bit little-endian PCM payload.
 ///
 /// The header is written up front with a zero data size and patched in
 /// [close] once the total number of bytes is known, which keeps the payload
 /// streaming-friendly (no need to buffer the whole recording in memory).
-class PcmWavSink {
+class PcmWavSink implements PcmSink {
   PcmWavSink._(this._raf, this.format);
 
   final RandomAccessFile _raf;
@@ -35,9 +53,11 @@ class PcmWavSink {
   int _dataSize = 0;
 
   /// Number of payload bytes written so far (excludes the 44-byte header).
+  @override
   int get dataSize => _dataSize;
 
   /// Approximate duration of the audio written so far.
+  @override
   Duration get duration {
     final rate = format.byteRate;
     if (rate <= 0) return Duration.zero;
@@ -57,6 +77,7 @@ class PcmWavSink {
   }
 
   /// Appends a raw interleaved 16-bit little-endian PCM chunk.
+  @override
   Future<void> add(Uint8List bytes) async {
     if (bytes.isEmpty) return;
     await _raf.setPosition(await _raf.length());
@@ -65,6 +86,7 @@ class PcmWavSink {
   }
 
   /// Finalizes the RIFF/data sizes and closes the underlying file.
+  @override
   Future<void> close() async {
     await _writeHeader(_dataSize);
     await _raf.close();

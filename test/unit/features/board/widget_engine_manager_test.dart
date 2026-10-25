@@ -1,5 +1,6 @@
 // covers-write: board.widget.custom
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -513,4 +514,176 @@ void main() {
       expect(manager.engine('p1'), isNotNull);
     });
   });
+
+  group('concurrent getOrCreate', () {
+    test('shares a single engine between in-flight loads', () async {
+      final manifestGate = Completer<void>();
+      final m = WidgetEngineManager.testInstance(
+        appRegistry: appRegistry,
+        manifestFinder: (widgetId) async {
+          await manifestGate.future;
+          return manifestFor(widgetId);
+        },
+        jsLoader: (_, _) async => '// js',
+        engineFactory: createEngine,
+      );
+      addTearDown(m.disposeAll);
+
+      final first = m.getOrCreate(
+        panelId: 'p1',
+        widgetId: 'weather',
+        panel: _panel('p1'),
+      );
+      final second = m.getOrCreate(
+        panelId: 'p1',
+        widgetId: 'weather',
+        panel: _panel('p1'),
+      );
+      // Both calls must be parked on the same in-flight load.
+      expect(m.activePanelIds, isEmpty);
+      manifestGate.complete();
+
+      final results = await Future.wait([first, second]);
+
+      expect(results[0], same(results[1]));
+      expect(factoryCalls, 1);
+      expect(createdBackends.single.runCount, 1);
+      expect(m.activePanelIds, ['p1']);
+      expect(m.engine('p1'), same(results[0]));
+    });
+
+    test('a failed shared load propagates to all waiters and cleans up', () async {
+      final m = WidgetEngineManager.testInstance(
+        appRegistry: appRegistry,
+        manifestFinder: (_) async => null,
+        jsLoader: (_, _) async => '// js',
+        engineFactory: createEngine,
+      );
+      addTearDown(m.disposeAll);
+
+      final first = m.getOrCreate(
+        panelId: 'p1',
+        widgetId: 'weather',
+        panel: _panel('p1'),
+      );
+      final second = m.getOrCreate(
+        panelId: 'p1',
+        widgetId: 'weather',
+        panel: _panel('p1'),
+      );
+
+      await expectLater(first, throwsA(isA<Exception>()));
+      await expectLater(second, throwsA(isA<Exception>()));
+      expect(factoryCalls, 0);
+      expect(m.activePanelIds, isEmpty);
+    });
+  });
+
+  group('fetch handler', () {
+    late _MockHttpClient httpClient;
+
+    setUp(() async {
+      registerFallbackValue(Uri());
+      registerFallbackValue(const Utf8Decoder());
+      httpClient = _MockHttpClient();
+      WidgetEngineManager.debugHttpClientFactory = () => httpClient;
+      await WidgetPermissionsService.instance.setAllowed('fetch', true);
+    });
+
+    tearDown(() async {
+      WidgetEngineManager.debugHttpClientFactory = null;
+      await WidgetPermissionsService.instance.setAllowed('fetch', false);
+    });
+
+    test('closes the HttpClient with force when the request fails', () async {
+      when(
+        () => httpClient.openUrl(any(), any()),
+      ).thenThrow(const SocketException('connection refused'));
+      when(() => httpClient.close(force: any(named: 'force'))).thenReturn(
+        null,
+      );
+
+      await manager.getOrCreate(
+        panelId: 'p1',
+        widgetId: 'weather',
+        panel: _panel('p1'),
+      );
+
+      await createdConfigs.single.fetchHandler!(
+        'f1',
+        'http://127.0.0.1:1/data',
+        'GET',
+        const {},
+      );
+
+      verify(() => httpClient.close(force: true)).called(1);
+      final resolved = createdBackends.single.resolved['f1'] as Map;
+      expect(resolved['__error'], isNotNull);
+    });
+
+    test('closes the HttpClient normally on success', () async {
+      final request = _MockHttpClientRequest();
+      final response = _MockHttpClientResponse();
+      final requestHeaders = _MockHttpClientRequestHeaders();
+      when(
+        () => httpClient.openUrl(any(), any()),
+      ).thenAnswer((_) async => request);
+      when(() => request.headers).thenReturn(requestHeaders);
+      when(() => requestHeaders.set(any(), any())).thenReturn(null);
+      when(request.close).thenAnswer((_) async => response);
+      when(
+        () => response.transform<String>(any()),
+      ).thenAnswer((_) => Stream<String>.value('{"ok":true}'));
+      when(() => httpClient.close(force: any(named: 'force'))).thenReturn(
+        null,
+      );
+
+      await manager.getOrCreate(
+        panelId: 'p1',
+        widgetId: 'weather',
+        panel: _panel('p1'),
+      );
+
+      await createdConfigs.single.fetchHandler!(
+        'f2',
+        'http://127.0.0.1:1/data',
+        'GET',
+        const {},
+      );
+
+      expect(createdBackends.single.resolved['f2'], {'ok': true});
+      verify(() => httpClient.close(force: false)).called(1);
+    });
+
+    test('resolves error when fetch permission is disabled', () async {
+      await WidgetPermissionsService.instance.setAllowed('fetch', false);
+
+      await manager.getOrCreate(
+        panelId: 'p1',
+        widgetId: 'weather',
+        panel: _panel('p1'),
+      );
+
+      await createdConfigs.single.fetchHandler!(
+        'f3',
+        'http://127.0.0.1:1/data',
+        'GET',
+        const {},
+      );
+
+      verifyNever(() => httpClient.openUrl(any(), any()));
+      final resolved = createdBackends.single.resolved['f3'] as Map;
+      expect(resolved['__error'], contains('fetch is disabled'));
+    });
+  });
 }
+
+class _MockHttpClient extends Mock implements HttpClient {}
+
+class _MockHttpClientRequest extends Mock implements HttpClientRequest {}
+
+class _MockHttpClientRequestHeaders extends Mock
+    implements HttpHeaders {}
+
+class _MockHttpClientResponse extends Mock implements HttpClientResponse {}
+

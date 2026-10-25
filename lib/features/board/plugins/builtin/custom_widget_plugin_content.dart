@@ -117,6 +117,16 @@ class _CustomWidgetContentState extends State<CustomWidgetContent> {
   void dispose() {
     HeadlessRenderRegistry.activeTasks.remove('widget:${widget.panel.id}');
     ThemeManager.instance.removeListener(_onThemeChanged);
+    // Always drop our reload callback, even if no engine was ever created
+    // (e.g. the widget failed to load): WidgetEngineManager.remove() is a
+    // no-op then, so without this the registry would keep invoking a
+    // callback bound to a disposed State.
+    if (_widgetId.isNotEmpty) {
+      WidgetAppRegistry.instance.unregisterReload(
+        _widgetId,
+        _reloadCurrentWidget,
+      );
+    }
     _engineManager.remove(widget.panel.id);
     super.dispose();
   }

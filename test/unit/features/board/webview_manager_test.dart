@@ -5,6 +5,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_platform_interface/webview_flutter_platform_interface.dart';
+import 'package:yoloit/features/board/plugins/builtin/webpage_plugin_base.dart';
 import 'package:yoloit/features/board/plugins/builtin/webview_manager.dart';
 
 class _MockPlatformWebViewController extends Mock
@@ -42,6 +43,11 @@ void main() {
 
     setUp(() {
       manager = WebViewManager.testInstance();
+    });
+
+    tearDown(() {
+      manager.disposeAll();
+      WebpagePluginBase.controllers.clear();
     });
 
     test('register exposes controller and has panel id', () {
@@ -199,10 +205,111 @@ void main() {
         expect(events, ['remove', 'add', 'remove']);
       });
     });
+
+    group('detached retention TTL', () {
+      var now = DateTime(2024, 1, 1, 12);
+      late WebViewManager clocked;
+
+      setUp(() {
+        now = DateTime(2024, 1, 1, 12);
+        clocked = WebViewManager.testInstance(clock: () => now);
+      });
+
+      tearDown(() {
+        clocked.disposeAll();
+        WebpagePluginBase.controllers.clear();
+      });
+
+      test('keeps detached controller until the retention TTL expires', () {
+        final controller = _controller();
+        WebpagePluginBase.controllers['p1'] = controller;
+        clocked.register('p1', controller);
+
+        clocked.detach('p1');
+        expect(clocked.has('p1'), isTrue);
+        expect(clocked.isAttached('p1'), isFalse);
+
+        now = now.add(
+          WebViewManager.kDetachedRetentionTTL - const Duration(seconds: 1),
+        );
+        clocked.evictExpiredDetachedNow();
+
+        expect(clocked.has('p1'), isTrue);
+        expect(clocked.controller('p1'), same(controller));
+        expect(WebpagePluginBase.controllers['p1'], same(controller));
+      });
+
+      test('evicts and disposes controller after the retention TTL', () {
+        final controller = _controller();
+        WebpagePluginBase.controllers['p1'] = controller;
+        clocked.register('p1', controller);
+
+        clocked.detach('p1');
+        now = now.add(
+          WebViewManager.kDetachedRetentionTTL + const Duration(seconds: 1),
+        );
+        clocked.evictExpiredDetachedNow();
+
+        expect(clocked.has('p1'), isFalse);
+        expect(clocked.controller('p1'), isNull);
+        expect(WebpagePluginBase.controllers, isNot(contains('p1')));
+        expect(clocked.activePanelIds, isEmpty);
+      });
+
+      test('reattach within TTL clears eviction and keeps the controller', () {
+        final controller = _controller();
+        clocked.register('p1', controller);
+        clocked.detach('p1');
+
+        // Board switch back: the widget re-registers the same controller.
+        clocked.register('p1', controller);
+
+        now = now.add(const Duration(minutes: 30));
+        clocked.evictExpiredDetachedNow();
+
+        expect(clocked.has('p1'), isTrue);
+        expect(clocked.isAttached('p1'), isTrue);
+        expect(clocked.controller('p1'), same(controller));
+      });
+
+      test('remove (panel delete) disposes immediately, no grace period', () {
+        final controller = _controller();
+        WebpagePluginBase.controllers['p1'] = controller;
+        clocked.register('p1', controller);
+        clocked.detach('p1');
+
+        clocked.remove('p1');
+
+        expect(clocked.has('p1'), isFalse);
+        expect(WebpagePluginBase.controllers, isNot(contains('p1')));
+
+        // A later eviction pass must not resurrect or double-dispose it.
+        now = now.add(const Duration(hours: 1));
+        clocked.evictExpiredDetachedNow();
+        expect(clocked.has('p1'), isFalse);
+      });
+
+      test('entry detached twice keeps the original detach time', () {
+        final controller = _controller();
+        WebpagePluginBase.controllers['p1'] = controller;
+        clocked.register('p1', controller);
+
+        clocked.detach('p1');
+        now = now.add(const Duration(minutes: 3));
+        clocked.detach('p1');
+        now = now.add(const Duration(minutes: 2));
+        // 5 min since the FIRST detach -> expired.
+        clocked.evictExpiredDetachedNow();
+        expect(clocked.has('p1'), isFalse);
+      });
+    });
   });
 }
 
 WebViewController _controller() {
   final platform = _MockPlatformWebViewController();
+  when(
+    () => platform.setPlatformNavigationDelegate(any()),
+  ).thenAnswer((_) async {});
   return WebViewController.fromPlatform(platform);
 }

@@ -58,6 +58,20 @@ class WidgetAppRegistry {
     }
   }
 
+  /// Removes a reload callback previously registered via [registerReload].
+  ///
+  /// Only clears the callback if it is still the same one — a newer
+  /// registration (e.g. a replacement panel) must not be clobbered. Unlike
+  /// [unregister], this works even when no engine is registered yet, so a
+  /// disposed panel never leaks its reload callback into the registry.
+  void unregisterReload(String widgetId, Future<void> Function() callback) {
+    final key = resolveLookupKey(widgetId);
+    final entry = _entries[key];
+    if (entry == null) return;
+    if (entry.reloadCallback != callback) return;
+    entry.reloadCallback = null;
+  }
+
   void updateTree(String widgetId, Map<String, dynamic> tree) {
     final key = resolveLookupKey(widgetId);
     final entry = _entries[key];

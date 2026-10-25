@@ -179,6 +179,149 @@ void main() {
     final boardRedPixels = await _countRedPixels(boardPng!);
     expect(boardRedPixels, greaterThan(250));
   });
+  group('capCaptureSize', () {
+    test('keeps small requests unchanged (below the cap)', () {
+      final capped = BoardOffscreenRenderer.capCaptureSize(
+        const Size(480, 320),
+        1.5,
+      );
+      expect(capped.size, const Size(480, 320));
+      expect(capped.pixelRatio, 1.5);
+    });
+
+    test('keeps requests exactly at the cap unchanged', () {
+      // 400x400 @ 1.0 = 160000 px; 200x200 @ 2.0 = 160000 px — both under.
+      // 4096x4096 is exactly 2^24 px.
+      final capped = BoardOffscreenRenderer.capCaptureSize(
+        const Size(4096, 4096),
+        1.0,
+      );
+      expect(capped.size, const Size(4096, 4096));
+      expect(capped.pixelRatio, 1.0);
+    });
+
+    test('reduces pixelRatio for oversized requests (4000x4000 @ 2.0)', () {
+      final capped = BoardOffscreenRenderer.capCaptureSize(
+        const Size(4000, 4000),
+        2.0,
+      );
+      final px = capped.size.width * capped.pixelRatio;
+      final py = capped.size.height * capped.pixelRatio;
+      expect(px * py, lessThanOrEqualTo(
+        BoardOffscreenRenderer.maxCapturePhysicalPixels.toDouble(),
+      ));
+      // Preferred strategy: logical size untouched, ratio reduced.
+      expect(capped.size, const Size(4000, 4000));
+      expect(capped.pixelRatio, lessThan(2.0));
+      expect(capped.pixelRatio, greaterThanOrEqualTo(1.0));
+    });
+
+    test('clamps logical dimensions when ratio alone cannot hit the cap', () {
+      final capped = BoardOffscreenRenderer.capCaptureSize(
+        const Size(5000, 5000),
+        1.0,
+      );
+      expect(capped.pixelRatio, 1.0);
+      expect(capped.size.width, lessThan(5000));
+      expect(capped.size.height, lessThan(5000));
+      final px = capped.size.width * capped.pixelRatio;
+      final py = capped.size.height * capped.pixelRatio;
+      expect(px * py, lessThanOrEqualTo(
+        BoardOffscreenRenderer.maxCapturePhysicalPixels.toDouble(),
+      ));
+    });
+  });
+
+  group('capture disposal', () {
+    final originalCapturer = BoardOffscreenRenderer.imageCapturer;
+    final originalEncoder = BoardOffscreenRenderer.imageEncoder;
+
+    setUp(() {
+      BoardOffscreenRenderer.imageCapturer = originalCapturer;
+      BoardOffscreenRenderer.imageEncoder = originalEncoder;
+    });
+
+    tearDown(() {
+      BoardOffscreenRenderer.imageCapturer = originalCapturer;
+      BoardOffscreenRenderer.imageEncoder = originalEncoder;
+    });
+
+    test('disposes the captured image on the success path', () async {
+      final board = _boardWithPanels([_panel('board.playlist')]);
+      final captured = await createTestImage(width: 8, height: 8);
+      BoardOffscreenRenderer.imageCapturer =
+          (boundary, {required pixelRatio}) async => captured;
+
+      final png = await BoardOffscreenRenderer.instance.renderBoard(
+        board,
+        size: const Size(320, 240),
+        pixelRatio: 1.0,
+      );
+
+      expect(png, isNotNull);
+      expect(captured.debugDisposed, isTrue);
+    });
+
+    test('disposes the captured image when encoding throws', () async {
+      final board = _boardWithPanels([_panel('board.playlist')]);
+      final captured = await createTestImage(width: 8, height: 8);
+      BoardOffscreenRenderer.imageCapturer =
+          (boundary, {required pixelRatio}) async => captured;
+      BoardOffscreenRenderer.imageEncoder = (image, format) async {
+        throw StateError('encode boom');
+      };
+
+      final png = await BoardOffscreenRenderer.instance.renderBoard(
+        board,
+        size: const Size(320, 240),
+        pixelRatio: 1.0,
+      );
+
+      // Error is swallowed by _withErrorBuilder (returns null), but the
+      // native image must still be disposed.
+      expect(png, isNull);
+      expect(captured.debugDisposed, isTrue);
+    });
+
+    test('cancel path returns null without throwing', () async {
+      final board = _boardWithPanels([_panel('board.playlist')]);
+      final token = CancelToken()..cancel();
+
+      final png = await BoardOffscreenRenderer.instance.renderBoard(
+        board,
+        size: const Size(320, 240),
+        pixelRatio: 1.0,
+        cancelToken: token,
+      );
+
+      expect(png, isNull);
+    });
+  });
+
+  test('renderPanel caps physical pixels of oversized panels', () async {
+    // 4000x4000 logical @ 2.0 would be a single 8000x8000 (~244 MiB) image.
+    final panel = _panel('board.playlist', width: 4000, height: 4000);
+    final board = _boardWithPanels([panel]);
+
+    final png = await BoardOffscreenRenderer.instance.renderPanel(
+      board,
+      panel,
+      pixelRatio: 2.0,
+    );
+
+    expect(png, isNotNull);
+    final codec = await ui.instantiateImageCodec(png!);
+    final frame = await codec.getNextFrame();
+    final image = frame.image;
+    expect(
+      image.width * image.height,
+      lessThanOrEqualTo(BoardOffscreenRenderer.maxCapturePhysicalPixels),
+    );
+    // Capping reduced the ratio (was requested at 2.0 -> 8000x8000 physical).
+    expect(image.width, lessThan(8000));
+    image.dispose();
+    codec.dispose();
+  });
 }
 
 Future<int> _countRedPixels(Uint8List png) async {

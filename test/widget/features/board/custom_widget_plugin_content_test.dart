@@ -7,6 +7,7 @@ import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/custom_widget_plugin_base.dart';
 import 'package:yoloit/features/board/plugins/builtin/custom_widget_plugin_content.dart';
+import 'package:yoloit/features/board/widgets/widget_app_registry.dart';
 import 'package:yoloit/features/board/widgets/widget_engine_manager.dart';
 
 BoardPanelRenderContext _dummyContext({
@@ -372,6 +373,54 @@ void main() {
 
       expect(find.text('widget:one'), findsOneWidget);
       expect(engineManager.engine('p1'), same(engine));
+    });
+
+    testWidgets('dispose unregisters reload callback when engine load failed', (
+      tester,
+    ) async {
+      final engineManager = WidgetEngineManager.testInstance(
+        manifestFinder:
+            (id) async => WidgetManifest(
+              id: id,
+              name: 'Bad',
+              description: '',
+              version: '1.0.0',
+              icon: '🔧',
+              allowedCommands: const [],
+              networkEnabled: true,
+              widgetPath: 'widgets/$id',
+              isSingleFile: false,
+            ),
+        jsLoader: (_, _) async => throw StateError('boom'),
+        engineFactory: (config) => JsWidgetEngine(config: config),
+      );
+      addTearDown(engineManager.disposeAll);
+      addTearDown(() => WidgetAppRegistry.instance.unregister('badwidget'));
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: CustomWidgetContent(
+              panel: _panel(state: {'widgetId': 'badwidget'}),
+              renderContext: _dummyContext(),
+              engineManager: engineManager,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      // initState pre-registered the reload callback; the load then failed,
+      // so no engine ever reached the registry.
+      expect(engineManager.engine('p1'), isNull);
+      expect(await WidgetAppRegistry.instance.triggerReload('badwidget'), isTrue);
+
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump();
+
+      // After dispose the stale callback must be gone from the registry.
+      expect(await WidgetAppRegistry.instance.triggerReload('badwidget'), isFalse);
     });
   });
 }
