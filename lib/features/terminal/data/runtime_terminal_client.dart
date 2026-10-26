@@ -163,7 +163,7 @@ class RuntimeTerminalClient {
     final response = await _post('/sessions', {
       'id': sessionId,
       'cwd': cwd,
-      if (command != null) 'command': command,
+      'command': ?command,
       'env': env,
       'cols': cols,
       'rows': rows,
@@ -175,7 +175,8 @@ class RuntimeTerminalClient {
       shellPid =
           rawPid is int ? rawPid : int.tryParse(rawPid?.toString() ?? '') ?? 0;
     }
-    final rawModes = response['modes'];
+    // yoloitd nests DEC modes inside session; they are not top-level fields.
+    final rawModes = session is Map ? session['modes'] : null;
     return RuntimeSessionCreateResult(
       existing: response['existing'] == true,
       shellPid: shellPid,

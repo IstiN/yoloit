@@ -2,16 +2,17 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/bloc/board_state.dart';
+import 'package:yoloit/features/board/model/terminal_panel_models.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_session_manager.dart';
 import 'package:yoloit/features/board/ui/board_view.dart';
 import 'package:yoloit/features/mindmap/widgets/canvas_interaction_lock.dart';
+import 'package:yoloit/features/terminal/data/terminal_backend_service.dart';
 import 'package:yoloit/features/terminal/ui/terminal_panel.dart';
 import 'package:yoxterm/xterm.dart' hide TerminalState;
 
-import 'board_terminal_panel_test_harness.dart';
 import '../board_view_test_harness.dart';
+import 'board_terminal_panel_test_harness.dart';
 
 class _RecordingMouseHandler extends TerminalMouseHandler {
   _RecordingMouseHandler(this.onWheel);
@@ -155,5 +156,77 @@ void main() {
           'mouse events after switching boards — the canvas zoom must not '
           'be the only thing consuming the wheel',
     );
+  });
+
+  testWidgets('restored SGR mouse modes route wheel after remount and resize',
+      (tester) async {
+    final backend = FakeTerminalBackend()
+      ..attachedExisting = true
+      ..attachedModes = const [1049, 1002, 1006];
+    TerminalBackendService.instance.debugBackendOverride = backend;
+    addTearDown(() {
+      TerminalBackendService.instance.debugBackendOverride = null;
+    });
+    addTearDown(backend.closeIfLaunched);
+
+    final manager = BoardTerminalSessionManager.instance;
+    final session = await manager.ensureSession(
+      const BoardTerminalConfig(
+        sessionId: 'sess-sgr',
+        sessionName: 'demo',
+        workingDir: '/tmp/demo',
+      ),
+    );
+    expect(session.terminal.isUsingAltBuffer, isTrue);
+
+    final panel = terminalPanel(
+      sessionId: 'sess-sgr',
+      sessionName: 'demo',
+      workingDir: '/tmp/demo',
+    );
+    final boardA = boardTestBoard(id: 'board-a', name: 'A', panels: [panel]);
+    final boardB = boardTestBoard(id: 'board-b', name: 'B');
+    final cubit = TestBoardViewCubit(
+      BoardState(
+        boards: [boardA, boardB],
+        activeBoardId: 'board-a',
+        isLoaded: true,
+      ),
+    );
+    addTearDown(cubit.close);
+
+    int wheelReports() => backend.writes
+        .where(
+          (data) => data.contains('\x1b[<64;') || data.contains('\x1b[<65;'),
+        )
+        .length;
+
+    setBoardViewSurface(tester);
+    await pumpBoardView(tester, cubit);
+    await tester.pump(const Duration(milliseconds: 500));
+    await wheelOverTerminal(tester, const Offset(0, -120));
+    expect(
+      wheelReports(),
+      greaterThan(0),
+      reason: '1049+1002+1006 must produce SGR wheel reports on mount',
+    );
+
+    await cubit.setActiveBoard('board-b');
+    await tester.pump(const Duration(milliseconds: 500));
+    await cubit.setActiveBoard('board-a');
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.byType(TerminalWidget), findsOneWidget);
+
+    // Exercise a real emulator resize as well as the remount: neither may
+    // clear the restored alt-buffer/mouse-reporting state used by the
+    // pointer-signal resolver.
+    session.terminal.resize(
+      session.terminal.viewWidth + 1,
+      session.terminal.viewHeight,
+    );
+    await tester.pump(const Duration(milliseconds: 500));
+    final beforeWheel = wheelReports();
+    await wheelOverTerminal(tester, const Offset(0, 120));
+    expect(wheelReports(), greaterThan(beforeWheel));
   });
 }

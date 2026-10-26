@@ -64,6 +64,13 @@ class FakeTerminalBackend implements TerminalBackend {
   /// Number of processes successfully handed out by [launch].
   var launchCount = 0;
 
+  /// State reported by a runtime backend when attaching to an existing TUI.
+  var attachedExisting = false;
+  List<int> attachedModes = const [];
+
+  /// Raw terminal input written by keyboard/mouse handling.
+  final writes = <String>[];
+
   /// Closes [output] only when a process was actually launched. Closing a
   /// controller whose stream never had a listener returns a future that
   /// never completes, which hangs test teardown.
@@ -89,11 +96,15 @@ class FakeTerminalBackend implements TerminalBackend {
     return TerminalProcess(
       output: output.stream,
       exitCode: Completer<int>().future,
+      attachedExisting: attachedExisting,
+      attachedModes: attachedModes,
     );
   }
 
   @override
-  void write(String sessionId, String data) {}
+  void write(String sessionId, String data) {
+    writes.add(data);
+  }
 
   @override
   void resize(String sessionId, int columns, int rows) {}

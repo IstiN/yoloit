@@ -65,6 +65,26 @@ void main() {
       expect(result.shellPid, 777);
     });
 
+    test('parses DEC modes from the nested session payload', () async {
+      final fixture = await _createFixture();
+      addTearDown(fixture.dispose);
+      fixture.runtime
+        ..sessionExisting = true
+        ..sessionModes = const [25, 1002, 1006, 1049, 2004];
+
+      final result = await fixture.client.createSession(
+        sessionId: 's1',
+        cwd: '/tmp/work',
+      );
+
+      expect(
+        result.modes,
+        const [25, 1002, 1006, 1049, 2004],
+        reason: 'dropping modes leaves a re-attached TUI in the main buffer '
+            'with wheel reporting off',
+      );
+    });
+
     test('returns zero pid when session payload is missing', () async {
       final fixture = await _createFixture();
       addTearDown(fixture.dispose);
@@ -521,6 +541,7 @@ class _FakeRuntime {
   Object? sessionPid = 4321;
   bool sessionExisting = false;
   bool omitSession = false;
+  List<int> sessionModes = const [];
   Map<String, dynamic>? lastCreateBody;
 
   String? lastInputData;
@@ -565,7 +586,8 @@ class _FakeRuntime {
       }
       _respondJson(request, {
         'existing': sessionExisting,
-        if (!omitSession) 'session': {'pid': sessionPid},
+        if (!omitSession)
+          'session': {'pid': sessionPid, 'modes': sessionModes},
       });
       return;
     }

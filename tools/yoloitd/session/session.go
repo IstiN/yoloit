@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	"syscall"
 	"time"
 	"unicode/utf8"
+	"unsafe"
 
 	"github.com/creack/pty"
 )
@@ -78,6 +80,12 @@ type Session struct {
 	modes        map[int]bool
 	modeMu       sync.Mutex
 	modeScanTail string
+	// Last PTY dimensions. A same-size attach resize needs an explicit
+	// SIGWINCH below: TIOCSWINSZ alone does not notify the application when
+	// nothing changed, but a freshly recreated emulator still needs a full
+	// alt-buffer repaint after replaying a differential output tail.
+	sizeMu     sync.Mutex
+	cols, rows int
 }
 
 // New starts a new PTY session.
@@ -153,6 +161,8 @@ func New(req *CreateRequest) (*Session, error) {
 		maxRingBytes: 512 * 1024,
 		alive:        true,
 		modes:        make(map[int]bool),
+		cols:         req.Cols,
+		rows:         req.Rows,
 	}
 
 	log.Printf("[session] created id=%s command=%s cwd=%s cols=%d rows=%d pid=%d", s.id, s.command, s.cwd, req.Cols, req.Rows, s.PID())
@@ -350,6 +360,12 @@ func (s *Session) trackModes(data string) {
 	}
 }
 
+func (s *Session) altBufferActive() bool {
+	s.modeMu.Lock()
+	defer s.modeMu.Unlock()
+	return s.modes[47] || s.modes[1047] || s.modes[1049]
+}
+
 // Modes returns the sorted list of currently enabled DEC private modes.
 func (s *Session) Modes() []int {
 	s.modeMu.Lock()
@@ -427,13 +443,69 @@ func (s *Session) Write(data string) error {
 	return err
 }
 
+// foregroundProcessGroup returns the PTY's foreground job, which is normally
+// the TUI process group rather than the interactive shell's process group.
+func foregroundProcessGroup(fd uintptr) (int, error) {
+	// TIOCGPGRP is not exported by the frozen syscall package on Darwin.
+	const bsdTiocgpgrp = 0x40047477 // _IOR('t', 119, int)
+	const linuxTiocgpgrp = 0x540f
+	var request uintptr
+	switch runtime.GOOS {
+	case "darwin", "freebsd", "netbsd", "openbsd", "dragonfly":
+		request = bsdTiocgpgrp
+	case "linux":
+		request = linuxTiocgpgrp
+	default:
+		return 0, fmt.Errorf("TIOCGPGRP is unsupported on %s", runtime.GOOS)
+	}
+	var pgrp int32
+	_, _, errno := syscall.Syscall(
+		syscall.SYS_IOCTL,
+		fd,
+		request,
+		uintptr(unsafe.Pointer(&pgrp)),
+	)
+	if errno != 0 {
+		return 0, errno
+	}
+	if pgrp <= 0 {
+		return 0, fmt.Errorf("invalid foreground process group %d", pgrp)
+	}
+	return int(pgrp), nil
+}
+
 // Resize changes the terminal dimensions.
 func (s *Session) Resize(cols, rows int) error {
 	log.Printf("[session] resize id=%s cols=%d rows=%d", s.id, cols, rows)
-	return pty.Setsize(s.ptmx, &pty.Winsize{
+	s.sizeMu.Lock()
+	defer s.sizeMu.Unlock()
+
+	sameSize := s.cols == cols && s.rows == rows
+	if err := pty.Setsize(s.ptmx, &pty.Winsize{
 		Cols: uint16(cols),
 		Rows: uint16(rows),
-	})
+	}); err != nil {
+		return err
+	}
+	s.cols, s.rows = cols, rows
+
+	// TIOCSWINSZ only generates SIGWINCH for an actual dimension change.
+	// Mounting a recreated emulator sends its current dimensions again, and
+	// that attach-time re-sync is precisely when an alt-buffer TUI must full-
+	// redraw: the client could only replay a recent differential output tail.
+	// Request the redraw explicitly for a same-size alt-buffer resize. Real
+	// dimension changes retain the kernel-generated single SIGWINCH.
+	if sameSize && s.altBufferActive() {
+		pgrp, err := foregroundProcessGroup(s.ptmx.Fd())
+		if err != nil {
+			// Non-job-control shells normally own the foreground group. Keep the
+			// redraw best-effort on platforms without a known TIOCGPGRP value.
+			pgrp = s.PID()
+		}
+		log.Printf("[session] redraw id=%s reason=same-size-alt-resize pgrp=%d", s.id, pgrp)
+		return syscall.Kill(-pgrp, syscall.SIGWINCH)
+	}
+	return nil
 }
 
 // Kill terminates the session gracefully (SIGTERM then SIGKILL).
