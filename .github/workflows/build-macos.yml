@@ -268,9 +268,13 @@ jobs:
             # certificate (gh-1852/gh-1866/gh-1865 class) can no longer
             # shadow resolution. Partition-list is set by install — no
             # GUI password prompts from orphaned per-job keychains.
-            ~/bin/ci-sign install macos
-            CERT_SHA1=$(~/bin/ci-sign sha1 macos)
-            CERT_NAME=$(~/bin/ci-sign name macos)
+            # Label is per-repo (yoloit-*) — 4 repos share ONE host
+            # ci-signing.keychain-db side-by-side; a generic "macos" label
+            # would ping-pong between repos' different certs on concurrent
+            # installs (each install replaces the identity under the label).
+            ~/bin/ci-sign install yoloit-macos
+            CERT_SHA1=$(~/bin/ci-sign sha1 yoloit-macos)
+            CERT_NAME=$(~/bin/ci-sign name yoloit-macos)
             echo "identity_sha1=$CERT_SHA1" >> $GITHUB_OUTPUT
             echo "identity_name=$CERT_NAME" >> $GITHUB_OUTPUT
             echo "gh-1865: signing identity pinned by SHA-1: $CERT_NAME ($CERT_SHA1)"
