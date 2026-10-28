@@ -4,21 +4,50 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
 	"regexp"
-	"runtime"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
-	"syscall"
 	"time"
 	"unicode/utf8"
-	"unsafe"
-
-	"github.com/creack/pty"
 )
+
+// ptyMaster is the platform PTY master end: a unix ptmx file or the Windows
+// ConPTY pipes. Platform files construct and resize it (startSessionPty).
+type ptyMaster interface {
+	Read(p []byte) (int, error)
+	WriteString(s string) (int, error)
+	Close() error
+
+	// resize sets the PTY dimensions. On unix this is TIOCSWINSZ, on
+	// Windows ResizePseudoConsole.
+	resize(cols, rows int) error
+
+	// sameSizeRedrawNudge asks the attached TUI to repaint after a
+	// same-size resize. Unix sends SIGWINCH to the PTY's foreground
+	// process group; Windows has no WINCH semantics — ConPTY notifies
+	// attached clients itself — so it is a logged no-op there.
+	sameSizeRedrawNudge(fallbackPID int) error
+}
+
+// ptyProcess abstracts the process attached to the PTY. It mirrors the parts
+// of *exec.Cmd the session needs, so the unix implementation keeps
+// os/exec + creack/pty verbatim while Windows uses ConPTY's own
+// CreateProcess-based child handling (os/exec cannot attach a pseudoconsole,
+// see golang/go#62708).
+type ptyProcess interface {
+	// Wait blocks until the process exits (like exec.Cmd.Wait).
+	Wait() error
+	// PID returns the OS process id of the attached process.
+	PID() int
+	// ExitCode is valid after Wait returned.
+	ExitCode() int
+	// Kill terminates the process without waiting: SIGTERM followed by a
+	// delayed SIGKILL on unix, taskkill /T /F on Windows.
+	Kill()
+}
 
 var debugEnabled = atomic.Bool{}
 
@@ -61,8 +90,8 @@ type Session struct {
 	cwd          string
 	command      string
 	createdAt    time.Time
-	ptmx         *os.File
-	cmd          *exec.Cmd
+	ptmx         ptyMaster
+	cmd          ptyProcess
 	readDone     chan struct{}
 	subscribers  []chan Event
 	ring         []Event
@@ -94,10 +123,7 @@ func New(req *CreateRequest) (*Session, error) {
 		req.Cwd, _ = os.Getwd()
 	}
 	if req.Command == "" {
-		req.Command = os.Getenv("SHELL")
-		if req.Command == "" {
-			req.Command = "/bin/sh"
-		}
+		req.Command = defaultShellCommand()
 	}
 	if req.Cols == 0 {
 		req.Cols = 120
@@ -105,16 +131,6 @@ func New(req *CreateRequest) (*Session, error) {
 	if req.Rows == 0 {
 		req.Rows = 30
 	}
-
-	var cmd *exec.Cmd
-	if strings.Contains(req.Command, " ") {
-		cmd = exec.Command("sh", "-c", req.Command)
-	} else {
-		// Plain interactive shell — login shells (-l) can re-source profile files
-		// and drop env vars injected by YoLoIT env groups.
-		cmd = exec.Command(req.Command)
-	}
-	cmd.Dir = req.Cwd
 
 	// Build environment map to deduplicate and ensure required vars.
 	envMap := make(map[string]string)
@@ -136,14 +152,10 @@ func New(req *CreateRequest) (*Session, error) {
 	for k, v := range envMap {
 		env = append(env, fmt.Sprintf("%s=%s", k, v))
 	}
-	cmd.Env = env
 
 	debugLog("[session] starting command=%s cwd=%s cols=%d rows=%d env_keys=%d", req.Command, req.Cwd, req.Cols, req.Rows, len(envMap))
 
-	ptmx, err := pty.StartWithSize(cmd, &pty.Winsize{
-		Cols: uint16(req.Cols),
-		Rows: uint16(req.Rows),
-	})
+	ptmx, proc, err := startSessionPty(req.Command, req.Cwd, env, req.Cols, req.Rows)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start pty: %w", err)
 	}
@@ -154,7 +166,7 @@ func New(req *CreateRequest) (*Session, error) {
 		command:      req.Command,
 		createdAt:    time.Now(),
 		ptmx:         ptmx,
-		cmd:          cmd,
+		cmd:          proc,
 		readDone:     make(chan struct{}),
 		subscribers:  make([]chan Event, 0),
 		ring:         make([]Event, 0),
@@ -296,9 +308,7 @@ func (s *Session) waitLoop() {
 
 	s.mu.Lock()
 	s.alive = false
-	if s.cmd.ProcessState != nil {
-		s.exitCode = s.cmd.ProcessState.ExitCode()
-	}
+	s.exitCode = s.cmd.ExitCode()
 	s.mu.Unlock()
 
 	log.Printf("[session] exited id=%s exitCode=%d", s.id, s.exitCode)
@@ -443,37 +453,6 @@ func (s *Session) Write(data string) error {
 	return err
 }
 
-// foregroundProcessGroup returns the PTY's foreground job, which is normally
-// the TUI process group rather than the interactive shell's process group.
-func foregroundProcessGroup(fd uintptr) (int, error) {
-	// TIOCGPGRP is not exported by the frozen syscall package on Darwin.
-	const bsdTiocgpgrp = 0x40047477 // _IOR('t', 119, int)
-	const linuxTiocgpgrp = 0x540f
-	var request uintptr
-	switch runtime.GOOS {
-	case "darwin", "freebsd", "netbsd", "openbsd", "dragonfly":
-		request = bsdTiocgpgrp
-	case "linux":
-		request = linuxTiocgpgrp
-	default:
-		return 0, fmt.Errorf("TIOCGPGRP is unsupported on %s", runtime.GOOS)
-	}
-	var pgrp int32
-	_, _, errno := syscall.Syscall(
-		syscall.SYS_IOCTL,
-		fd,
-		request,
-		uintptr(unsafe.Pointer(&pgrp)),
-	)
-	if errno != 0 {
-		return 0, errno
-	}
-	if pgrp <= 0 {
-		return 0, fmt.Errorf("invalid foreground process group %d", pgrp)
-	}
-	return int(pgrp), nil
-}
-
 // Resize changes the terminal dimensions.
 func (s *Session) Resize(cols, rows int) error {
 	log.Printf("[session] resize id=%s cols=%d rows=%d", s.id, cols, rows)
@@ -481,10 +460,7 @@ func (s *Session) Resize(cols, rows int) error {
 	defer s.sizeMu.Unlock()
 
 	sameSize := s.cols == cols && s.rows == rows
-	if err := pty.Setsize(s.ptmx, &pty.Winsize{
-		Cols: uint16(cols),
-		Rows: uint16(rows),
-	}); err != nil {
+	if err := s.ptmx.resize(cols, rows); err != nil {
 		return err
 	}
 	s.cols, s.rows = cols, rows
@@ -496,33 +472,20 @@ func (s *Session) Resize(cols, rows int) error {
 	// Request the redraw explicitly for a same-size alt-buffer resize. Real
 	// dimension changes retain the kernel-generated single SIGWINCH.
 	if sameSize && s.altBufferActive() {
-		pgrp, err := foregroundProcessGroup(s.ptmx.Fd())
-		if err != nil {
-			// Non-job-control shells normally own the foreground group. Keep the
-			// redraw best-effort on platforms without a known TIOCGPGRP value.
-			pgrp = s.PID()
-		}
-		log.Printf("[session] redraw id=%s reason=same-size-alt-resize pgrp=%d", s.id, pgrp)
-		return syscall.Kill(-pgrp, syscall.SIGWINCH)
+		return s.ptmx.sameSizeRedrawNudge(s.cmd.PID())
 	}
 	return nil
 }
 
-// Kill terminates the session gracefully (SIGTERM then SIGKILL).
+// Kill terminates the session (SIGTERM→SIGKILL on unix, taskill on Windows).
 func (s *Session) Kill() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if !s.alive {
 		return
 	}
-	log.Printf("[session] kill id=%s pid=%d", s.id, s.PID())
-	if s.cmd.Process != nil {
-		_ = s.cmd.Process.Signal(syscall.SIGTERM)
-		go func(pid int) {
-			time.Sleep(2 * time.Second)
-			_ = syscall.Kill(pid, syscall.SIGKILL)
-		}(s.cmd.Process.Pid)
-	}
+	log.Printf("[session] kill id=%s pid=%d", s.id, s.cmd.PID())
+	s.cmd.Kill()
 	s.alive = false
 }
 
@@ -547,10 +510,7 @@ func (s *Session) CreatedAt() time.Time { return s.createdAt }
 
 // PID returns the OS process id.
 func (s *Session) PID() int {
-	if s.cmd.Process != nil {
-		return s.cmd.Process.Pid
-	}
-	return 0
+	return s.cmd.PID()
 }
 
 // Ring returns a copy of the replay buffer (most recent output events,

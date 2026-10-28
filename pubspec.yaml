@@ -146,6 +146,8 @@ flutter:
     - assets/command_catalog/
     - tools/yoloit
     - tools/yoloitd/yoloitd
+    - tools/yoloitd/yoloitd.exe
+    - tools/yoloitd/yoloitd-linux-amd64
     - tools/widgets/weather/manifest.json
     - tools/widgets/weather/widget.js
     - tools/widgets/crypto/manifest.json

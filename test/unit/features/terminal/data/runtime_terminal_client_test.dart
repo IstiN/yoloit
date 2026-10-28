@@ -5,6 +5,7 @@ import 'dart:io' as io;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:yoloit/core/services/support_log_service.dart';
 import 'package:yoloit/features/terminal/data/runtime_terminal_client.dart';
 
 void main() {
@@ -15,9 +16,71 @@ void main() {
 
   tearDown(() {
     RuntimeTerminalClient.debugModeOverride = null;
+    RuntimeTerminalClient.debugPlatformOverride = null;
     RuntimeTerminalClient.updateRequired.value = false;
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMessageHandler('flutter/assets', null);
+  });
+
+  group('binary asset name per platform', () {
+    test('windows resolves to yoloitd.exe', () {
+      expect(
+        RuntimeTerminalClient.binaryAssetNameFor('windows'),
+        'yoloitd.exe',
+      );
+    });
+
+    test('linux resolves to yoloitd-linux-amd64', () {
+      expect(
+        RuntimeTerminalClient.binaryAssetNameFor('linux'),
+        'yoloitd-linux-amd64',
+      );
+    });
+
+    test('macos resolves to the bare yoloitd binary', () {
+      expect(RuntimeTerminalClient.binaryAssetNameFor('macos'), 'yoloitd');
+    });
+
+    test('host resolution follows the platform override', () {
+      RuntimeTerminalClient.debugPlatformOverride = 'windows';
+      expect(RuntimeTerminalClient.binaryAssetName, 'yoloitd.exe');
+      RuntimeTerminalClient.debugPlatformOverride = 'linux';
+      expect(RuntimeTerminalClient.binaryAssetName, 'yoloitd-linux-amd64');
+      RuntimeTerminalClient.debugPlatformOverride = 'macos';
+      expect(RuntimeTerminalClient.binaryAssetName, 'yoloitd');
+    });
+
+    test('unknown platforms fall back to the macOS binary', () {
+      expect(RuntimeTerminalClient.binaryAssetNameFor('android'), 'yoloitd');
+    });
+  });
+
+  group('start failure diagnostics', () {
+    test('a missing binary asset is logged to the support log and rethrown',
+        () async {
+      RuntimeTerminalClient.debugModeOverride = false;
+      final fixture = await _createFixture(
+        seedDebugMtime: false,
+        seedPort: false,
+      );
+      addTearDown(fixture.dispose);
+      SupportLogService.instance.clearMemoryLog();
+      // The flutter_tester harness serves REAL bundled assets, so an absent
+      // handler still loads tools/yoloitd/yoloitd. Answer null instead —
+      // that is exactly the FlutterError('Unable to load asset') Windows
+      // installs hit before yoloitd.exe was bundled (IstiN/yoloit#17).
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMessageHandler(
+        'flutter/assets',
+        (message) async => null,
+      );
+
+      await expectLater(fixture.client.ensureStarted(), throwsA(anything));
+
+      final log = SupportLogService.instance.memoryLog;
+      expect(log, contains('[terminal-backend] error='));
+      expect(log, contains('yoloitd'));
+    });
   });
 
   group('createSession', () {

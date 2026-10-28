@@ -4,12 +4,14 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart'
     show
+        debugPrint,
         kDebugMode,
         ValueNotifier,
         protected,
         visibleForOverriding,
         visibleForTesting;
 import 'package:flutter/services.dart' show rootBundle;
+import 'package:yoloit/core/services/support_log_service.dart';
 import 'package:yoloit/features/terminal/data/runtime_paths.dart';
 
 class RuntimeSessionCreateResult {
@@ -56,6 +58,41 @@ class RuntimeTerminalClient {
 
   bool get _isDebug => debugModeOverride ?? kDebugMode;
 
+  /// Test hook: overrides the host OS used to resolve the bundled yoloitd
+  /// binary name (values match [Platform.operatingSystem]: 'macos',
+  /// 'linux', 'windows'). Mirrors [debugModeOverride].
+  @visibleForTesting
+  static String? debugPlatformOverride;
+
+  /// File name of the yoloitd binary bundled as a Flutter asset for [os].
+  ///
+  /// The asset and the on-disk binary under the runtime home share this
+  /// name; a platform mismatch (e.g. the macOS Mach-O binary shipped to a
+  /// Windows install) is exactly the silent no-start of IstiN/yoloit#17.
+  @visibleForTesting
+  static String binaryAssetNameFor(String os) {
+    switch (os) {
+      case 'windows':
+        return 'yoloitd.exe';
+      case 'linux':
+        return 'yoloitd-linux-amd64';
+      case 'macos':
+      default:
+        return 'yoloitd';
+    }
+  }
+
+  /// Binary asset/file name for the current (or test-overridden) platform.
+  @visibleForTesting
+  static String get binaryAssetName =>
+      binaryAssetNameFor(debugPlatformOverride ?? Platform.operatingSystem);
+
+  static String get _hostOS =>
+      debugPlatformOverride ?? Platform.operatingSystem;
+
+  void _logBackend(String message) =>
+      SupportLogService.instance.add('terminal-backend', message);
+
   Future<void> ensureStarted() async {
     if (_isDebug) {
       await _killStaleDebugRuntime();
@@ -64,17 +101,27 @@ class RuntimeTerminalClient {
       await _checkBinaryUpdate();
       return;
     }
-    await startRuntime();
+    try {
+      await startRuntime();
+    } catch (e, st) {
+      _logBackend('error=startRuntime failed: $e');
+      debugPrint('$st');
+      rethrow;
+    }
     for (var i = 0; i < 50; i++) {
       if (await _loadPort() && await _isHealthy()) return;
       await Future<void>.delayed(const Duration(milliseconds: 100));
     }
+    _logBackend(
+      'error=runtime did not become healthy after start '
+      '(binary=$binaryAssetName home=$runtimeHome)',
+    );
     throw StateError('YoLoIT runtime did not start');
   }
 
   Future<void> _checkBinaryUpdate() async {
     if (_isDebug) return;
-    final binaryName = Platform.isWindows ? 'yoloitd.exe' : 'yoloitd';
+    final binaryName = binaryAssetName;
     final installed = File('$runtimeHome/$binaryName');
     if (!await installed.exists()) return;
     try {
@@ -83,8 +130,9 @@ class RuntimeTerminalClient {
       if (await installed.length() != assetBytes.length) {
         updateRequired.value = true;
       }
-    } catch (_) {
-      // ignore
+    } catch (e) {
+      _logBackend('error=binary update check failed asset=tools/yoloitd/'
+          '$binaryName: $e');
     }
   }
 
@@ -107,22 +155,30 @@ class RuntimeTerminalClient {
 
   /// Kills the current runtime, re-extracts the binary, and starts a fresh one.
   Future<void> restartRuntime() async {
-    await _killPidFile(File(_pidPath), sigtermDelayMs: 500);
-    await Future<void>.delayed(const Duration(milliseconds: 200));
-    await _deleteIfExists(_portPath);
-    await _deleteIfExists(_pidPath);
+    try {
+      await _killPidFile(File(_pidPath), sigtermDelayMs: 500);
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      await _deleteIfExists(_portPath);
+      await _deleteIfExists(_pidPath);
 
-    // Re-extract binary and start fresh.
-    await _runtimeBinaryPath();
-    await startRuntime();
-    for (var i = 0; i < 50; i++) {
-      if (await _loadPort() && await _isHealthy()) {
-        updateRequired.value = false;
-        return;
+      // Re-extract binary and start fresh.
+      await _runtimeBinaryPath();
+      await startRuntime();
+      for (var i = 0; i < 50; i++) {
+        if (await _loadPort() && await _isHealthy()) {
+          updateRequired.value = false;
+          return;
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 100));
       }
-      await Future<void>.delayed(const Duration(milliseconds: 100));
+      _logBackend('error=runtime did not restart (home=$runtimeHome)');
+      throw StateError('YoLoIT runtime did not restart');
+    } catch (e) {
+      if (e is! StateError) {
+        _logBackend('error=restartRuntime failed: $e');
+      }
+      rethrow;
     }
-    throw StateError('YoLoIT runtime did not restart');
   }
 
   Future<void> _killStaleDebugRuntime() async {
@@ -356,6 +412,9 @@ class RuntimeTerminalClient {
     await _deleteIfExists(_pidPath);
 
     final binary = await _runtimeBinaryPath();
+    _logBackend(
+      'starting runtime os=$_hostOS binary=$binary home=$runtimeHome',
+    );
 
     if (Platform.isWindows) {
       await Process.start(binary, [
@@ -400,7 +459,8 @@ class RuntimeTerminalClient {
   }
 
   Future<String> _runtimeBinaryPath() async {
-    final binaryName = Platform.isWindows ? 'yoloitd.exe' : 'yoloitd';
+    final binaryName = binaryAssetName;
+    final hostOS = _hostOS;
 
     // In debug mode prefer the live binary in the project tree so developers
     // can iterate without rebuilding Flutter assets.
@@ -409,26 +469,37 @@ class RuntimeTerminalClient {
       if (await File(debugPath).exists()) return debugPath;
     }
 
-    final installed = File('$runtimeHome/$binaryName');
-    final assetData = await rootBundle.load('tools/yoloitd/$binaryName');
-    final bytes = assetData.buffer.asUint8List();
+    try {
+      final installed = File('$runtimeHome/$binaryName');
+      final assetData = await rootBundle.load('tools/yoloitd/$binaryName');
+      final bytes = assetData.buffer.asUint8List();
 
-    // Re-extract if missing or different size (cheap proxy for "outdated").
-    if (!await installed.exists() || await installed.length() != bytes.length) {
-      await installed.parent.create(recursive: true);
-      // Write to a temp file and atomically rename instead of truncating the
-      // installed binary in place: on macOS, rewriting the inode of a signed
-      // executable that was recently running taints its code-signature cache
-      // and every subsequent exec is SIGKILLed ("Code Signature Invalid").
-      final tmp = File('${installed.path}.new');
-      await tmp.writeAsBytes(bytes, flush: true);
-      await tmp.rename(installed.path);
-      if (!Platform.isWindows) {
-        await Process.run('chmod', ['+x', installed.path]);
+      // Re-extract if missing or different size (cheap proxy for "outdated").
+      if (!await installed.exists() ||
+          await installed.length() != bytes.length) {
+        await installed.parent.create(recursive: true);
+        // Write to a temp file and atomically rename instead of truncating the
+        // installed binary in place: on macOS, rewriting the inode of a signed
+        // executable that was recently running taints its code-signature cache
+        // and every subsequent exec is SIGKILLed ("Code Signature Invalid").
+        final tmp = File('${installed.path}.new');
+        await tmp.writeAsBytes(bytes, flush: true);
+        await tmp.rename(installed.path);
+        if (!Platform.isWindows) {
+          await Process.run('chmod', ['+x', installed.path]);
+        }
       }
-    }
 
-    return installed.path;
+      return installed.path;
+    } catch (e) {
+      // A missing platform asset is exactly the silent no-start of
+      // IstiN/yoloit#17: record it so support logs explain the dead panel.
+      _logBackend(
+        'error=runtime binary extraction failed os=$hostOS '
+        'asset=tools/yoloitd/$binaryName: $e',
+      );
+      rethrow;
+    }
   }
 
   Future<void> _deleteIfExists(String path) async {

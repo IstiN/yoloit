@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yoloit/core/remote/yoloit_remote_client.dart';
 import 'package:yoloit/core/services/agent_hook_service.dart';
+import 'package:yoloit/core/services/support_log_service.dart';
 import 'package:yoloit/core/session/session_prefs.dart';
 import 'package:yoloit/features/settings/data/agent_config_service.dart';
 import 'package:yoloit/features/skills/data/skills_install_service.dart';
@@ -290,12 +291,21 @@ class TerminalCubit extends Cubit<TerminalState> {
 
     final extraEnv = await _loadWorkspaceSecrets(effectiveWorkspaceId);
 
-    final process = await _backendService.launch(
-      sessionId: sessionId,
-      label: type.displayName,
-      workspacePath: effectivePath,
-      extraEnv: extraEnv,
-    );
+    final TerminalProcess process;
+    try {
+      process = await _backendService.launch(
+        sessionId: sessionId,
+        label: type.displayName,
+        workspacePath: effectivePath,
+        extraEnv: extraEnv,
+      );
+    } catch (e, st) {
+      // A dead backend (e.g. the yoloitd runtime binary missing on Windows —
+      // IstiN/yoloit#17) used to surface as an unhandled async error while
+      // the panel waited in silence. Show it in the session instead.
+      _onSpawnFailed(session, e, st);
+      return;
+    }
     final backendMode = _backendService.modeFor(sessionId);
     final useTmux = backendMode == TerminalBackendMode.tmux;
     final attachedRuntime =
@@ -327,6 +337,28 @@ class TerminalCubit extends Cubit<TerminalState> {
       type,
       skipAutoRun: isRestore && (useTmux || attachedRuntime),
     );
+  }
+
+  /// Surfaces a failed session launch to the user instead of letting it die
+  /// as an unhandled async error: the session stays in the list with an
+  /// [AgentStatus.error] status and the reason printed into its terminal.
+  void _onSpawnFailed(AgentSession session, Object error, StackTrace st) {
+    SupportLogService.instance.add(
+      'terminal-backend',
+      'error=session spawn failed id=${session.id} '
+          'type=${session.type.name} path=${session.workspacePath}: $error',
+    );
+    debugPrint('spawnSession failed: $error\n$st');
+    session.terminal.write(
+      '\r\n\x1b[31m[yoloit] terminal backend failed to start:\x1b[0m '
+      '\r\n  $error\r\n\r\n'
+      '\x1b[90mSupport: Help → Copy Support Log\x1b[0m\r\n',
+    );
+    _allSessions.removeWhere((s) => s.id == session.id);
+    _allSessions.add(session.copyWith(status: AgentStatus.error));
+    final visible = _workspaceSessions;
+    _emitLoaded(visible, visible.length - 1);
+    _persistWorkspaceSessions(session.workspaceId);
   }
 
   /// Creates the agent worktree dir when [worktreeContexts] are present and

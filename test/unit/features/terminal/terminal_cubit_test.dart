@@ -6,6 +6,7 @@ import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:yoloit/core/services/support_log_service.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_cubit.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_state.dart';
 import 'package:yoloit/features/terminal/models/agent_phase.dart';
@@ -395,6 +396,57 @@ void main() {
       cubit.closeSession('ghost');
       verifyNever(() => harness.backend.kill(any()));
       cubit.close();
+    });
+
+    test('spawnSession surfaces a backend launch failure as an error session',
+        () {
+      fakeAsync((async) {
+        // Backend launch blowing up (e.g. the yoloitd runtime binary missing
+        // or not starting — IstiN/yoloit#17) must reach the user: the
+        // session stays visible with an error status and the reason in the
+        // terminal, and lands in the support log.
+        when(
+          () => harness.backend.launch(
+            sessionId: any(named: 'sessionId'),
+            workspacePath: any(named: 'workspacePath'),
+            label: any(named: 'label'),
+            extraEnv: any(named: 'extraEnv'),
+          ),
+        ).thenThrow(StateError('YoLoIT runtime did not start'));
+        SupportLogService.instance.clearMemoryLog();
+
+        final cubit = initCubit(async);
+        cubit.setActiveWorkspace(workspaceId: 'ws1', workspacePath: '/tmp/ws1');
+        async.flushMicrotasks();
+
+        cubit.spawnSession(
+          type: AgentType.terminal,
+          workspacePath: '/tmp/ws1',
+          workspaceId: 'ws1',
+          savedSessionId: 'boom',
+        );
+        async.flushMicrotasks();
+
+        final state = loaded(cubit);
+        // setActiveWorkspace auto-spawned the default agent first; both
+        // failures surface, assert on the explicitly spawned one.
+        final session = state.sessions.firstWhere((s) => s.id == 'boom');
+        expect(session.id, 'boom');
+        expect(session.status, AgentStatus.error);
+        final lines = session.terminal.buffer.lines;
+        final rendered = List.generate(
+          lines.length,
+          (i) => lines[i].toString(),
+        ).join('\n');
+        expect(rendered, contains('failed to start'));
+        expect(rendered, contains('YoLoIT runtime did not start'));
+        expect(
+          SupportLogService.instance.memoryLog,
+          contains('[terminal-backend] error=session spawn failed'),
+        );
+
+        settle(async, cubit);
+      });
     });
 
     test('loadPersistedMetadataForWorkspaces adds idle stubs for other '
