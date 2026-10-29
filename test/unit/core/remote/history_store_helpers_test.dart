@@ -88,6 +88,29 @@ void main() {
       final decoded = jsonDecode(content) as Map<String, dynamic>;
       expect(decoded['new'], 'data');
     });
+
+    test('concurrent writes to the same target all succeed', () async {
+      final file = File(p.join(tempDir.path, 'shared.json'));
+      final results = await Future.wait([
+        for (var i = 0; i < 8; i++)
+          HistoryStoreHelpers.writeJsonAtomic(file, {'i': i}).then((_) => true),
+      ]);
+      expect(results.every((ok) => ok), true);
+      expect(file.existsSync(), true);
+      final decoded = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+      expect(decoded.containsKey('i'), true);
+    });
+
+    test('leaves no .tmp files behind after successful write', () async {
+      final file = File(p.join(tempDir.path, 'clean.json'));
+      await HistoryStoreHelpers.writeJsonAtomic(file, {'a': 1});
+      final leftovers = tempDir
+          .listSync()
+          .whereType<File>()
+          .where((f) => f.path.endsWith('.tmp'))
+          .toList();
+      expect(leftovers, isEmpty);
+    });
   });
 
   group('appendEvent', () {

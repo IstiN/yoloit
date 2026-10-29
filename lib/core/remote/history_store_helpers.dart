@@ -41,20 +41,33 @@ abstract final class HistoryStoreHelpers {
     await writeJsonAtomic(file, json);
   }
 
-  static final JsonEncoder _prettyEncoder = const JsonEncoder.withIndent('  ');
+  static const JsonEncoder _prettyEncoder = JsonEncoder.withIndent('  ');
 
   static Future<void> writeJsonAtomic(File file, Object? value) async {
     await file.parent.create(recursive: true);
-    final tmp = File('${file.path}.tmp');
+    // Unique tmp name per write: concurrent writers must not fight over the
+    // same tmp file (the loser's rename would fail with "file not found").
+    final tmp = File(
+      '${file.path}.${DateTime.now().microsecondsSinceEpoch}.$pid.tmp',
+    );
     await tmp.writeAsString(_prettyEncoder.convert(value), flush: true);
-    // POSIX rename atomically replaces the destination — no need for a
-    // separate exists()+delete() round-trip.
-    try {
-      await tmp.rename(file.path);
-    } catch (_) {
-      // On Windows rename fails if the target exists; fall back to delete+rename.
-      try { await file.delete(); } catch (_) {}
-      await tmp.rename(file.path);
+    const maxAttempts = 6;
+    for (var attempt = 0;; attempt++) {
+      try {
+        // POSIX rename atomically replaces the destination.
+        await tmp.rename(file.path);
+        return;
+      } on FileSystemException {
+        // Windows: rename fails when the target exists or is transiently
+        // locked (Defender scanning the fresh file, a concurrent reader).
+        // Delete the target and retry with a short backoff so transients
+        // clear (IstiN/yoloit#17 logs: single retry was not enough).
+        if (attempt >= maxAttempts) rethrow;
+        try {
+          await file.delete();
+        } catch (_) {}
+        await Future<void>.delayed(Duration(milliseconds: 25 * (attempt + 1)));
+      }
     }
   }
 
