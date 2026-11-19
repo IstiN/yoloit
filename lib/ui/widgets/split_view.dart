@@ -29,6 +29,9 @@ class HSplitViewController extends ChangeNotifier {
 // ---------------------------------------------------------------------------
 
 /// A simple horizontal split view with a draggable divider.
+///
+/// Pass `initialRightWidth: 0` to use it as a two-pane (left + center)
+/// layout; the hidden side leaves no gap.
 class HSplitView extends StatefulWidget {
   const HSplitView({
     super.key,
@@ -39,6 +42,8 @@ class HSplitView extends StatefulWidget {
     this.initialRightWidth = 360,
     this.minPaneWidth = 160,
     this.controller,
+    this.onLeftWidthChanged,
+    this.onRightWidthChanged,
   });
 
   final Widget left;
@@ -48,6 +53,12 @@ class HSplitView extends StatefulWidget {
   final double initialRightWidth;
   final double minPaneWidth;
   final HSplitViewController? controller;
+
+  /// Called after the user drags the left divider; use to persist the width.
+  final ValueChanged<double>? onLeftWidthChanged;
+
+  /// Called after the user drags the right divider; use to persist the width.
+  final ValueChanged<double>? onRightWidthChanged;
 
   @override
   State<HSplitView> createState() => _HSplitViewState();
@@ -76,6 +87,18 @@ class _HSplitViewState extends State<HSplitView> {
     if (oldWidget.controller != widget.controller) {
       oldWidget.controller?.removeListener(_onControllerChange);
       widget.controller?.addListener(_onControllerChange);
+    }
+    // Controllable pattern: adopt externally changed initial widths (e.g.
+    // after persisting a drag and rebuilding with the stored value).
+    if (oldWidget.initialLeftWidth != widget.initialLeftWidth &&
+        widget.initialLeftWidth != _leftWidth) {
+      _leftWidth = widget.initialLeftWidth;
+      _savedLeftWidth = widget.initialLeftWidth;
+    }
+    if (oldWidget.initialRightWidth != widget.initialRightWidth &&
+        widget.initialRightWidth != _rightWidth) {
+      _rightWidth = widget.initialRightWidth;
+      _savedRightWidth = widget.initialRightWidth;
     }
   }
 
@@ -108,36 +131,54 @@ class _HSplitViewState extends State<HSplitView> {
       builder: (context, constraints) {
         final totalWidth = constraints.maxWidth;
         const dividerWidth = 4.0;
-        const totalDividers = 2 * dividerWidth;
         final effectiveLeft = _leftWidth.clamp(0.0, totalWidth);
         final effectiveRight = _rightWidth.clamp(0.0, totalWidth);
+        final leftVisible = effectiveLeft > 0;
+        final rightVisible = effectiveRight > 0;
+        // Only rendered dividers consume space — a hidden pane must not
+        // leave a gap (two-pane usage with initial*Width: 0).
+        final renderedDividers =
+            (leftVisible ? dividerWidth : 0.0) +
+            (rightVisible ? dividerWidth : 0.0);
+        // Never clamp the center up to minPaneWidth: with two wide panes
+        // that would overflow the Row. minPaneWidth constrains dragging,
+        // not layout.
         final centerWidth =
-            (totalWidth - effectiveLeft - effectiveRight - totalDividers).clamp(
-          widget.minPaneWidth,
-          totalWidth,
-        );
+            (totalWidth -
+                    effectiveLeft -
+                    effectiveRight -
+                    renderedDividers)
+                .clamp(0.0, totalWidth);
 
         return Row(
           children: [
-            if (effectiveLeft > 0) ...[
+            if (leftVisible) ...[
               SizedBox(width: effectiveLeft, child: widget.left),
               _Divider(
                 onDrag: (dx) => setState(() {
                   _leftWidth = (_leftWidth + dx).clamp(
                     widget.minPaneWidth,
-                    totalWidth - _rightWidth - widget.minPaneWidth - totalDividers,
+                    totalWidth -
+                        _rightWidth -
+                        widget.minPaneWidth -
+                        renderedDividers,
                   );
+                  widget.onLeftWidthChanged?.call(_leftWidth);
                 }),
               ),
             ],
             SizedBox(width: centerWidth, child: widget.center),
-            if (effectiveRight > 0) ...[
+            if (rightVisible) ...[
               _Divider(
                 onDrag: (dx) => setState(() {
                   _rightWidth = (_rightWidth - dx).clamp(
                     widget.minPaneWidth,
-                    totalWidth - _leftWidth - widget.minPaneWidth - totalDividers,
+                    totalWidth -
+                        _leftWidth -
+                        widget.minPaneWidth -
+                        renderedDividers,
                   );
+                  widget.onRightWidthChanged?.call(_rightWidth);
                 }),
               ),
               SizedBox(width: effectiveRight, child: widget.right),

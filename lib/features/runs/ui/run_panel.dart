@@ -4,14 +4,18 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:path/path.dart' as p;
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/utils/clipboard_utils.dart';
 import 'package:yoloit/features/runs/bloc/run_cubit.dart';
 import 'package:yoloit/features/runs/bloc/run_state.dart';
 import 'package:yoloit/features/runs/models/run_config.dart';
 import 'package:yoloit/features/runs/models/run_session.dart';
+import 'package:yoloit/features/runs/models/run_worktree_context.dart';
 import 'package:yoloit/features/runs/ui/run_config_dialog.dart';
-
+import 'package:yoloit/features/workspaces/data/worktree_service.dart';
+import 'package:yoloit/features/workspaces/models/worktree_model.dart';
+import 'package:yoloit/ui/widgets/split_view.dart';
 typedef RunPanelDetachToPanelCallback =
     Future<void> Function(RunSession session);
 typedef RunPanelSendToGroupCallback =
@@ -25,6 +29,28 @@ typedef RunPanelSessionVisibilityChanged =
 
 String _stripAnsi(String s) =>
     s.replaceAll(RegExp(r'\x1B\[[\d;]*[A-Za-z]|\x1B[()][0-9A-Z]'), '');
+
+/// Applies the panel-selected worktree to [config] for launching: only the
+/// working directory changes (and only when the config belongs to the same
+/// repository as the worktrees). Returns [config] unchanged when no
+/// worktree is selected or the override does not apply.
+Future<RunConfig> resolveWorktreeLaunch(
+  RunCubit cubit,
+  RunConfig config,
+  String? worktreePath,
+) async {
+  if (worktreePath == null) return config;
+  final workspace = cubit.state.workspacePath ?? Directory.current.path;
+  final repoBase = config.workingDir ?? workspace;
+  final worktrees = await WorktreeService.instance.listWorktrees(repoBase);
+  final resolved = RunWorktreeContext.resolveWorkingDir(
+    config: config,
+    workspacePath: workspace,
+    worktreePath: worktreePath,
+    worktrees: worktrees,
+  );
+  return resolved == repoBase ? config : config.copyWith(workingDir: resolved);
+}
 
 class RunPanel extends StatelessWidget {
   const RunPanel({
@@ -40,6 +66,10 @@ class RunPanel extends StatelessWidget {
     this.onSessionVisibilityChanged,
     this.onDetachToPanel,
     this.onSendToGroup,
+    this.sidebarWidth = 180,
+    this.onSidebarWidthChanged,
+    this.worktreePath,
+    this.onWorktreeChanged,
   });
 
   final String groupId;
@@ -53,6 +83,15 @@ class RunPanel extends StatelessWidget {
   final RunPanelSessionVisibilityChanged? onSessionVisibilityChanged;
   final RunPanelDetachToPanelCallback? onDetachToPanel;
   final RunPanelSendToGroupCallback? onSendToGroup;
+
+  /// Width of the left config-list sidebar (draggable divider).
+  final double sidebarWidth;
+  final ValueChanged<double>? onSidebarWidthChanged;
+
+  /// Selected git worktree path to launch configs from; null = run each
+  /// config from its own working directory (default).
+  final String? worktreePath;
+  final ValueChanged<String?>? onWorktreeChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -71,12 +110,15 @@ class RunPanel extends StatelessWidget {
           onSessionVisibilityChanged: onSessionVisibilityChanged,
           onDetachToPanel: onDetachToPanel,
           onSendToGroup: onSendToGroup,
+          sidebarWidth: sidebarWidth,
+          onSidebarWidthChanged: onSidebarWidthChanged,
+          worktreePath: worktreePath,
+          onWorktreeChanged: onWorktreeChanged,
         );
       },
     );
   }
 }
-
 class _RunPanelView extends StatefulWidget {
   const _RunPanelView({
     required this.state,
@@ -91,6 +133,10 @@ class _RunPanelView extends StatefulWidget {
     this.onSessionVisibilityChanged,
     this.onDetachToPanel,
     this.onSendToGroup,
+    this.sidebarWidth = 180,
+    this.onSidebarWidthChanged,
+    this.worktreePath,
+    this.onWorktreeChanged,
   });
   final RunState state;
   final String groupId;
@@ -104,6 +150,10 @@ class _RunPanelView extends StatefulWidget {
   final RunPanelSessionVisibilityChanged? onSessionVisibilityChanged;
   final RunPanelDetachToPanelCallback? onDetachToPanel;
   final RunPanelSendToGroupCallback? onSendToGroup;
+  final double sidebarWidth;
+  final ValueChanged<double>? onSidebarWidthChanged;
+  final String? worktreePath;
+  final ValueChanged<String?>? onWorktreeChanged;
 
   @override
   State<_RunPanelView> createState() => _RunPanelViewState();
@@ -241,46 +291,49 @@ class _RunPanelViewState extends State<_RunPanelView> {
 
     return Container(
       color: colors.terminalBackground,
-      child: Row(
-        children: [
-          if (widget.showConfigList) ...[
-            // Left: configurations list
-            _ConfigList(
+      child: HSplitView(
+        // Hidden panes get width 0; HSplitView skips them without gaps.
+        initialLeftWidth: widget.showConfigList ? widget.sidebarWidth : 0,
+        initialRightWidth: 0,
+        minPaneWidth: 160,
+        onLeftWidthChanged:
+            widget.showConfigList
+                ? (w) => widget.onSidebarWidthChanged?.call(w)
+                : null,
+        left: _ConfigList(
+          state: scopedState,
+          groupId: group,
+          onGroupChanged: widget.onGroupChanged,
+          showGroupControls: widget.showGroupControls,
+          onAttachSession: _attachSession,
+          worktreePath: widget.worktreePath,
+          onWorktreeChanged: widget.onWorktreeChanged,
+        ),
+        center: Column(
+          children: [
+            _ConsoleHeader(
               state: scopedState,
-              groupId: group,
+              allSessions: state.sessions,
+              allConfigs: state.configs,
+              currentGroup: group,
+              showSessionTabs: widget.showSessionTabs,
               onGroupChanged: widget.onGroupChanged,
-              showGroupControls: widget.showGroupControls,
               onAttachSession: _attachSession,
+              onSessionVisibilityChanged: widget.onSessionVisibilityChanged,
+              onDetachToPanel: widget.onDetachToPanel,
+              onSendToGroup: widget.onSendToGroup,
+              scrollController: _scrollController,
             ),
-            Container(width: 1, color: colors.divider),
+            Expanded(
+              child: _Console(
+                state: scopedState,
+                scrollController: _scrollController,
+                worktreePath: widget.worktreePath,
+              ),
+            ),
           ],
-          // Right: session tabs + console output
-          Expanded(
-            child: Column(
-              children: [
-                _ConsoleHeader(
-                  state: scopedState,
-                  allSessions: state.sessions,
-                  allConfigs: state.configs,
-                  currentGroup: group,
-                  showSessionTabs: widget.showSessionTabs,
-                  onGroupChanged: widget.onGroupChanged,
-                  onAttachSession: _attachSession,
-                  onSessionVisibilityChanged: widget.onSessionVisibilityChanged,
-                  onDetachToPanel: widget.onDetachToPanel,
-                  onSendToGroup: widget.onSendToGroup,
-                  scrollController: _scrollController,
-                ),
-                Expanded(
-                  child: _Console(
-                    state: scopedState,
-                    scrollController: _scrollController,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+        ),
+        right: const SizedBox.shrink(),
       ),
     );
   }
@@ -1102,12 +1155,19 @@ class _ConfigList extends StatelessWidget {
     this.onGroupChanged,
     this.showGroupControls = true,
     this.onAttachSession,
+    this.worktreePath,
+    this.onWorktreeChanged,
   });
   final RunState state;
   final String groupId;
   final ValueChanged<String>? onGroupChanged;
   final bool showGroupControls;
   final ValueChanged<String>? onAttachSession;
+
+  /// Selected worktree path to launch configs from (null = each config's
+  /// own working directory).
+  final String? worktreePath;
+  final ValueChanged<String?>? onWorktreeChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -1133,31 +1193,34 @@ class _ConfigList extends StatelessWidget {
       }
     }
 
-    return SizedBox(
-      width: 180,
-      child: Column(
-        children: [
-          _buildHeader(context, groupLabel),
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.only(bottom: 4),
-              children: [
-                ...state.configs.map(
-                  (c) => _configItemFor(
-                    context,
-                    cubit,
-                    c,
-                    runningByConfig,
-                    stoppedByConfig,
-                  ),
+    // The surrounding HSplitView sizes this pane; width comes from there.
+    return Column(
+      children: [
+        _buildHeader(context, groupLabel),
+        _WorktreeSelector(
+          state: state,
+          selectedPath: worktreePath,
+          onChanged: onWorktreeChanged,
+        ),
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.only(bottom: 4),
+            children: [
+              ...state.configs.map(
+                (c) => _configItemFor(
+                  context,
+                  cubit,
+                  c,
+                  runningByConfig,
+                  stoppedByConfig,
                 ),
-                _buildAddConfigTile(context, cubit, colors),
-                ..._sessionSection(context, cubit, sessionsByConfig),
-              ],
-            ),
+              ),
+              _buildAddConfigTile(context, cubit, colors),
+              ..._sessionSection(context, cubit, sessionsByConfig),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -1245,7 +1308,7 @@ class _ConfigList extends StatelessWidget {
           cubit.restartSession(stoppedSession.id);
           onAttachSession?.call(stoppedSession.id);
         } else {
-          cubit.startRun(c).then((started) {
+          _startInWorktree(context, cubit, c).then((started) {
             if (started != null) {
               onAttachSession?.call(started.id);
             }
@@ -1263,6 +1326,19 @@ class _ConfigList extends StatelessWidget {
       },
       onDelete: () => cubit.removeConfig(c.id),
     );
+  }
+
+  /// Starts [config] from the panel-selected worktree when one is chosen
+  /// and the config belongs to the same repository; otherwise starts it
+  /// unchanged. Only the working directory differs — command/env are the
+  /// config's own.
+  Future<RunSession?> _startInWorktree(
+    BuildContext context,
+    RunCubit cubit,
+    RunConfig config,
+  ) async {
+    final effective = await resolveWorktreeLaunch(cubit, config, worktreePath);
+    return cubit.startRun(effective);
   }
 
   Widget _buildAddConfigTile(
@@ -1519,6 +1595,216 @@ class _SessionGroup extends StatelessWidget {
     return '$hh:$mm';
   }
 }
+// ── Worktree launch-context selector ─────────────────────────────────────────
+
+/// Picker for the git worktree that run configs launch from. Shown under the
+/// CONFIGURATIONS header; the selected entry is highlighted, `root` means
+/// each config runs from its own working directory (no override).
+class _WorktreeSelector extends StatefulWidget {
+  const _WorktreeSelector({
+    required this.state,
+    this.selectedPath,
+    this.onChanged,
+  });
+  final RunState state;
+  final String? selectedPath;
+  final ValueChanged<String?>? onChanged;
+
+  @override
+  State<_WorktreeSelector> createState() => _WorktreeSelectorState();
+}
+
+class _WorktreeSelectorState extends State<_WorktreeSelector> {
+  List<WorktreeEntry>? _entries;
+
+  @override
+  void initState() {
+    super.initState();
+    _reload();
+  }
+
+  void _reload() {
+    final base = widget.state.configs
+            .map((c) => c.workingDir)
+            .firstWhere((d) => d != null, orElse: () => null) ??
+        widget.state.workspacePath;
+    if (base == null) {
+      setState(() => _entries = const []);
+      return;
+    }
+    WorktreeService.instance.listWorktrees(base).then((entries) {
+      if (mounted) setState(() => _entries = entries);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final entries = _entries;
+    // Hide while loading, and when the repo has no extra worktrees at all
+    // (nothing to choose) unless a stale selection needs to be visible.
+    if (entries == null ||
+        (entries.where((w) => !w.isMain).isEmpty &&
+            widget.selectedPath == null)) {
+      return const SizedBox.shrink();
+    }
+    final selected = widget.selectedPath;
+    final isDefault = selected == null;
+    final label = isDefault
+        ? 'root: ${RunWorktreeContext.labelFor(null, entries)}'
+        : RunWorktreeContext.labelFor(selected, entries);
+    final activeColor = isDefault ? colors.textMuted : colors.primary;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(4),
+        onTap: widget.onChanged == null ? null : _showMenu,
+        child: Container(
+          height: 24,
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          decoration: BoxDecoration(
+            color: isDefault
+                ? colors.surfaceElevated
+                : colors.primary.withAlpha(28),
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(
+              color: isDefault ? colors.border : colors.primary.withAlpha(90),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.account_tree_outlined,
+                size: 12,
+                color: activeColor,
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 10, color: activeColor),
+                ),
+              ),
+              Icon(
+                Icons.arrow_drop_down,
+                size: 14,
+                color: activeColor,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showMenu() {
+    final entries = _entries!;
+    final main = entries.firstWhere(
+      (w) => w.isMain,
+      orElse: () => entries.first,
+    );
+    final renderBox = context.findRenderObject()! as RenderBox;
+    final anchor = renderBox.localToGlobal(Offset.zero) & renderBox.size;
+    final colors = context.appColors;
+
+    final selected = widget.selectedPath;
+    String? normalize(String? path) =>
+        path == null ? null : p.normalize(path);
+
+    showMenu<String?>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        anchor.left,
+        anchor.bottom + 2,
+        anchor.right,
+        anchor.bottom,
+      ),
+      items: [
+        _worktreeMenuItem(
+          label: 'root: ${main.branch ?? p.basename(main.path)}',
+          subtitle: main.path,
+          checked: selected == null,
+          highlight: false,
+          colors: colors,
+          value: null,
+        ),
+        for (final w in entries.where((w) => !w.isMain))
+          _worktreeMenuItem(
+            label: w.branch ?? p.basename(w.path),
+            subtitle: w.path,
+            checked: normalize(w.path) == normalize(selected),
+            highlight: true,
+            colors: colors,
+            value: w.path,
+          ),
+      ],
+    ).then((value) {
+      // Menu dismissal without selection also yields null — only clear the
+      // selection when the user actually picked the root item while a
+      // worktree was selected.
+      if (!mounted || widget.onChanged == null) return;
+      if (value != null) {
+        widget.onChanged!(value);
+      } else if (selected != null) {
+        widget.onChanged!(null);
+      }
+    });
+  }
+
+  PopupMenuItem<String?> _worktreeMenuItem({
+    required String label,
+    required String subtitle,
+    required bool checked,
+    required bool highlight,
+    required AppColorScheme colors,
+    required String? value,
+  }) {
+    return PopupMenuItem<String?>(
+      value: value,
+      child: Row(
+        children: [
+          Icon(
+            checked ? Icons.check_circle : Icons.circle_outlined,
+            size: 14,
+            color:
+                checked
+                    ? (highlight ? colors.primary : colors.textMuted)
+                    : colors.border,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color:
+                        highlight && checked
+                            ? colors.primary
+                            : colors.textMuted,
+                    fontWeight:
+                        checked ? FontWeight.w600 : FontWeight.normal,
+                  ),
+                ),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 9, color: colors.textMuted),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class _ConfigItem extends StatefulWidget {
   const _ConfigItem({
@@ -1702,9 +1988,14 @@ class _SmallIconButton extends StatelessWidget {
 // ── Console Output ───────────────────────────────────────────────────────────
 
 class _Console extends StatefulWidget {
-  const _Console({required this.state, required this.scrollController});
+  const _Console({
+    required this.state,
+    required this.scrollController,
+    this.worktreePath,
+  });
   final RunState state;
   final ScrollController scrollController;
+  final String? worktreePath;
 
   @override
   State<_Console> createState() => _ConsoleState();
@@ -1743,6 +2034,7 @@ class _ConsoleState extends State<_Console> {
       return _EmptyConsole(
         hasWorkspace: widget.state.workspacePath != null,
         configs: widget.state.configs,
+        worktreePath: widget.worktreePath,
       );
     }
 
@@ -1929,10 +2221,14 @@ class _FullLogView extends StatelessWidget {
 }
 
 class _EmptyConsole extends StatelessWidget {
-  const _EmptyConsole({required this.hasWorkspace, required this.configs});
-
+  const _EmptyConsole({
+    required this.hasWorkspace,
+    required this.configs,
+    this.worktreePath,
+  });
   final bool hasWorkspace;
   final List<RunConfig> configs;
+  final String? worktreePath;
 
   @override
   Widget build(BuildContext context) {
@@ -1988,7 +2284,14 @@ class _EmptyConsole extends StatelessWidget {
                           .map(
                             (c) => _RunQuickButton(
                               config: c,
-                              onTap: () => cubit.startRun(c),
+                              onTap: () async {
+                                final effective = await resolveWorktreeLaunch(
+                                  cubit,
+                                  c,
+                                  worktreePath,
+                                );
+                                await cubit.startRun(effective);
+                              },
                             ),
                           )
                           .toList(),

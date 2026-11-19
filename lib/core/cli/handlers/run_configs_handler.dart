@@ -195,6 +195,7 @@ class RunConfigsCliHandler extends PanelCliHandler {
       final session = await RunBridge.instance.startConfig(
         args['id'] as String? ?? args['name'] as String?,
         actionGroup,
+        args['worktreePath'] as String?,
       );
       return CliActionResult(
         message: 'Running "${session.config.name}"',
@@ -449,6 +450,8 @@ class RunConfigsCliHandler extends PanelCliHandler {
         'id': 'Configuration ID',
         'name': 'Configuration name (alternative to id)',
         'group': 'Group scope override (optional)',
+        'worktreePath':
+            'Git worktree path to launch from (optional; overrides the config working directory when the config belongs to that repo)',
       },
     ),
     'stop': const CliActionHelp(

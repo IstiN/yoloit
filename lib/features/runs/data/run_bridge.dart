@@ -4,6 +4,8 @@ import 'package:yoloit/features/runs/bloc/run_cubit.dart';
 import 'package:yoloit/features/runs/bloc/run_state.dart';
 import 'package:yoloit/features/runs/models/run_config.dart';
 import 'package:yoloit/features/runs/models/run_session.dart';
+import 'package:yoloit/features/runs/models/run_worktree_context.dart';
+import 'package:yoloit/features/workspaces/data/worktree_service.dart';
 
 /// Shared bridge to the real run backend.
 ///
@@ -101,7 +103,11 @@ class RunBridge {
     return persisted;
   }
 
-  Future<RunSession> startConfig([String? identifier, String? group]) async {
+  Future<RunSession> startConfig([
+    String? identifier,
+    String? group,
+    String? worktreePath,
+  ]) async {
     final config = findConfig(identifier, group);
     if (config == null) {
       throw StateError('Run configuration not found');
@@ -111,7 +117,15 @@ class RunBridge {
     if (effectiveWorkspace == null || effectiveWorkspace.trim().isEmpty) {
       throw StateError('Run workspace is not initialized');
     }
-    final started = await _requireCubit.startRun(config);
+    final effective =
+        worktreePath == null || worktreePath.trim().isEmpty
+            ? config
+            : await resolveWorktreeLaunchConfig(
+              config,
+              worktreePath.trim(),
+              effectiveWorkspace,
+            );
+    final started = await _requireCubit.startRun(effective);
     if (started != null) return started;
     throw StateError('Run session was not created');
   }
@@ -242,4 +256,23 @@ class RunBridge {
             )
             .toList(),
   };
+}
+
+/// Applies a worktree launch override to [config] for one-off CLI runs:
+/// only the working directory changes, and only when the config's directory
+/// belongs to the same repository as the worktrees.
+Future<RunConfig> resolveWorktreeLaunchConfig(
+  RunConfig config,
+  String worktreePath,
+  String workspacePath,
+) async {
+  final repoBase = config.workingDir ?? workspacePath;
+  final worktrees = await WorktreeService.instance.listWorktrees(repoBase);
+  final resolved = RunWorktreeContext.resolveWorkingDir(
+    config: config,
+    workspacePath: workspacePath,
+    worktreePath: worktreePath,
+    worktrees: worktrees,
+  );
+  return resolved == repoBase ? config : config.copyWith(workingDir: resolved);
 }

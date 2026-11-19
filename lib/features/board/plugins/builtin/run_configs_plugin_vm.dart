@@ -5,6 +5,16 @@ import 'package:yoloit/features/board/plugins/builtin/run_configs_plugin_base.da
 import 'package:yoloit/features/mindmap/widgets/canvas_interaction_lock.dart';
 import 'package:yoloit/features/runs/ui/run_panel.dart';
 
+/// Panel-state keys persisted per Run Configs panel.
+abstract final class RunConfigsPanelStateKeys {
+  /// Width of the left config-list sidebar (user-draggable divider).
+  static const sidebarWidth = 'sidebarWidth';
+
+  /// Selected git worktree path to launch configs from; absent/null = run
+  /// each config from its own working directory.
+  static const worktreePath = 'runWorktreePath';
+}
+
 class RunConfigsPlugin extends RunConfigsPluginBase {
   const RunConfigsPlugin();
 
@@ -94,6 +104,18 @@ class _RunPluginBody extends StatelessWidget {
             : fallbackGroupId;
     final activeSessionId = panel.state['activeSessionId'] as String?;
     final hiddenSessionIds = _readHiddenSessionIds(panel);
+    final rawSidebarWidth =
+        panel.state[RunConfigsPanelStateKeys.sidebarWidth];
+    final sidebarWidth =
+        rawSidebarWidth is num
+            ? rawSidebarWidth.toDouble().clamp(120.0, 600.0)
+            : 180.0;
+    final rawWorktreePath =
+        panel.state[RunConfigsPanelStateKeys.worktreePath];
+    final worktreePath =
+        rawWorktreePath is String && rawWorktreePath.trim().isNotEmpty
+            ? rawWorktreePath.trim()
+            : null;
 
     return ScrollableCardMarker(
       child: ScrollableCardRegion(
@@ -104,6 +126,8 @@ class _RunPluginBody extends StatelessWidget {
           showSessionTabs: showSessionTabs,
           initialAttachedSessionId: activeSessionId,
           hiddenSessionIds: hiddenSessionIds,
+          sidebarWidth: sidebarWidth,
+          worktreePath: worktreePath,
           onGroupChanged: (next) {
             renderContext.onUpdateState({...panel.state, 'group': next.trim()});
           },
@@ -113,6 +137,26 @@ class _RunPluginBody extends StatelessWidget {
               'activeSessionId': sessionId,
             });
           },
+          onSidebarWidthChanged: showConfigList
+              ? (width) {
+                  renderContext.onUpdateState({
+                    ...panel.state,
+                    RunConfigsPanelStateKeys.sidebarWidth:
+                        double.parse(width.toStringAsFixed(1)),
+                  });
+                }
+              : null,
+          onWorktreeChanged: showConfigList
+              ? (path) {
+                  final next = <String, Object?>{...panel.state};
+                  if (path == null) {
+                    next.remove(RunConfigsPanelStateKeys.worktreePath);
+                  } else {
+                    next[RunConfigsPanelStateKeys.worktreePath] = path;
+                  }
+                  renderContext.onUpdateState(next);
+                }
+              : null,
           onSessionVisibilityChanged: (sessionId, hidden) {
             final nextHidden = <String>{...hiddenSessionIds};
             if (hidden) {
