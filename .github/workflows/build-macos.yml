@@ -246,32 +246,31 @@ jobs:
           echo "Build info generated:"
           cat lib/core/services/build_info.dart
 
-      - name: Import macOS signing certificate
+      # ci-sign model v3 (flutter_agent_harness PR #1944, yoclip gh-1865
+      # port): one PERSISTENT host keychain (ci-signing.keychain-db)
+      # provisioned by ~/bin/ci-sign — no per-job keychains, no
+      # user-default keychain flips, no search-list writes (that model
+      # popped SecurityAgent dialogs on the shared runner host and was
+      # removed from yoclip; yoloit is the last straggler).
+      - name: Provision signing via ci-sign (persistent host keychain)
         id: signing
         env:
           MACOS_CERTIFICATE_P12_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
           MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
-          MACOS_KEYCHAIN_PASSWORD: ${{ secrets.MACOS_KEYCHAIN_PASSWORD }}
-          MACOS_CERTIFICATE_ID: ${{ secrets.MACOS_CERTIFICATE_ID }}
+          CI_SIGN_P12_B64_ENV: MACOS_CERTIFICATE_P12_BASE64
+          CI_SIGN_P12_PASSWORD_ENV: MACOS_CERTIFICATE_PASSWORD
         run: |
           if [ -z "$MACOS_CERTIFICATE_P12_BASE64" ]; then
             echo "⚠️  No signing certificate found — building unsigned (development only)"
             echo "signed=false" >> $GITHUB_OUTPUT
           else
-            echo "✅ Signing certificate found — importing..."
-            security delete-keychain build.keychain 2>/dev/null || true
-            security create-keychain -p "$MACOS_KEYCHAIN_PASSWORD" build.keychain
-            security default-keychain -s build.keychain
-            security unlock-keychain -p "$MACOS_KEYCHAIN_PASSWORD" build.keychain
-            security set-keychain-settings -t 3600 -u build.keychain
-            security list-keychains -d user -s build.keychain ~/Library/Keychains/login.keychain-db
-
-            echo "$MACOS_CERTIFICATE_P12_BASE64" | base64 --decode > certificate.p12
-            security import certificate.p12 -k build.keychain \
-              -P "$MACOS_CERTIFICATE_PASSWORD" \
-              -T /usr/bin/codesign \
-              -T /usr/bin/productbuild
-            security set-key-partition-list -S apple-tool:,apple: -s -k "$MACOS_KEYCHAIN_PASSWORD" build.keychain
+            echo "✅ Signing certificate found — provisioning via ci-sign..."
+            ~/bin/ci-sign install yoloit-macos
+            CERT_SHA1=$(~/bin/ci-sign sha1 yoloit-macos)
+            CERT_NAME=$(~/bin/ci-sign name yoloit-macos)
+            echo "identity_name=$CERT_NAME" >> $GITHUB_OUTPUT
+            echo "identity_sha1=$CERT_SHA1" >> $GITHUB_OUTPUT
+            echo "yoloit: signing identity pinned by SHA-1: $CERT_NAME ($CERT_SHA1)"
             echo "signed=true" >> $GITHUB_OUTPUT
           fi
 
@@ -313,7 +312,7 @@ jobs:
         id: package
         env:
           SIGNED: ${{ steps.signing.outputs.signed }}
-          MACOS_CERTIFICATE_ID: ${{ secrets.MACOS_CERTIFICATE_ID }}
+          MACOS_CERTIFICATE_ID: ${{ steps.signing.outputs.identity_name }}
           VERSION: ${{ needs.version.outputs.version }}
         run: |
           ARCH="${{ matrix.arch }}"
@@ -452,11 +451,13 @@ jobs:
             ${{ steps.package.outputs.manifest_name }}
           retention-days: 14
 
-      - name: Cleanup keychain
+      # The persistent ci-signing keychain is host infrastructure —
+      # NEVER delete it from a job (the old cleanup removed the keychain
+      # a user-default flip had made global, leaving the Mac prompting
+      # for a missing keychain).
+      - name: Cleanup temp files
         if: always()
-        run: |
-          security delete-keychain build.keychain 2>/dev/null || true
-          rm -f certificate.p12
+        run: rm -f certificate.p12
 
   release-macos:
     name: Create macOS GitHub Release
